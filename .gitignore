@@ -1,0 +1,10 @@
+# The built site and the resolved environment
+site/build/
+Manifest.toml
+# Drawn by site/diagrams.jl on every build, never committed
+site/src/assets/landing/icon.svg
+site/src/assets/landing/icon_dark.svg
+site/src/assets/landing/favicon.png
+site/src/assets/landing/avatar.png
+# Local build notes
+REPORT-landing.md
