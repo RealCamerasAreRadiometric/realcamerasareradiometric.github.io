@@ -10,7 +10,7 @@ hero:
   image:
     src: /assets/landing/logo.svg
     dark: /assets/landing/logo_dark.svg
-    alt: The image circle of a lens, darker towards its rim, with the rays of an aperture meeting in a point on a curved focus surface.
+    alt: The radiometric camera of a fisheye lens in a cross-section. The rays from a sensor point through the aperture meet in a point on a curved focus surface and spread onto the scene.
   actions:
     - theme: brand
       text: Paper (coming soon)
