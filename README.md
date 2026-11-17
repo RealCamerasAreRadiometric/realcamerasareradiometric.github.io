@@ -1,10 +1,11 @@
 # Real Cameras are Radiometric — project page
 
-The landing page of the CVPR 2027 paper *Real Cameras are Radiometric*, served at
+The landing page of the paper *Real Cameras are Radiometric*, served at
 <https://realcamerasareradiometric.github.io>. It is a Documenter site with the
 DocumenterLandingPage plugin, in `site/`:
 
-- `site/src/index.md` — the page (hero frontmatter, abstract, BibTeX);
+- `site/src/index.md` — the page (hero frontmatter, abstract, method, results, BibTeX);
+- `site/src/assets/landing/logo.svg`, `logo_dark.svg` — the hero logo (committed);
 - `site/diagrams.jl` — draws the icon (`icon.svg`, `icon_dark.svg`, `favicon.png`,
   `avatar.png`) into `site/src/assets/landing/` on every build, from the measured
   image circle and vignetting of the fisheye; the files are not committed;

@@ -7,7 +7,7 @@ include(joinpath(@__DIR__, "diagrams.jl"))
 write_icons(joinpath(@__DIR__, "src", "assets", "landing"))
 
 makedocs(;
-    authors="Authors to be announced",
+    authors="Ties Harder, Felix Seegräber, Hendrik Sauer, David Nakath, Kevin Köser, James Pritts",
     sitename="Real Cameras are Radiometric",
     repo=Remotes.GitHub("RealCamerasAreRadiometric", "realcamerasareradiometric.github.io"),
     format=Documenter.HTML(;

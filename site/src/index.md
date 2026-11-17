@@ -3,72 +3,121 @@
 layout: home
 hero:
   name: Real Cameras are Radiometric
-  text: A radiometric camera model for calibration by inverse rendering
+  text: Lifting geometric camera models to radiometric ones
   tagline: |-
-    Authors to be announced
-    CVPR 2027 (under review)
+    Ties Harder, Felix Seegräber, Hendrik Sauer, David Nakath, Kevin Köser, James Pritts
+    Preprint, 2026
   image:
-    src: /assets/landing/icon.svg
-    dark: /assets/landing/icon_dark.svg
-    alt: The image circle of a fisheye lens, its brightness falling off towards the rim, under the faint lattice of a calibration grid.
+    src: /assets/landing/logo.svg
+    dark: /assets/landing/logo_dark.svg
+    alt: The image circle of a lens, darker towards its rim, with the rays of an aperture meeting in a point on a curved focus surface.
   actions:
     - theme: brand
-      text: Paper
-      link: "#"
+      text: Paper (coming soon)
+      link: "#Paper"
+    - theme: alt
+      text: Code (coming soon)
+      link: "#Code-and-documentation"
+    - theme: alt
+      text: Docs (coming soon)
+      link: "#Code-and-documentation"
     - theme: alt
       text: BibTeX
-      link: "#BibTeX"
-    - theme: alt
-      text: VisualGeometryToolkit
-      link: https://github.com/VisualGeometryToolkit
+      link: "#Citation"
 features:
   - icon: 📷
-    title: One radiometric camera around a geometric model
-    details: The model extends the classical pinhole model by a lens and an aperture to capture the radiometric properties of real cameras — vignetting, defocus and distortion.
+    title: Any central camera, lifted
+    details: The radiometric camera keeps the projection of a geometric model — Brown–Conrady, OpenCV, Kannala–Brandt, Double Sphere or a generic spline — and adds a finite aperture, a free-form focus surface and a generic vignetting function.
   - icon: 🔁
-    title: Calibration by inverse rendering
-    details: Radiometric and geometric camera parameters are inferred by inverse rendering of real images, from the light energy the sensor measures rather than from features found by a detector.
+    title: Calibrated by inverse rendering
+    details: The camera is calibrated on the RAW photosites of the same images of standard targets that a geometric calibration uses, without a feature detector, by a maximum-likelihood fit of rendered to measured radiant flux.
   - icon: 🎯
-    title: Detector biases revealed
-    details: The evaluation reveals systematic biases in the AprilGrid and Siemens-star detectors used by today's calibration tools, and the method outperforms the state of the art in geometric calibration accuracy.
+    title: More accurate, and physically meaningful
+    details: The calibrated cameras have lower reprojection errors on a held-out high-precision target, their vignetting reproduces a measured flat field, and their focus surfaces recover sharp texture from defocused images.
 ---
 ```
 
 ```@raw html
-<!-- AUTHORS: owner to supply the author list and affiliation before publishing -->
-<!-- PAPER: the arXiv URL goes in the "Paper" action above (link: "#") and in the BibTeX below -->
+<!-- PAPER: the arXiv URL goes in the "Paper" action above and in the Paper and Citation sections below -->
 ```
 
-<!-- TEASER: the paper's detector-bias figure goes here after the CVPR decision (owner, 2026-11-10) -->
+<!-- TEASER: the paper's figures go here later (owner, 2026-11-10) -->
+
+A camera model with an aperture, a focus surface and a vignetting function around any central geometric model, calibrated from the light the sensor measures.
 
 ## Abstract
 
-The pinhole camera model has been proven extremely useful for 3D computer vision based on
-geometric primitives such as points, lines or conics. Real cameras however do not
-directly measure the position of such primitives. Rather, the geometric pinhole paradigm
-requires an intermediate step that searches the direct light energy signal collected by
-the sensor (the image) for discrete primitives, e.g. a feature detector. These detectors
-can be biased, fail under certain conditions, and converting the original photon/sensor
-noise to some “feature uncertainty” is challenging. Inspired by forward models from
-computer graphics and direct SLAM methods, we propose a novel camera model for computer
-vision that extends the classical pinhole model by a lens and aperture in order to
-capture radiometric properties of real cameras. We demonstrate that the model can be
-employed in inverse rendering approaches to infer radiometric and geometric camera
-parameters from real images of different lenses that exhibit vignetting, defocus, a
-capability that current differentiable rendering frameworks are lacking, and argue that
-the model could be used for many other vision and photogrammetry problems with real
-lenses. Besides outperforming the state-of-the-art in geometric calibration accuracy
-(and yielding vignetting & depth-of-field calibration on top), our evaluation also
-reveals systematic biases in april(-grid) and siemens star detectors as commonly
-employed in today's calibration tools.
+We propose the radiometric camera, a model that lifts any central geometric camera model
+to a radiometric one. The lifted model keeps the projection of the geometric model and
+adds a finite aperture, a free-form focus surface and a generic vignetting function. We
+calibrate it by inverse rendering directly on the relative irradiance of the sensor, from
+the same images of standard calibration targets used in geometric calibration. Geometric
+calibration absorbs the bias of its feature detections. The proposed radiometric
+calibration uses no features, and our radiometric cameras have lower reprojection errors
+on held-out test sets. The focus surface extends defocus modeling from the thin lens to
+any central camera, and we use it in a first multi-view radiometric reconstruction, which
+recovers the in-focus reflectance of a texture from defocused images. The vignetting is
+estimated jointly and accurately reproduces a flat field measured through a diffuser.
+Because every standard camera model lifts to a radiometric one, the radiometric camera
+naturally and directly extends generative scene models beyond multi-view geometry to
+multi-view radiometric ones, where phenomena such as lighting and attenuation can be
+accurately estimated.
 
-## BibTeX
+## Method
+
+A geometric camera model maps a sensor point to one ray through its center of projection.
+The radiometric camera keeps that mapping and replaces the pinhole by an aperture:
+
+- **Aperture and focus surface.** The rays from a sensor point through all points of the
+  aperture meet in one point of focus. These points form a free-form focus surface, which
+  is learned: close to a plane for a wide-angle lens, close to a sphere for a fisheye.
+  With a pinhole aperture, the model is the geometric model it started from.
+- **Vignetting.** A generic radial function about the principal point replaces the
+  cos⁴ falloff of the thin lens, which real lenses do not follow.
+- **Calibration.** The images of a calibration target are rendered and fitted to the RAW
+  photosites under the noise model of the sensor. The formulation has no boundary terms,
+  so every parameter of the camera, including the aperture radius and the focus surface,
+  is differentiable, and its gauge freedoms are removed by the parameterization.
+
+## Results
+
+- **Geometric accuracy.** On a held-out high-precision target, the radiometric refinement
+  lowers the median reprojection error significantly for 82 % of 28 combinations of
+  camera model, lens and calibration target, and the 95th percentile for all of them.
+- **Vignetting.** The learned vignetting follows a measured flat field for three lenses,
+  with an RMS deviation of 0.009 to 0.042 of the value at the principal point, against
+  0.059 to 0.244 for the cos⁴ falloff.
+- **Defocus.** Modeling the aperture and the focus surface lowers the median reprojection
+  error by 25 % and 16 % against the same refinement with a pinhole aperture.
+- **A first multi-view radiometric reconstruction.** From defocused images of a printed
+  page, the radiometric camera recovers sharp text where a pinhole camera returns the
+  blur of the images.
+
+## Paper
+
+Coming soon.
+
+## Code and documentation
+
+Coming soon. The calibration is built on the
+[VisualGeometryToolkit](https://github.com/VisualGeometryToolkit).
+
+## Data
+
+Coming soon: the RAW images and the configurations of every experiment.
+
+## Related projects
+
+- [BlobBoards](https://blobboards.github.io): robust markers for accurate pose.
+- [VisualGeometryToolkit](https://github.com/VisualGeometryToolkit): the geometry stack
+  this work is built on.
+
+## Citation
 
 ```bibtex
-@inproceedings{realcameras2027,
-  author    = {Authors to be announced},
-  title     = {Real Cameras are Radiometric},
-  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year      = {2027},
+@misc{realcameras2026,
+  author = {Harder, Ties and Seegr{\"a}ber, Felix and Sauer, Hendrik and Nakath, David and K{\"o}ser, Kevin and Pritts, James},
+  title  = {Real Cameras are Radiometric},
+  year   = {2026},
 }
 ```
