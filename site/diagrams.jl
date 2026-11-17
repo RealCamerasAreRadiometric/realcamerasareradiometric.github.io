@@ -34,7 +34,7 @@ const GRID = (35, 25)
 # channel, all cells, normalized to the 0–10° ring), against the equisolid field
 # angle θ about the image-circle centre, on the rings `V_EDGES` (degrees). Read
 # with plain JSON from
-#   /home/jbpritts/data/rc-cvpr2027/vignetting/results/logs/fit/rotation_vignetting.json
+#   <data root>/vignetting/results/logs/fit/rotation_vignetting.json
 #   (fits.all_G.V, ring_edges), the rooftop rotation sequence DSC00456–DSC00465
 # and copied here so the site builds without the private data. The samples
 # reach θ = 68.3°; the rings beyond are unmeasured (NaN in the file).
