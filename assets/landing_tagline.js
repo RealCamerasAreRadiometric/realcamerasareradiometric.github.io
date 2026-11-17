@@ -1,10 +1,9 @@
-// Links the names and the venue in the landing hero's author block. DocumenterLandingPage
+// Links the names in the landing hero's author block. DocumenterLandingPage
 // renders the hero tagline as plain escaped text, so the links are added here,
 // on load; without JavaScript the block reads the same, unlinked.
 // AUTHORS: add each author's (and affiliation's) page here once index.md names them.
 (function () {
   var LINKS = {
-      "CVPR 2027": "https://cvpr.thecvf.com/"
   };
   function linkify() {
     var el = document.querySelector(".landing-tagline");
