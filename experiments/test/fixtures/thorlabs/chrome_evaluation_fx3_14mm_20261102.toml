@@ -1,0 +1,38 @@
+# TEST FIXTURE (2026-11-05): the FX3 green-photosite decode of 2026-11-02, retired from configs/experiments; test/chrome_evaluation_tests.jl exercises the prepare stage on it.
+# Config of record of the chrome evaluation experiment on the Sony ILME-FX3 with the Sigma 14 mm lens (its EXIF LensModel reads
+# "DT 14mm F2.8 SAM"; the maker is Sigma, by the owner's record)
+# (scripts/chrome_evaluation.jl --config=configs/experiments/chrome_evaluation_fx3_14mm_20261102.toml): the Thorlabs R3L3S7N1 negative grid
+# distortion target of configs/experiments/chrome_evaluation.toml (17 × 17 clear 0.500 mm dots at 5.000 mm on chrome-coated
+# soda-lime glass; the maker's dimensions to ±0.005 mm) photographed 111 times on 2026-11-02 (f/22, 1/4 s, ISO 100; 14-bit ARW,
+# 4256 × 2848), in the session that also shot the Siemens stars and the AprilGrid with the same lens (tier rc_fx3_14mm). Not the 27.10 capture of chrome_evaluation_fx3_14mm.toml.
+#
+# The calibration reads the GREEN photosites only, as the sensor recorded them: stage prepare decodes each raw in mode "green"
+# (src/drivers.jl RAW_MODES — the green photosites on the raw's grid, nothing interpolated, and their mask, which marks the green
+# photosites at the sensor's white level: the brightest pixels of the dots clip in these exposures, ~2300–2800 green photosites a
+# frame). Stage detect (to come: its per-photograph integration_sigma is measured, as for the HX400V) reads the RAW mosaics, image "raw_green" (the green cells retired, RC 0.10.2).
+#
+# Not recorded with the capture, so not assumed here: the light behind the target, the side of the glass facing the camera
+# (refraction through the glass or not), the camera's motion between frames (a rotation about one point or not).
+#
+# Paths are relative to data_root(): VGTK_DATA_ROOT, data/exp_raw, or the artifact view of the tiers of configs/data_artifacts.toml
+# (scripts/fetch_data.jl; data/README.md). Each input's `tier` is a tier of that catalog.
+
+[experiment]
+name = "chrome_evaluation"
+
+# ---- the inputs (data_root()-relative), each with the stage that requires it and how it was made -------------------------------
+[inputs.raw]
+tier = "rc_fx3_14mm"
+path = "geometric_accuracy/data/fx3-14mm-20261102/raw/thorlabs_r3l3s7n1"
+stage = "prepare"
+provenance = "the 111 raw photographs DSC05464.ARW … DSC05576.ARW of the Thorlabs R3L3S7N1 target (Sony ILME-FX3, Sigma 14 mm lens — EXIF \"DT 14mm F2.8 SAM\", f/22, 1/4 s, ISO 100, 14-bit ARW 4256 x 2848), captured on 2026-11-02 10:22–10:39; the camera's files as uploaded to radiometric-camera/radiometric-camera-data 02.11.26/14mm/chrome/ (revision 09d714b32fbaae894769ccaa92028f450a94224c), sha256 in raw.sha256 of the tier"
+
+# ---- stage prepare: the raws decoded -------------------------------------------------------------------------------------------
+# mode "bin2" (a test fixture, 2026-11-16: the green cells, its "green" until then, are retired for geometry): a decoding of stage
+# prepare, stated here rather than left to the decoder's default.
+# gain 1.0: 1.0 is the sensor's white level, so a value of 1.0 IS saturation (the mask's 2) and nothing is clipped by the gain.
+[prepare.thorlabs]
+raw = "raw"
+gain = 1.0
+mode = "bin2"
+srgb = "off"

@@ -1,0 +1,201 @@
+# Config of record of the chrome-board evaluation of the chrome set zoom48_f10 (scripts/chrome_evaluation.jl): ONE config per chrome
+# set, every model scored on it a row of [evaluate] models (3 rows: Ties, Mattermost 2026-11-13 — "1. Schöps calibration, 2. ours with
+# aperture and focus surface, 3. radiometric refinement with pinhole only. All scored on the chrome board.").
+#
+# The set: the FX3 + the zoom lens at 48 mm, f/10 (EXIF lens "DT 24-70mm F3 SAM", not electronically coupled; tab:defocus's third lens):
+# Förstner detection of the 289 backlit dots of the Thorlabs R3L3S7N1 target on the GREEN PHOTOSITES (stage prepare: [prepare] mode
+# "photosites", the RAW photographs and their EXIF; [detect] image "raw_green": the bilinear green on the raw grid), their registration against the target's grid (RANSAC
+# through the set's index camera: the Kannala–Brandt lens Estimation fitted to Schöps's detections, configs/experiments/frontends.toml
+# [fits.zoom48_f10_kb] — the route of the Tamron f/8 set's index, there OpenCV's), and the evaluation of the start (Schöps's
+# central-generic of the set, frontends.toml [schoeps.zoom48_f10_siemens_w20], imported onto the raw grid) and the cases
+# sizl_spline_warped and sizl_spline_pinhole_warped of configs/experiments/radiometric_refinement.toml. Every [detect], [index] and
+# [evaluate] setting is the Tamron f/8 set's (chrome_evaluation_fx3_tamron_largeaperture.toml), the same route.
+
+[experiment]
+name = "chrome_evaluation"
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
+
+[inputs.fx3_sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+stage = "detect"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+
+[inputs.raw]
+tier = "rc_raw_photos"
+path = "paper-data/defocus/zoom-lens/chrome"
+stage = "prepare"
+provenance = "the 54 chrome photographs DSC03472.ARW … DSC03525.ARW (Sony ILME-FX3) of the Thorlabs R3L3S7N1 target with the zoom lens at 48 mm (EXIF lens \"DT 24-70mm F3 SAM\"), f/10, 1/500 s, ISO 100, manual focus, captured on 2026-11-11 15:05–15:10 (configs/data_artifacts.toml defocus/zoom-lens/chrome; rotation about one point)"
+
+[inputs.target]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"
+sha256 = "9fd2754a2aa7e278a18d95df15e07140b87bc115dec47be169adebe085fab880"   # sha256sum of the file of record (the local data root and dgx01's rc-vgtk-root agree, 2026-11-12)
+stage = "index"
+provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024): 17 x 17 dots at 5.000 mm, calibration Rigid (vgio/target/v3 by vgio_migrate_tree)"
+
+[runs.camera]
+config = "configs/experiments/frontends.toml"
+run = "fits.zoom48_f10_kb"
+path = "camera.json"
+stage = "index"
+provenance = "the Kannala–Brandt lens VisualGeometryToolkitEstimation fitted to Schöps's detections of the zoom set's Siemens photographs (scripts/frontends.jl, configs/experiments/frontends.toml [fits.zoom48_f10_kb]: find_absolute_pose per view, then refine_camera_and_poses): the index's camera"
+
+[prepare.fx3_zoom48_f10_chrome]
+raw = "raw"
+mode = "photosites"               # read, not decoded: the RAW photographs linked with their EXIF (Features' load_raw_metadata); detect reads each mosaic
+
+[detect]
+sensor_characterisation = "fx3_sensor_characterisation"   # the FX3's record of record (input fx3_sensor_characterisation): each RAW re-linearised under its frame's model, its Poisson–Gaussian noise propagated into the detections' covariances
+photos = "fx3_zoom48_f10_chrome"
+image = "raw_green"               # the RAW mosaics behind prepare's set, Features' bilinear green on the raw grid under each frame's sensor model; raw pixels
+precision = "Float32"
+device = "gpu"                   # detect_foerstner on the GPU (KernelAbstractions; device 0 of the job)
+derivative = "gaussian2d"
+derivative_sigma = 2.0                # raw px: 1.0 green cell (the value of record on the green cells until RC 0.10.2) × 2 raw px per cell
+polarity = "light"                # the backlit dots are bright on the dark chrome: Features' polarity gate keeps light blobs only, a dark blob (a gap, a shadow) never seeds (owner 2026-11-14)
+precision_threshold = 1.0             # raw px: SFOP's point σ gate, 0.5 green cell (the value of record until RC 0.10.2) × 2 raw px per cell
+significance_level = 0.999
+
+photographs = [                 # the photographs detected (each its own scale: detect_sfop); the others are [detect.excluded]
+    "DSC03472.ARW",
+    "DSC03473.ARW",
+    "DSC03474.ARW",
+    "DSC03475.ARW",
+    "DSC03476.ARW",
+    "DSC03477.ARW",
+    "DSC03478.ARW",
+    "DSC03479.ARW",
+    "DSC03480.ARW",
+    "DSC03481.ARW",
+    "DSC03482.ARW",
+    "DSC03483.ARW",
+    "DSC03484.ARW",
+    "DSC03485.ARW",
+    "DSC03486.ARW",
+    "DSC03487.ARW",
+    "DSC03488.ARW",
+    "DSC03489.ARW",
+    "DSC03490.ARW",
+    "DSC03491.ARW",
+    "DSC03492.ARW",
+    "DSC03493.ARW",
+    "DSC03494.ARW",
+    "DSC03495.ARW",
+    "DSC03496.ARW",
+    "DSC03497.ARW",
+    "DSC03498.ARW",
+    "DSC03499.ARW",
+    "DSC03500.ARW",
+    "DSC03501.ARW",
+    "DSC03502.ARW",
+    "DSC03503.ARW",
+    "DSC03504.ARW",
+    "DSC03505.ARW",
+    "DSC03506.ARW",
+    "DSC03507.ARW",
+    "DSC03508.ARW",
+    "DSC03509.ARW",
+    "DSC03510.ARW",
+    "DSC03511.ARW",
+    "DSC03512.ARW",
+    "DSC03513.ARW",
+    "DSC03514.ARW",
+    "DSC03515.ARW",
+    "DSC03516.ARW",
+    "DSC03517.ARW",
+    "DSC03518.ARW",
+    "DSC03519.ARW",
+    "DSC03520.ARW",
+    "DSC03521.ARW",
+    "DSC03522.ARW",
+    "DSC03523.ARW",
+    "DSC03524.ARW",
+    "DSC03525.ARW",
+]
+
+[detect.excluded]
+
+[index]
+target = "target"
+camera = "camera"
+camera_name = "cam"
+target_id = "thorlabs_r3l3s7n1"
+label = "circular"
+scoring = { type = "msac" }        # RANSAC's scorer (the stack's SCORING_TAGS): MSAC on the board-plane residual (mm) of the Hungarian's one-to-one matches; its threshold is NOT stated here — it is half the target record's pitch (2.5 mm at 5 mm), the assignment's dustbin, derived in code (owner 2026-11-14)
+seed_tolerance = 5.0
+rng_seed = 1
+min_assigned = 145
+
+[index.ransac]
+success_prob = 0.999               # the chrome configs' value of record since their renames (2026-11-12), above Estimation's default 0.99 (configs/default.toml [ransac])
+max_trials = 10000                 # Estimation's default (configs/default.toml [ransac]): the cap, never reached (after4: every photograph stopped at min_trials)
+min_trials = 200                   # owner 2026-11-14: twice the 100 that every photograph of after4 stopped at (the confidence rule is met far earlier — the grid sampler's draws are correct at the right parity), as margin
+
+# RANSAC's local optimization (src/chrome_evaluation.jl register_grid; owner 2026-11-14): Estimation's Irls strategy at the Gaussian
+# shape — plain least squares, not robust: the scorer's matches of the hypothesis are within its threshold by construction — on
+# those matches, frozen (the GridPoseProblem's refine!: the board-plane residuals, mm, by Core's chart LM; the Hungarian is not
+# re-run), at most max_iter iterations.
+[index.local_optimization_strategy]
+type = "irls"
+loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
+max_iter = 10
+
+# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
+# is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
+[index.refine_strategy]
+type = "none"                     # a refine's least squares (optimization_strategy = nothing)
+
+[index.excluded]
+
+[runs.start_sizl_spline]
+config = "configs/experiments/frontends.toml"
+run = "schoeps.zoom48_f10_siemens_w20"
+path = "camera.json"
+stage = "evaluate"
+provenance = "the start of cases sizl_spline_warped and sizl_spline_pinhole_warped: T. Schöps's central-generic (cell 150, window as frontends.toml states it: the Tamron f/8 set's arguments 150 / 40 in sensor pixels × ½) of the zoom set's 171 Siemens photographs, made by scripts/frontends.jl (configs/experiments/frontends.toml [schoeps.zoom48_f10_siemens_w20]) on Features' green cells and imported onto the raw grid through IO (camera.json)"
+
+# The zoom set's Brown–Conrady start (owner GO 2026-11-17, T. Harder's Table 3 as he defined it; overrides the no-refits ruling for the zoom)
+[inputs.start_sizl_bc5]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json"
+sha256 = "92f3fc8a151cfd809da2b3a4885bfb193915567966dab19c53b4c7d2550feab2"   # sha256sum of the record of record (dgx01, 2026-11-17)
+stage = "evaluate"
+provenance = "the start of cases sizl_bc5_warped and sizl_bc5_pinhole_warped (configs/experiments/radiometric_refinement.toml): OpenCV's cv2.calibrateCamera, its default model (k1 k2 p1 p2 k3), on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 4.12.0) of the zoom set's Schöps run of record (frontends.toml [schoeps.zoom48_f10_siemens_w20], dataset.bin) by T. Harder's experiments/tools/opencv_calibrate_schoeps.py (verbatim from v0.10.0 frontends_history/scripts; fe_si7.sh's arguments), converted to vgio/cameras/v4 by experiments/tools/ocv_record.jl (owner GO 2026-11-17)"
+
+[evaluate]
+index = "stage"
+target = "target"
+optimization_strategy = { type = "triggs", loss = "huber" }   # the rotation-centre refine (src/chrome_evaluation.jl evaluate_grid_models: Estimation's refine_camera_and_poses on RotationCenterViews, the camera held): the Triggs-corrected Huber LM at the efficiency table's Huber constant for d = 2 (Core's efficiency_constant(HuberShape, 2)) × the index stage's pooled noise scale (a refine estimates none)
+iterations = 80
+profile_bins = 10
+lens_coverage = "sensor"        # the chrome set's lens lights the whole sensor (src/image_region.jl): the radial profile about the sensor's centre out to its half-diagonal (2128, 1424; 2560.5 px as stated before 2026-11-15)
+centre_rho = 0.4                # the summary's centre region: ρ = |𝐩 − centre| / rmax below 0.4 (the regions of record)
+edge_rho = 0.6                  # the summary's edge region: ρ above 0.6
+holdout = "on"                  # the parity-interleaved hold-out (motion_heldout, the paper's headline; owner 2026-11-15): each fit on one parity of the grid nodes, scoring the other
+bootstrap = { resamples = 10000, seed = 20261115, alpha = 0.05 }   # the paired photograph bootstrap of the comparisons (src/chrome_evaluation.jl paired_differences, Eval's bootstrap_ci): 10,000 draws (the owner's count, 2026-11-15: the 2.5 % / 97.5 % tails each rest on 250 draws), StableRNG of the date of the ruling, the 95 % interval
+# every refinement against its start (its label with _start for _refined) and every model against the Schöps baseline of its target (T. Schöps's own camera; the label's prefix): model − reference
+# and the defocus ablation directly (owner GO 2026-11-17): each aperture + focus surface refinement against its pinhole refinement
+comparisons = [
+    {model = "sizl_spline_refined", reference = "sizl_spline_start"},
+    {model = "sizl_spline_pinhole_refined", reference = "sizl_spline_start"},
+    {model = "sizl_spline_refined", reference = "sizl_spline_pinhole_refined"},
+    {model = "sizl_bc5_refined", reference = "sizl_bc5_start"},
+    {model = "sizl_bc5_pinhole_refined", reference = "sizl_bc5_start"},
+    {model = "sizl_bc5_refined", reference = "sizl_bc5_pinhole_refined"},
+    {model = "sizl_bc5_start", reference = "sizl_spline_start"},
+    {model = "sizl_bc5_refined", reference = "sizl_spline_start"},
+    {model = "sizl_bc5_pinhole_refined", reference = "sizl_spline_start"},
+]
+models = [
+    {label = "sizl_spline_start", kind = "schoeps", input = "start_sizl_spline"},   # the Schöps baseline: T. Schöps's OWN camera (his run's camera record), never a grid re-estimated from it (src/chrome_evaluation.jl check_schoeps_baseline)
+    {label = "sizl_spline_refined", kind = "grid", case = "sizl_spline_warped"},
+    {label = "sizl_spline_pinhole_refined", kind = "grid", case = "sizl_spline_pinhole_warped"},
+    {label = "sizl_bc5_start", kind = "lens", input = "start_sizl_bc5"},
+    {label = "sizl_bc5_refined", kind = "lens", case = "sizl_bc5_warped"},
+    {label = "sizl_bc5_pinhole_refined", kind = "lens", case = "sizl_bc5_pinhole_warped"},
+]

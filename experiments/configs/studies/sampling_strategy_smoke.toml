@@ -1,0 +1,21 @@
+# RATIONALE (owner convention 2026-11-16; comments only: no run key reads them)
+#   question:   does the sampling-strategy experiment's wiring run end to end (overrides, lattice guard, the owners' drivers)?
+#   hypothesis: none: a smoke run, never a result (the experiment's own rationale: sampling_strategy.toml, its base)
+#   decides:    whether the production arms may be submitted
+#   decided:    nothing of its own (a smoke run); the study's decision is sampling_strategy.toml's
+#   evidence:   the smoke run's logs
+#   owner:      J. Pritts
+#   date:       2026-11-15
+#   discussion: sampling_strategy.toml's RATIONALE
+#
+# The sampling-strategy experiment's smoke run (scripts/sampling_strategy.jl): the config of record with the LM capped at 2 iterations
+# on one fisheye arm — the wiring end to end (the overrides, the lattice guard, the owners' drivers), never a result. lm.max_iter keys
+# every refinement, so a smoke arm never shadows a production one.
+#   julia --project=experiments experiments/scripts/sampling_strategy.jl --config=experiments/configs/studies/sampling_strategy_smoke.toml --case=fisheye_f4 --variant=ecdf_a1
+
+[experiment]
+name = "sampling_strategy"
+base = "configs/studies/sampling_strategy.toml"
+
+[sampling_strategy]
+lm_max_iter = 2      # two LM iterations: the wiring, not a result

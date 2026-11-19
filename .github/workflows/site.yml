@@ -1,26 +1,71 @@
 name: Site
 
+# The one deploy of https://realcamerasareradiometric.github.io: the landing page (site/) at /, the package documentation
+# (RadiometricCamera/docs/) at /docs/ and the paper with its supplement (paper/main.tex) at /paper.pdf, assembled by
+# site/build.sh (the same script a local preview runs) and deployed by site/deploy.jl to the root of the gh-pages branch.
+# Nothing else deploys to gh-pages: this deploy replaces the branch content (versions = nothing).
 on:
   push:
     branches:
       - main
   workflow_dispatch:
 
+concurrency:
+  # One deploy at a time, in push order; a running deploy is never cancelled.
+  group: site
+  cancel-in-progress: false
+
 jobs:
-  site:
+  paper:
+    name: Paper PDF
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      # paper/Makefile's `make pdf` (latexmk, the same flags), in a pinned TeX Live 2024 image; the PDF is never committed.
+      - uses: xu-cheng/latex-action@v3
+        with:
+          texlive_version: 2024
+          working_directory: paper
+          root_file: main.tex
+          args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error -outdir=build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper/build/main.pdf
+          if-no-files-found: error
+          retention-days: 7
+
+  site:
+    name: Build and deploy the site
+    needs: paper
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      actions: write    # julia-actions/cache deletes its superseded caches
+      contents: write   # deploydocs pushes gh-pages with the GITHUB_TOKEN
       statuses: write
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.12'
-      - name: Install site dependencies
-        run: julia --project=site -e 'using Pkg; Pkg.instantiate()'
-      - name: Build and deploy the site
+          version: '1.13'   # the package's compat floor (the docs load it); the site admits it (julia = "1.12")
+      - uses: julia-actions/cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: paper
+          path: paper/build
+      - name: Instantiate the site and the package docs environments
+        run: |
+          julia --project=site -e 'using Pkg; Pkg.instantiate()'
+          julia --project=RadiometricCamera/docs -e 'using Pkg; Pkg.instantiate()'
+      # The landing page, the package docs (doctests, checkdocs, linkcheck; any warning fails) and the paper, in site/build.
+      - name: Build the site
+        run: site/build.sh site/build
+      - name: Deploy the site
         env:
           # deploys to the gh-pages branch of this repository: no deploy key
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: julia --project=site site/make.jl
+        run: julia --project=site --startup-file=no site/deploy.jl site/build

@@ -1,0 +1,52 @@
+# The published input data of experiments as lazy Julia artifacts, hosted on
+# Hugging Face until publication (Zenodo then) and pinned by tree hash and sha256. Written by DataArtifacts
+# `pack_artifacts` from configs/data_artifacts.toml, never by hand; read only
+# through data_root() (the artifact view), never through `artifact"…"`.
+
+[rc_baselines_20261029]
+git-tree-sha1 = "c8442e4520c1be201ab452967d6da76fd82378a0"
+lazy = true
+
+    [[rc_baselines_20261029.download]]
+    sha256 = "4738cf707950088c0d252a847be56a68e19d6c36380f9e02e4723524585f758e"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_baselines_20261029.tar.gz"
+
+[rc_calibration_20261029]
+git-tree-sha1 = "831b5727e5ab08172ef7d4cf2da6829467b85f28"
+lazy = true
+
+    [[rc_calibration_20261029.download]]
+    sha256 = "c52f7587d65a08e5bf86e2fd497bd3922bc533f23b4c78af65d67dae5ff2d344"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_calibration_20261029.tar.gz"
+
+[rc_fx3_14mm_20261102]
+git-tree-sha1 = "337ccb5113321db051ff31d1344d658f20717303"
+lazy = true
+
+    [[rc_fx3_14mm_20261102.download]]
+    sha256 = "5d6c206598a8ddec96e7abc50ac445c4361ee3f63785860a8cb8bc82adf76e20"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_fx3_14mm_20261102.tar.gz"
+
+[rc_raw_photos_20261029]
+git-tree-sha1 = "3daf0cc4be884533049186bd375b26bd03d549ba"
+lazy = true
+
+    [[rc_raw_photos_20261029.download]]
+    sha256 = "45fb4562825ace993c42eede09a6e183c2c741a9bc1bc1403c21243ea432f5aa"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_raw_photos_20261029.tar.gz"
+
+[rc_synthetic_20261029]
+git-tree-sha1 = "487fba62e42f77f5601f2c4a60bae9e51733955e"
+lazy = true
+
+    [[rc_synthetic_20261029.download]]
+    sha256 = "5d97075085f42f28301f9d543e96d490e84e803929043454f5e0c70a90f1c6fe"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_synthetic_20261029.tar.gz"
+
+[rc_thorlabs_20261029]
+git-tree-sha1 = "8ffd782872149e21334c6ae76b98ba147f9316c9"
+lazy = true
+
+    [[rc_thorlabs_20261029.download]]
+    sha256 = "c1d90732ab4aead7702a03a2c8c3179cf18ee7cbdfe707ee3b4e37a09384e18a"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_thorlabs_20261029.tar.gz"

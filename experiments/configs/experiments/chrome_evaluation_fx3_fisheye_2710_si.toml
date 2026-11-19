@@ -1,0 +1,304 @@
+# Config of record of the chrome-board evaluation of the chrome set fisheye_2710_si (scripts/chrome_evaluation.jl): ONE config per chrome set,
+# every model scored on it a row of [evaluate] models (10 rows). Merged 2026-11-12 (RC 0.9 round 3) from the
+# 5 per-model configs chrome_evaluation_fx3_fisheye_2710_si[_<model>].toml, which differed only in their models row and its start input:
+# detect, index and the [evaluate] settings were the same in every one (src/chrome_evaluation.jl; test/chrome_evaluation_tests.jl).
+#
+# The set: the chrome-board evaluation of the FX3 + fisheye chrome photographs (fisheye_20261027; scripts/chrome_evaluation.jl):
+# Förstner detection of the 289 backlit dots of the Thorlabs R3L3S7N1 target, their registration against the target's grid (RANSAC
+# through the camera of record), and the evaluation of the refinement cases of configs/experiments/radiometric_refinement.toml (one
+# rotation centre for the set, from the poses of the index stage's RANSAC local optimization). The settings: each dot's own integration scale selected by SFOP (detect_sfop, then the seeded detect_foerstner).
+# the 27.10 fisheye Siemens set (f/32): chrome_evaluation_fx3_fisheye_20261027.toml with case si27fe_bc5_warped and its
+# start: the same chrome photographs, detection and index.
+
+[experiment]
+name = "chrome_evaluation"
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
+
+[inputs.fx3_sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+stage = "detect"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+
+[inputs.raw]
+tier = "rc_raw_photos"
+path = "paper-data/geometric-accuracy/fisheye/chrome-siemens"
+stage = "prepare"
+provenance = "the 118 chrome photographs of the FX3 + Sigma 8 mm fisheye of 27.10.26 (Hugging Face 27.10.26/fisheye/chrome): the RAW photographs (.ARW) the retired decoded copies (rc_baselines chrome/*.photos, decoded by scripts/py/convert_raw.py) were made from (owner 2026-11-14: every chrome set read from its RAW through Features' raw module); on the cluster only"
+
+[inputs.raw_fisheye_siemens_20261027]
+tier = "rc_raw_photos"
+path = "paper-data/geometric-accuracy/fisheye/siemens-stars"
+stage = "evaluate"
+provenance = "the 150 Siemens-star photographs of the fisheye at f/32 of 2026-10-27, the chrome photographs' capture session: the session's coverage frames ([image_regions.fx3_fisheye_siemens_20261027])"
+
+# The chrome set's lens coverage (src/image_region.jl; owner ruling 2026-11-15): the session's, measured on five of its Siemens frames
+# at the same f/32 (DSC03644 … DSC03764, the frames of 2026-11-08, as RAW). The set is excluded (configs/excluded.toml).
+[image_regions.fx3_fisheye_siemens_20261027]
+input = "raw_fisheye_siemens_20261027"
+frames = { "DSC03644.ARW" = "35930d6e16464ad38aa387014ce31fe7ea63a682e0fa645dd7ddda994ab99f2e", "DSC03674.ARW" = "2a2ecf999c877c7200cbe5af127f675372d2c6297046cecef06645aa6d670806", "DSC03704.ARW" = "5fbf9e9a44286c76c4cd006141041211282c73b0c2d922adc4d7dd54901b1f5b", "DSC03734.ARW" = "5a7bf926fb345d534d07779fb8d19e156138f871afbfeae40615ab54e5e4c3aa", "DSC03764.ARW" = "812758742ebcecdef4b922b3679151cd2e422774fc79741ad6ed963d12f31a39" }   # sha256sum on dgx01 (2026-11-15)
+image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+seed = 1                       # the RANSAC ellipse fit's StableRNG seed (the refinements' masks.seed)
+
+[inputs.target]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"
+sha256 = "9fd2754a2aa7e278a18d95df15e07140b87bc115dec47be169adebe085fab880"   # sha256sum of the file of record (the local data root and dgx01's rc-vgtk-root agree, 2026-11-12)
+stage = "index"
+provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024): 17 x 17 dots at 5.000 mm, calibration Rigid (vgio/target/v3 by vgio_migrate_tree)"
+
+[inputs.camera]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/2710/fisheye_kb_fit.json"
+stage = "index"
+provenance = "the 27.10 Kannala–Brandt lens fitted to Schöps's fisheye Siemens detections (fit_lens_detections.jl, branch paper-finalization; vgio/cameras/v4 by vgio_migrate_tree)"
+
+[prepare.fx3_fisheye2710_chrome]
+raw = "raw"
+mode = "photosites"               # read, not decoded: the RAW photographs linked with their EXIF (Features' load_raw_metadata); detect reads each mosaic
+
+[detect]
+sensor_characterisation = "fx3_sensor_characterisation"   # the FX3's record of record (input fx3_sensor_characterisation): each RAW re-linearised under its frame's model, its Poisson–Gaussian noise propagated into the detections' covariances
+photos = "fx3_fisheye2710_chrome"
+image = "raw_green"               # the RAW mosaics behind prepare's set, Features' bilinear green on the raw grid under each frame's sensor model; raw pixels
+precision = "Float32"
+device = "gpu"                   # detect_foerstner on the GPU (KernelAbstractions; device 0 of the job)
+derivative = "gaussian2d"
+derivative_sigma = 2.0                # raw px: 1.0 green cell (the value of record on the green cells until RC 0.10.2) × 2 raw px per cell
+polarity = "light"                # the backlit dots are bright on the dark chrome: Features' polarity gate keeps light blobs only, a dark blob (a gap, a shadow) never seeds (owner 2026-11-14)
+precision_threshold = 1.0             # raw px: SFOP's point σ gate, 0.5 green cell (the value of record until RC 0.10.2) × 2 raw px per cell
+significance_level = 0.999
+
+photographs = [                 # the photographs detected (each its own scale: detect_sfop); the others are [detect.excluded]
+    "DSC02835.ARW",
+    "DSC02836.ARW",
+    "DSC02837.ARW",
+    "DSC02838.ARW",
+    "DSC02839.ARW",
+    "DSC02840.ARW",
+    "DSC02841.ARW",
+    "DSC02842.ARW",
+    "DSC02843.ARW",
+    "DSC02844.ARW",
+    "DSC02845.ARW",
+    "DSC02846.ARW",
+    "DSC02847.ARW",
+    "DSC02848.ARW",
+    "DSC02849.ARW",
+    "DSC02850.ARW",
+    "DSC02851.ARW",
+    "DSC02852.ARW",
+    "DSC02853.ARW",
+    "DSC02854.ARW",
+    "DSC02855.ARW",
+    "DSC02856.ARW",
+    "DSC02857.ARW",
+    "DSC02858.ARW",
+    "DSC02859.ARW",
+    "DSC02860.ARW",
+    "DSC02861.ARW",
+    "DSC02862.ARW",
+    "DSC02863.ARW",
+    "DSC02864.ARW",
+    "DSC02865.ARW",
+    "DSC02866.ARW",
+    "DSC02867.ARW",
+    "DSC02868.ARW",
+    "DSC02869.ARW",
+    "DSC02870.ARW",
+    "DSC02871.ARW",
+    "DSC02872.ARW",
+    "DSC02873.ARW",
+    "DSC02874.ARW",
+    "DSC02875.ARW",
+    "DSC02876.ARW",
+    "DSC02877.ARW",
+    "DSC02878.ARW",
+    "DSC02879.ARW",
+    "DSC02880.ARW",
+    "DSC02881.ARW",
+    "DSC02882.ARW",
+    "DSC02883.ARW",
+    "DSC02884.ARW",
+    "DSC02885.ARW",
+    "DSC02886.ARW",
+    "DSC02887.ARW",
+    "DSC02888.ARW",
+    "DSC02889.ARW",
+    "DSC02890.ARW",
+    "DSC02891.ARW",
+    "DSC02892.ARW",
+    "DSC02893.ARW",
+    "DSC02894.ARW",
+    "DSC02895.ARW",
+    "DSC02896.ARW",
+    "DSC02897.ARW",
+    "DSC02898.ARW",
+    "DSC02899.ARW",
+    "DSC02900.ARW",
+    "DSC02901.ARW",
+    "DSC02902.ARW",
+    "DSC02903.ARW",
+    "DSC02904.ARW",
+    "DSC02905.ARW",
+    "DSC02906.ARW",
+    "DSC02907.ARW",
+    "DSC02908.ARW",
+    "DSC02909.ARW",
+    "DSC02910.ARW",
+    "DSC02911.ARW",
+    "DSC02912.ARW",
+    "DSC02913.ARW",
+    "DSC02914.ARW",
+    "DSC02915.ARW",
+    "DSC02916.ARW",
+    "DSC02917.ARW",
+    "DSC02918.ARW",
+    "DSC02919.ARW",
+    "DSC02920.ARW",
+    "DSC02921.ARW",
+    "DSC02922.ARW",
+    "DSC02923.ARW",
+    "DSC02924.ARW",
+    "DSC02925.ARW",
+    "DSC02926.ARW",
+    "DSC02927.ARW",
+    "DSC02928.ARW",
+    "DSC02929.ARW",
+    "DSC02930.ARW",
+    "DSC02931.ARW",
+    "DSC02932.ARW",
+    "DSC02933.ARW",
+    "DSC02934.ARW",
+    "DSC02935.ARW",
+    "DSC02936.ARW",
+    "DSC02937.ARW",
+    "DSC02938.ARW",
+    "DSC02939.ARW",
+    "DSC02940.ARW",
+    "DSC02941.ARW",
+    "DSC02942.ARW",
+    "DSC02943.ARW",
+    "DSC02944.ARW",
+    "DSC02945.ARW",
+    "DSC02946.ARW",
+    "DSC02947.ARW",
+    "DSC02948.ARW",
+    "DSC02949.ARW",
+    "DSC02950.ARW",
+    "DSC02951.ARW",
+    "DSC02952.ARW",
+]
+
+[detect.excluded]
+
+[index]
+target = "target"
+camera = "camera"
+camera_name = "cam"
+target_id = "thorlabs_r3l3s7n1"
+label = "circular"
+scoring = { type = "msac" }        # RANSAC's scorer (the stack's SCORING_TAGS): MSAC on the board-plane residual (mm) of the Hungarian's one-to-one matches; its threshold is NOT stated here — it is half the target record's pitch (2.5 mm at 5 mm), the assignment's dustbin, derived in code (owner 2026-11-14)
+seed_tolerance = 5.0
+rng_seed = 1
+min_assigned = 145
+
+[index.ransac]
+success_prob = 0.999               # the chrome configs' value of record since their renames (2026-11-12), above Estimation's default 0.99 (configs/default.toml [ransac])
+max_trials = 10000                 # Estimation's default (configs/default.toml [ransac]): the cap, never reached (after4: every photograph stopped at min_trials)
+min_trials = 200                   # owner 2026-11-14: twice the 100 that every photograph of after4 stopped at (the confidence rule is met far earlier — the grid sampler's draws are correct at the right parity), as margin
+
+# RANSAC's local optimization (src/chrome_evaluation.jl register_grid; owner 2026-11-14): Estimation's Irls strategy at the Gaussian
+# shape — plain least squares, not robust: the scorer's matches of the hypothesis are within its threshold by construction — on
+# those matches, frozen (the GridPoseProblem's refine!: the board-plane residuals, mm, by Core's chart LM; the Hungarian is not
+# re-run), at most max_iter iterations.
+[index.local_optimization_strategy]
+type = "irls"
+loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
+max_iter = 10
+
+# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
+# is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
+[index.refine_strategy]
+type = "none"                     # a refine's least squares (optimization_strategy = nothing)
+
+[index.excluded]
+
+[inputs.start_si27fe_bc5]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_bc5_cv2.json"
+stage = "evaluate"
+provenance = "the start of case si27fe_bc5_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model on Schöps's star detections (opencv_calibrate_schoeps.py, fe_si7.sh)"
+
+[runs.start_si27fe_ds]
+config = "configs/experiments/frontends.toml"
+run = "fits.fisheye2710_ds"
+path = "camera.json"
+stage = "evaluate"
+provenance = "the Double Sphere camera Estimation fitted to the 27.10 fisheye set's imported Schöps detections (frontends.toml [fits.fisheye2710_ds]); replaces make_parametric_starts.jl's start and the frozen hand LM's fit (owner ruling 2026-11-13)"
+
+[inputs.start_si27fe_kb]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_kb_cv2.json"
+stage = "evaluate"
+provenance = "the start of case si27fe_kb_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model on Schöps's star detections (opencv_calibrate_schoeps.py, fe_si7.sh)"
+
+[inputs.start_si27fe_ocv14]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_ocv14_cv2.json"
+stage = "evaluate"
+provenance = "the start of case si27fe_ocv14_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model on Schöps's star detections (opencv_calibrate_schoeps.py, fe_si7.sh)"
+
+[runs.start_si27fe_spline]
+config = "configs/experiments/frontends.toml"
+run = "schoeps.fisheye2710_siemens"
+path = "camera.json"
+stage = "evaluate"
+provenance = "T. Schöps's central-generic of the 27.10 fisheye Siemens set (f/32) made by the project's front end (frontends.toml [schoeps.fisheye2710_siemens]: green cells, auto gain, cell 150 → 75 and window 10 → 5 on the green cells); replaces the start of record (owner ruling 2026-11-13; validation 0.51 px gauge median at the record's detections)"
+
+[evaluate]
+index = "stage"
+target = "target"
+optimization_strategy = { type = "triggs", loss = "huber" }   # the rotation-centre refine (src/chrome_evaluation.jl evaluate_grid_models: Estimation's refine_camera_and_poses on RotationCenterViews, the camera held): the Triggs-corrected Huber LM at the efficiency table's Huber constant for d = 2 (Core's efficiency_constant(HuberShape, 2)) × the index stage's pooled noise scale (a refine estimates none)
+iterations = 80
+profile_bins = 10
+lens_coverage = "image_region:fx3_fisheye_siemens_20261027"   # the session's measured image region: the radial profile about its centre out to its rim
+centre_rho = 0.4                # the summary's centre region: ρ = |𝐩 − centre| / rmax below 0.4 (the regions of record)
+edge_rho = 0.6                  # the summary's edge region: ρ above 0.6
+holdout = "on"                  # the parity-interleaved hold-out (motion_heldout, the paper's headline; owner 2026-11-15): each fit on one parity of the grid nodes, scoring the other
+bootstrap = { resamples = 10000, seed = 20261115, alpha = 0.05 }   # the paired photograph bootstrap of the comparisons (src/chrome_evaluation.jl paired_differences, Eval's bootstrap_ci): 10,000 draws (the owner's count, 2026-11-15: the 2.5 % / 97.5 % tails each rest on 250 draws), StableRNG of the date of the ruling, the 95 % interval
+# every refinement against its start (its label with _start for _refined) and every model against the Schöps baseline of its target (T. Schöps's own camera; the label's prefix): model − reference
+comparisons = [
+    {model = "si27fe_bc5_refined", reference = "si27fe_bc5_start"},
+    {model = "si27fe_ds_refined", reference = "si27fe_ds_start"},
+    {model = "si27fe_kb_refined", reference = "si27fe_kb_start"},
+    {model = "si27fe_ocv14_refined", reference = "si27fe_ocv14_start"},
+    {model = "si27fe_spline_refined", reference = "si27fe_spline_start"},
+    {model = "si27fe_bc5_start", reference = "si27fe_spline_start"},
+    {model = "si27fe_bc5_refined", reference = "si27fe_spline_start"},
+    {model = "si27fe_ds_start", reference = "si27fe_spline_start"},
+    {model = "si27fe_ds_refined", reference = "si27fe_spline_start"},
+    {model = "si27fe_kb_start", reference = "si27fe_spline_start"},
+    {model = "si27fe_kb_refined", reference = "si27fe_spline_start"},
+    {model = "si27fe_ocv14_start", reference = "si27fe_spline_start"},
+    {model = "si27fe_ocv14_refined", reference = "si27fe_spline_start"},
+]
+max_unassigned = 13                # the fisheye 27.10, as the Tamron: 44 → 64 of 116 photographs (276–288 of 289 assigned)
+models = [
+    {label = "si27fe_bc5_start", kind = "lens", input = "start_si27fe_bc5"},
+    {label = "si27fe_bc5_refined", kind = "lens", case = "si27fe_bc5_warped"},
+    {label = "si27fe_ds_start", kind = "lens", input = "start_si27fe_ds"},
+    {label = "si27fe_ds_refined", kind = "lens", case = "si27fe_ds_warped"},
+    {label = "si27fe_kb_start", kind = "lens", input = "start_si27fe_kb"},
+    {label = "si27fe_kb_refined", kind = "lens", case = "si27fe_kb_warped"},
+    {label = "si27fe_ocv14_start", kind = "lens", input = "start_si27fe_ocv14"},
+    {label = "si27fe_ocv14_refined", kind = "lens", case = "si27fe_ocv14_warped"},
+    {label = "si27fe_spline_start", kind = "schoeps", input = "start_si27fe_spline"},   # the Schöps baseline: T. Schöps's OWN camera (his run's camera record), never a grid re-estimated from it (src/chrome_evaluation.jl check_schoeps_baseline)
+    {label = "si27fe_spline_refined", kind = "grid", case = "si27fe_spline_warped"},
+]
+

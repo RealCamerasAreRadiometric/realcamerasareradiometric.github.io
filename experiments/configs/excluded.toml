@@ -1,0 +1,15 @@
+# The capture sets excluded from the paper (owner, 2026-11-15): kept — their data and catalogue entries (configs/data_artifacts.toml)
+# stay — but run by no driver. Every driver reads this one file (src/drivers.jl `excluded_sets`, through `load_driver_config`): a case of
+# an excluded set is skipped and said so, with its reason, and a config of an excluded set is refused by name. The configs of record
+# carry no table of it (their commented-out copies were removed in rc-0116: git history, tag v0.11.5).
+#
+# [excluded.<set>]
+#   reason   why (the evidence)
+#   configs  the configs of record that are the set's alone (refused whole)
+#   cases    the cases of shared configs that read it (skipped)
+
+[excluded.fisheye2710_siemens]
+reason = "superseded by Ties's fisheye 30 cm recapture (2026-11-14); Schöps localises 36–40 of 150 photos and returns a folded camera (283° FOV) that Core refuses"
+configs = ["configs/experiments/chrome_evaluation_fx3_fisheye_2710_si.toml"]
+cases = ["si27fe_bc5_warped", "si27fe_ocv14_warped", "si27fe_kb_warped", "si27fe_spline_warped", "si27fe_ds_warped",
+         "fisheye2710_siemens", "fisheye2710_ds", "fisheye2710_schoeps", "si_fisheye_spline_20261027_warped"]

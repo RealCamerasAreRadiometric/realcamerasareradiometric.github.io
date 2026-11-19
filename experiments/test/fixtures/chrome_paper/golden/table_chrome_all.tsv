@@ -1,0 +1,105 @@
+set	model	variant	stat	start	refined	change_pct	photos_start	photos_refined	dots_start	dots_refined	retcode_start	retcode_refined	retcode_refinement	converged	coverage_dots_start	coverage_dots_refined	coverage_fraction_start	coverage_fraction_refined	refined_all	photos_refined_all
+14 mm · central_30cm · Siemens stars	Brown–Conrady	motion	median_px	0.796561	0.349589	-56.11271453159268	37	99	10101	27027	Success	Success	Success	true	10101	27027	1.0	1.0	0.349589	99
+14 mm · central_30cm · Siemens stars	Brown–Conrady	motion	mean_px	0.941451	0.408064	-56.65584294880987	37	99	10101	27027	Success	Success	Success	true	10101	27027	1.0	1.0	0.408064	99
+14 mm · central_30cm · Siemens stars	Brown–Conrady	motion	p95_px	1.920104	0.988246	-48.53164203605638	37	99	10101	27027	Success	Success	Success	true	10101	27027	1.0	1.0	0.988246	99
+14 mm · central_30cm · Siemens stars	Brown–Conrady	motion	rms_px	1.559736	0.506995	-67.49481963614356	37	99	10101	27027	Success	Success	Success	true	10101	27027	1.0	1.0	0.506995	99
+14 mm · central_30cm · Siemens stars	OpenCV-14	motion	median_px	1.953289	0.819311	-58.05479885464977	51	118	14484	32922	Success	Success	Success	true	14484	32922	1.0	1.0	0.819311	118
+14 mm · central_30cm · Siemens stars	OpenCV-14	motion	mean_px	2.183307	1.117481	-48.81704680102249	51	118	14484	32922	Success	Success	Success	true	14484	32922	1.0	1.0	1.117481	118
+14 mm · central_30cm · Siemens stars	OpenCV-14	motion	p95_px	5.074198	2.460573	-51.508139808497816	51	118	14484	32922	Success	Success	Success	true	14484	32922	1.0	1.0	2.460573	118
+14 mm · central_30cm · Siemens stars	OpenCV-14	motion	rms_px	3.139223	1.357804	-56.74713137613989	51	118	14484	32922	Success	Success	Success	true	14484	32922	1.0	1.0	1.357804	118
+14 mm · central_30cm · Siemens stars	Kannala–Brandt	motion	median_px	0.75943	1.913618	151.9808277260577	41	40	11316	10880	Success	Success	Success	true	11316	10880	1.0	1.0	1.913618	40
+14 mm · central_30cm · Siemens stars	Kannala–Brandt	motion	mean_px	0.851782	2.208753	159.30965904421555	41	40	11316	10880	Success	Success	Success	true	11316	10880	1.0	1.0	2.208753	40
+14 mm · central_30cm · Siemens stars	Kannala–Brandt	motion	p95_px	2.424905	4.249528	75.24513331450099	41	40	11316	10880	Success	Success	Success	true	11316	10880	1.0	1.0	4.249528	40
+14 mm · central_30cm · Siemens stars	Kannala–Brandt	motion	rms_px	1.434682	2.793447	94.70844410120152	41	40	11316	10880	Success	Success	Success	true	11316	10880	1.0	1.0	2.793447	40
+14 mm · central_30cm · Siemens stars	central spline	motion	median_px	1.426464	1.279114	-10.329738430132123	107	173	30388	47575	Success	Success	Success	true	30388	47575	1.0	1.0	1.279114	173
+14 mm · central_30cm · Siemens stars	central spline	motion	mean_px	1.790511	1.743179	-2.6434911597862247	107	173	30388	47575	Success	Success	Success	true	30388	47575	1.0	1.0	1.743179	173
+14 mm · central_30cm · Siemens stars	central spline	motion	p95_px	3.772131	3.83067	1.5518814166316102	107	173	30388	47575	Success	Success	Success	true	30388	47575	1.0	1.0	3.83067	173
+14 mm · central_30cm · Siemens stars	central spline	motion	rms_px	2.59326	2.484924	-4.177598852409708	107	173	30388	47575	Success	Success	Success	true	30388	47575	1.0	1.0	2.484924	173
+14 mm · central_30cm · AprilGrid	Brown–Conrady	motion	median_px	1.853316	1.630658	-12.014033224771168	165	115	47190	31165	Success	Success	Success	true	47190	31165	1.0	1.0	1.630658	115
+14 mm · central_30cm · AprilGrid	Brown–Conrady	motion	mean_px	2.408746	1.837084	-23.73276385305881	165	115	47190	31165	Success	Success	Success	true	47190	31165	1.0	1.0	1.837084	115
+14 mm · central_30cm · AprilGrid	Brown–Conrady	motion	p95_px	5.650344	4.008453	-29.05824848894155	165	115	47190	31165	Success	Success	Success	true	47190	31165	1.0	1.0	4.008453	115
+14 mm · central_30cm · AprilGrid	Brown–Conrady	motion	rms_px	2.418771	2.457239	1.5903944606579103	165	115	47190	31165	Success	Success	Success	true	47190	31165	1.0	1.0	2.457239	115
+14 mm · central_30cm · AprilGrid	OpenCV-14	motion	median_px	1.074873	1.716345	59.67886438676941	46	148	12650	42032	Success	Success	Success	true	12650	42032	1.0	1.0	1.716345	148
+14 mm · central_30cm · AprilGrid	OpenCV-14	motion	mean_px	1.236931	2.362083	90.96319843224886	46	148	12650	42032	Success	Success	Success	true	12650	42032	1.0	1.0	2.362083	148
+14 mm · central_30cm · AprilGrid	OpenCV-14	motion	p95_px	3.006129	5.843733	94.39395315370697	46	148	12650	42032	Success	Success	Success	true	12650	42032	1.0	1.0	5.843733	148
+14 mm · central_30cm · AprilGrid	OpenCV-14	motion	rms_px	2.008358	2.811107	39.97041364139262	46	148	12650	42032	Success	Success	Success	true	12650	42032	1.0	1.0	2.811107	148
+14 mm · central_30cm · AprilGrid	Kannala–Brandt	motion	median_px	2.256603	0.603126	-73.272835319283	180	33	51840	9273	Success	Success	MaxTime	false	51840	9273	1.0	1.0	0.603126	33
+14 mm · central_30cm · AprilGrid	Kannala–Brandt	motion	mean_px	2.733285	0.80963	-70.37886645556537	180	33	51840	9273	Success	Success	MaxTime	false	51840	9273	1.0	1.0	0.80963	33
+14 mm · central_30cm · AprilGrid	Kannala–Brandt	motion	p95_px	5.770171	1.356565	-76.4900381635137	180	33	51840	9273	Success	Success	MaxTime	false	51840	9273	1.0	1.0	1.356565	33
+14 mm · central_30cm · AprilGrid	Kannala–Brandt	motion	rms_px	3.334503	0.855473	-74.34481240532698	180	33	51840	9273	Success	Success	MaxTime	false	51840	9273	1.0	1.0	0.855473	33
+14 mm · central_30cm · AprilGrid	central spline	motion	median_px	1.592928	2.51345	57.78804817292435	178	116	49840	31320	Success	Success	Success	true	49840	31320	1.0	1.0	2.51345	116
+14 mm · central_30cm · AprilGrid	central spline	motion	mean_px	2.02302	3.274505	61.86221589504801	178	116	49840	31320	Success	Success	Success	true	49840	31320	1.0	1.0	3.274505	116
+14 mm · central_30cm · AprilGrid	central spline	motion	p95_px	4.42907	7.377899	66.57896578740007	178	116	49840	31320	Success	Success	Success	true	49840	31320	1.0	1.0	7.377899	116
+14 mm · central_30cm · AprilGrid	central spline	motion	rms_px	2.592004	3.548085	36.88578412687634	178	116	49840	31320	Success	Success	Success	true	49840	31320	1.0	1.0	3.548085	116
+fisheye · 10 cm · AprilGrid	Brown–Conrady	motion	median_px	0.720876	0.841335	16.710086061957966	164	182	46740	51688	Success	Success	Success	true	46740	51688	1.0	1.0	0.841335	182
+fisheye · 10 cm · AprilGrid	Brown–Conrady	motion	mean_px	0.887721	1.049857	18.26429700322512	164	182	46740	51688	Success	Success	Success	true	46740	51688	1.0	1.0	1.049857	182
+fisheye · 10 cm · AprilGrid	Brown–Conrady	motion	p95_px	1.933011	1.985844	2.733197069235504	164	182	46740	51688	Success	Success	Success	true	46740	51688	1.0	1.0	1.985844	182
+fisheye · 10 cm · AprilGrid	Brown–Conrady	motion	rms_px	1.039764	1.502552	44.5089462608823	164	182	46740	51688	Success	Success	Success	true	46740	51688	1.0	1.0	1.502552	182
+fisheye · 10 cm · AprilGrid	OpenCV-14	motion	median_px	2.479586	1.615108	-34.86380387693752	113	89	30849	25276	Success	Success	Success	true	30849	25276	1.0	1.0	1.615108	89
+fisheye · 10 cm · AprilGrid	OpenCV-14	motion	mean_px	2.781803	2.190433	-21.258514711501853	113	89	30849	25276	Success	Success	Success	true	30849	25276	1.0	1.0	2.190433	89
+fisheye · 10 cm · AprilGrid	OpenCV-14	motion	p95_px	8.295224	5.025452	-39.41752507225845	113	89	30849	25276	Success	Success	Success	true	30849	25276	1.0	1.0	5.025452	89
+fisheye · 10 cm · AprilGrid	OpenCV-14	motion	rms_px	3.273086	2.41554	-26.199922641812652	113	89	30849	25276	Success	Success	Success	true	30849	25276	1.0	1.0	2.41554	89
+fisheye · 10 cm · AprilGrid	Kannala–Brandt	motion	median_px	1.166927	1.070145	-8.293749309082758	152	65	41952	18460	Success	Success	Success	true	41952	18460	1.0	1.0	1.070145	65
+fisheye · 10 cm · AprilGrid	Kannala–Brandt	motion	mean_px	1.327241	1.232449	-7.142033737655783	152	65	41952	18460	Success	Success	Success	true	41952	18460	1.0	1.0	1.232449	65
+fisheye · 10 cm · AprilGrid	Kannala–Brandt	motion	p95_px	2.92471	3.61437	23.580457549637398	152	65	41952	18460	Success	Success	Success	true	41952	18460	1.0	1.0	3.61437	65
+fisheye · 10 cm · AprilGrid	Kannala–Brandt	motion	rms_px	2.225808	1.473258	-33.810193871169474	152	65	41952	18460	Success	Success	Success	true	41952	18460	1.0	1.0	1.473258	65
+fisheye · 10 cm · AprilGrid	Double Sphere	motion	median_px	0.598755	1.163523	94.32372172257435	148	118	41144	33040	Success	Success	Success	true	41144	33040	1.0	1.0	1.163523	118
+fisheye · 10 cm · AprilGrid	Double Sphere	motion	mean_px	0.736274	1.348151	83.10452358768613	148	118	41144	33040	Success	Success	Success	true	41144	33040	1.0	1.0	1.348151	118
+fisheye · 10 cm · AprilGrid	Double Sphere	motion	p95_px	1.951169	2.60247	33.38004037579522	148	118	41144	33040	Success	Success	Success	true	41144	33040	1.0	1.0	2.60247	118
+fisheye · 10 cm · AprilGrid	Double Sphere	motion	rms_px	0.956398	2.183573	128.31216711034526	148	118	41144	33040	Success	Success	Success	true	41144	33040	1.0	1.0	2.183573	118
+fisheye · 10 cm · AprilGrid	central spline	motion	median_px	2.046725	1.319636	-35.524508666283936	181	88	51585	23848	Success	Success	Success	true	51585	23848	1.0	1.0	1.319636	88
+fisheye · 10 cm · AprilGrid	central spline	motion	mean_px	2.314343	1.474382	-36.293712729703415	181	88	51585	23848	Success	Success	Success	true	51585	23848	1.0	1.0	1.474382	88
+fisheye · 10 cm · AprilGrid	central spline	motion	p95_px	5.79974	4.380913	-24.463631128291965	181	88	51585	23848	Success	Success	Success	true	51585	23848	1.0	1.0	4.380913	88
+fisheye · 10 cm · AprilGrid	central spline	motion	rms_px	3.309339	2.512089	-24.0909136235363	181	88	51585	23848	Success	Success	Success	true	51585	23848	1.0	1.0	2.512089	88
+Tamron · f/8 · Siemens stars	central spline	motion	median_px	2.119686	0.453143	-78.62216384879648	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.453143	24
+Tamron · f/8 · Siemens stars	central spline	motion	mean_px	2.958382	0.618418	-79.09607346177741	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.618418	24
+Tamron · f/8 · Siemens stars	central spline	motion	p95_px	6.930628	1.200247	-82.68198783717725	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	1.200247	24
+Tamron · f/8 · Siemens stars	central spline	motion	rms_px	3.351662	0.593928	-82.279597405705	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.593928	24
+14 mm · central_30cm · Siemens stars	Double Sphere	motion	median_px	0.970445	0.77469	-20.17167381974249	177	37	50445	10508	Success	Success	Success	true	50445	10508	1.0	1.0	0.77469	37
+14 mm · central_30cm · Siemens stars	Double Sphere	motion	mean_px	1.180465	0.947376	-19.745524009606388	177	37	50445	10508	Success	Success	Success	true	50445	10508	1.0	1.0	0.947376	37
+14 mm · central_30cm · Siemens stars	Double Sphere	motion	p95_px	3.345075	2.453975	-26.639163546407786	177	37	50445	10508	Success	Success	Success	true	50445	10508	1.0	1.0	2.453975	37
+14 mm · central_30cm · Siemens stars	Double Sphere	motion	rms_px	1.463474	1.178271	-19.488081100176696	177	37	50445	10508	Success	Success	Success	true	50445	10508	1.0	1.0	1.178271	37
+14 mm · central_30cm · AprilGrid	Double Sphere (Kalibr)	motion	median_px	2.001703	0.507969	-74.62315838063888	96	80	26016	21840	Success	Success	Success	true	26016	21840	1.0	1.0	0.507969	80
+14 mm · central_30cm · AprilGrid	Double Sphere (Kalibr)	motion	mean_px	2.220184	0.585462	-73.63002345751522	96	80	26016	21840	Success	Success	Success	true	26016	21840	1.0	1.0	0.585462	80
+14 mm · central_30cm · AprilGrid	Double Sphere (Kalibr)	motion	p95_px	4.455179	1.366484	-69.32819085383551	96	80	26016	21840	Success	Success	Success	true	26016	21840	1.0	1.0	1.366484	80
+14 mm · central_30cm · AprilGrid	Double Sphere (Kalibr)	motion	rms_px	2.954177	0.872409	-70.46862797997548	96	80	26016	21840	Success	Success	Success	true	26016	21840	1.0	1.0	0.872409	80
+Tamron · AprilGrid · 2026-11-08	Brown–Conrady	motion	median_px	2.173196	0.600761	-72.35587586209436	109	119	31065	33677	Success	Success	Success	true	31065	33677	1.0	1.0	0.600761	119
+Tamron · AprilGrid · 2026-11-08	Brown–Conrady	motion	mean_px	2.464012	0.78431	-68.16939203218166	109	119	31065	33677	Success	Success	Success	true	31065	33677	1.0	1.0	0.78431	119
+Tamron · AprilGrid · 2026-11-08	Brown–Conrady	motion	p95_px	6.255089	1.773944	-71.63998785628789	109	119	31065	33677	Success	Success	Success	true	31065	33677	1.0	1.0	1.773944	119
+Tamron · AprilGrid · 2026-11-08	Brown–Conrady	motion	rms_px	3.084952	1.07293	-65.22052855279435	109	119	31065	33677	Success	Success	Success	true	31065	33677	1.0	1.0	1.07293	119
+Tamron · AprilGrid · 2026-11-08	OpenCV-14	motion	median_px	0.407831	0.297099	-27.151442631874477	159	127	45156	34798	Success	Success	Success	true	45156	34798	1.0	1.0	0.297099	127
+Tamron · AprilGrid · 2026-11-08	OpenCV-14	motion	mean_px	0.525797	0.354996	-32.48420968548698	159	127	45156	34798	Success	Success	Success	true	45156	34798	1.0	1.0	0.354996	127
+Tamron · AprilGrid · 2026-11-08	OpenCV-14	motion	p95_px	0.928292	0.662827	-28.59714400210278	159	127	45156	34798	Success	Success	Success	true	45156	34798	1.0	1.0	0.662827	127
+Tamron · AprilGrid · 2026-11-08	OpenCV-14	motion	rms_px	0.735951	0.591481	-19.630383001042187	159	127	45156	34798	Success	Success	Success	true	45156	34798	1.0	1.0	0.591481	127
+Tamron · AprilGrid · 2026-11-08	Kannala–Brandt	motion	median_px	1.469578	2.296966	56.30106057657367	32	117	9088	32760	Success	Success	Success	true	9088	32760	1.0	1.0	2.296966	117
+Tamron · AprilGrid · 2026-11-08	Kannala–Brandt	motion	mean_px	1.75066	2.55757	46.091759679206696	32	117	9088	32760	Success	Success	Success	true	9088	32760	1.0	1.0	2.55757	117
+Tamron · AprilGrid · 2026-11-08	Kannala–Brandt	motion	p95_px	4.296042	5.123838	19.268806031225957	32	117	9088	32760	Success	Success	Success	true	9088	32760	1.0	1.0	5.123838	117
+Tamron · AprilGrid · 2026-11-08	Kannala–Brandt	motion	rms_px	2.385813	3.950679	65.59047167569292	32	117	9088	32760	Success	Success	Success	true	9088	32760	1.0	1.0	3.950679	117
+Tamron · AprilGrid · 2026-11-08	Double Sphere	motion	median_px	1.018895	1.440388	41.36765810019677	154	30	43120	8340	Success	Success	Success	true	43120	8340	1.0	1.0	1.440388	30
+Tamron · AprilGrid · 2026-11-08	Double Sphere	motion	mean_px	1.15196	1.621902	40.79499288169726	154	30	43120	8340	Success	Success	Success	true	43120	8340	1.0	1.0	1.621902	30
+Tamron · AprilGrid · 2026-11-08	Double Sphere	motion	p95_px	3.132518	4.309495	37.57287268580739	154	30	43120	8340	Success	Success	Success	true	43120	8340	1.0	1.0	4.309495	30
+Tamron · AprilGrid · 2026-11-08	Double Sphere	motion	rms_px	2.036148	2.683051	31.77092234945594	154	30	43120	8340	Success	Success	Success	true	43120	8340	1.0	1.0	2.683051	30
+Tamron · AprilGrid · 2026-11-08	central spline	motion	median_px	1.432246	1.893376	32.19628471645235	77	110	21714	30580	Success	Success	Success	true	21714	30580	1.0	1.0	1.893376	110
+Tamron · AprilGrid · 2026-11-08	central spline	motion	mean_px	1.833149	2.574198	40.42491908731915	77	110	21714	30580	Success	Success	Success	true	21714	30580	1.0	1.0	2.574198	110
+Tamron · AprilGrid · 2026-11-08	central spline	motion	p95_px	3.487081	5.791719	66.09075040126685	77	110	21714	30580	Success	Success	Success	true	21714	30580	1.0	1.0	5.791719	110
+Tamron · AprilGrid · 2026-11-08	central spline	motion	rms_px	2.121113	2.991829	41.04995820590418	77	110	21714	30580	Success	Success	Success	true	21714	30580	1.0	1.0	2.991829	110
+Tamron · 17 cm · Siemens stars	Brown–Conrady	motion	median_px	1.37875	0.95474	-30.753218495013595	54	50	14742	14250	Success	Success	Success	true	14742	14250	1.0	1.0	0.95474	50
+Tamron · 17 cm · Siemens stars	Brown–Conrady	motion	mean_px	1.561733	1.137761	-27.14753418157905	54	50	14742	14250	Success	Success	Success	true	14742	14250	1.0	1.0	1.137761	50
+Tamron · 17 cm · Siemens stars	Brown–Conrady	motion	p95_px	3.585826	2.433351	-32.13973572616184	54	50	14742	14250	Success	Success	Success	true	14742	14250	1.0	1.0	2.433351	50
+Tamron · 17 cm · Siemens stars	Brown–Conrady	motion	rms_px	2.165914	1.872128	-13.564065793932718	54	50	14742	14250	Success	Success	Success	true	14742	14250	1.0	1.0	1.872128	50
+Tamron · 17 cm · Siemens stars	Double Sphere	motion	median_px	1.696404	1.598452	-5.774096264804848	110	109	30910	29648	Success	MaxIters	Success	false	30910	29648	1.0	1.0	1.598452	109
+Tamron · 17 cm · Siemens stars	Double Sphere	motion	mean_px	2.12656	1.787554	-15.94152057783462	110	109	30910	29648	Success	MaxIters	Success	false	30910	29648	1.0	1.0	1.787554	109
+Tamron · 17 cm · Siemens stars	Double Sphere	motion	p95_px	5.810512	3.785364	-34.85317644985502	110	109	30910	29648	Success	MaxIters	Success	false	30910	29648	1.0	1.0	3.785364	109
+Tamron · 17 cm · Siemens stars	Double Sphere	motion	rms_px	2.834464	2.844887	0.367723844790403	110	109	30910	29648	Success	MaxIters	Success	false	30910	29648	1.0	1.0	2.844887	109
+Tamron · 17 cm · Siemens stars	Kannala–Brandt	motion	median_px	1.833709	0.98334	-46.37426112867418	24	93	6528	25110	Success	Success	Success	true	6528	25110	1.0	1.0	0.98334	93
+Tamron · 17 cm · Siemens stars	Kannala–Brandt	motion	mean_px	2.356139	1.112052	-52.80193570922599	24	93	6528	25110	Success	Success	Success	true	6528	25110	1.0	1.0	1.112052	93
+Tamron · 17 cm · Siemens stars	Kannala–Brandt	motion	p95_px	5.878339	3.181074	-45.88481542149917	24	93	6528	25110	Success	Success	Success	true	6528	25110	1.0	1.0	3.181074	93
+Tamron · 17 cm · Siemens stars	Kannala–Brandt	motion	rms_px	3.310796	1.478739	-55.33584672688984	24	93	6528	25110	Success	Success	Success	true	6528	25110	1.0	1.0	1.478739	93
+Tamron · 17 cm · Siemens stars	OpenCV-14	motion	median_px	0.48151	0.553487	14.948183838341874	34	118	9486	33394	Success	Success	Success	true	9486	33394	1.0	1.0	0.553487	118
+Tamron · 17 cm · Siemens stars	OpenCV-14	motion	mean_px	0.617103	0.717032	16.19324488780642	34	118	9486	33394	Success	Success	Success	true	9486	33394	1.0	1.0	0.717032	118
+Tamron · 17 cm · Siemens stars	OpenCV-14	motion	p95_px	1.552629	1.390861	-10.41897323829454	34	118	9486	33394	Success	Success	Success	true	9486	33394	1.0	1.0	1.390861	118
+Tamron · 17 cm · Siemens stars	OpenCV-14	motion	rms_px	0.716186	0.854445	19.30490124073914	34	118	9486	33394	Success	Success	Success	true	9486	33394	1.0	1.0	0.854445	118
+Tamron · 17 cm · Siemens stars	central spline	motion	median_px	1.223865	1.205509	-1.4998386259922492	94	22	27166	6314	Success	Success	Success	true	27166	6314	1.0	1.0	1.205509	22
+Tamron · 17 cm · Siemens stars	central spline	motion	mean_px	1.455762	1.484442	1.9701022557258698	94	22	27166	6314	Success	Success	Success	true	27166	6314	1.0	1.0	1.484442	22
+Tamron · 17 cm · Siemens stars	central spline	motion	p95_px	3.345481	3.118462	-6.785840361968873	94	22	27166	6314	Success	Success	Success	true	27166	6314	1.0	1.0	3.118462	22
+Tamron · 17 cm · Siemens stars	central spline	motion	rms_px	2.31013	2.01851	-12.623532009021137	94	22	27166	6314	Success	Success	Success	true	27166	6314	1.0	1.0	2.01851	22

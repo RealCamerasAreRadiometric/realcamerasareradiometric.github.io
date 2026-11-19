@@ -1,0 +1,197 @@
+# The paper config of record of the chrome evaluation (scripts/chrome_evaluation_paper.jl --config=<this>): the paper's chrome outputs,
+# straight from the chrome-board evaluations (scripts/chrome_evaluation.jl, ONE config per chrome set, [chrome.<key>] config: every
+# model scored on it — each start and its refinement — a row of its [evaluate] models; a table row or a figure panel names the set and
+# the row's label). Its stages (src/chrome_evaluation_paper.jl): sets — each set's pending stages (prepare, detect on the GPU, index,
+# evaluate) — and figures (the tables, their numbers and the residual maps):
+#   fig:color-wheels (color-wheels.png)  rows Tamron + OpenCV's Brown–Conrady on the AprilGrid at 17 cm, 14 mm + OpenCV-14 on the
+#                                        Siemens board (central_30cm), fisheye + the central spline of Schöps's pipeline on the AprilGrid at 10 cm;
+#                                        columns the geometric start and the radiometric refinement, the residuals as arrows; one
+#                                        rotation centre
+#   [tables.<name>] (table_<name>.{tsv,md,tex})  the median, mean, 95th percentile and RMS of the start and the refinement (one
+#                                        rotation centre) and the change in percent — radiometric_refinement (tab:refinement-chrome: every
+#                                        model on the geometric-accuracy sets), defocus (tab:defocus: the Tamron f/8 central spline
+#                                        with the aperture and the focus surface and as a pinhole), chrome_all (every model on every
+#                                        chrome set, a results table)
+# The geometric-accuracy sets: the 14 mm central_30cm (Siemens stars, AprilGrid400), the fisheye at 10 cm (AprilGrid), the 27.10
+# fisheye Siemens stars (excluded; from 2026-11-16 the 30 cm fisheye Siemens set), the Tamron Siemens stars at 17 cm and the Tamron
+# AprilGrid set of 2026-11-08.
+#
+# [chrome.<key>] keys: <lens>[_<set>], one per chrome set — fourteen (the 14 mm's central_30cm chrome photographs: the models of its
+# Siemens stars and of its AprilGrid400) | fisheye_tenth (the fisheye at 10 cm, AprilGrid) | fisheye_si27 (the 27.10 fisheye Siemens
+# stars, excluded) | fisheye_si30 (the fisheye 30 cm session's Siemens stars) | tamron_si17 (the Tamron Siemens stars at 17 cm) | tamron_ag08 (the Tamron AprilGrid set of 2026-11-08) | tamron_la (the
+# Tamron at f/8) | zoom48 (the zoom lens at 48 mm, f/10: the defocus experiment's third lens).
+# The block ends at the marker line `# --- end of [chrome] ---`; a [tables.<name>] rows list holds one row per line and closes with `]`
+# on its own line.
+
+[experiment]
+name = "chrome_evaluation_paper"
+
+[inputs]
+
+[chrome.fourteen]
+config = "configs/experiments/chrome_evaluation_fx3_14mm_central30cm.toml"
+
+[chrome.fisheye_tenth]
+config = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+
+[chrome.tamron_la]
+config = "configs/experiments/chrome_evaluation_fx3_tamron_largeaperture.toml"
+
+[chrome.tamron_si17]
+config = "configs/experiments/chrome_evaluation_fx3_tamron_17cm_si.toml"
+
+# the paper's fisheye Siemens set in place of the excluded 27.10 set (owner 2026-11-16): the 30 cm session (its Siemens set the front
+# end's [cases.fisheye30cm_siemens]); its rows are the Schöps start and the index fit, each with its refinement (radiometric_refinement.toml
+# cases si30fe_spline_warped, si30fe_kb_warped)
+[chrome.fisheye_si30]
+config = "configs/experiments/chrome_evaluation_fx3_fisheye_30cm_si.toml"
+
+[chrome.tamron_ag08]
+config = "configs/experiments/chrome_evaluation_fx3_tamron_20261108_ag.toml"
+
+[chrome.zoom48]
+config = "configs/experiments/chrome_evaluation_fx3_zoom48_f10.toml"
+
+# --- end of [chrome] ---
+
+[figures.color_wheels]
+asset = "color-wheels.png"
+variant = "motion"             # one rotation centre for the chrome set (the evaluation's motion fit)
+size = [4256, 2848]
+cols = 2
+dpi = 150
+title = ""
+# the residuals as thin black arrows instead of dense colour wheels —
+# src/figures.jl arrow_wheel_figure: of every one of `cells_x` cells across the sensor the measurement nearest its centre, its arrow's
+# length `vmax` px = 0.95 of a cell of `len_cells_x` across the sensor, the key in each panel; `view` per row: sensor | overflow (the
+# 14 mm: the sensor as the border, its arrows running past it) | zoom (the fisheye: its measured area enlarged).
+style = "arrows"
+cells_x = 45
+len_cells_x = 32
+panels = [
+    {chrome = "tamron_ag08", model = "ag08ta_bc5_start", label = "Tamron · Brown–Conrady (OpenCV, AprilGrid): geometric calibration", vmax = 0.5, view = "sensor"},
+    {chrome = "tamron_ag08", model = "ag08ta_bc5_refined", label = "Tamron · Brown–Conrady: radiometric refinement (ours)", vmax = 0.5, view = "sensor"},
+    {chrome = "fourteen", model = "si30_ocv14_start", label = "14 mm · OpenCV-14 (Siemens stars): geometric calibration", vmax = 1.0, view = "overflow"},
+    {chrome = "fourteen", model = "si30_ocv14_refined", label = "14 mm · OpenCV-14: radiometric refinement (ours)", vmax = 1.0, view = "overflow"},
+    {chrome = "fisheye_tenth", model = "ag10fe_spline_start", label = "fisheye · central spline (Schöps, AprilGrid at 10 cm): geometric calibration", vmax = 3.0, view = "zoom"},
+    {chrome = "fisheye_tenth", model = "ag10fe_spline_refined", label = "fisheye · central spline: radiometric refinement (ours)", vmax = 3.0, view = "zoom"},
+]
+
+# (the fisheye 27.10 Siemens set's rows: dropped from the paper's tables — configs/excluded.toml [excluded.fisheye2710_siemens], owner 2026-11-15)
+[tables.chrome_all]
+# every model on every chrome set: the four statistics of the start (blank where the set's configs evaluate no start: the Tamron f/8
+# pairs) and the refinement, one rotation centre, held out (variant "motion_heldout") with the in-sample score and the gap; the set labels group the rows of the md / tex tables
+variant = "motion_heldout"     # the headline: the parity-interleaved hold-out (each rotation-centre fit on one parity of the grid nodes scores the other; holdout = "on" in the sets' configs, owner 2026-11-15)
+confidence = "on"              # beside each change, the refined − start difference's 95 % interval of the set's paired photograph bootstrap (paired.tsv; owner 2026-11-15), * where it excludes 0
+in_sample_variant = "motion"   # beside it, per statistic: the refinement's in-sample score (the fit on every dot it scores) and the gap, held-out − in-sample [px]
+stats = ["median_px", "mean_px", "p95_px", "rms_px"]
+rows = [
+    {set = "14 mm · central_30cm · Siemens stars", model = "Brown–Conrady", chrome = "fourteen", start = "si30_bc5_start", refined = "si30_bc5_refined"},
+    {set = "14 mm · central_30cm · Siemens stars", model = "OpenCV-14", chrome = "fourteen", start = "si30_ocv14_start", refined = "si30_ocv14_refined"},
+    {set = "14 mm · central_30cm · Siemens stars", model = "Kannala–Brandt", chrome = "fourteen", start = "si30_kb_start", refined = "si30_kb_refined"},
+    {set = "14 mm · central_30cm · Siemens stars", model = "central spline", chrome = "fourteen", start = "si30_spline_start", refined = "si30_spline_refined"},
+    {set = "14 mm · central_30cm · AprilGrid", model = "Brown–Conrady", chrome = "fourteen", start = "ag30_bc5_start", refined = "ag30_bc5_refined"},
+    {set = "14 mm · central_30cm · AprilGrid", model = "OpenCV-14", chrome = "fourteen", start = "ag30_ocv14_start", refined = "ag30_ocv14_refined"},
+    {set = "14 mm · central_30cm · AprilGrid", model = "Kannala–Brandt", chrome = "fourteen", start = "ag30_kb_start", refined = "ag30_kb_refined"},
+    {set = "14 mm · central_30cm · AprilGrid", model = "central spline", chrome = "fourteen", start = "ag30_spline_start", refined = "ag30_spline_refined"},
+    {set = "fisheye · 10 cm · AprilGrid", model = "Brown–Conrady", chrome = "fisheye_tenth", start = "ag10fe_bc5_start", refined = "ag10fe_bc5_refined"},
+    {set = "fisheye · 10 cm · AprilGrid", model = "OpenCV-14", chrome = "fisheye_tenth", start = "ag10fe_ocv14_start", refined = "ag10fe_ocv14_refined"},
+    {set = "fisheye · 10 cm · AprilGrid", model = "Kannala–Brandt", chrome = "fisheye_tenth", start = "ag10fe_kb_start", refined = "ag10fe_kb_refined"},
+    {set = "fisheye · 10 cm · AprilGrid", model = "Double Sphere", chrome = "fisheye_tenth", start = "ag10fe_ds_start", refined = "ag10fe_ds_refined"},
+    {set = "fisheye · 10 cm · AprilGrid", model = "central spline", chrome = "fisheye_tenth", start = "ag10fe_spline_start", refined = "ag10fe_spline_refined"},
+    {set = "Tamron · f/8 · Siemens stars", model = "central spline", chrome = "tamron_la", start = "sitla_spline_start", refined = "sitla_spline_refined", macro = "aperture"},
+    {set = "14 mm · central_30cm · Siemens stars", model = "Double Sphere", chrome = "fourteen", start = "si30_ds_start", refined = "si30_ds_refined"},
+    {set = "14 mm · central_30cm · AprilGrid", model = "Double Sphere (Kalibr)", chrome = "fourteen", start = "ag30_ds_start", refined = "ag30_ds_refined"},
+    {set = "Tamron · AprilGrid · 2026-11-08", model = "Brown–Conrady", chrome = "tamron_ag08", start = "ag08ta_bc5_start", refined = "ag08ta_bc5_refined"},
+    {set = "Tamron · AprilGrid · 2026-11-08", model = "OpenCV-14", chrome = "tamron_ag08", start = "ag08ta_ocv14_start", refined = "ag08ta_ocv14_refined"},
+    {set = "Tamron · AprilGrid · 2026-11-08", model = "Kannala–Brandt", chrome = "tamron_ag08", start = "ag08ta_kb_start", refined = "ag08ta_kb_refined"},
+    {set = "Tamron · AprilGrid · 2026-11-08", model = "Double Sphere", chrome = "tamron_ag08", start = "ag08ta_ds_start", refined = "ag08ta_ds_refined"},
+    {set = "Tamron · AprilGrid · 2026-11-08", model = "central spline", chrome = "tamron_ag08", start = "ag08ta_spline_start", refined = "ag08ta_spline_refined"},
+    {set = "Tamron · 17 cm · Siemens stars", model = "Brown–Conrady", chrome = "tamron_si17", start = "si17ta_bc5_start", refined = "si17ta_bc5_refined"},
+    {set = "Tamron · 17 cm · Siemens stars", model = "Double Sphere", chrome = "tamron_si17", start = "si17ta_ds_start", refined = "si17ta_ds_refined"},
+    {set = "Tamron · 17 cm · Siemens stars", model = "Kannala–Brandt", chrome = "tamron_si17", start = "si17ta_kb_start", refined = "si17ta_kb_refined"},
+    {set = "Tamron · 17 cm · Siemens stars", model = "OpenCV-14", chrome = "tamron_si17", start = "si17ta_ocv14_start", refined = "si17ta_ocv14_refined"},
+    {set = "Tamron · 17 cm · Siemens stars", model = "central spline", chrome = "tamron_si17", start = "si17ta_spline_start", refined = "si17ta_spline_refined"},
+    {set = "fisheye · 30 cm · Siemens stars", model = "Double Sphere", chrome = "fisheye_si30", start = "si30fe_ds_start", refined = "si30fe_ds_refined"},
+    {set = "fisheye · 30 cm · Siemens stars", model = "Kannala–Brandt", chrome = "fisheye_si30", start = "si30fe_kb_start", refined = "si30fe_kb_refined"},
+    {set = "fisheye · 30 cm · Siemens stars", model = "OpenCV-14", chrome = "fisheye_si30", start = "si30fe_ocv14_start", refined = "si30fe_ocv14_refined"},
+    {set = "fisheye · 30 cm · Siemens stars", model = "central spline", chrome = "fisheye_si30", start = "si30fe_spline_start", refined = "si30fe_spline_refined"},
+]
+
+# (the fisheye 27.10 Siemens set's rows: dropped from the paper's tables — configs/excluded.toml [excluded.fisheye2710_siemens], owner 2026-11-15)
+[tables.refinement_chrome]
+# the paper's tab:refinement-chrome: one table across both columns with a block per geometric-accuracy set, a model per row, the
+# start, the refinement and the change of the four statistics, one rotation centre, held out (variant "motion_heldout") with the in-sample score and the gap; written to
+# plots/latex/table_refinement_chrome.tex (not deployed: the paper's Tab. 2 is the external refinement-table-ci.tex)
+variant = "motion_heldout"     # the headline: the parity-interleaved hold-out (each rotation-centre fit on one parity of the grid nodes scores the other; holdout = "on" in the sets' configs, owner 2026-11-15)
+confidence = "on"              # beside each change, the refined − start difference's 95 % interval of the set's paired photograph bootstrap (paired.tsv; owner 2026-11-15), * where it excludes 0
+in_sample_variant = "motion"   # beside it, per statistic: the refinement's in-sample score (the fit on every dot it scores) and the gap, held-out − in-sample [px]
+stats = ["median_px", "mean_px", "p95_px", "rms_px"]
+layout = "blocks"
+label = "tab:refinement-chrome"
+worse_color = "red"            # the refined value and change of a statistic that did not improve, in red
+mark_best = "on"               # the best value of each statistic per camera (the rows of one chrome set: both 14 mm blocks together), bold (owner 2026-11-15)
+inline_change = "on"           # per statistic "start → refined (change %)": an arrow between the values, the change in brackets behind the refinement, no % column (owner 2026-11-15)
+caption = "Chrome-board residuals [px] of each model's geometric calibration (start) and after our radiometric refinement (refined), with one rotation centre for all chrome photographs of a set: the median, mean, 95th percentile and RMS, each as start $\\rightarrow$ refined with the change in percent in brackets (negative: an improvement; red: no improvement; bold: the best value of each camera). Held out: each rotation-centre fit sees one parity of the grid's dots and scores the other."
+rows = [
+    {set = "14 mm, Siemens stars at 30 cm", model = "Brown–Conrady", chrome = "fourteen", start = "si30_bc5_start", refined = "si30_bc5_refined"},
+    {set = "14 mm, Siemens stars at 30 cm", model = "OpenCV-14", chrome = "fourteen", start = "si30_ocv14_start", refined = "si30_ocv14_refined"},
+    {set = "14 mm, Siemens stars at 30 cm", model = "Kannala–Brandt", chrome = "fourteen", start = "si30_kb_start", refined = "si30_kb_refined"},
+    {set = "14 mm, Siemens stars at 30 cm", model = "Double Sphere", chrome = "fourteen", start = "si30_ds_start", refined = "si30_ds_refined"},
+    {set = "14 mm, Siemens stars at 30 cm", model = "central spline", chrome = "fourteen", start = "si30_spline_start", refined = "si30_spline_refined"},
+    {set = "14 mm, AprilGrid at 30 cm", model = "Brown–Conrady", chrome = "fourteen", start = "ag30_bc5_start", refined = "ag30_bc5_refined"},
+    {set = "14 mm, AprilGrid at 30 cm", model = "OpenCV-14", chrome = "fourteen", start = "ag30_ocv14_start", refined = "ag30_ocv14_refined"},
+    {set = "14 mm, AprilGrid at 30 cm", model = "Kannala–Brandt", chrome = "fourteen", start = "ag30_kb_start", refined = "ag30_kb_refined"},
+    {set = "14 mm, AprilGrid at 30 cm", model = "Double Sphere", chrome = "fourteen", start = "ag30_ds_start", refined = "ag30_ds_refined"},
+    {set = "14 mm, AprilGrid at 30 cm", model = "central spline", chrome = "fourteen", start = "ag30_spline_start", refined = "ag30_spline_refined"},
+    {set = "fisheye, AprilGrid at 10 cm", model = "Brown–Conrady", chrome = "fisheye_tenth", start = "ag10fe_bc5_start", refined = "ag10fe_bc5_refined"},
+    {set = "fisheye, AprilGrid at 10 cm", model = "OpenCV-14", chrome = "fisheye_tenth", start = "ag10fe_ocv14_start", refined = "ag10fe_ocv14_refined"},
+    {set = "fisheye, AprilGrid at 10 cm", model = "Kannala–Brandt", chrome = "fisheye_tenth", start = "ag10fe_kb_start", refined = "ag10fe_kb_refined"},
+    {set = "fisheye, AprilGrid at 10 cm", model = "Double Sphere", chrome = "fisheye_tenth", start = "ag10fe_ds_start", refined = "ag10fe_ds_refined"},
+    {set = "fisheye, AprilGrid at 10 cm", model = "central spline", chrome = "fisheye_tenth", start = "ag10fe_spline_start", refined = "ag10fe_spline_refined"},
+    {set = "Tamron 20 mm, AprilGrid", model = "Brown–Conrady", chrome = "tamron_ag08", start = "ag08ta_bc5_start", refined = "ag08ta_bc5_refined"},
+    {set = "Tamron 20 mm, AprilGrid", model = "OpenCV-14", chrome = "tamron_ag08", start = "ag08ta_ocv14_start", refined = "ag08ta_ocv14_refined"},
+    {set = "Tamron 20 mm, AprilGrid", model = "Kannala–Brandt", chrome = "tamron_ag08", start = "ag08ta_kb_start", refined = "ag08ta_kb_refined"},
+    {set = "Tamron 20 mm, AprilGrid", model = "Double Sphere", chrome = "tamron_ag08", start = "ag08ta_ds_start", refined = "ag08ta_ds_refined"},
+    {set = "Tamron 20 mm, AprilGrid", model = "central spline", chrome = "tamron_ag08", start = "ag08ta_spline_start", refined = "ag08ta_spline_refined"},
+    {set = "Tamron 20 mm, Siemens stars at 17 cm", model = "Brown–Conrady", chrome = "tamron_si17", start = "si17ta_bc5_start", refined = "si17ta_bc5_refined"},
+    {set = "Tamron 20 mm, Siemens stars at 17 cm", model = "OpenCV-14", chrome = "tamron_si17", start = "si17ta_ocv14_start", refined = "si17ta_ocv14_refined"},
+    {set = "Tamron 20 mm, Siemens stars at 17 cm", model = "Kannala–Brandt", chrome = "tamron_si17", start = "si17ta_kb_start", refined = "si17ta_kb_refined"},
+    {set = "Tamron 20 mm, Siemens stars at 17 cm", model = "Double Sphere", chrome = "tamron_si17", start = "si17ta_ds_start", refined = "si17ta_ds_refined"},
+    {set = "Tamron 20 mm, Siemens stars at 17 cm", model = "central spline", chrome = "tamron_si17", start = "si17ta_spline_start", refined = "si17ta_spline_refined"},
+    {set = "8 mm fisheye, Siemens stars at 30 cm", model = "OpenCV-14", chrome = "fisheye_si30", start = "si30fe_ocv14_start", refined = "si30fe_ocv14_refined"},
+    {set = "8 mm fisheye, Siemens stars at 30 cm", model = "Kannala–Brandt", chrome = "fisheye_si30", start = "si30fe_kb_start", refined = "si30fe_kb_refined"},
+    {set = "8 mm fisheye, Siemens stars at 30 cm", model = "Double Sphere", chrome = "fisheye_si30", start = "si30fe_ds_start", refined = "si30fe_ds_refined"},
+    {set = "8 mm fisheye, Siemens stars at 30 cm", model = "central spline", chrome = "fisheye_si30", start = "si30fe_spline_start", refined = "si30fe_spline_refined"},
+]
+
+[tables.defocus]
+# the paper's tab:defocus — the defocus experiment: the Tamron 20 mm at f/8 (Siemens stars at ≈ 0.5 m), the central spline refined with
+# the aperture and the focus surface and as the plain pinhole, both from the same geometric start, scored on the chrome board (one
+# rotation centre), and the zoom lens at 48 mm, f/10, the same pair: one table* with a block per lens, the pinhole row first, then ours
+# (layout "blocks", as tab:refinement-chrome; owner 2026-11-15), a non-improvement in red;
+# plots/latex/table_defocus.tex (not deployed: the paper's Tab. 3 is the external defocus-table-ci.tex)
+# The zoom's Brown–Conrady pair (owner GO 2026-11-17, T. Harder's Table 3 as he defined it): rows beside the spline's, the owner decides which to show.
+variant = "motion_heldout"     # the headline: the parity-interleaved hold-out (each rotation-centre fit on one parity of the grid nodes scores the other; holdout = "on" in the sets' configs, owner 2026-11-15)
+confidence = "on"              # beside each change, the refined − start difference's 95 % interval of the set's paired photograph bootstrap (paired.tsv; owner 2026-11-15), * where it excludes 0
+in_sample_variant = "motion"   # beside it, per statistic: the refinement's in-sample score (the fit on every dot it scores) and the gap, held-out − in-sample [px]
+stats = ["median_px", "mean_px", "p95_px", "rms_px"]
+layout = "blocks"
+label = "tab:defocus"
+worse_color = "red"
+mark_best = "on"               # the best value of each statistic per camera (its chrome set), bold
+inline_change = "on"           # as tab:refinement-chrome
+numbers_prefix = "defocus"     # its number macros (\defocus<Row><Stat>{Start,Refined,Change}, \defocus<Stat>ImprovementGain): numbers.tex
+caption = "Defocus: chrome-board residuals [px] of the Tamron 20\\,mm at $f/8$ (Siemens stars at $\\approx 0.5$\\,m) and the zoom lens at 48\\,mm, $f/10$, each lens's central spline's geometric calibration (start) and our radiometric refinement with the finite aperture and the focus surface or as a pinhole without defocus, one rotation centre for all chrome photographs: the median, mean, 95th percentile and RMS, each as start $\\rightarrow$ refined with the change in percent in brackets (negative: an improvement; red: no improvement; bold: the best value of each camera). Held out: each rotation-centre fit sees one parity of the grid's dots and scores the other."
+rows = [
+    {set = "Tamron 20 mm, Siemens stars ($f/8$)", model = "pinhole (no defocus)", chrome = "tamron_la", start = "sitla_spline_start", refined = "sitla_spline_pinhole_refined", macro = "pinhole"},
+    {set = "Tamron 20 mm, Siemens stars ($f/8$)", model = "with aperture + focus surface", chrome = "tamron_la", start = "sitla_spline_start", refined = "sitla_spline_refined", macro = "aperture"},
+    {set = "zoom 48 mm (f/10)", model = "pinhole (no defocus)", chrome = "zoom48", start = "sizl_spline_start", refined = "sizl_spline_pinhole_refined", macro = "zoomPinhole"},
+    {set = "zoom 48 mm (f/10)", model = "with aperture + focus surface", chrome = "zoom48", start = "sizl_spline_start", refined = "sizl_spline_refined", macro = "zoomAperture"},
+    {set = "zoom 48 mm (f/10)", model = "Brown–Conrady, pinhole (no defocus)", chrome = "zoom48", start = "sizl_bc5_start", refined = "sizl_bc5_pinhole_refined", macro = "zoomBcPinhole"},
+    {set = "zoom 48 mm (f/10)", model = "Brown–Conrady, with aperture + focus surface", chrome = "zoom48", start = "sizl_bc5_start", refined = "sizl_bc5_refined", macro = "zoomBcAperture"},
+]
+
+[render]
+significant_digits = 3         # of a pixel value in the md and tex tables (the CSV keeps every number raw)
+change_digits = 2              # of a change in percent

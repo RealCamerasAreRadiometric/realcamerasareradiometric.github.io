@@ -1,0 +1,32 @@
+# RATIONALE
+#   question:   why does the held-out Thorlabs error of the fisheye 30 cm spline (si30fe_spline_warped) not fall over the LM iterations,
+#               and does the spline's smoothness weight bind?
+#   hypothesis: the P-spline smoothness ([grid.smoothness] weight 0.1) holds the lattice back at the rim; a weaker weight lets the
+#               Thorlabs error fall
+#   decides:    [grid.smoothness] weight of record for the spline cases
+#   decided:    the weight 0.1 kept: it does not bind (the three weights give the same per-iteration curves); the held-out RMS rise comes
+#               from ≈ 23 dots at the top rim of the image circle (ρ ≈ 0.98; the top 0.1 % of the dots carry 43 % of the squared error at
+#               iteration 30; the RMS without the worst 1 % falls 0.385 → 0.223 px), with a centre median drift 0.062 → 0.094 px
+#   evidence:   branch exp-convergence-si30fe, scratch root /raid/data/jpr/rc-results-exp-conv (reproduction
+#               43916ed01eaa82a8 of T. Harder's curves: held-out RMS 0.479 → 0.582 @12 → 0.502 @30, median 0.121 → 0.085 @9 → 0.101);
+#               each arm against its start: median −0.023 px *, p95 −0.52 px *, RMS n.s.; 25 vs 30 iterations: 25 better on the median
+#   owner:      J. Pritts (2026-11-17 ~09:45: "three runs, 25 iterations each, weight 0.1 / 0.01 / 0.001")
+#   date:       2026-11-17
+#
+# The study's refinements: the case of record si30fe_spline_warped (fisheye, Siemens stars at 30 cm, the central spline) as an OVERRIDE
+# of the refinements' config of record (src/drivers.jl expand_overrides; the scratch copies of the config on the branch are not
+# carried): the smoothness weight at 0.1 (the record's), 0.01 and 0.001, each at 25 LM iterations (the record's 50 cut to the arms'
+# common count). Its convergence analysis per arm is configs/studies/convergence_smoothness_si30fe.toml. Products under
+# results_root()/studies/radiometric_refinement_smoothness_si30fe/.
+#   julia --project=experiments experiments/scripts/radiometric_refinement.jl --config=experiments/configs/studies/radiometric_refinement_smoothness_si30fe.toml --plan
+
+[experiment]
+name = "radiometric_refinement"
+base = "configs/experiments/radiometric_refinement.toml"
+cases = ["si30fe_spline_warped"]
+
+[overrides]
+"grid.smoothness" = [{ type = "pspline", order = 3, weight = 0.1 },     # the record's (radiometric_refinement.toml [cases.si30fe_spline_warped])
+                     { type = "pspline", order = 3, weight = 0.01 },    # /10 (owner 2026-11-17)
+                     { type = "pspline", order = 3, weight = 0.001 }]   # /100 (owner 2026-11-17)
+"lm.max_iter" = [25]                            # 25 for every arm (owner 2026-11-17; the record's 50)

@@ -1,0 +1,339 @@
+# Config of record of the paper's large-aperture refinements (scripts/radiometric_refinement.jl with --config=<this>): per lens the Schöps
+# central-generic start refined radiometrically on the 28.10.26 Siemens-star photographs taken at a LARGE aperture (f/4; the Tamron f/2.8)
+# for strong vignetting; fig:focus-surfaces reads the fisheye's camera (configs/experiments/focus_surfaces.toml).
+#
+# The grid: 35 × 25 controls, the nodes outside the imaged region dependent.
+#
+# [vignetting] boundary_order = 2 named in every case — RadiometricCamera 0.7.0 continues the radial profile's dependent control
+# points (below support_min of the data weight) with Core's BoundaryRule, the natural Δ²c = 0 (held constant before: the plateaus at
+# the ends of fig:vignetting's diagonals); the option names the rule the runs are keyed by.
+#
+# Paths are relative to data_root() (VGTK_DATA_ROOT). Raw photographs: Hugging Face radiometric-camera/radiometric-camera-data
+# 28.10.26/<lens>/SiemensStars.
+
+[experiment]
+name = "radiometric_refinement"
+
+[kinds]
+source = "configs/experiments/radiometric_refinement.toml"   # the samples per view of every spline case (owner 2026-11-16 23:30), stated there once
+
+
+[runs.siemens_1m_distance_map]
+config = "configs/experiments/distance_maps.toml"
+run = "maps.siemens_1m"
+path = "distance_map.json"
+stage = "refine"
+provenance = "the 1 m Siemens-star print's printed-edge distance map, a vgio/raster record (edge.sdf): the step [maps.siemens_1m] of distance_maps.toml (scripts/distance_maps.jl), keyed by the board generator's sdf.f32 + sdf.json (each pinned by its sha256), produced on demand when missing (owner 2026-11-16: a derived file is produced, never an input of record)"
+
+[inputs.fx3_sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+stage = "refine"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+
+[inputs.raw_14mm_siemens_20261028]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/14mm/siemens-stars"
+stage = "prepare"
+provenance = "the Siemens-star photographs (Sony FX3 ARW + HIF) of the 1 m board with the Sigma 14 mm F2.8 at f/4, captured on 2026-10-28; Hugging Face 28.10.26/14mm/SiemensStars"
+
+[inputs.raw_fisheye_siemens_20261028]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/fisheye/siemens-stars"
+stage = "prepare"
+provenance = "the Siemens-star photographs (Sony FX3 ARW + HIF) of the 1 m board with the Sigma 8 mm F3.5 fisheye at f/4, captured on 2026-10-28; Hugging Face 28.10.26/fisheye/SiemensStars"
+
+[inputs.raw_tamron_siemens_20261028]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/tamron/siemens-stars"
+stage = "prepare"
+provenance = "the Siemens-star photographs (Sony FX3 ARW + HIF) of the 1 m board with the Tamron 20 mm F2.8 at f/2.8, captured on 2026-10-28; Hugging Face 28.10.26/Tamron/SiemensStars"
+
+# ---- the starts: the front end's Schöps runs of the 28.10 sets (owner 2026-11-16: every Schöps start reads raw_green), in place of the
+# frozen rc_baselines runs on the sRGB copies (night_stars/data/fx3-*-siemens-2026-10-28/schoeps)
+[runs.fx3_14mm_siemens_20261028_schoeps]
+config = "configs/experiments/frontends.toml"
+run = "schoeps.vig14mm_f4_siemens_w20"
+path = ""
+stage = "detect"
+provenance = "T. Schöps's central-generic of the 14 mm f/4 Siemens set of 2026-10-28 made by the project's front end (frontends.toml [schoeps.vig14mm_f4_siemens_w20]: the bilinear green on the raw grid (owner 2026-11-16), cell 150, window 20, the frozen arguments verbatim)"
+
+[runs.fx3_fisheye_siemens_20261028_schoeps]
+config = "configs/experiments/frontends.toml"
+run = "schoeps.vigfisheye_f4_siemens_w10"
+path = ""
+stage = "detect"
+provenance = "T. Schöps's central-generic of the fisheye f/4 Siemens set of 2026-10-28 made by the project's front end (frontends.toml [schoeps.vigfisheye_f4_siemens_w10]: the bilinear green on the raw grid (owner 2026-11-16), cell 150, window 10, the frozen arguments verbatim)"
+
+[runs.fx3_tamron_siemens_20261028_schoeps]
+config = "configs/experiments/frontends.toml"
+run = "schoeps.vigtamron_f28_siemens_w10"
+path = ""
+stage = "detect"
+provenance = "T. Schöps's central-generic of the Tamron f/2.8 Siemens set of 2026-10-28 made by the project's front end (frontends.toml [schoeps.vigtamron_f28_siemens_w10]: the bilinear green on the raw grid (owner 2026-11-16), cell 150, window 10, the frozen arguments verbatim)"
+
+[inputs.siemens_board]
+tier = "rc_calibration"
+path = "geometric_accuracy/data/target/siemens_1m/board"
+stage = "refine"
+provenance = "the 1 m Siemens-star print: texture.png, texture_features.bin (Schöps's detector on the 4000 × 4000 px texture), the printed-edge distance map sdf.f32 + sdf.json"
+
+[inputs.raw_14mm_diffuser_20261028]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/14mm/diffuser"
+stage = "detect"
+provenance = "the diffuser flat-field photographs of the Sigma 14 mm at f/4 in its housing, captured on 2026-10-28 with the f/4 Siemens-star set (Hugging Face 28.10.26/14mm/Diffuser): the capture session's coverage frames ([image_regions.fx3_14mm_f4_20261028])"
+
+# ---- the lens coverage of each set (src/image_region.jl; owner ruling 2026-11-15): measured on the set's own frames, or the sensor --
+# The 14 mm's f/4 sets of 2026-10-28 (this Siemens set, the diffuser) were taken in the lens's housing, which cuts the
+# light inside the sensor: their coverage is measured once, on the session's diffuser flat DSC04161 (the coordinator's classification,
+# job 18294: centre ≈ (2132, 1426), semi-axes ≈ 1719 / 1717 px, cut by the frame).
+[image_regions.fx3_14mm_f4_20261028]
+input = "raw_14mm_diffuser_20261028"
+frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # sha256sum on dgx01 (2026-11-15)
+image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+seed = 1                       # the RANSAC ellipse fit's StableRNG seed: the cases' masks.seed, which seeded the in-run measurement before 2026-11-15
+
+# The fisheye's f/4 Siemens set of 2026-10-28: its image circle lies inside the frame; measured on five of the set's own photographs
+# (DSC04845–48, DSC04853: the frames of the runs of 2026-10-31, as RAW, the green cells).
+[image_regions.fx3_fisheye_siemens_20261028]
+input = "raw_fisheye_siemens_20261028"
+frames = { "DSC04845.ARW" = "c489a8df1c700b12c34f34466ad25375f8b22fb8d07eb8f29d11c9215cce5639", "DSC04846.ARW" = "fadcc183d874c1c6b7e2bddb3b93fd7c62639c4f048812e0f3752566d357e4f2", "DSC04847.ARW" = "651d8845ba8a645af944bea43e4f7db705bb75472dc6486414251e69e4469a59", "DSC04848.ARW" = "a8abfe3ad4315ca7d1a9fc3ff1cfd5d7aa9ecf8d675dad75faec38856406a023", "DSC04853.ARW" = "6f7168c0451410ea6d5b474ddf6fda2f1f8dd8f5bdead4201068a2036f101d4b" }   # sha256sum on dgx01 (2026-11-15)
+image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+seed = 1                       # as above
+
+[prepare.fx3_14mm_siemens_20261028]
+raw = "raw_14mm_siemens_20261028"
+mode = "photosites"               # the RAW photographs read, not decoded: compared at their GREEN PHOTOSITES on the raw grid (RadiometricCamera io.photosites; owner ruling 2026-11-12); no gain
+
+[prepare.fx3_fisheye_siemens_20261028]
+raw = "raw_fisheye_siemens_20261028"
+mode = "photosites"               # the RAW photographs read, not decoded: compared at their GREEN PHOTOSITES on the raw grid (RadiometricCamera io.photosites; owner ruling 2026-11-12); no gain
+
+[prepare.fx3_tamron_siemens_20261028]
+raw = "raw_tamron_siemens_20261028"
+mode = "photosites"               # the RAW photographs read, not decoded: compared at their GREEN PHOTOSITES on the raw grid (RadiometricCamera io.photosites; owner ruling 2026-11-12); no gain
+
+[views]
+# the 174 views (Schöps's registered views: every photograph with ≥ 20 stars in frontends.toml [schoeps.vig14mm_f4_siemens_w20], views.txt, 2026-11-16)
+fx3_14mm_siemens_20261028_f4 = ["DSC04656.png", "DSC04657.png", "DSC04658.png", "DSC04659.png", "DSC04660.png", "DSC04661.png", "DSC04662.png", "DSC04663.png", "DSC04664.png", "DSC04665.png", "DSC04666.png", "DSC04667.png", "DSC04668.png", "DSC04669.png", "DSC04670.png", "DSC04671.png", "DSC04672.png", "DSC04673.png", "DSC04674.png", "DSC04675.png", "DSC04676.png", "DSC04677.png", "DSC04678.png", "DSC04679.png", "DSC04680.png", "DSC04681.png", "DSC04682.png", "DSC04683.png", "DSC04684.png", "DSC04685.png", "DSC04686.png", "DSC04687.png", "DSC04688.png", "DSC04689.png", "DSC04690.png", "DSC04691.png", "DSC04692.png", "DSC04693.png", "DSC04694.png", "DSC04695.png", "DSC04696.png", "DSC04697.png", "DSC04698.png", "DSC04699.png", "DSC04700.png", "DSC04701.png", "DSC04702.png", "DSC04703.png", "DSC04704.png", "DSC04705.png", "DSC04706.png", "DSC04707.png", "DSC04708.png", "DSC04709.png", "DSC04710.png", "DSC04711.png", "DSC04712.png", "DSC04713.png", "DSC04714.png", "DSC04715.png", "DSC04716.png", "DSC04717.png", "DSC04718.png", "DSC04719.png", "DSC04720.png", "DSC04721.png", "DSC04722.png", "DSC04723.png", "DSC04724.png", "DSC04725.png", "DSC04726.png", "DSC04727.png", "DSC04728.png", "DSC04729.png", "DSC04730.png", "DSC04731.png", "DSC04732.png", "DSC04733.png", "DSC04734.png", "DSC04735.png", "DSC04736.png", "DSC04737.png", "DSC04738.png", "DSC04739.png", "DSC04740.png", "DSC04741.png", "DSC04742.png", "DSC04743.png", "DSC04744.png", "DSC04745.png", "DSC04746.png", "DSC04747.png", "DSC04748.png", "DSC04749.png", "DSC04750.png", "DSC04751.png", "DSC04752.png", "DSC04753.png", "DSC04754.png", "DSC04755.png", "DSC04756.png", "DSC04757.png", "DSC04758.png", "DSC04759.png", "DSC04760.png", "DSC04761.png", "DSC04762.png", "DSC04763.png", "DSC04764.png", "DSC04765.png", "DSC04766.png", "DSC04767.png", "DSC04768.png", "DSC04769.png", "DSC04770.png", "DSC04771.png", "DSC04772.png", "DSC04773.png", "DSC04774.png", "DSC04775.png", "DSC04776.png", "DSC04777.png", "DSC04778.png", "DSC04779.png", "DSC04780.png", "DSC04781.png", "DSC04782.png", "DSC04783.png", "DSC04784.png", "DSC04785.png", "DSC04786.png", "DSC04787.png", "DSC04788.png", "DSC04789.png", "DSC04790.png", "DSC04791.png", "DSC04792.png", "DSC04793.png", "DSC04794.png", "DSC04795.png", "DSC04796.png", "DSC04797.png", "DSC04798.png", "DSC04799.png", "DSC04800.png", "DSC04801.png", "DSC04802.png", "DSC04803.png", "DSC04804.png", "DSC04805.png", "DSC04806.png", "DSC04807.png", "DSC04808.png", "DSC04809.png", "DSC04810.png", "DSC04811.png", "DSC04812.png", "DSC04813.png", "DSC04814.png", "DSC04815.png", "DSC04816.png", "DSC04817.png", "DSC04818.png", "DSC04819.png", "DSC04820.png", "DSC04821.png", "DSC04822.png", "DSC04823.png", "DSC04824.png", "DSC04825.png", "DSC04826.png", "DSC04827.png", "DSC04828.png", "DSC04829.png"]
+# the 71 views (Schöps's registered views: every photograph with ≥ 20 stars in frontends.toml [schoeps.vigfisheye_f4_siemens_w10], views.txt, 2026-11-16)
+fx3_fisheye_siemens_20261028_f4 = ["DSC04830.png", "DSC04842.png", "DSC04845.png", "DSC04846.png", "DSC04847.png", "DSC04848.png", "DSC04853.png", "DSC04854.png", "DSC04855.png", "DSC04858.png", "DSC04859.png", "DSC04861.png", "DSC04862.png", "DSC04863.png", "DSC04867.png", "DSC04868.png", "DSC04869.png", "DSC04870.png", "DSC04871.png", "DSC04872.png", "DSC04873.png", "DSC04887.png", "DSC04888.png", "DSC04889.png", "DSC04890.png", "DSC04891.png", "DSC04893.png", "DSC04894.png", "DSC04895.png", "DSC04896.png", "DSC04897.png", "DSC04898.png", "DSC04899.png", "DSC04900.png", "DSC04901.png", "DSC04902.png", "DSC04903.png", "DSC04904.png", "DSC04905.png", "DSC04906.png", "DSC04907.png", "DSC04908.png", "DSC04917.png", "DSC04922.png", "DSC04932.png", "DSC04933.png", "DSC04934.png", "DSC04935.png", "DSC04936.png", "DSC04937.png", "DSC04938.png", "DSC04939.png", "DSC04940.png", "DSC04941.png", "DSC04942.png", "DSC04943.png", "DSC04944.png", "DSC04945.png", "DSC04946.png", "DSC04947.png", "DSC04948.png", "DSC04949.png", "DSC04950.png", "DSC04955.png", "DSC04968.png", "DSC04970.png", "DSC04981.png", "DSC04983.png", "DSC04984.png", "DSC04987.png", "DSC04988.png"]
+# the 139 views (Schöps's registered views: every photograph with ≥ 20 stars in frontends.toml [schoeps.vigtamron_f28_siemens_w10], views.txt, 2026-11-16)
+fx3_tamron_siemens_20261028_f4 = ["DSC04176.png", "DSC04177.png", "DSC04178.png", "DSC04182.png", "DSC04183.png", "DSC04184.png", "DSC04185.png", "DSC04186.png", "DSC04187.png", "DSC04188.png", "DSC04189.png", "DSC04190.png", "DSC04191.png", "DSC04192.png", "DSC04193.png", "DSC04194.png", "DSC04195.png", "DSC04196.png", "DSC04197.png", "DSC04198.png", "DSC04199.png", "DSC04206.png", "DSC04210.png", "DSC04211.png", "DSC04217.png", "DSC04218.png", "DSC04219.png", "DSC04220.png", "DSC04221.png", "DSC04222.png", "DSC04223.png", "DSC04224.png", "DSC04225.png", "DSC04226.png", "DSC04227.png", "DSC04228.png", "DSC04229.png", "DSC04230.png", "DSC04231.png", "DSC04232.png", "DSC04233.png", "DSC04234.png", "DSC04235.png", "DSC04236.png", "DSC04237.png", "DSC04238.png", "DSC04239.png", "DSC04240.png", "DSC04241.png", "DSC04242.png", "DSC04243.png", "DSC04244.png", "DSC04245.png", "DSC04246.png", "DSC04247.png", "DSC04248.png", "DSC04249.png", "DSC04250.png", "DSC04251.png", "DSC04252.png", "DSC04253.png", "DSC04254.png", "DSC04255.png", "DSC04256.png", "DSC04257.png", "DSC04258.png", "DSC04259.png", "DSC04260.png", "DSC04261.png", "DSC04271.png", "DSC04272.png", "DSC04273.png", "DSC04274.png", "DSC04276.png", "DSC04277.png", "DSC04278.png", "DSC04279.png", "DSC04280.png", "DSC04281.png", "DSC04283.png", "DSC04284.png", "DSC04285.png", "DSC04286.png", "DSC04287.png", "DSC04288.png", "DSC04289.png", "DSC04290.png", "DSC04292.png", "DSC04293.png", "DSC04294.png", "DSC04295.png", "DSC04296.png", "DSC04297.png", "DSC04298.png", "DSC04299.png", "DSC04300.png", "DSC04301.png", "DSC04302.png", "DSC04303.png", "DSC04304.png", "DSC04305.png", "DSC04306.png", "DSC04307.png", "DSC04308.png", "DSC04309.png", "DSC04310.png", "DSC04311.png", "DSC04312.png", "DSC04313.png", "DSC04314.png", "DSC04315.png", "DSC04316.png", "DSC04317.png", "DSC04318.png", "DSC04319.png", "DSC04320.png", "DSC04321.png", "DSC04322.png", "DSC04323.png", "DSC04324.png", "DSC04325.png", "DSC04326.png", "DSC04327.png", "DSC04328.png", "DSC04329.png", "DSC04330.png", "DSC04331.png", "DSC04332.png", "DSC04333.png", "DSC04334.png", "DSC04335.png", "DSC04336.png", "DSC04337.png", "DSC04338.png", "DSC04339.png", "DSC04340.png", "DSC04341.png", "DSC04342.png", "DSC04343.png"]
+
+# the Sigma 14 mm F2.8 at f/4: Schöps's central-generic grid refined with the poses, focus, aperture, material, board warping (from flat),
+# the radial V and the lighting; the printed edge fixed (σ_print 0.0277 mm, no camera σ).
+[cases.f4_14mm_spline_warped]
+kind = "grid"
+images = "fx3_14mm_siemens_20261028"
+views = "fx3_14mm_siemens_20261028_f4"
+[cases.f4_14mm_spline_warped.pipeline.io]
+checkpoint_each = "on"
+linearize = "off"
+channel = "G"                      # the green photosites: one measurement each, one channel (photosites; was "RGB", which counted each three times)
+[cases.f4_14mm_spline_warped.pipeline.frontend]
+type = "schoeps"
+schoeps = "run:fx3_14mm_siemens_20261028_schoeps"
+texture = "geometric_accuracy/data/target/siemens_1m/board/texture.png"
+texture_features = "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"
+texture_features_size = [4000, 4000]
+page_mm = [1000.0, 1000.0]
+print_scale = 1.0
+[cases.f4_14mm_spline_warped.pipeline.camera]
+sensor_mm = 35.6
+f_mm = 14.6776
+fnumber = 4.0
+lens_coverage = "image_region:fx3_14mm_f4_20261028"   # the housing cuts the light inside the sensor: the session's measured image region ([image_regions])
+sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+[cases.f4_14mm_spline_warped.pipeline.grid]
+lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
+                                #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
+nodes = "interior"
+[cases.f4_14mm_spline_warped.pipeline.grid.smoothness]
+type = "pspline"
+order = 3                         # the third differences Δ³ of the grid correction (the grid A/B's winner)
+weight = 0.1
+[cases.f4_14mm_spline_warped.pipeline.masks]
+gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
+seed = 1
+[cases.f4_14mm_spline_warped.pipeline.rendering]
+N = 16
+n_p = 2
+hammersley = "on"
+n_rho = 3
+n_phi = 8
+[cases.f4_14mm_spline_warped.pipeline.lighting]
+sh_order = 2
+[cases.f4_14mm_spline_warped.pipeline.material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.0
+eta_noink = 1.3
+mu = 0.244
+mu_bounds = [0.0, 1.0]
+[cases.f4_14mm_spline_warped.pipeline.vignetting]
+model = "radial"
+node_count = 19   # the projective chart's 19: 16 functions on the fitted pixels, as the linear 16 (T. Harder; Core 0.10.11)
+degree = 3
+support_min = 0.1
+boundary_order = 2             # the dependent points (below support_min) continue the supported ones with Δ²c = 0 — RC 0.7.0's rule for the radial profile (constant before); named, so the runs are keyed by it
+[cases.f4_14mm_spline_warped.pipeline.warping]
+degree = 1
+inplane = "aspect_skew"          # # the printed pattern's in-plane aspect and skew are estimated; owner ruling 2026-11-13 (Core's Aspect ∘ Skew in the placed chart; "inplane" not in fixed)
+inplane_start = [0.0, 0.0]       # started at the design as printed
+[cases.f4_14mm_spline_warped.pipeline.edge]
+sdf = "run:siemens_1m_distance_map"
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+[cases.f4_14mm_spline_warped.pipeline.lm]
+max_iter = 25                     # 25, owner 2026-11-14: the 14 mm si30_spline_warped run (Schöps start, photosites + FX3 all-darks) flattened by ~20 iterations (rel-RMS 0.2901 @10, 0.2876 @21, 0.2872 @47); doubling the pixels left the trajectory unchanged to 3–4 digits
+max_time = 36000.0
+[cases.f4_14mm_spline_warped.pipeline.compute]
+backend = "gpu"
+jacobian_chunk = 4
+
+# the Sigma 8 mm F3.5 fisheye at f/4: Schöps's central-generic grid refined with the poses, focus, aperture, material, board warping (from flat),
+# the radial V and the lighting; the printed edge fixed (σ_print 0.0277 mm, no camera σ).
+[cases.f4_fisheye_spline_warped]
+kind = "grid"
+images = "fx3_fisheye_siemens_20261028"
+views = "fx3_fisheye_siemens_20261028_f4"
+[cases.f4_fisheye_spline_warped.pipeline.io]
+checkpoint_each = "on"
+linearize = "off"
+channel = "G"                      # the green photosites: one measurement each, one channel (photosites; was "RGB", which counted each three times)
+[cases.f4_fisheye_spline_warped.pipeline.frontend]
+type = "schoeps"
+schoeps = "run:fx3_fisheye_siemens_20261028_schoeps"
+texture = "geometric_accuracy/data/target/siemens_1m/board/texture.png"
+texture_features = "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"
+texture_features_size = [4000, 4000]
+page_mm = [1000.0, 1000.0]
+print_scale = 1.0
+[cases.f4_fisheye_spline_warped.pipeline.camera]
+sensor_mm = 35.6
+f_mm = 7.8057
+fnumber = 4.0
+lens_coverage = "image_region:fx3_fisheye_siemens_20261028"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
+sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+[cases.f4_fisheye_spline_warped.pipeline.grid]
+lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
+                                #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
+nodes = "interior"
+[cases.f4_fisheye_spline_warped.pipeline.grid.smoothness]
+type = "pspline"
+order = 3                         # the third differences Δ³ of the grid correction (the grid A/B's winner)
+weight = 0.1
+[cases.f4_fisheye_spline_warped.pipeline.masks]
+gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
+seed = 1
+[cases.f4_fisheye_spline_warped.pipeline.rendering]
+N = 16
+n_p = 2
+hammersley = "on"
+n_rho = 3
+n_phi = 8
+[cases.f4_fisheye_spline_warped.pipeline.lighting]
+sh_order = 2
+[cases.f4_fisheye_spline_warped.pipeline.material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.7   # Ties's value of record for the fisheye board's ink (the detector-bias configs of 2026-11-05; the 14 mm cases' 2.0)
+eta_noink = 1.3
+mu = 0.229   # Ties's value of record for the fisheye board (the detector-bias configs of 2026-11-05; the 14 mm cases' 0.244)
+mu_bounds = [0.0, 1.0]
+[cases.f4_fisheye_spline_warped.pipeline.vignetting]
+model = "radial"
+node_count = 19   # the projective chart's 19: 16 functions on the fitted pixels, as the linear 16 (T. Harder; Core 0.10.11)
+degree = 3
+support_min = 0.1
+boundary_order = 2             # the dependent points (below support_min) continue the supported ones with Δ²c = 0 — RC 0.7.0's rule for the radial profile (constant before); named, so the runs are keyed by it
+[cases.f4_fisheye_spline_warped.pipeline.warping]
+degree = 1
+inplane = "aspect_skew"          # # the printed pattern's in-plane aspect and skew are estimated; owner ruling 2026-11-13 (Core's Aspect ∘ Skew in the placed chart; "inplane" not in fixed)
+inplane_start = [0.0, 0.0]       # started at the design as printed
+[cases.f4_fisheye_spline_warped.pipeline.edge]
+sdf = "run:siemens_1m_distance_map"
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+[cases.f4_fisheye_spline_warped.pipeline.lm]
+max_iter = 50                     # 50, owner 2026-11-14: the fisheye 10 cm spline run (ag10fe_spline_warped, Schöps start, photosites + all-darks, image region) was still improving at 25 (rel-RMS 0.3915 @20, 0.3890 @25) while Thorlabs improved −27 % median; the 14 mm flattened by ~15, hence 25 there
+max_time = 36000.0
+[cases.f4_fisheye_spline_warped.pipeline.compute]
+backend = "gpu"
+jacobian_chunk = 4
+
+# the Tamron 20 mm F2.8 at f/2.8: Schöps's central-generic grid refined with the poses, focus, aperture, material, board warping (from flat),
+# the radial V and the lighting; the printed edge fixed (σ_print 0.0277 mm, no camera σ).
+[cases.f4_tamron_spline_warped]
+kind = "grid"
+images = "fx3_tamron_siemens_20261028"
+views = "fx3_tamron_siemens_20261028_f4"
+[cases.f4_tamron_spline_warped.pipeline.io]
+checkpoint_each = "on"
+linearize = "off"
+channel = "G"                      # the green photosites: one measurement each, one channel (photosites; was "RGB", which counted each three times)
+[cases.f4_tamron_spline_warped.pipeline.frontend]
+type = "schoeps"
+schoeps = "run:fx3_tamron_siemens_20261028_schoeps"
+texture = "geometric_accuracy/data/target/siemens_1m/board/texture.png"
+texture_features = "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"
+texture_features_size = [4000, 4000]
+page_mm = [1000.0, 1000.0]
+print_scale = 1.0
+[cases.f4_tamron_spline_warped.pipeline.camera]
+sensor_mm = 35.6
+f_mm = 21.1975
+fnumber = 2.8
+lens_coverage = "sensor"       # the Tamron 20 mm lights the whole sensor (owner ruling 2026-11-12): its rectangle, nothing measured
+sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+[cases.f4_tamron_spline_warped.pipeline.grid]
+lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
+                                #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
+nodes = "interior"
+[cases.f4_tamron_spline_warped.pipeline.grid.smoothness]
+type = "pspline"
+order = 3                         # the third differences Δ³ of the grid correction (the grid A/B's winner)
+weight = 0.1
+[cases.f4_tamron_spline_warped.pipeline.masks]
+gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
+seed = 1
+[cases.f4_tamron_spline_warped.pipeline.rendering]
+N = 16
+n_p = 2
+hammersley = "on"
+n_rho = 3
+n_phi = 8
+[cases.f4_tamron_spline_warped.pipeline.lighting]
+sh_order = 2
+[cases.f4_tamron_spline_warped.pipeline.material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.0
+eta_noink = 1.3
+mu = 0.218   # the Tamron f/4 case's value of record (the 14 mm cases' 0.244)
+mu_bounds = [0.0, 1.0]
+[cases.f4_tamron_spline_warped.pipeline.vignetting]
+model = "radial"
+node_count = 19   # the projective chart's 19: 16 functions on the fitted pixels, as the linear 16 (T. Harder; Core 0.10.11)
+degree = 3
+support_min = 0.1
+boundary_order = 2             # the dependent points (below support_min) continue the supported ones with Δ²c = 0 — RC 0.7.0's rule for the radial profile (constant before); named, so the runs are keyed by it
+[cases.f4_tamron_spline_warped.pipeline.warping]
+degree = 1
+inplane = "aspect_skew"          # # the printed pattern's in-plane aspect and skew are estimated; owner ruling 2026-11-13 (Core's Aspect ∘ Skew in the placed chart; "inplane" not in fixed)
+inplane_start = [0.0, 0.0]       # started at the design as printed
+[cases.f4_tamron_spline_warped.pipeline.edge]
+sdf = "run:siemens_1m_distance_map"
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+[cases.f4_tamron_spline_warped.pipeline.lm]
+max_iter = 25                     # 25, owner 2026-11-14: the 14 mm si30_spline_warped run (Schöps start, photosites + FX3 all-darks) flattened by ~20 iterations (rel-RMS 0.2901 @10, 0.2876 @21, 0.2872 @47); doubling the pixels left the trajectory unchanged to 3–4 digits
+max_time = 36000.0
+[cases.f4_tamron_spline_warped.pipeline.compute]
+backend = "gpu"
+jacobian_chunk = 4

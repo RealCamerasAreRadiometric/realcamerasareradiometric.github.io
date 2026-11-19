@@ -1,0 +1,80 @@
+# RATIONALE
+#   question    does the refinement of the paper's fisheye (AprilGrid at 10 cm) improve with 32,768 photosites per photograph instead of
+#               the counts of record (6,000 for the parametric models, 16,528 for the spline; no derivation, see sampling_strategy_kb_count.toml)?
+#   hypothesis  32,768 (2^15) lowers the held-out Thorlabs error of the fisheye models, whose image circle the counts of record sample sparsely
+#   decides     whether the fisheye cases' samples_per_view of record changes (owner, after this record)
+#   decided     the counts of record 8,192 / 16,384 (owner 2026-11-16 23:30; radiometric_refinement.toml [kinds]); this record (32,768 vs
+#               the counts of record, held-out Thorlabs median, 153 photographs): Kannala–Brandt +0.002 [−0.002, +0.007], Double Sphere +0.004
+#               [−0.005, +0.012], OpenCV-14 +0.013 [−0.005, +0.026], the spline −0.002 [−0.008, +0.005] px, all n.s.; Brown–Conrady −0.060
+#               [−0.100, −0.036] px, the wrong model for a fisheye (11.3 px); rc-results-0.11.5, 2026-11-16 23:05
+#   evidence    this experiment's record: each model's two arms, their LM trajectories and the paired Thorlabs bootstrap — fisheye 10 cm
+#               at 32,768: all n.s. (KB +0.002, DS +0.004, OpenCV-14 +0.013, spline −0.002 px) but the Brown–Conrady (−0.060 px, the wrong model)
+#   owner       J. Pritts (2026-11-16: "can we run them with 32768?", the fisheye after the 14 mm Kannala-Brandt test)
+#   date        2026-11-16
+#
+# A side experiment (experiments as overrides): the five fisheye 10 cm cases of record, each at its count of record (the arm `record`:
+# the case unchanged, so the run of record's product by its key) and at 32,768, the uniform draw. Not a release, not the paper's numbers.
+#   julia --project=experiments experiments/scripts/sampling_strategy.jl --config=experiments/configs/studies/sampling_strategy_fe10_count.toml [--plan]
+
+[experiment]
+name = "sampling_strategy"
+
+[inputs]
+
+[sampling_strategy]
+cases = ["fe10_bc5", "fe10_ocv14", "fe10_kb", "fe10_ds", "fe10_spline"]
+variants = ["record", "n32768"]         # run order
+reference = "record"                    # every paired difference is n32768 - record (each case's own count of record)
+headline = ["n32768"]
+label = "fisheye sample count (side experiment, 2026-11-16)"
+dome_tolerance = 0.12                   # derivation: as the config of record sampling_strategy.toml (the edge-sampling sweep's dome criterion)
+
+# ---- the arms ------------------------------------------------------------------------------------------------------------------
+[variants.record]
+"masks.gradient_bias" = 0.0             # the case of record unchanged (its uniform draw at its own samples_per_view): the run of record's product
+
+[variants.n32768]
+"masks.gradient_bias" = 0.0
+"masks.samples_per_view" = 32768        # owner 2026-11-16: 2^15
+
+# ---- the cases: the paper's fisheye 10 cm models -------------------------------------------------------------------------------
+[cases.fe10_bc5]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_bc5_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_bc5_start"]
+
+[cases.fe10_ocv14]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_ocv14_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_ocv14_start"]
+
+[cases.fe10_kb]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_kb_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_kb_start"]
+
+[cases.fe10_ds]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_ds_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_ds_start"]
+
+[cases.fe10_spline]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_spline_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_kb_start"]
+lattice = { subdivision = [1, 1], max_nodes = 800 }   # Schöps's own lattice (m = 1): this run of record's start of the case is 20 x 20 = 400
+                                                      #   nodes (dgx01 2026-11-16, start.json resample); 800 refuses any subdivision's
+
+[runtime]
+reference_s_per_iteration = { fe10_bc5 = 60.0, fe10_ocv14 = 60.0, fe10_kb = 60.0, fe10_ds = 60.0, fe10_spline = 120.0 }   # derivation: order of
+                                                      #   the run of record's fisheye refinements per LM iteration; a run 2x slower is reported
+regression_factor = 2.0
+
+[figure]
+asset = "fig_sampling_fe10_count.tex"
+table = "tab_sampling_fe10_count.tex"

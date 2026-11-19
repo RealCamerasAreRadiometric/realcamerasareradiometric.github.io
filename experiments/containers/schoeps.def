@@ -1,0 +1,53 @@
+Bootstrap: docker
+From: nvidia/cuda@sha256:a99a1860ba8e2916e5c3e73b72ec4c4301653a84586e05bfc9a2aa2d58027e97
+
+# Schöps' camera_calibration (puzzlepaint/camera_calibration, the last commit, 2023-06-30) for rtx-01-mds.
+# - Base: nvidia/cuda:12.8.1-devel-ubuntu22.04 (the digest above). CUDA 12.8 is the first release that builds for the node's
+#   Blackwell GPUs (sm_120); the old container's CUDA 11.8 cannot. Ubuntu 22.04 has the old container's system libraries.
+# - OpenGV at the commit camera_calibration's Readme names. OpenGV's CMake adds -march=native and camera_calibration matches it
+#   (Eigen alignment), so the image is built on the node that runs it.
+# - One patch: CUDA 12 removed texture references. The bundled CUB 1.8.0's umbrella header cub.cuh includes its
+#   TexRefInputIterator (texture<…>), which camera_calibration never uses; that include is dropped (CUB 1.13 removed the iterator).
+# Built by ~/cluster/setup/install.sh (stage apptainer) inside a Slurm job; run through ~/cluster/apptainer/camera_calibration.
+
+%labels
+    camera_calibration 00ef4deca274377f00c3654b75b857dd20382cc2
+    opengv 306a54e6c6b94e2048f820cdf77ef5281d4b48ad
+    cuda 12.8.1
+    cuda_arch sm_120
+
+%environment
+    export QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-offscreen}
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive PATH=/usr/local/cuda/bin:$PATH
+    apt-get update
+    apt-get install -y --no-install-recommends git ca-certificates cmake make g++ \
+        libeigen3-dev libboost-serialization-dev libboost-filesystem-dev libboost-system-dev \
+        libgl-dev libglx-dev libegl-dev libgl1-mesa-dri libglew-dev qtbase5-dev libqt5opengl5-dev libqt5x11extras5-dev \
+        libsuitesparse-dev libgoogle-glog-dev libgflags-dev libpng-dev zlib1g-dev libv4l-dev
+    rm -rf /var/lib/apt/lists/*
+    J=$(nproc)   # the cores of the Slurm job that builds the image
+
+    git clone -q https://github.com/laurentkneip/opengv.git /opt/src/opengv
+    git -C /opt/src/opengv checkout -q 306a54e6c6b94e2048f820cdf77ef5281d4b48ad
+    cmake -S /opt/src/opengv -B /opt/src/opengv/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+    cmake --build /opt/src/opengv/build -j "$J"
+    cmake --install /opt/src/opengv/build
+    rm -rf /opt/src
+
+    C=/opt/camera_calibration
+    git clone -q https://github.com/puzzlepaint/camera_calibration.git "$C"
+    git -C "$C" checkout -q 00ef4deca274377f00c3654b75b857dd20382cc2
+    sed -i '/#include "iterator\/tex_ref_input_iterator.cuh"/d' "$C/applications/camera_calibration/third_party/cub-1.8.0/cub/cub.cuh"
+    cmake -S "$C" -B "$C/build" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+        -DCMAKE_CUDA_FLAGS="-arch=sm_120"
+    cmake --build "$C/build" -j "$J" --target camera_calibration
+
+%test
+    B=/opt/camera_calibration/build/applications/camera_calibration/camera_calibration
+    test -x "$B"
+    # libcuda comes from the host driver at run time (apptainer --nv)
+    if ldd "$B" | grep 'not found' | grep -v libcuda; then echo "camera_calibration: unresolved libraries"; exit 1; fi
+    echo "camera_calibration: $B links"

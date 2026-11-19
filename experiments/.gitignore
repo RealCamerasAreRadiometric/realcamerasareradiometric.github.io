@@ -1,0 +1,28 @@
+# The per-machine bindings of the data trees (data/README.md): links or
+# directories, never tracked. Results live under data/exp_pro, keyed by run key.
+/data/exp_raw
+/data/exp_pro
+/data/sims
+
+# Local renderings (DrWatson plotsdir); the paper's assets are tracked under ../paper/fig/ and ../paper/latex/
+/plots/
+
+# Julia. The Manifest is this project's own (experiments/Manifest.toml), never tracked.
+Manifest*.toml
+Manifest-v*.toml
+LocalPreferences.toml
+
+# Slurm
+slurm-*.out
+
+# pixi environments (experiments/pixi.toml; the lock file is tracked)
+/.pixi/
+
+# packed artifact tarballs (scripts/make_artifacts.jl --stage default); never tracked, never uploaded from here
+/output/
+
+# the one command's results base on a machine without a shared results tree (configs/reproduce.toml [sites.desktop])
+/data/results
+
+# the pipeline checks: one scratch run folder per invocation (test/pipeline/run_pipeline_checks.sh)
+/test/pipeline/work/

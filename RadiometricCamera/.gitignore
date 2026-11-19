@@ -1,0 +1,24 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+Manifest*.toml
+LocalPreferences.toml
+JuliaLocalPreferences.toml
+
+# editor / agent state
+.cache/
+.claude/
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# outputs of the example walkthrough
+examples/output/
+
+# the BlobBoards / VisualGeometryCore migration harness: one scratch run folder per invocation
+test/integration_blobboards/work/
+
+docs/superpowers/
+# the local docs build (docs/make.jl; published by the Site workflow, never committed)
+docs/build/

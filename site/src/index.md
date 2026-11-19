@@ -5,7 +5,7 @@ hero:
   name: Real Cameras are Radiometric
   text: Lifting geometric camera models to radiometric ones
   tagline: |-
-    Ties Harder, Felix Seegräber, Hendrik Sauer, David Nakath, Kevin Köser, James Pritts
+    Ties Harder, Felix Seegräber, David Nakath, Hendrik Sauer, Kevin Köser, James Pritts
     Preprint, 2026
   image:
     src: /assets/landing/logo.svg
@@ -13,14 +13,17 @@ hero:
     alt: The radiometric camera of a fisheye lens in a cross-section. The rays from a sensor point through the aperture meet in a point on a curved focus surface and spread onto the scene.
   actions:
     - theme: brand
-      text: Paper (coming soon)
+      text: Paper (PDF)
+      link: /paper.pdf
+    - theme: alt
+      text: arXiv (coming soon)
       link: "#Paper"
     - theme: alt
-      text: Code (coming soon)
-      link: "#Code-and-documentation"
+      text: Code
+      link: https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io
     - theme: alt
-      text: Docs (coming soon)
-      link: "#Code-and-documentation"
+      text: Docs
+      link: /docs/
     - theme: alt
       text: BibTeX
       link: "#Citation"
@@ -38,7 +41,7 @@ features:
 ```
 
 ```@raw html
-<!-- PAPER: the arXiv URL goes in the "Paper" action above and in the Paper and Citation sections below -->
+<!-- ARXIV: the arXiv URL goes in the "arXiv" action above and in the Paper and Citation sections below -->
 ```
 
 <!-- TEASER: the paper's figures go here later (owner, 2026-11-10) -->
@@ -95,12 +98,21 @@ The radiometric camera keeps that mapping and replaces the pinhole by an apertur
 
 ## Paper
 
-Coming soon.
+```@raw html
+<p><a href="paper.pdf">The paper and its supplement (PDF)</a>, built from the
+<a href="https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io/tree/main/paper">manuscript
+in the repository</a>. arXiv: coming soon.</p>
+```
 
 ## Code and documentation
 
-Coming soon. The calibration is built on the
-[VisualGeometryToolkit](https://github.com/VisualGeometryToolkit).
+```@raw html
+<p>The code, the experiments that reproduce the paper and the manuscript are in one repository:
+<a href="https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io">RealCamerasAreRadiometric/realcamerasareradiometric.github.io</a>.
+The Julia package RadiometricCamera.jl is its subdirectory <code>RadiometricCamera/</code>;
+<a href="docs/">its documentation</a> covers the installation, a tutorial, the calibration and the API.
+The calibration is built on the <a href="https://github.com/VisualGeometryToolkit">VisualGeometryToolkit</a>.</p>
+```
 
 ## Data
 
@@ -116,7 +128,7 @@ Coming soon: the RAW images and the configurations of every experiment.
 
 ```bibtex
 @misc{realcameras2026,
-  author = {Harder, Ties and Seegr{\"a}ber, Felix and Sauer, Hendrik and Nakath, David and K{\"o}ser, Kevin and Pritts, James},
+  author = {Harder, Ties and Seegr{\"a}ber, Felix and Nakath, David and Sauer, Hendrik and K{\"o}ser, Kevin and Pritts, James},
   title  = {Real Cameras are Radiometric},
   year   = {2026},
 }

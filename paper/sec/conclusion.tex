@@ -1,0 +1,30 @@
+\section{Conclusion}
+We presented the radiometric camera, which lifts any central geometric
+camera model to a radiometric one with a finite aperture, a free-form
+focus surface and a generic vignetting function. We also presented its
+calibration from the RAW photosites of ordinary calibration images,
+formulated without parameter-dependent discontinuities or integration
+domains and with every gauge freedom fixed exactly. To our knowledge,
+it is the first model to unite aperture, focus and vignetting with
+any central projection and to calibrate all of them jointly from the
+images of a geometric calibration (\cref{tab:related}). The calibrated
+cameras have a lower reprojection error on a held-out high-precision
+target than their geometric starts for most models and lenses, their
+vignetting reproduces a measured flat field, and their focus surface
+is learned as a plane for a wide-angle lens and as a hemisphere for a
+fisheye. In a first multi-view radiometric reconstruction, they
+recover the in-focus reflectance of a texture from defocused images.
+The estimation of light sources and of the attenuation of water
+is future work. We will
+release the code, the data and the configurations of every experiment.
+
+% ---- Ties's conclusion of 11-17, kept for reference ----
+% A generative camera model enables the learning of a generative scene.
+% A bias in the geometric model as well as a bias in the radiometric model will propagate into the scene.
+% Creating an accurate geometric camera model for an unbiased 3D reconstruction has been tried for several years.
+% However, even the most accurate geometric model cannot be used to reconstruct scene radiometry since the geometric model cannot match a radiometric sensor.
+% We showed that our camera model is indeed a generative model: we can learn geometric distortion models combined with arbitrary focus surfaces and arbitrary vignetting, matching the physical properties of our calibrated lenses.
+% Our generative model gave us already the possibility to reach a smaller reprojection error in calibration, a joint learning of the vignetting and a sharp texture reconstruction from out-of-focus images.
+% There are also challenges arising from radiometric optimization:
+% we had to cope missing constrains and several gauge freedoms for our calibration.
+% Moreover, differentiating integrals during differentiable ray tracing entails the risk of missing boundary terms leading to wrong gradients.

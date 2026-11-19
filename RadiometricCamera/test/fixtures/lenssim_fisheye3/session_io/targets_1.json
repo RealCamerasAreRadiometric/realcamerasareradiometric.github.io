@@ -1,0 +1,76 @@
+{
+    "schema": "vgio/rig/v6",
+    "length_unit": "mm",
+    "rotation_encoding": "quaternion_wxyz_hamilton",
+    "transform_convention": "x_to = R * x_from + t",
+    "frame": "target:291",
+    "targets": [
+        {
+            "id": "291",
+            "target": {
+                "type": "planar",
+                "reference": "291",
+                "calibration": {
+                    "type": "rigid"
+                },
+                "canvas": {
+                    "size": {
+                        "width": 150.0,
+                        "height": 150.0
+                    },
+                    "origin": [
+                        -75.0,
+                        -75.0
+                    ],
+                    "texture": {
+                        "path": "textures/291.png",
+                        "sha256": "d86d6dfde7af4bcc5d96068cd1ce56d893d3472724be4951fa8b38562ed76507",
+                        "size": {
+                            "width": 130.0268333333333,
+                            "height": 130.0268333333333
+                        },
+                        "origin": [
+                            -65.00933333333334,
+                            -65.01749999999998
+                        ]
+                    }
+                }
+            },
+            "pose": {
+                "rotation": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "translation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "not_migrated": "stacked, doublesphere, central_generic: functions of the camera",
+        "migrated_from": "RadiometricCamera session export (session.json, geometry.json, pattern.png)",
+        "geometry_sha256": "2672a7e66d24b9285f98508414d6217e3313997aa0518c0e04bac14ba87ad57a",
+        "session_sha256": "a8b3f2901a598d9ff1cf13c5ef69f0d18af420b00fa5a97e4a60b4704d7c4263",
+        "refined": {
+            "stop": "converged",
+            "iterations": 11,
+            "residual_px": {
+                "after": {
+                    "median": 0.04751434101412984,
+                    "rms": 0.07962967949848876,
+                    "p90": 0.12743131314891384
+                },
+                "before": {
+                    "median": 0.04825114267128944,
+                    "rms": 0.07968519934785859,
+                    "p90": 0.12562259777138005
+                }
+            }
+        }
+    }
+}

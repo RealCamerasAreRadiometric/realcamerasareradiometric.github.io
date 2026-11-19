@@ -1,0 +1,97 @@
+# Config of record of the calibration case `siemens_coarse_full` (scripts/calibrate.jl
+# --config=configs/calibration/siemens_coarse_full.toml): a Schöps central-generic run on the synthetic Siemens board (2 views) →
+# the 35 × 25 grid with the board warping h, the material, V and the lighting free (per-tile LM), the printed-edge albedo. The
+# package's golden gate (experiments/test/pipeline/run_pipeline_checks.sh) runs this file through the driver.
+#
+# [runs.<id>] (src/drivers.jl check_runs_table): the derived files [pipeline] names as `run:<id>`, each the keyed step of another
+# config of record found by its key and produced on demand when missing — the board's distance map (scripts/distance_maps.jl).
+#
+# [pipeline] is the full PipelineOptions table of the run (RadiometricCamera.pipeline_options; every key and default in the
+# package's configs/default.toml). Its input paths are RELATIVE TO data_root() (the driver runs the pipeline there); the driver
+# sets io.out to the run's keyed directory, so io.out is never stated here. It is the case's ONE config: the package's options tests read its [pipeline]
+# table (no mirror in the package).
+
+[experiment]
+case = "siemens_coarse_full"
+dataset = "geometric_accuracy/detector_bias/data/fisheye_full"       # the input tier under data_root()
+
+[pipeline]
+fixed = ["aperture"]   # held blocks (RC 0.11.0: lm.fixed moved here; "aperture" replaces camera.r_min == camera.r_max)
+
+[pipeline.io]
+images = "geometric_accuracy/detector_bias/data/fisheye_full/gt/images_linear"
+linearize = "off"
+views = ["V01.png", "V02.png"]
+
+[pipeline.frontend]
+type = "schoeps"
+schoeps = "geometric_accuracy/detector_bias/data/fisheye_full/schoeps"
+print_scale = 1.0
+texture = "geometric_accuracy/data/target/siemens_1m/board/texture.png"
+texture_features = "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"
+texture_features_size = [4000, 4000]
+page_mm = [1000, 1000]
+
+[pipeline.camera]
+sensor_mm = 22.3
+f_mm = 3.9927
+fnumber = 1996
+lens_coverage = "sensor"   # the case's lens lights the whole sensor: its rectangle, nothing measured (every config of record states it, 2026-11-15)
+
+[pipeline.grid]
+lattice = "derived"       # Schöps's own lattice (≈ 166 px: 16 × 17 nodes over his 2158 × 2320 px box) extended over the sensor, never
+                          #   subdivided (m = 1) — what lattice_spacing = 160 gave (subdivision 1 × 1): the golden bit for bit
+
+[pipeline.rendering]
+hammersley = "off"   # stated for the lock: the default the golden was recorded with (not the paper's "on"; the golden's coarse regression)
+N = 8   # stated for the lock: the default the golden was recorded with (not the paper's 16; the golden's coarse regression)
+n_p = 4   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+
+[pipeline.vignetting]
+model = "radial"
+node_count = 16   # the golden's profile as recorded (pinned: the default turned to the projective 19, RC 0.11.4)
+chart = "linear"   # the golden's chart as recorded (pinned, so its golden does not move: the default is projective since RC 0.11.4)
+
+[pipeline.edge]
+sdf = "run:siemens_1m_distance_map"   # the board's distance map: [runs.siemens_1m_distance_map] below (a derived file, produced on demand)
+ink_spread_mm = 0
+print_sigma_mm = 0.025   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+
+[pipeline.material]
+alpha_ink = 0.5   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+alpha_noink = 0.5   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+eta_ink = 2
+eta_noink = 2   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+mu = 0.5   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+
+[pipeline.warping]
+degree = 1
+inplane = "aspect_skew"          # the printed pattern's in-plane aspect and skew are estimated; owner ruling 2026-11-13 (Core's Aspect ∘ Skew in the placed chart; "inplane" not in fixed)
+inplane_start = [0.0, 0.0]       # started at the design as printed
+
+# samples_per_view is a SAMPLING choice, not a convergence setting: the LM sees a random subset of 1500 masked pixels per view
+# (StableRNG(seed)). Two different samples move this case's poses by 0.17° / 5.5 mm (measured, Task 3). A paper run that reports
+# results at that resolution raises it (a new config, a new run key).
+[pipeline.masks]
+gradient_bias = 0.0   # the golden's uniform draw, as recorded (α = 0 is the uniform draw bit for bit; not the paper's α = 1)
+samples_per_view = 1500    # the count of record: its former per-view cap max_pixels_per_view = 1500 (2026-11-15 migration: a fixed count of the usable observations)
+seed = 1
+
+[pipeline.lm]
+max_time = 10800.0   # stated for the lock: the default the golden was recorded with (not the paper's 36000.0; the golden's coarse regression)
+max_iter = 1   # the golden's coarse value (siemens_coarse_full: the one-iteration regression of the coarse pipeline, recorded with it; not the paper's hyperparameter)
+
+[pipeline.compute]
+backend = "gpu"
+
+# Excluded from the run key: how the run's summary table (summary.tex, stage `figures`) is printed.
+[render]
+title = "35 x 25 grid lens on the synthetic Siemens board, board warping, material, vignetting and lighting free"
+significant_digits = 4
+
+[runs.siemens_1m_distance_map]
+config = "configs/experiments/distance_maps.toml"
+run = "maps.siemens_1m"
+path = "distance_map.json"
+stage = "refine"
+provenance = "the 1 m Siemens-star print's printed-edge distance map, a vgio/raster record (edge.sdf): the step [maps.siemens_1m] of distance_maps.toml (scripts/distance_maps.jl), keyed by the board generator's sdf.f32 + sdf.json (each pinned by its sha256), produced on demand when missing (owner 2026-11-16: a derived file is produced, never an input of record)"

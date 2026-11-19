@@ -1,0 +1,16 @@
+# A test fixture of the figure-config machinery (src/assets.jl: load_figure_config, deploy_figures; test/reproduce_tests.jl):
+# the figure config that deployed focus-surfaces.png into the manuscript until the paper's own figures and tables replaced it
+# (v0.11.6). The render is not part of the paper; no config of record deploys it.
+
+[experiment]
+name = "focus-surfaces"
+generator = "scripts/focus_surfaces.jl"
+
+[runs]
+experiment = "configs/experiments/focus_surfaces.toml"
+
+[render]
+asset = "figures.focus_surfaces"
+
+[deploy]
+replace_submitted = "off"   # true only once the author has signed off the difference verify.tsv states

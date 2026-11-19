@@ -1,0 +1,603 @@
+{
+    "schema": "rc/calibration_state/v1",
+    "length_unit": "mm",
+    "rotation_encoding": "quaternion_wxyz_hamilton",
+    "transform_convention": "x_to = R * x_from + t",
+    "pixel_frame": "colmap",
+    "camera": {
+        "camera": {
+            "width": 5208,
+            "height": 3476,
+            "K": {
+                "fx": 932.4473684210526,
+                "fy": 932.4473684210526,
+                "cx": 2604.0,
+                "cy": 1738.0,
+                "skew": 0.0
+            },
+            "lens": {
+                "equidistant": [],
+                "radial": [
+                    [
+                        -0.041666666666666664,
+                        0.0005208333333333333,
+                        -3.1001984126984127e-6,
+                        1.076457782186949e-8
+                    ],
+                    []
+                ]
+            }
+        },
+        "aperture": {
+            "radius": 0.001
+        },
+        "focus": {
+            "type": "sensor_thin_plate_spline",
+            "nodes": [
+                [
+                    0.0,
+                    0.0
+                ],
+                [
+                    1302.0,
+                    0.0
+                ],
+                [
+                    2604.0,
+                    0.0
+                ],
+                [
+                    3906.0,
+                    0.0
+                ],
+                [
+                    5208.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    869.0
+                ],
+                [
+                    1302.0,
+                    869.0
+                ],
+                [
+                    2604.0,
+                    869.0
+                ],
+                [
+                    3906.0,
+                    869.0
+                ],
+                [
+                    5208.0,
+                    869.0
+                ],
+                [
+                    0.0,
+                    1738.0
+                ],
+                [
+                    1302.0,
+                    1738.0
+                ],
+                [
+                    2604.0,
+                    1738.0
+                ],
+                [
+                    3906.0,
+                    1738.0
+                ],
+                [
+                    5208.0,
+                    1738.0
+                ],
+                [
+                    0.0,
+                    2607.0
+                ],
+                [
+                    1302.0,
+                    2607.0
+                ],
+                [
+                    2604.0,
+                    2607.0
+                ],
+                [
+                    3906.0,
+                    2607.0
+                ],
+                [
+                    5208.0,
+                    2607.0
+                ],
+                [
+                    0.0,
+                    3476.0
+                ],
+                [
+                    1302.0,
+                    3476.0
+                ],
+                [
+                    2604.0,
+                    3476.0
+                ],
+                [
+                    3906.0,
+                    3476.0
+                ],
+                [
+                    5208.0,
+                    3476.0
+                ]
+            ],
+            "parameters": [
+                -0.09184385338804975,
+                -0.03680806474024613,
+                -0.07370836068755353,
+                -0.03680806474024613,
+                -0.09184385338804975,
+                -0.024698137834907628,
+                -0.040913338730189555,
+                0.05657289267747192,
+                -0.040913338730189555,
+                -0.024698137834907628,
+                -0.027598562391783023,
+                0.0025137609924422684,
+                0.1,
+                0.0025137609924422684,
+                -0.027598562391783023,
+                -0.024698137834907628,
+                -0.040913338730189555,
+                0.05657289267747192,
+                -0.040913338730189555,
+                -0.024698137834907628,
+                -0.09184385338804975,
+                -0.03680806474024613,
+                -0.07370836068755353,
+                -0.03680806474024613,
+                -0.09184385338804975
+            ],
+            "unit": "1/m"
+        },
+        "vignetting": {
+            "type": "tensor_product",
+            "degree": [
+                2,
+                2
+            ],
+            "knots_x": [
+                0.0,
+                0.0,
+                0.0,
+                1736.0,
+                3472.0,
+                5208.0,
+                5208.0,
+                5208.0
+            ],
+            "knots_y": [
+                0.0,
+                0.0,
+                0.0,
+                1158.6666666666665,
+                2317.333333333333,
+                3476.0,
+                3476.0,
+                3476.0
+            ],
+            "control_points": [
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            ]
+        },
+        "in_focus_blur": [
+            {
+                "name": "R",
+                "unit": "px^2",
+                "covariance": {
+                    "isotropic": 1.816791149935115
+                }
+            },
+            {
+                "name": "G",
+                "unit": "px^2",
+                "covariance": {
+                    "isotropic": 0.5261273307082749
+                }
+            },
+            {
+                "name": "B",
+                "unit": "px^2",
+                "covariance": {
+                    "isotropic": 1.0338948574809823
+                }
+            }
+        ]
+    },
+    "target": {
+        "warping": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "material": {
+            "alpha_ink": 0.16724187141063007,
+            "alpha_noink": 0.45210741478372335,
+            "eta_ink": [
+                1.5465840972711904,
+                1.5445760676373064,
+                1.5635769810167182
+            ],
+            "eta_noink": [
+                2.9728587596853298,
+                2.9993866448097957,
+                2.9705779056214086
+            ],
+            "mu": 0.21979635680664264
+        },
+        "ink_spread": 0.07901593001389558,
+        "print_blur": {
+            "unit": "mm^2",
+            "covariance": {
+                "isotropic": 0.000784
+            }
+        }
+    },
+    "poses": {
+        "from": "view:cam",
+        "to": "world",
+        "frames": [
+            {
+                "t": 1,
+                "image": "V01.png",
+                "pose": {
+                    "rotation": [
+                        0.043828754587581585,
+                        0.9961891844315891,
+                        -0.003314412109172651,
+                        -0.07533368280654754
+                    ],
+                    "translation": [
+                        45.22092694067492,
+                        26.133685921106338,
+                        296.23017210607213
+                    ]
+                }
+            },
+            {
+                "t": 2,
+                "image": "V02.png",
+                "pose": {
+                    "rotation": [
+                        0.10699214499974725,
+                        -0.9339724511760759,
+                        -0.2129186262443603,
+                        0.2662964512544623
+                    ],
+                    "translation": [
+                        129.32372138835487,
+                        -119.80853287585434,
+                        97.79183243541755
+                    ]
+                }
+            },
+            {
+                "t": 3,
+                "image": "V03.png",
+                "pose": {
+                    "rotation": [
+                        0.09313457289665744,
+                        -0.9714092160531116,
+                        -0.1415472112033421,
+                        -0.16629634180881184
+                    ],
+                    "translation": [
+                        -137.830862416413,
+                        75.74396975508125,
+                        140.24480464630676
+                    ]
+                }
+            },
+            {
+                "t": 4,
+                "image": "V04.png",
+                "pose": {
+                    "rotation": [
+                        0.12758115042743476,
+                        -0.9585319257896784,
+                        -0.17315366722421305,
+                        0.18696899428608343
+                    ],
+                    "translation": [
+                        186.32237024350863,
+                        70.16036870558546,
+                        182.15360467601153
+                    ]
+                }
+            },
+            {
+                "t": 5,
+                "image": "V05.png",
+                "pose": {
+                    "rotation": [
+                        0.2929542091804833,
+                        0.9399580897369769,
+                        0.14438597318638977,
+                        0.09904196892464494
+                    ],
+                    "translation": [
+                        -172.30653900750596,
+                        28.15374386436019,
+                        197.79394626980988
+                    ]
+                }
+            },
+            {
+                "t": 6,
+                "image": "V06.png",
+                "pose": {
+                    "rotation": [
+                        0.0967483802701632,
+                        -0.9447674564020949,
+                        0.04673089191181729,
+                        0.30962950114571064
+                    ],
+                    "translation": [
+                        189.56542563026974,
+                        -116.58287462498072,
+                        109.42541175629465
+                    ]
+                }
+            },
+            {
+                "t": 7,
+                "image": "V07.png",
+                "pose": {
+                    "rotation": [
+                        0.1701067038135734,
+                        0.9342471385507995,
+                        -0.06931120077709835,
+                        0.30568276182042203
+                    ],
+                    "translation": [
+                        -202.34521778504953,
+                        -36.42667366771949,
+                        130.79605779012638
+                    ]
+                }
+            },
+            {
+                "t": 8,
+                "image": "V08.png",
+                "pose": {
+                    "rotation": [
+                        0.203575215837525,
+                        -0.9406813798442986,
+                        0.14384433380539874,
+                        0.23018358052435547
+                    ],
+                    "translation": [
+                        152.52036749225033,
+                        26.256695431115737,
+                        153.24794970177794
+                    ]
+                }
+            },
+            {
+                "t": 9,
+                "image": "V09.png",
+                "pose": {
+                    "rotation": [
+                        0.2007815676787624,
+                        -0.9528724658357954,
+                        0.21992504721253067,
+                        -0.05791199824764718
+                    ],
+                    "translation": [
+                        -154.5639463839953,
+                        12.083982496076173,
+                        231.45127269372108
+                    ]
+                }
+            },
+            {
+                "t": 10,
+                "image": "V10.png",
+                "pose": {
+                    "rotation": [
+                        0.03993704131902345,
+                        0.9455470594720371,
+                        0.02269471777579698,
+                        0.32222777788319773
+                    ],
+                    "translation": [
+                        -193.05282272587417,
+                        48.00548530149673,
+                        106.80388913748465
+                    ]
+                }
+            }
+        ]
+    },
+    "light": {
+        "center": [
+            -0.014500000000000624,
+            0.017000000000003124,
+            0.0
+        ],
+        "radius": 300.79999999999995,
+        "map": {
+            "type": "spherical_harmonics",
+            "basis": "real_orthonormal_no_condon_shortley",
+            "l_max": 2,
+            "coefficients": [
+                [
+                    7.457213062775922e11,
+                    2.3542328049526997e10,
+                    1.718311024425791e11,
+                    -4.920624162077878e10,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    1.0429232709481097e12,
+                    1.3781232094375177e10,
+                    1.7598195873003513e11,
+                    -2.2606323914076607e10,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    5.679151620517545e11,
+                    -2.0005550101460114e10,
+                    1.764850872983956e11,
+                    3.16945467061169e10,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "sensor": {
+            "nodes": 16,
+            "in_focus_blur": false
+        },
+        "aperture": {
+            "radial_nodes": 1,
+            "angular_nodes": 2
+        },
+        "sampler": {
+            "samples": 32,
+            "seed": 7,
+            "hammersley": false
+        },
+        "normalize_aperture": false
+    },
+    "provenance": {
+        "converted_from": "geometric_accuracy/detector_bias/data/blobs_fisheye/gt/state.jls",
+        "converter": "rc_port converter: pre-port RC (VisualGeometryCore 0.6.0, Julia 1.12.6) with the legacy reader of experiments/scripts/migrate_states.jl (57b14c77) .jls → RC 0.6.0 rc/calibration_state/v1 (chart values to COLMAP pixels)",
+        "dropped": {
+            "image_distance_m": 0.003994216920358103,
+            "downsample": 1
+        },
+        "in_focus_blur_from": "edge",
+        "source": {
+            "lens": "<dev-checkout>/paper/radiometric-camera-board-space/src/experiments/detector-bias/lenses/fisheye_equisolid_932px.json",
+            "board": "<dev-checkout>/paper/radiometric-camera-board-space/src/experiments/hyper-accuracy/data/blobs/board_0fd",
+            "radiometry": "<dev-checkout>/paper/radiometric-camera-board-space/src/experiments/hyper-accuracy/generic-spline/logs/aprilgrid-stars2-stratified/edge_model/identifiability_3views/state.jls",
+            "r_real": 0.0010625,
+            "r_gt": 1.0e-6,
+            "scale": 0.188,
+            "poses_from": "<dev-checkout>/paper/radiometric-camera-board-space/src/experiments/detector-bias/fisheye_full/gt/poses.json"
+        },
+        "legacy_material_dropped": {
+            "tone": [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "warp": [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "ρ_ink": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "shared": false
+        },
+        "sensor_width_m": 0.0223,
+        "focus_surface_between_nodes": {
+            "nodal_values_deviation": 0.0,
+            "max_deviation_relative": 0.043451987857900456,
+            "max_deviation_absolute_per_m": 0.0043,
+            "measured_on": "81 pixel probes, max |new − old| / max |old| of the focus surface t̂ after load_state, against the pre-port values",
+            "reason": "The pre-port focus surface was a thin-plate spline over chart nodes in [−½, ½]², the 5208 × 3476 px sensor scaled per axis; the converted one is the same nodes in COLMAP pixels. The nodal values carry over exactly, but a thin-plate spline is not invariant under an anisotropic scaling of its domain (only a similarity leaves it the same surface), so between the nodes the surface moves.",
+            "note": "The state's aperture is r_gt = 1 μm (a pinhole render): its focus surface does not reach the images."
+        }
+    }
+}

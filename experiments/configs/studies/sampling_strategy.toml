@@ -1,0 +1,127 @@
+# RATIONALE (owner convention 2026-11-16; comments only: no run key reads them)
+#   question:   which LM sampling strategy is best, judged by the Thorlabs held-out reprojection error AND by the texture the calibrated
+#               camera recovers (the texture experiment's CV pipeline, scored at 1 mm)?
+#   hypothesis: an edge bias helps the focus surface (the defocus information sits at the edges), while a fixed sample budget can starve
+#               the geometry (flat regions and the rim lose samples); the add-on separates the two (the full uniform budget plus edges)
+#   decides:    the 0.11.5 sampling default (ECDF α = 1 is the provisional 0.11.4 default, chosen on the fisheye scoring alone)
+#   decided:    the uniform draw (masks.gradient_bias = 0: α = 0) for every case of record (owner 2026-11-16, this study's record
+#               rc-results-0.11/sampling_strategy/record/952231f4538a4b78: uniform best on both cases and both metrics — the 14 mm a1 − uniform
+#               texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median,
+#               +0.040 px at p95); the counts 8,192 per photograph for every global model and 16,384 for every spline (owner 2026-11-16 23:30,
+#               after the count side studies sampling_strategy_kb_count / _fe10_count / _fe10_kb16384: radiometric_refinement.toml [kinds])
+#   evidence:   the fisheye f/4 (pre-0.11.4 defaults, paired 153-photograph bootstrap vs uniform): the old rule (edge_fraction 0.37)
+#               +0.087 px [+0.063, +0.111] on the held-out median; α = 1 ≈ uniform on the median (−0.002 [−0.013, +0.011]) but
+#               +0.040 [+0.011, +0.083] px at p95; the 14 mm and the texture: this experiment's record
+#   owner:      J. Pritts
+#   date:       2026-11-15
+#   discussion: /tmp/claude-1002/-home-jbpritts-src-radiometric-camera/60680b91-11b6-4e3b-a1ab-fafedaa30f93/scratchpad/sampling_strategy_report.md
+#
+# Config of record of the sampling-strategy experiment (scripts/sampling_strategy.jl; owner 2026-11-15):
+# which LM sampling strategy is best, judged by the Thorlabs chrome reprojection error (the paper protocol: one rotation centre, the
+# held-out headline) AND by the texture recovered with the calibrated camera held fixed (the texture experiment's CV pipeline, scored
+# at 1 mm). It cross-validates the owner's provisional 0.11.4 default (ECDF α = 1, chosen on the fisheye scoring alone).
+#
+# Every variant is an OVERRIDE of a refinement case of record (src/drivers.jl expand_overrides: DrWatson's dict_list of the variant's
+# keys, one value each): the case's [pipeline] with the variant's [masks] keys set, nothing else changed — the config of record is
+# not edited. The variants are modes of the ONE draw (RadiometricCamera's draw_samples; owner: no second sampler). Every variant states
+# every draw key it reads (so a change of the package default moves no variant); the keys a mode does not read are not stated (an
+# inapplicable key is an error: the package's check_draw).
+#
+# The steps are their owners' (run in a module of their own: Eval's run_isolated) on configs this driver writes into a keyed
+# product of its own (`configs`, from this file and the configs of record, nothing else): the refinement driver's start and refine,
+# the chrome evaluation's prepare/detect/index/evaluate (its paired photograph bootstrap: Eval's bootstrap_ci), the texture driver's
+# stages and its compare. One repeat at the cases' own seeds (masks.seed): rerun with another seed only if the intervals say so.
+#   julia --project=experiments experiments/scripts/sampling_strategy.jl [--config=<toml>] [--plan] [--stage=NAME[,NAME]] [--case=a] [--variant=a,b] [--force]
+# A smoke run of the wiring: a config sampling_strategy_<name>.toml with [sampling_strategy] lm_max_iter set (the LM cap of every run;
+# it keys every refinement, so a smoke run never shadows a production one).
+
+[experiment]
+name = "sampling_strategy"
+
+[inputs]
+
+[sampling_strategy]
+cases = ["texcal_14mm", "fisheye_f4"]   # the 14 mm (texture + Thorlabs) and the fisheye f/4 (Thorlabs only: no texture set of its own)
+variants = ["uniform", "old037", "ecdf_a1", "ecdf_a2", "addon"]   # run order; a [variants.<name>] each
+reference = "uniform"                   # every paired difference is variant − uniform (Thorlabs and texture)
+headline = ["ecdf_a1", "ecdf_a2"]       # the owner's question (2026-11-15): α = 1 (the provisional default) vs α = 2 vs uniform
+label = "provisional (pre-0.11.4 defaults)"   # owner 2026-11-15: run before rc-0114 final (the pending 0.11.4 defaults shift every arm alike);
+                                              #   every record carries it; re-run on 0.11.4 only if the answer is close
+dome_tolerance = 0.12                   # derivation: the edge-sampling sweep's dome criterion, as the record stage was written (
+                                        #   2026-11-15) — every focus node finite, its distance within ±12 % of their mean; was the driver's
+                                        #   const DOME_TOLERANCE (owner rule 2026-11-16: no configuring const)
+
+# ---- the variants: [masks] keys of the case's [pipeline] -------------------------------------------------------------------------
+# uniform  α = 0: the uniform draw itself, bit for bit (draw_samples: no detector run)
+[variants.uniform]
+"masks.gradient_bias" = 0.0
+
+# old037   the rule of 2026-10-31, RC ≤ 0.11.4's configs of record (edge_fraction = 0.37): a uniform pool of n / 0.37, its strongest |∇ϕ|²
+#          (central differences; a RAW photograph's diagonal green neighbours). Reproduced EXACTLY as a mode of draw_samples
+#          (`_edge_select` restored verbatim from RC 0.11.4, the last version with it; tested against it), on this code base
+[variants.old037]
+"masks.gradient_bias" = 0.0
+"masks.edge_fraction" = 0.37
+
+# ecdf_a1  the Gaussian-derivative ECDF draw, p ∝ u^1, no importance weights (dropped). The detector is configs/default.toml's
+#          [masks] edge_detector = { type = "gaussian_derivative", sigma = 1.5 } (its derivation there; no case of record states one),
+#          not restated here: a table-valued override names its case with a comma, which the drivers' --case list cannot carry
+[variants.ecdf_a1]
+"masks.gradient_bias" = 1.0
+
+# ecdf_a2  the same at α = 2
+[variants.ecdf_a2]
+"masks.gradient_bias" = 2.0
+
+# addon    the full uniform samples_per_view PLUS M edge-biased samples (α = 2) of the other usable observations, on the same stream
+#          (the n are the uniform variant's, bit for bit): is the edge bias's geometry-vs-defocus trade-off only a fixed-budget effect?
+#          M per case: [cases.<case>.variants.addon] (a literal, samples_per_view / 2)
+[variants.addon]
+"masks.gradient_bias" = 0.0
+"masks.addon_gradient_bias" = 2.0
+
+# ---- the cases ----------------------------------------------------------------------------------------------------------------
+# refinement  the refinement config of record holding the case; case its [cases.<name>]
+# chrome      the chrome evaluation config of record of the lens's Thorlabs photographs (its [evaluate] protocol kept: holdout, bootstrap,
+#             regions); the variants are its models, compared with the reference
+# context     models of that chrome config of record evaluated BESIDE the variants in a second evaluation (the Schöps baseline, a
+#             parametric start, the pinhole-defocus refinement where the set has one), so the head-to-head of the variants is on their
+#             own common dots and the context's on all of theirs; a case model among them is a case of `refinement`, run as recorded
+# texture     the texture config of record whose camera is this case (scripts/texture_recovery.jl), or absent; texture_crop_mm its crop
+# lattice     the guard before every refinement (owner rule 2026-11-15 20:25: nothing on the slow lattice): the start's subdivision
+#             (start.json resample) must be `subdivision`, its lattice at most `max_nodes` nodes; an arm (a variant or a context
+#             case) overrides it only in [cases.<case>.lattice_override] <arm> = {…}
+
+[cases.texcal_14mm]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "texcal_14mm_spline_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_14mm_central30cm.toml"
+context = ["si30_spline_start", "si30_kb_start"]   # the set's Schöps baseline and Kannala–Brandt start (its pinhole-defocus model left the
+                                                   #   chrome config of record in RC 0.11.4)
+texture = "configs/experiments/texture_recovery_14mm_small.toml"
+texture_crop_mm = [28.0, 239.0, 60.0, 33.0]   # [x0, y0, width, height] mm, the crop the variants' textures are compared on: the last five lines of the
+                                              #   text from its left margin, no blobs (the texture config's former [figures.texture_large] crop, since retired)
+lattice = { subdivision = [1, 1], max_nodes = 900 }   # Schöps's own lattice (m = 1): the texcal run's 35 × 25 = 875 nodes (cell 155.7 × 164.5 px;
+                                                      #   its start, dgx01 2026-11-15) and the si30 context case's 35 × 25 (cell 156.8 × 166.4 px),
+                                                      #   against ≈ 8–9.6 k at the slow 40 px lattice; 900 admits 875, refuses any subdivision's
+[cases.texcal_14mm.variants.addon]
+"masks.addon_samples" = 8192          # samples_per_view / 2 = 16384 / 2 (the case's count of record, owner 2026-11-16)
+
+[cases.fisheye_f4]
+refinement = "configs/experiments/radiometric_refinement_vignetting.toml"
+case = "f4_fisheye_spline_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"   # the paper's fisheye chrome (the edge-sampling sweep's Thorlabs score)
+context = ["ag10fe_spline_start", "ag10fe_kb_start"]   # the set's Schöps baseline and Kannala–Brandt start (it has no pinhole-defocus row)
+lattice = { subdivision = [1, 1], max_nodes = 800 }   # Schöps's own lattice (m = 1) over the image circle: 20 × 20 = 400 nodes padded (cell
+                                                      #   163.7 × 164.5 px; its start, dgx01 2026-11-15); 800 refuses any subdivision's (m = 2: 1600)
+[cases.fisheye_f4.variants.addon]
+"masks.addon_samples" = 8192          # samples_per_view / 2 = 16384 / 2 (the case's count of record, owner 2026-11-16)
+
+[runtime]
+reference_s_per_iteration = { texcal_14mm = 88.0 }   # the 14 mm on Schöps's own lattice: ≈ 88 s per LM iteration at 97 % GPU (the profiler's
+                                                      #   160 px arm, coordinator 2026-11-15); a run ≥ 2× slower is reported as a regression
+regression_factor = 2.0
+
+[figure]
+asset = "fig_sampling_strategy.tex"   # plots/latex/: the pgfplots figure (src/figure_style.jl), the Δ vs uniform with its 95 % interval per variant
+table = "tab_sampling_strategy.tex"   # plots/latex/: the results table (variant × case)

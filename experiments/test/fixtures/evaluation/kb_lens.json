@@ -1,0 +1,35 @@
+{
+    "schema": "vgio/cameras/v4",
+    "pixel_frame": "colmap",
+    "cameras": [
+        {
+            "name": "cam",
+            "width": 5208,
+            "height": 3476,
+            "K": {
+                "fx": 932.4460672467567,
+                "fy": 932.4460293702952,
+                "cx": 2604.000203132912,
+                "cy": 1737.9993531661419,
+                "skew": 0.0
+            },
+            "lens": {
+                "equidistant": [],
+                "radial": [
+                    [
+                        -0.0416621130504616,
+                        0.0005144457468327627,
+                        7.004777969173644e-7,
+                        -7.433208605462832e-7
+                    ],
+                    []
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "model": "radiometric_kannala_brandt_schoeps_it11",
+        "iteration": 11,
+        "migrated_from": "RadiometricCamera lens JSON (lens_type kannala_brandt, theta in chart units)"
+    }
+}

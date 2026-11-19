@@ -1,0 +1,68 @@
+# Config of record of the convergence experiment (scripts/convergence.jl; src/convergence.jl; owner 2026-11-15): the BIAS of
+# T. Schöps's method. Our radiometric refinement starts from his camera; at every LM iteration two series on the same iterations —
+# the bearing divergence of his own detections through our camera of that iteration under its own poses (deg; median and p95: the
+# refinement monitor's "bearing(detections, own poses)" quantity, in degrees) and the Thorlabs reprojection error of that camera on
+# the independent chrome target (px; the chrome evaluation's protocol: the ball-head motion, the dots every iteration scores, the
+# held-out fit the headline beside the in-sample one) — on one figure with two y axes. Expected: the divergence rising while the
+# Thorlabs error falls (fisheye 10 cm: the bearing median 0.57 → 1.00 px while the chrome error improved, owner 2026-11-15).
+#
+# Every value is computed after the run from the refinement's own checkpoints (its cases' [pipeline.io] checkpoint_each: the state
+# and grid of every iteration), nothing logged on the side. Each case is a case of record of [upstream] radiometric_refinement, as it
+# is there (its config of record: the run this experiment reads IS the refinement of record's product); each names the chrome set of
+# record that scores it (its config's [evaluate] models name the case).
+#
+#   julia --project=experiments experiments/scripts/convergence.jl [--plan] [--stage=refine,chrome,convergence,figure] [--case=a,b]
+
+[experiment]
+name = "convergence"
+
+[inputs]
+# none of its own: the photographs, detections and target are the upstream configs' inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
+
+[convergence]
+stride = 1                      # every LM iteration: the refinements of record checkpoint each (ag10fe 50 iterations, si30 25), each scored on the chrome set in seconds; the last checkpoint is always read
+
+# fisheye 8 mm, AprilGrid at ≈ 10 cm, f/22: the case of the owner's observation (Schöps start, photosites + all-darks, image region)
+[cases.ag10fe_spline_warped]
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"   # the fisheye 10 cm chrome set (its [evaluate] models score ag10fe_spline_refined)
+label = "fisheye 8 mm, AprilGrid at 10 cm"
+
+# 14 mm, Siemens stars at 30 cm (central30cm), f/22: the 14 mm case of record (Schöps start)
+[cases.si30_spline_warped]
+chrome = "configs/experiments/chrome_evaluation_fx3_14mm_central30cm.toml"  # the 14 mm central 30 cm chrome set (its [evaluate] models score si30_spline_refined)
+label = "14 mm, Siemens stars at 30 cm"
+
+# 14 mm, AprilGrid at 30 cm (central30cm), f/22: the right panel of the paper's figure (fig:convergence-rms; owner 2026-11-17 11:20)
+[cases.ag30_spline_warped]
+chrome = "configs/experiments/chrome_evaluation_fx3_14mm_central30cm.toml"  # the 14 mm central 30 cm chrome set (its [evaluate] models score ag30_spline_refined)
+label = "14 mm, AprilGrid at 30 cm"
+
+# The paper's figure (fig:convergence-rms, src/fig/convergence-rms.tex + convergence-rms/<case>[-narrow].tex; src/convergence_panels.jl,
+# T. Harder's rms_figure.py style): the median per LM iteration of the detections' true reprojection error and of the held-out Thorlabs
+# error, px, one axis per panel (owner 2026-11-17 11:20: the Sigma 14 mm Siemens-star spline LEFT, the AprilGrid spline RIGHT, medians,
+# iterations 0..25 — the refinements of record's 25).
+[panels]
+left = "si30_spline_warped"
+right = "ag30_spline_warped"
+asset_dir = "convergence-rms"   # plotsdir("convergence-rms.tex", "convergence-rms/<case>[-narrow].tex"): the paper's src/fig/ layout
+macro_prefix = "convergence"    # \convergence<Panel><Quantity><Point> (Eval's number_macro_name)
+rise_from_iteration = 4         # the paper's sentence: the detections' error "rises after the first four iterations (from 0.59 to 0.71 px on the Siemens stars …)"
+[panels.si30_spline_warped]
+title = "Sigma 14 mm lens, Siemens stars, Spline"
+target = "siemens"
+macro = "siemens"
+[panels.ag30_spline_warped]
+title = "Sigma 14 mm lens, AprilGrid, Spline"
+target = "aprilgrid"
+macro = "aprilgrid"
+
+# The figure (src/convergence.jl write_convergence_figure; its styles are src/figure_style.jl's rows `divergence median`,
+# `divergence p95`, `thorlabs heldout`, `thorlabs in-sample`): one pgfplots fragment per case, its data inline, two y axes.
+[figure]
+asset_dir = "convergence"       # plotsdir("convergence/<case>/"): convergence_<case>.tex, figure_styles.tex, preview.tex (+ .pdf)
+xlabel = "LM iteration"
+divergence_ylabel = "bearing divergence ($^\\circ$)"
+thorlabs_ylabel = "Thorlabs reprojection error (px)"

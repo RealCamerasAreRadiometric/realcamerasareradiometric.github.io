@@ -1,0 +1,16 @@
+# A test fixture of the figure-config machinery (src/assets.jl: load_figure_config, deploy_figures; test/reproduce_tests.jl):
+# the figure config that deployed table_refinement_chrome.tex into the manuscript until the paper's own figures and tables replaced it
+# (v0.11.6). The render is not part of the paper; no config of record deploys it.
+
+[experiment]
+name = "table_refinement_chrome"
+generator = "scripts/chrome_evaluation_paper.jl"
+
+[runs]
+experiment = "configs/experiments/chrome_evaluation_paper.toml"
+
+[render]
+asset = "tables.refinement_chrome"
+
+[deploy]
+replace_submitted = "off"   # true only once the author has signed off the difference verify.tsv states

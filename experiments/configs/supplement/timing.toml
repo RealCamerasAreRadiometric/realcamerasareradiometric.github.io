@@ -1,0 +1,48 @@
+# RATIONALE
+#   question:   how long does our code take to output a radiometric calibration — the refinement alone, from its loaded start and
+#               prepared photographs to the written calibrated camera record — on the hardware of record?
+#   hypothesis: none (a measurement): the paper promises the runtime (experiments.tex: the captures "are listed in
+#               \cref{sec:supp-dataset} together with the runtime for each experiment")
+#   decides:    the runtime statement of the supplement (sec:supp-dataset) and its number macros
+#   evidence:   the run of record's refinement logs: si30_spline_warped 759–775 s of LM for 25 iterations on one B200
+#               (rc-results-0.11.5 radiometric_refinement/refine 7a66fb15e2329e87, refine.log)
+#   owner:      J. Pritts (2026-11-18: "the mean and standard deviation times for doing a radiometric calibration. Not including the
+#               pre-processing, so not including the initial guess"; simplified the same day to one typical case on all 8 B200s, with
+#               the context a reader needs: photographs, resolution, samples, observations, iterations, time per iteration, free
+#               parameters, GPU and CPU threads)
+#   date:       2026-11-18
+#
+# Config of record of the timing experiment (scripts/timing.jl; src/timing.jl). WHAT IS TIMED: the radiometric refinement of [timing] case
+# of [upstream] radiometric_refinement, as it is there (the run of record's settings exactly: its config, its samples), from its start
+# record: bin/refine.jl --start=<the case's start product> --repeat=<warmup + 1> (one process: the start and the prepared photographs
+# loaded, untimed; `warmup` untimed solves that compile; then ONE timed solve) — the wall time of `refine_calibration!` (the LM and its
+# per-iteration work, the checkpoints of record included) plus `save_radiometric_calibration` (the calibrated camera record written).
+# EXCLUDED: the decode (prepare), the masks, the geometric start (the initial guess), the chrome scoring. Each replicate is its own Slurm
+# job on its own GPU (no two on one GPU: a shared device would distort the time); the record gathers them.
+#
+#   julia --project=experiments experiments/scripts/timing.jl [--plan] [--stage=start,time,record] [--replicate=1,2] [--config=<toml>]
+
+[experiment]
+name = "timing"
+
+[inputs]
+# none of its own: the photographs, the start's front end and the target are [upstream] radiometric_refinement's inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"   # the case, as it is there (its start product is read by key)
+
+[timing]
+case = "si30_spline_warped"   # owner 2026-11-18: one typical calibration case (Sigma 14 mm, Siemens stars at 30 cm, the central spline: the paper's main model and Figure 4's case)
+replicates = 8                # owner 2026-11-18: one run per B200 of dgx01 (8 GPUs), all at once, one per GPU
+warmup = 1                    # owner 2026-11-18: one untimed warm-up solve (compile) before the one timed solve; its time reported apart
+
+[overrides]
+# none: the case of record as it is (a smoke config sets refine-only keys here, e.g. "lm.max_iter" = 2: src/timing.jl timing_case, the case keeping its name and start)
+
+[record]
+macro_prefix = "timing"       # the number macros \timing<Name> (Eval's number_macro_name)
+seconds_digits = 1            # wall seconds printed at 0.1 s (the replicates spread by seconds over ≈ 13 min)
+label = "Sigma 14\\,mm, Siemens stars, central spline"   # the runtime table's data-set row, as the paper's tables name the set (refinement-table-supp-a.tex)
+runtime_table_asset = "timing/runtime-table.tex"        # plotsdir(): the supplement's runtime table (the paper's table style; deployed as ../paper/fig/runtime-table.tex)
+table_asset = "timing/table_timing.tex"                 # plotsdir(): the per-run table (each replicate's times)
+statement_asset = "timing/timing_statement.tex"         # plotsdir(): the supplement's one-sentence statement, its numbers the macros

@@ -1,0 +1,115 @@
+# The run of record of the paper (owner 2026-11-16: "once the release has been in the registry, switch to it and run all experiments
+# that we need for the paper … occupying the DGX at full capacity"): which stages of the stage graph of record (configs/reproduce.toml)
+# one launch runs, where, the runtime of each job from its last good run, and the experiments the launch must hold. Read by
+# scripts/run_of_record.jl (src/run_of_record.jl); launched by
+#
+#   bash experiments/scripts/slurm/run_of_record.sh <rc-version> --plan     # the job graph, the projected wall-clock, the risks; nothing runs
+#   bash experiments/scripts/slurm/run_of_record.sh <rc-version>            # the registered version's tree, every stage submitted
+#
+# The stages, the jobs, their resources, dependencies and keys are the graph's and the runner's (VisualGeometryToolkitEval Reproduce):
+# this file only selects and estimates. Every literal states its derivation (owner rule: TOML literals only).
+
+[launch]
+# the MAIN group's stages (configs/experiments/: REPRODUCE.md "The main paper"): the front ends and the image regions they read, the
+# refinements of record (chrome sets and f/4), their chrome evaluations, the texture, then the regeneration and its results branch.
+# The SUPPLEMENT group's timing (configs/supplement/timing.toml) is launched by hand until it has a stage of the graph (REPRODUCE.md,
+# "Running on Slurm"; a known limitation); the STUDIES (configs/studies/) never run here.
+# Not a paper result: golden (the package's gate), convergence (its stage `panels` makes fig:convergence-rms from the refinements
+# of record: named when wanted), chrome_index_grid (a measurement), sensor_characterisation (its record is an input of record),
+# paper_pdf (after accept_results).
+stages = [
+    "setup", "image_regions",
+    "frontends_prepare", "frontends_detect", "frontends_init", "frontends_evaluate",
+    "radiometric_refinement_prepare", "radiometric_refinement",
+    "radiometric_refinement_vignetting_prepare", "radiometric_refinement_vignetting",
+    "chrome_evaluation", "chrome_evaluation_score",
+    "texture_recovery",
+    "regenerate_paper", "results_branch",
+]
+# a NEW results root per release (never a dated one: a run is found by its key); the tree is the registered version's clone
+results_root = "/raid/data/jpr/rc-results-{version}"
+tree_root = "/raid/data/jpr/ror-{version}"
+# where the tree comes from and how it resolves: the repository of record, the registry RadiometricCamera is registered in, and on
+# dgx01 the julia of the release gates (1.13.3, the gates' JL) and a depot of the launch's own before the shared one (the gates'
+# layout: the shared depot's registries, General and CauRegistry, and its packages; the launch's compile caches its own)
+repository = "https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git"   # the package in its subdirectory RadiometricCamera/
+registry = "CauRegistry"
+julia = "/raid/data/jpr/julia-depot/juliaup/julia-1.13.3+0.x64.linux.gnu/bin/julia"
+depot = "/raid/data/jpr/depot-ror-{version}:/raid/data/jpr/julia-depot:"
+
+[machine]
+gpus = 8      # dgx01: 8 × B200 (scontrol show node: Gres=gpu:8)
+cpus = 224    # dgx01: 224 CPUs, 1,900,000 MB (8480M per CPU, the node ratio)
+
+[risk]
+tight_fraction = 0.75   # a job projected past 75 % of its --time is flagged: the slow-run rule acts before a time-out, not after
+# the estimates below that no run measured (assumed from a neighbour's, or a stage that ran inside another until now): flagged
+untimed = ["regenerate_paper"]
+
+# Minutes per task of each job: "<stage>" its own job (its last phase), "<stage>:<phase>" an earlier phase. The sources: the runner's
+# completion markers (start/end of every task of the launches under /raid/data/jpr/rc-results-0.11/_reproduce, harvested 2026-11-16;
+# no sacct on dgx01: accounting storage is disabled), the GNU time -v lines of the logs, and the measured runtimes stated beside each
+# stage's limit in configs/reproduce.toml (the rehearsal of 2026-11-13, dgx01 2026-11-15). A job without an entry is planned at
+# `default` and flagged unmeasured.
+[estimate]
+default = 60
+precompile = 2                                    # a stage's CPU precompile after setup compiled the tree: 0.1 min (markers, 20261115_130418), the load ×10
+"setup" = 15                                      # 2.9 min (markers, 20261115_130418, a warm depot); a NEW tree compiles RC, experiments and CUDA's extensions: ≈ 12–15 min at 12 CPUs (Eval's dgx01 precompile_time note)
+"distance_maps" = 10                              # the two maps' conversion (seconds each, dgx01 job 20478) and the driver's load: minutes; ×2 margin under its 30 min limit
+"image_regions" = 5                               # 0.3–0.9 min (markers, 2 launches); the full-resolution raw_green frames and the fisheye 30 cm step: ×5
+"frontends_prepare" = 10                          # 0.2–1.9 min (markers, 21 tasks); 6–10 min on a cold decode (2026-11-13: zoom 551 s, 14 mm 531 s)
+"frontends_detect" = 15                           # 2.1–14.6 min (markers, 21 tasks: the 14 mm's camera_calibration 766 s); the window study's fe30w runs 8–10 min (fe30-window logs, 2026-11-16)
+"frontends_init" = 3                              # 0.2–3.6 min (markers, 21 tasks)
+"frontends_evaluate" = 3                          # 2–3 min (configs/reproduce.toml, measured)
+"radiometric_refinement_prepare" = 10             # 1.1 min on a reused decode (markers); a fresh decode of every set some minutes
+"radiometric_refinement" = 90                     # 50 min (ag10fe_bc5) … 72.2 min (markers, 20261115_032416) … 90 min (ag08ta at the 50-iteration cap), rehearsal 2026-11-13: the longest
+"radiometric_refinement_vignetting_prepare" = 10  # as radiometric_refinement_prepare
+"radiometric_refinement_vignetting" = 90          # as radiometric_refinement (the same LM on the f/4 sets)
+"chrome_evaluation:decode" = 10                   # ≈ 250 RAW photographs a set, Features' load_raw threaded (the prepares above: minutes)
+"chrome_evaluation:detect" = 15                   # the chrome detect "minutes per set on a GPU" (chrome_index_grid's detect phase)
+"chrome_evaluation" = 16                          # the index: 18 set tasks in a 940 s span (the index grid, cvpr-eff 2026-11-13)
+"chrome_evaluation_score" = 10                    # each evaluate minutes (dgx01 2026-11-15)
+"texture_recovery:poses" = 3                      # the whole set 9.2 min (markers, 20261115_032416): the decode and the poses a third
+"texture_recovery:solve" = 13                     # 5 folds × the page solve 138–156 s on a B200 (cvpr-eff 2026-11-13)
+"texture_recovery" = 3                            # the scores, the fold report, the compare and summary.md: minutes
+"regenerate_paper" = 60                           # every GPU stage upstream: the figures, the tables, numbers, verify (not measured as a CPU stage)
+"results_branch" = 5                              # one julia writing the branch (minutes)
+
+# The experiments the launch must hold (the brief of 2026-11-16): a stage, and an item of it when the experiment is one case or set.
+
+[[require]]
+what = "Main Sec. 5.2: the chrome refinements and their scores (tab:refinement-chrome, Tab. 2; Supp. Tab. A4, A5)"
+stage = "chrome_evaluation_score"
+
+[[require]]
+what = "Main Sec. 5.4: the defocus table's Tamron f/8 refinements (tab:defocus, Tab. 3)"
+stage = "radiometric_refinement"
+item = "^sitla_spline_(pinhole_)?warped$"
+
+[[require]]
+what = "Main Sec. 5.4: the focus surfaces' fisheye f/4 refinement (fig:focus-surfaces, Fig. 7)"
+stage = "radiometric_refinement_vignetting"
+item = "^f4_fisheye_spline_warped$"
+
+[[require]]
+what = "Main Sec. 5.4: the learned texture (fig:texture-learned, Fig. 7) and its camera"
+stage = "texture_recovery"
+
+[[require]]
+what = "the regeneration of every figure, table and number, on a results branch"
+stage = "results_branch"
+
+[[require]]
+what = "the fisheye 30 cm set's front end (schoeps-window)"
+stage = "frontends_detect"
+item = "^fisheye30cm_siemens$"
+
+[[require]]
+what = "the fisheye 30 cm set's chrome evaluation (schoeps-window)"
+stage = "chrome_evaluation_score"
+item = "fisheye.*30"
+
+[[require]]
+what = "the fisheye 30 cm set's refinement"
+stage = "radiometric_refinement"
+item = "(fe30|fisheye30|si30fe|30cm.*fisheye|fisheye.*30)"

@@ -1,0 +1,140 @@
+# A single-channel run (`io.channel` "R"/"G"/"B", the green photosites) takes ONE residual per measured pixel (owner ruling
+# 2026-11-12). Until then the channel was copied into the three channels of a colour state, so every measurement was three residuals:
+# that state ("today's") is the reference here. At the same parameters the single-channel cost is exactly a third of it, its residual
+# and Jacobian are the reference's channel rows and the measured channel's columns, and a fit from the same start reaches the same
+# parameters; the other channels' lighting and η are no parameters (they follow the measured channel).
+
+@testsetup module SingleChannelScene
+    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
+                             sphere_radius, View, 𝔟
+    using RadiometricCamera, StaticArrays
+    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
+    import VisualGeometryToolkitCore as VgtkCore
+    const RC = RadiometricCamera
+    include(joinpath(@__DIR__, "fixture_board.jl"))
+    include(joinpath(@__DIR__, "fixture_camera.jl"))
+    export single_channel_scene
+
+    "The calibration fixture's two views; the colour reference (`io.channel` copied into three) and the single-channel state of
+    channel `c`, both from the start `views` (or the truth) with the lighting and η tied to channel `c`."
+    function single_channel_scene(; c = 2, W = 24, H = 24, perturbed = false, backend = nothing)
+        tex = fixture_board()
+        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        scene = Scene(board, W, H)
+        lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 1.288 * W, (0.51 * W, 0.48 * H), W, H)
+        tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
+        focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
+        poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
+        views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
+        vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
+        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+        a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
+        light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
+        mat_t = Material(0.12, 0.35, SVector(1.6, 1.65, 1.7), SVector(1.3, 1.33, 1.36), 0.4)   # η differs by channel
+        st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
+        masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
+        renders = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+        copied = [repeat(r[:, :, c:c], 1, 1, 3) for r in renders]                     # today's io.channel: channel c in all three
+        views0 = perturbed ? [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.005), SVector(0.004, -0.004, 0.006))),
+                                   cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 1.27 * W, (0.5 * W, 0.49 * H), W, H), focus_t, 0.0386) for p in poses] : views_t
+        light0, mat0 = RC.tie_channels(light_t, c), RC.tie_channels(mat_t, c)          # the reference starts tied, as the single-channel state
+        kw = backend === nothing ? (;) : (; backend)
+        ref = CalibrationState(scene, st, copy(views0), vig_t, mat0, light0, copied; masks, kw...)
+        one = CalibrationState(scene, st, copy(views0), vig_t, mat_t, light_t, renders; masks, channel = c, kw...)
+        return (; ref, one, renders, masks, c)
+    end
+end
+
+@testitem "single channel: one residual per measured pixel, a third of today's cost, its rows and columns" setup = [RCFixtures, SingleChannelScene] begin
+    using RadiometricCamera: build_problem, cost, PerViewResidual
+    using LinearAlgebra
+    f = single_channel_scene()
+    ref, one, c = f.ref, f.one, f.c
+    @test RC.fit_channels(one) == (c,) && RC.n_channels(one) == 1 && RC.fit_channels(ref) == (1, 2, 3)
+    @test all(k -> length(one.ϕ[k]) == length(one.px[k]) == length(ref.ϕ[k]) ÷ 3, 1:2)
+    @test all(k -> one.ϕ[k] == ref.ϕ[k][c:3:end], 1:2)                                 # the measured entries, once
+    # the other channels' lighting and η follow the measured channel
+    a = coefficients(one.light)
+    @test a[1, :] == a[c, :] == a[3, :] && one.mat.𝛈_ink == fill(one.mat.𝛈_ink[c], 3) && one.mat.𝛈_noink == fill(one.mat.𝛈_noink[c], 3)
+    @test coefficients(ref.light) == a && ref.mat == one.mat
+    # the cost: exactly a third (the same squared residuals, once instead of three times)
+    @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-12
+    @test cost(one)[2] ≈ cost(ref)[2] rtol = 1e-12                                       # the relative RMS is the same
+    # the residual and Jacobian of the per-view block: the reference's channel rows; the columns of the single-channel blocks
+    p1, i1 = build_problem(one); p0, i0 = build_problem(ref)
+    @test Int(RC.NLLSsolver.nvars(p1.variables[i1.lighting])) == 9 && Int(RC.NLLSsolver.nvars(p0.variables[i0.lighting])) == 27
+    @test Int(RC.NLLSsolver.nvars(p1.variables[i1.material])) == 5 && Int(RC.NLLSsolver.nvars(p0.variables[i0.material])) == 9
+    r1 = get(p1.problem.costs, PerViewResidual{9})[1]; r0 = get(p0.problem.costs, PerViewResidual{9})[1]
+    v1 = RC.NLLSsolver.getvars(r1, p1.variables); v0 = RC.NLLSsolver.getvars(r0, p0.variables)
+    @test RC.NLLSsolver.nres(r1) == length(one.px[1]) && RC.NLLSsolver.nres(r0) == 3 * length(one.px[1])
+    e1, J1 = RC.NLLSsolver.computeresjac(RC.static(127), r1, v1...)
+    e0, J0 = RC.NLLSsolver.computeresjac(RC.static(127), r0, v0...)
+    @test e1 == e0[c:3:end] && e1 == RC.NLLSsolver.computeresidual(r1, v1...)
+    @test size(J1, 2) == size(J0, 2) - 18 - 4                                            # 2 × 9 lighting and 4 η columns fewer
+    lay = RC._jacobian_layout(127, 9, length(one.settings.sensor), VgtkCore.tangent_size(v0[6]), RC.n_control_points(VgtkCore.model(v0[6])), 9,
+                              VgtkCore.tangent_size(v0[2]))
+    @test J1 == RC._channel_jacobian(J0, lay, c)
+    # the 22 columns dropped are the ones the measured channel does not see: no parameter of the fit is left with a zero column
+    zc(M) = count(j -> iszero(view(M, :, j)), axes(M, 2))
+    @test zc(J1) == zc(J0[c:3:end, :]) - 22
+end
+
+@testitem "single channel: a fit reaches today's parameters" setup = [RCFixtures, SingleChannelScene] begin
+    using RadiometricCamera: cost, run_lm!
+    using Rotations: rotation_angle, RotMatrix
+    f = single_channel_scene(; perturbed = true)
+    ref, one, c = f.ref, f.one, f.c
+    run_lm!(ref; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
+    run_lm!(one; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
+    @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-6 atol = 1e-20
+    @test all(rad2deg(rotation_angle(RotMatrix{3}(one.poses[k].R' * ref.poses[k].R))) < 1e-6 for k in 1:2)
+    @test maximum(abs, VgtkCore.parameter_vector(VgtkCore.model(RC.lens(one))) .- VgtkCore.parameter_vector(VgtkCore.model(RC.lens(ref)))) < 1e-6
+    @test maximum(abs, coefficients(one.light) .- coefficients(ref.light)) < 1e-6 * maximum(abs, coefficients(ref.light))
+    @test abs(one.mat.μ - ref.mat.μ) < 1e-6 && abs(one.mat.𝛈_ink[c] - ref.mat.𝛈_ink[c]) < 1e-6
+    # the other channels still follow the measured one
+    a = coefficients(one.light); @test a[1, :] == a[c, :] == a[3, :]
+end
+
+@testitem "single channel: the grid route's tiles, one residual per measured pixel" setup = [RCFixtures, GridTilesScene] begin
+    using RadiometricCamera: build_problem_grid
+    c = 2
+    copied = [repeat(t[:, :, c:c], 1, 1, 3) for t in targets]
+    ref = CalibrationState(scene, st, copy(views_t), vig_t, RC.tie_channels(mat_t, c), RC.tie_channels(light_t, c), copied; masks)
+    one = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks, channel = c)
+    p0, _ = build_problem_grid(ref; patch = (5, 5)); p1, _ = build_problem_grid(one; patch = (5, 5))
+    t0 = RC.tile_costs(p0); t1 = RC.tile_costs(p1)
+    @test length(t0) == length(t1)
+    for (a, b) in zip(t0, t1)
+        va = RC.NLLSsolver.getvars(a, p0.variables); vb = RC.NLLSsolver.getvars(b, p1.variables)
+        @test RC.NLLSsolver.nres(b) == length(b.pix) && b.ϕt == a.ϕt[c:3:end]
+        ea, Ja = RC.NLLSsolver.computeresjac(RC.static(1023), a, va...)
+        eb, Jb = RC.NLLSsolver.computeresjac(RC.static(1023), b, vb...)
+        @test eb == ea[c:3:end] && size(Jb) == (length(b.pix), size(Ja, 2) - 22)
+        nz(M) = M[:, [j for j in axes(M, 2) if any(!iszero, view(M, :, j))]]            # the columns that see the measured channel
+        @test nz(Jb) == nz(Ja[c:3:end, :])
+    end
+end
+
+@testitem "single channel: the device evaluates the same residual and Jacobian" tags = [:gpu] setup = [RCFixtures, RCGPU, SingleChannelScene] begin
+    using RadiometricCamera: build_problem, PerViewResidual
+    import CUDA
+    using CUDA: CUDABackend
+    require_gpu()
+    if RC_GPU_TESTS
+        cpu = single_channel_scene().one
+        gpu = single_channel_scene(; backend = CUDABackend(; always_inline = true)).one
+        pc, ic = build_problem(cpu); pg, ig = build_problem(gpu)
+        rc = get(pc.problem.costs, PerViewResidual{9})[1]; rg = get(pg.problem.costs, PerViewResidual{9})[1]
+        vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)
+        ec, Jc = RC.NLLSsolver.computeresjac(RC.static(127), rc, vc...)
+        eg, Jg = RC.NLLSsolver.computeresjac(RC.static(127), rg, vg...)
+        @test length(eg) == length(ec) == length(cpu.px[1]) && size(Jg) == size(Jc)
+        @test maximum(abs, eg .- ec) < 2e-3 * max(1.0, maximum(abs, ec))                      # Float32 device, Float64 CPU
+        @test eg == RC.NLLSsolver.computeresidual(rg, vg...)                                   # the device residual, bitwise its own
+        for j in axes(Jc, 2)
+            n = sqrt(sum(abs2, view(Jc, :, j)))
+            n < 1e-3 * maximum(sqrt(sum(abs2, view(Jc, :, q))) for q in axes(Jc, 2)) && continue
+            @test sqrt(sum(abs2, view(Jc, :, j) .- view(Jg, :, j))) / n < 2e-2
+        end
+    end
+end

@@ -1,0 +1,64 @@
+{
+    "schema": "vgio/trajectory/v5.0",
+    "generator": {
+        "name": "VisualGeometryToolkitIO",
+        "version": "0.10.5"
+    },
+    "units": {
+        "length": "mm",
+        "time": "s",
+        "angle": "rad",
+        "pixel": "colmap",
+        "density": "dpi",
+        "radiance": "relative",
+        "length_roles": {}
+    },
+    "conventions": {
+        "rotation_encoding": "quaternion_wxyz_hamilton",
+        "transform_convention": "x_to = R * x_from + t",
+        "matrix_layout": "rows",
+        "grid_layout": "row_major",
+        "index_base": 1
+    },
+    "from": "world",
+    "to": "view:cam",
+    "frames": [
+        {
+            "frame_index": 1,
+            "image": "V01.png",
+            "pose": {
+                "rotation": [
+                    0.9960292008284364,
+                    0.044832149477260316,
+                    -0.07685416626598526,
+                    0.003057220612823935
+                ],
+                "translation": [
+                    -487.65509769313053,
+                    -499.06310998491557,
+                    1480.535424058051
+                ]
+            }
+        },
+        {
+            "frame_index": 2,
+            "image": "V02.png",
+            "pose": {
+                "rotation": [
+                    0.9395443230759326,
+                    0.0072831949308641356,
+                    -0.28882741755448155,
+                    0.18379919182683
+                ],
+                "translation": [
+                    -273.6703633181373,
+                    -1302.486489656121,
+                    257.00504764315076
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "world": "printed page (origin top-left, x right, y down)"
+    }
+}

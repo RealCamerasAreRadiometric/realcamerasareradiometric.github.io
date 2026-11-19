@@ -1,0 +1,115 @@
+\section{Radiometric Camera Model}
+\label{sec:radiometric-camera-model}
+\label{sec:image-formation}
+Let $\mathcal{I}\subseteq\mathbb{R}^2$ be the sensor plane. A pixel
+$\vbu$ with the area $\mathcal{I}_{\vbu}\subseteq\mathcal{I}$ measures
+the radiant flux~\cite{pharr2023physically}
+\begin{equation}
+\label{eq:per-channel-rad-flux}
+    \Phi(\vbu) \coloneqq \int_{\mathcal{I}_{\vbu}}\int_{\calOmega(\vbp)} L(\vbx(\vbp,\vbomega), \vbomega_o(\vbp,\vbomega)) \cos\theta(\vbomega)\odif{\vbomega}\odif{\vbp},
+\end{equation}
+where $\calOmega(\vbp)$ is the solid angle under which the sensor
+point $\vbp$ sees the aperture, $\vbx(\vbp,\vbomega)$ the scene point
+visible from $\vbp$ along the direction $\vbomega$,
+$L(\vbx,\vbomega_o)$ the radiance that leaves $\vbx$ in the direction
+$\vbomega_o$ towards the lens, and $\theta$ the angle of incidence on
+the sensor. The inner integral is the irradiance $E(\vbp)$. All
+quantities are per color channel, and we omit the channel index
+(\cref{sec:supp-image-formation} gives the spectral formulation). The
+radiance $L$ follows from the lighting and the reflectance of the
+scene (\cref{eq:scene-rad}). The lens model determines
+$\calOmega(\vbp)$, $\vbx(\vbp,\vbomega)$ and $\vbomega_o(\vbp,\vbomega)$. With a pinhole aperture,
+$\calOmega(\vbp)$ is a single direction, so every scene point is in
+focus and there is no vignetting (\cref{sec:supp-pinhole-radiometry}).
+
+\subsection{Projection}
+Let $\vbpi^{-1}: \mathcal{I}\rightarrow\mathcal{S}^2$ be the
+back-projection of a central geometric camera model with the center
+of projection $\vbo$. It maps a sensor point $\vbp$ to the unit
+direction $\hat{\vbd}(\vbp)\coloneqq\vbpi^{-1}(\vbp)$ of its ray. For
+a model that is given by its forward projection, we invert the
+projection numerically per sample. The radiometric camera keeps
+$\vbpi^{-1}$ as it is.
+
+\subsection{Aperture and Focus Surface}
+\label{sec:defocus}
+\begin{figure}[t]
+        \centering
+        \input{latex/fig_model}
+        \caption{The radiometric camera lifts any central geometric model, here a perspective and a fisheye model, in a cross-section. The geometric model alone sets the direction $\hat{\vbd}(\vbp)$ in which the ray of the sensor point $\vbp$ leaves the center $\vbo$ of the aperture $\mathcal{A}$; the model does not trace the light inside the camera (dashed). The lift adds the aperture: the rays through all aperture points $\vba$ meet in the point of focus $\vbx_f(\vbp)$ on the focus surface $\mathcal{F}$, which is close to a plane for the perspective model and surrounds the camera for the fisheye. Where the scene is off $\mathcal{F}$, the cone of these rays meets it in a region (thick blue), from which $\vbp$ collects its light.}
+        \label{fig:model}
+\end{figure}
+The thin lens~\cite{pharr2023physically} replaces the pinhole by an
+aperture disc $\mathcal{A}$ of radius $r$, centered at $\vbo$ and
+parallel to the sensor. All rays from a sensor point $\vbp$ through
+$\mathcal{A}$ meet in one point $\vbx_f(\vbp)$ on the plane of focus.
+Where the scene does not pass through $\vbx_f(\vbp)$, the cone of
+these rays intersects it in a region and not in a point, and $\vbp$
+collects the light of this whole region, which defocuses the image. For a real
+lens, the points of focus form a surface $\mathcal{F}$
+(\cref{fig:model}) that is not a plane in general \cite{Hecht+2023}: it is approximately a plane for a
+thin-lens-like lens and a sphere for a fisheye
+\cite{Kingslake2010,wide-field-of-view-2017}. We therefore learn the
+focus surface. We represent it by the inverse distance $\tau(\vbp)$
+from $\vbo$ to the point of focus $\vbx_f(\vbp)\in\mathcal{F}$ along
+the ray of $\vbp$,
+\begin{equation}
+    \vbx_f(\vbp) \coloneqq \vbo + \frac{1}{\tau(\vbp)}\,\hat{\vbd}(\vbp),
+\end{equation}
+and extend the back-projection to the aperture
+(\cref{fig:model}). The ray from $\vbp$
+through an aperture point $\vba\in\mathcal{A}$ is directed from
+$\vba$ towards $\vbx_f(\vbp)$:
+\begin{equation}
+\label{eq:lifted-back-projection}
+    \vbpi^{-1}(\vbp,\vba)
+    \coloneqq \frac{\vbx_f(\vbp) - \vba}{\lVert \vbx_f(\vbp) - \vba \rVert}
+    = \frac{\tau(\vbp)(\vbo-\vba) + \hat{\vbd}(\vbp)}{\lVert\tau(\vbp)(\vbo-\vba) + \hat{\vbd}(\vbp)\rVert}.
+\end{equation}
+This is the lift of the geometric model. Setting the aperture $\mathcal{A}=\{\vbo\}$ reduces the lifted model back to the geometric one, since $\vbpi^{-1}(\vbp,\vbo)=\vbpi^{-1}(\vbp)$. Where the latter back-projects to a single ray,
+$\vbpi^{-1}(\vbp,\mathcal{A})$ back-projects to a cone of rays
+through $\vbx_f(\vbp)$. Similarly, with the perspective back-projection and a plane of focus, the model reduces to
+the thin lens (\cref{sec:supp-thin-lens-equiv}). The inverse distance
+avoids intersecting the rays with $\mathcal{F}$, and unlike the
+distance itself, it keeps the gradient from vanishing for a far focus
+\cite{unified-inverse-depth,direct-sparse-odometry}
+(\cref{sec:supp-inverse-depth}). We model $\tau$ by a thin plate
+spline \cite{thin-plate-spline} over a grid restricted to the illuminated region
+of the sensor.
+
+\subsection{Vignetting}
+\label{sec:vignetting}
+Written as an integral over the aperture, the flux of the thin lens
+carries the factor $\cos^4\theta/s'^2$ that expresses its vignetting, with the image distance $s'$~\cite{Goossens_2019}
+(\cref{sec:supp-thin-lens-vignetting}). Real lenses differ much
+from it (\cref{fig:vignetting}). Hence, we replace this factor by a generic
+vignetting function $V$. We also normalize by the aperture area $\pi r^2$,
+so that the aperture radius changes the defocus but not the
+brightness of the image, such that its scale is carried by the lighting (see \cref{sec:lighting}, \ref{sec:supp-gauge-freedoms}) alone. To spare us computing a boundary integral (see \cref{sec:boundary-terms}), we substitute the aperture point
+$\vba=\vbo+r\vbxi$ with $\vbxi$ in the unit disc $\mathcal{D}$ of the
+aperture plane. The area element $\odif{\vba}=r^2\odif{\vbxi}$
+cancels the $r^2$ of the normalization, and the radiometric camera
+measures
+\begin{equation}
+\label{eq:rad-flux-with-vignetting}
+    \Phi(\vbu)
+    = \frac{1}{\pi}\int_{\mathcal{I}_{\vbu}}V(\vbp)
+    \int_{\mathcal{D}}L\bigl(\vbx(\vbp,\vba),-\vbpi^{-1}(\vbp,\vba)\bigr)\odif{\vbxi}\odif{\vbp},
+\end{equation}
+where $\vbx(\vbp,\vba)$ is the scene point that the ray from $\vba$ in
+the direction $\vbpi^{-1}(\vbp,\vba)$ meets. The radius now
+appears only in the position of the aperture point, and no longer in
+the domain of the integral. We assume a vignetting
+that is radially symmetric about the principal point
+$\vbc\in\mathcal{I}$ and represent it by a cubic B-spline
+\cite{piegl1997nurbs}
+\begin{equation}
+    V(\vbp) \coloneqq \sum_{i=0}^{n} N_{i,3}\Bigl(\frac{\lVert \vbp-\vbc \rVert}{r_{\text{max}} + \lVert \vbp-\vbc \rVert}\Bigr)P_{i},
+\end{equation}
+with the basis functions $N_{i,3}$, the control points
+$\vbTheta_v = \{P_{i}\}_{i\in\{0,\dots,n\}}$, $n=15$, and the largest
+distance $r_{\text{max}}$ from the principal point to an illuminated
+pixel. Its knots are uniform in the image
+(\cref{sec:supp-vignetting-uniform-knots}).
+
+% one-panel caption (fig_model_single.tex): \caption{The radiometric camera in a cross-section. The geometric model gives the ray $\hat{\vbd}(\vbp)$ of the sensor point $\vbp$ through the center $\vbo$ of the aperture $\mathcal{A}$ of radius $r$. The rays from $\vbp$ through all aperture points $\vba$ meet in the point of focus $\vbx_f(\vbp)$ on the focus surface $\mathcal{F}$, at the distance $1/\tau(\vbp)$ from $\vbo$. Where the scene is off $\mathcal{F}$, the cone of these rays intersects it in a region (thick blue), from which $\vbp$ collects its light.}

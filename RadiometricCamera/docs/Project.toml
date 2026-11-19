@@ -1,0 +1,12 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+RadiometricCamera = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
+VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+
+[sources]
+RadiometricCamera = {path = ".."}
+
+[compat]
+Documenter = "1"
+VisualGeometryToolkitCore = "0.11.1"
+julia = "1.13"

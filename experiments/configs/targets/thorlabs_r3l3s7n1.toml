@@ -1,0 +1,17 @@
+# The Thorlabs R3L3S7N1 negative grid distortion target (drawing R3L3S7N1, 15 Nov 2024): a chrome-on-soda-lime reticle, clear dots on
+# an OD3 low-reflectivity chrome background. Its dimensions are the maker's and fixed: the target record (src/boards.jl,
+# save_dot_grid_board; scripts/make_targets.jl) is the design itself, calibration Rigid().
+part = "R3L3S7N1"
+maker = "Thorlabs"
+description = "Negative grid distortion target, 90 mm x 90 mm, 5000 um spacing"
+rows = 17
+cols = 17
+spacing_mm = 5.0                # dot centre spacing; the pattern is 80.0 mm x 80.0 mm
+dot_diameter_mm = 0.5
+glass_mm = 90.0                 # face dimension, tolerance 0.5 mm
+thickness_tolerance_mm = 0.2
+tolerance_mm = 0.005            # dot diameter, dot centre spacing, grid corner to corner
+material = "soda lime"
+coating = "OD3 low-reflectivity chrome, 0.120 um"
+polarity = "negative: clear dots on a dark background"
+output = "geometric_accuracy/data/target/thorlabs_r3l3s7n1"   # relative to data_root()

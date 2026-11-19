@@ -1,0 +1,41 @@
+# The stack the VisualGeometryToolkitCore port (branch vgtk-port, Tier 1 Task 1, 2026-10-26) passed gate 1 on: the package suite incl.
+# the GPU sets with golden_migration_snd_try.json at rtol 1e-10 (not re-recorded). Beside recorded_stack.txt (the old stack the goldens
+# were recorded on).
+julia 1.12.7 (goldens recorded on 1.12.6)
+VisualGeometryToolkitCore 0.2.0 = [sources] path ../vgtk-hand-eye-nlls/VisualGeometryToolkitCore, worktree of the VisualGeometryToolkit.jl
+  monorepo at commit 1ccdb2dbbe4cb3ac0b1c4d8b2b98df3dce5baa99 (unreleased 0.2 wave; checkout of VisualGeometryToolkitCore clean: yes).
+  Task 1 gated 7fec1f29b24cc3d6b1185a5b66eca76756f7b688; Task 2 (the parametric lenses on Core) needed 1ccdb2d, which added the double
+  sphere's unbounded back-projection (a keyword since removed: Core's double-sphere domain is the fold of its radial profile).
+ForwardDiff, StaticArrays and Adapt are HELD at the old stack's versions (1.4.5, 1.9.19, 4.7.0; recorded_stack.txt) for parity —
+  pinned in the untracked Manifest by Pkg.add(PackageSpec(name, version)) without a compat change; a fresh resolve takes newer patch
+  releases, which were not gated. KernelAbstractions moved 0.9.42 → 0.9.45 (Core's compat floor). The experiments env holds the same three.
+# package environment (Pkg.status), then the pinned and the numerically relevant packages as resolved in the Manifest:
+  Project RadiometricCamera v0.2.0
+  Status `~/src/rc-port/Project.toml`
+  ⌃ [79e6a3ab] Adapt v4.7.0
+  ⌅ [052768ef] CUDA v5.11.3
+  ⌃ [f6369f11] ForwardDiff v1.4.5
+    [a09fc81d] ImageCore v0.10.5
+    [0f8b85d8] JSON3 v1.14.3
+  ⌅ [63c18a36] KernelAbstractions v0.9.45
+  ⌅ [7ed4a6bd] LinearSolve v5.12.0
+    [50b5cf9e] NLLSsolver v4.1.0
+    [f57f5aa1] PNGFiles v0.4.5
+    [aedffcd0] Static v1.4.6
+  ⌃ [90137ffa] StaticArrays v1.9.19
+    [10745b16] Statistics v1.11.5
+    [96820d6b] VisualGeometryToolkitCore v0.2.0 `../vgtk-hand-eye-nlls/VisualGeometryToolkitCore`
+    [37e2e46d] LinearAlgebra v1.12.0
+    [de0858da] Printf v1.11.0
+    [9a3f8284] Random v1.11.0
+    [9e88b42a] Serialization v1.11.0
+  Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated`
+  Project RadiometricCamera v0.2.0
+  Status `~/src/rc-port/Manifest.toml`
+  ⌃ [79e6a3ab] Adapt v4.7.0
+  ⌅ [052768ef] CUDA v5.11.3
+  ⌃ [f6369f11] ForwardDiff v1.4.5
+  ⌅ [63c18a36] KernelAbstractions v0.9.45
+    [50b5cf9e] NLLSsolver v4.1.0
+  ⌃ [90137ffa] StaticArrays v1.9.19
+  Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`

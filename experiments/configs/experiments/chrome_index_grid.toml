@@ -1,0 +1,31 @@
+# The chrome index stage's comparison grid (scripts/chrome_index_grid.jl; configs/reproduce.toml stage chrome_index_grid): every
+# chrome set × every variant of the index stage's RANSAC scorer, each a pair of tables that replace the set's [index] scoring and
+# [index.local_optimization_strategy] (src/chrome_evaluation.jl index_settings reads them), the rest of each config of record
+# unchanged. A task registers the set's photographs under its variant (chrome_evaluation.jl's stages index and evaluate, keyed
+# runs) and records per photograph the registration, its wall time and every local-optimization call's iterations and retcode; the
+# evaluate stage compares every variant with `baseline` (photos, dots, rms, wall time, LO iterations, assignment differences, the
+# evaluate rows, and the evaluate rows on the baseline's own photographs).
+#
+# A variant is a measurement, not a protocol: the configs of record state msac_ls. The Hungarian index (owner 2026-11-14) fixes the
+# scorer — MSAC at half the record's pitch, the assignment's dustbin, its threshold derived from the target record and never a
+# table's — and the local optimization — plain least squares on the scorer's matches — so the earlier variants (ransac8_irls,
+# studentt3_irls, studentt4_irls: inlier counting and the Student-t + uniform marginal in pixels, a Huber Irls) are retired: a
+# stated threshold and a non-least-squares local optimization are refused by index_settings; the scorer's type is each table's own
+# `type` (no code default, owner 2026-11-16). One variant remains, the configs of record's.
+
+[experiment]
+name = "chrome_index_grid"
+
+# No input of its own: each task reads its chrome set's configs of record and their inputs.
+[inputs]
+
+[grid]
+# the chrome sets: configs/experiments/chrome_evaluation_fx3_<set>.toml (one per set: its index and its evaluations)
+sets = ["14mm_central30cm", "fisheye_10cm_ag", "fisheye_2710_si", "tamron_17cm_si", "tamron_20261108_ag", "tamron_largeaperture"]
+baseline = "msac_ls"              # the configs of record (the one variant the Hungarian index admits)
+models = "inputs"                 # the evaluation's models: "inputs", the starts of record alone; "all", the refinement cases too
+
+# ---- MSAC at half a pitch (board mm), plain least squares: the configs of record -------------------------------------------
+[variants.msac_ls]                # the configs of record
+scoring = { type = "msac" }                                 # the configs of record's: the threshold, half the record's pitch, derived in code
+local_optimization_strategy = { type = "irls", loss = "gaussian", max_iter = 10 }   # the configs of record's

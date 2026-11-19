@@ -1,0 +1,68 @@
+# The hyperparameters of record of RC 0.11.5's paper runs (the run of record; 0.11.4's lock with the uniform draw) (experiments/test/config_lock_tests.jl): every case of every config of record
+# (configs/**: [cases.<c>.pipeline] and [init.<c>.pipeline]) resolves through RadiometricCamera.pipeline_options to these values, or its
+# config states the key on a line that carries a comment (an explicit, commented override). Derivation: each value is the one every
+# case of record stated at the 0.11.4 integration (2026-11-15, the survey of the 36 cases; the majority where cases differ, the others
+# commented in their configs) — the owner's lock against a silent change (0.11.0's 40 px subdivision of Schöps's lattice).
+# Keys are `table.key` of the resolved options (RadiometricCamera.config_dict); inputs and facts (io, frontend, camera, edge.sdf) are
+# not hyperparameters and are not locked.
+
+[grid]
+lattice = "derived"          # a grid case's lattice: Schöps's own, m = 1 (owner ruling 2026-11-15); a parametric record start states none
+nodes = "interior"
+smoothness = { type = "pspline", order = 3, weight = 0.1 }   # the grid A/B's winner: Δ³ of the correction, β = 0.1
+
+[masks]
+samples_per_view = 27500     # configs/default.toml's (the fisheye f/4 dome run's 27 548 per view); the migrated caps are commented per case
+gradient_bias = 0.0          # the uniform draw (owner decision 2026-11-16, the sampling-strategy record; RC 0.11.4 locked α = 1)
+edge_detector = { type = "gaussian_derivative", sigma = 1.5 }
+seed = 1
+
+[rendering]
+N = 16
+n_p = 2
+n_rho = 3
+n_phi = 8
+hammersley = "on"
+
+[lighting]
+sh_order = 2
+
+[material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.0
+eta_noink = 1.3
+mu = 0.244
+mu_bounds = [0.0, 1.0]
+
+[vignetting]
+model = "radial"
+node_count = 19              # the projective chart's 19 nodes: 16 functions act on the fitted pixels, as the linear 16 did (T. Harder, Core 0.10.11)
+chart = "projective"
+degree = 3
+support_min = 0.1
+
+[warping]
+degree = 1
+inplane = "aspect_skew"
+inplane_start = [0.0, 0.0]
+
+[edge]
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+
+[lm]
+max_iter = 25                # the 14 mm cases' flattening (owner 2026-11-14); the fisheye's 50 commented per case
+max_time = 36000.0
+ftol = 5.0e-4                # √(2/N) of the largest-N case of record (texcal_14mm: 7.7e6 residuals); owner 2026-11-15
+xtol_rel = 1.0e-8            # Core 0.10.11's relative step test, Ceres' parameter tolerance (owner 2026-11-15; Core's name 2026-11-16)
+
+[focus]
+variant = "A"
+lens_coverage_scale = 0.9
+support_min = 0.0
+smoothness = { type = "bending", weight = 0.0 }
+
+[compute]
+backend = "gpu"              # GPU first (every stage on the device)
+jacobian_chunk = 4

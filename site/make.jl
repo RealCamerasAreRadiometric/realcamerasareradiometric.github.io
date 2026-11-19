@@ -1,13 +1,19 @@
 using Documenter
 using DocumenterLandingPage   # LandingPage(): the VitePress-style home page (index.md frontmatter)
 
+# Builds the landing page only, into ARGS[1] (default site/build/). The whole site — this page, the package
+# docs at docs/ and the paper at paper.pdf — is assembled by site/build.sh and deployed by site/deploy.jl
+# (.github/workflows/site.yml runs both, so CI and a local preview are one code path).
+build = isempty(ARGS) ? "build" : abspath(ARGS[1])
+
 # The icon is drawn from the measured image circle and vignetting of the
 # fisheye (site/diagrams.jl): regenerated on every build, never committed.
 include(joinpath(@__DIR__, "diagrams.jl"))
 write_icons(joinpath(@__DIR__, "src", "assets", "landing"))
 
 makedocs(;
-    authors="Ties Harder, Felix Seegräber, Hendrik Sauer, David Nakath, Kevin Köser, James Pritts",
+    build,
+    authors="Ties Harder, Felix Seegräber, David Nakath, Hendrik Sauer, Kevin Köser, James Pritts",
     sitename="Real Cameras are Radiometric",
     repo=Remotes.GitHub("RealCamerasAreRadiometric", "realcamerasareradiometric.github.io"),
     format=Documenter.HTML(;
@@ -24,15 +30,4 @@ makedocs(;
     plugins=[LandingPage()],
     linkcheck=true,
     pages=["Home" => "index.md"],
-)
-
-# The site is the RealCamerasAreRadiometric organization page
-# (https://realcamerasareradiometric.github.io): unversioned, on the gh-pages
-# branch of this same repository, deployed by CI (.github/workflows/site.yml)
-# with the workflow's GITHUB_TOKEN. Off CI, deploydocs does nothing.
-deploydocs(;
-    repo="github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git",
-    branch="gh-pages",
-    devbranch="main",
-    versions=nothing,
 )

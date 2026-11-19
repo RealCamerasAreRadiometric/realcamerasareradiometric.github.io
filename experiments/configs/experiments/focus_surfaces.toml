@@ -1,0 +1,28 @@
+# Config of record of the paper's focus-surface figure (scripts/focus_surfaces.jl): fig:focus-surfaces, the focus surfaces two
+# refinements learned, from their radiometric_camera.json. The chrome-board outputs (fig:color-wheels, tab:refinement-chrome,
+# tab:defocus, chrome_all) are the chrome evaluation's own stages: configs/experiments/chrome_evaluation_paper.toml.
+
+[experiment]
+name = "focus_surfaces"
+
+[inputs]
+
+[figures.focus_surfaces]
+# fig:focus-surfaces (the defocus section): the focus surfaces two refinements learned, as surfaces of in-focus points in camera
+# space — the fisheye at f/4 (the vignetting refinement, radiometric_refinement_vignetting.toml) a sphere about the camera, the Tamron
+# 20 mm at f/8 (the defocus pair's refinement with the aperture and the focus surface) a plane; src/figures.jl focus_surface_figure
+# on every spacing_px-th pixel the lens images (the panels' radiometric_camera.json). The look (owner 2026-11-15): one light tone,
+# no colour for the focus distance, a grid on the surface (a line along every grid_every-th row and column of the lattice: every
+# 336 px of the sensor), the camera a black dot the surface covers where it lies in front of it; a panel's elevation_deg is the
+# view's elevation above the x–y plane — the fisheye's dome from low down, so that its camera lies under it, not on it
+kind = "focus"
+asset = "focus-surfaces.png"
+size_in = [3.3, 1.75]          # one column
+dpi = 300
+spacing_px = 24
+grid_every = 14
+title = ""
+panels = [
+    {config = "configs/experiments/radiometric_refinement_vignetting.toml", case = "f4_fisheye_spline_warped", label = "fisheye at f/4", elevation_deg = 14.4},
+    {config = "configs/experiments/radiometric_refinement.toml", case = "sitla_spline_warped", label = "Tamron 20 mm at f/8", elevation_deg = 36.0},
+]

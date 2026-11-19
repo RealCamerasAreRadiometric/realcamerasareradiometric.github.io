@@ -1,0 +1,17 @@
+# The environment the pipeline goldens were recorded in (experiments/test/pipeline/record_environment.jl). compare_outputs.jl compares
+# bit for bit only under the same Julia major.minor and Manifest sha256; elsewhere within its tolerances.
+date = "2026-11-16"
+device = "gpu"
+forwarddiff_version = "1.4.8"
+julia_minor = "1.13"
+julia_num_threads = 8
+julia_version = "1.13.3"
+manifest = "Manifest.toml"
+manifest_sha256 = "0fd00a87da05f87da8a539864cd6fd12489c299a00bff77493d6c97c42f5ed53"
+nllssolver_version = "5.3.4"
+panoramastitching = "0.9.0 registered (git-tree-sha1 cdac990c6411c41e46bca3eb4454fed937fcacec)"
+stablerngs_version = "1.1.0"
+staticarrays_version = "1.9.25"
+visualgeometrytoolkitcore = "0.10.11 registered (git-tree-sha1 19d16691459ea34c7766a09db4376aceeab64a28)"
+visualgeometrytoolkitestimation = "0.11.9 registered (git-tree-sha1 11993a26bd14204ed8e86d4c87303e72726a5032)"
+visualgeometrytoolkitio = "0.10.5 registered (git-tree-sha1 517354606f1cf3ff092350110c88e467027040b6)"

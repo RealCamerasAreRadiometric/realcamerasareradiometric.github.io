@@ -1,0 +1,33 @@
+# RATIONALE
+#   question:   does leaving the blurred rim of the lens coverage out of the photometric samples (masks.lens_coverage_scale 0.9) change the
+#               chrome-scored accuracy of the refinements of record?
+#   hypothesis: the rim's unmodelled housing / field-stop effects (barrel vignetting, stray light, odd blur) pull the outermost focus nodes
+#               to infinity and bias the geometry there (owner 2026-11-15 ~14:30)
+#   decides:    [masks] lens_coverage_scale of record
+#   decided:    1.0, the whole lens coverage (configs/default.toml; owner ruling 2026-11-15 16:45: every experiment runs on the 0.11.4
+#               hyperparameters — the sampling margin 1.0 to the rim, the focus nodes' own margin ρ ≤ 0.9 apart); this config never ran
+#               as a whole (no record of it in the results roots)
+#   evidence:   the fisheye f/4 runs of 2026-11-15 (V1m90 / V0m90 against V1x2 / V0x2, the progress ledger)
+#   owner:      J. Pritts
+#   date:       2026-11-15
+#
+# The lens_coverage_scale ablation (owner, 2026-11-15): the chrome-scored calibration cases of the refinement's config of record,
+# each at masks.lens_coverage_scale 1.0 (configs/default.toml's: the whole lens coverage) and 0.9 (the coverage scaled about its
+# centre, the blurred rim left out; pending the owner: on the fisheye 30 cm the band ρ 0.9–1.0 then has no photometric data). An experiment is the config of record plus keyword OVERRIDES (src/drivers.jl `expand_overrides`,
+# DrWatson's dict_list), never a copied case: the 1.0 variant of a case IS the case (its run of record reused, by its key), the 0.9
+# variant is `<case>__masks.lens_coverage_scale=0.9`.
+#   julia --project=experiments experiments/scripts/radiometric_refinement.jl --config=experiments/configs/studies/radiometric_refinement_ablation_lens_coverage_scale.toml --plan
+# Not a paper table (yet): no stage of configs/reproduce.toml runs it by default.
+
+[experiment]
+name = "radiometric_refinement"
+base = "configs/experiments/radiometric_refinement.toml"
+cases = ["si30_bc5_warped", "si30_ocv14_warped", "si30_kb_warped", "si30_ds_warped", "si30_spline_warped",
+         "ag30_bc5_warped", "ag30_ocv14_warped", "ag30_kb_warped", "ag30_ds_warped", "ag30_spline_warped",
+         "ag10fe_bc5_warped", "ag10fe_ocv14_warped", "ag10fe_kb_warped", "ag10fe_ds_warped", "ag10fe_spline_warped",
+         "si17ta_bc5_warped", "si17ta_ocv14_warped", "si17ta_kb_warped", "si17ta_ds_warped", "si17ta_spline_warped",
+         "ag08ta_bc5_warped", "ag08ta_ocv14_warped", "ag08ta_kb_warped", "ag08ta_ds_warped", "ag08ta_spline_warped",
+         "sitla_spline_warped", "sitla_spline_pinhole_warped", "sizl_spline_warped", "sizl_spline_pinhole_warped"]
+
+[overrides]
+"masks.lens_coverage_scale" = [1.0, 0.9]

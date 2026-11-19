@@ -1,0 +1,25 @@
+# Config of record of ../paper/latex/numbers.tex, the number macros the prose cites: scripts/numbers.jl gathers the numbers.tex
+# fragment each driver's figures stage writes into its keyed figures run (<results_root()>/figures-<key>/numbers.tex) — the drivers
+# of the experiment configs below, each named by its [experiment] name (scripts/<name>.jl) — into one file, one \newcommand per
+# number, sorted. A macro the prose does not cite fails the suite (test/reproduce_tests.jl) unless its allow table there names why.
+# The experiment list below is THE list of drivers: scripts/regenerate_paper.jl runs their stages in this order.
+
+[experiment]
+name = "numbers"
+generator = "scripts/numbers.jl"
+
+[runs]
+# In dependency order (scripts/regenerate_paper.jl runs each driver's pending stages, reusing complete runs by key):
+# chrome_evaluation_paper scores every chrome set (scripts/chrome_evaluation_paper.jl, its sets stage: scripts/chrome_evaluation.jl on each set's config) before its tables
+# and figures; focus_surfaces draws the focus surfaces from the refinements (scripts/reproduce/reproduce_results_dgx.sh, configs/reproduce.toml,
+# runs the refinements of radiometric_refinement.toml and radiometric_refinement_vignetting.toml on the GPU before it).
+experiments = [
+    "configs/experiments/chrome_evaluation_paper.toml",
+    "configs/experiments/focus_surfaces.toml",
+    "configs/experiments/texture_recovery_14mm_small.toml",
+]
+
+[deploy]
+# The submitted numbers are replaced under the figures' rule: a gathered numbers.tex that differs from the paper's is deployed only
+# once the author has signed off the difference (the numbers run's verify.tsv states it).
+replace_submitted = "off"

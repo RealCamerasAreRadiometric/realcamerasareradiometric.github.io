@@ -1,0 +1,51 @@
+{
+    "schema": "vgio/cameras/v4",
+    "pixel_frame": "colmap",
+    "cameras": [
+        {
+            "name": "cam",
+            "width": 1024,
+            "height": 1024,
+            "K": {
+                "fx": 436.0213104771413,
+                "fy": 436.0213104771413,
+                "cx": 511.9576608862082,
+                "cy": 511.96875516969214,
+                "skew": 0.0
+            },
+            "lens": {
+                "lift": {
+                    "radial": [
+                        [],
+                        [
+                            -0.35634709275313886,
+                            -0.04418410355792069
+                        ]
+                    ]
+                }
+            }
+        }
+    ],
+    "provenance": {
+        "not_migrated": "stacked, doublesphere, central_generic: functions of the camera",
+        "migrated_from": "RadiometricCamera session export (session.json, geometry.json, pattern.png)",
+        "geometry_sha256": "2672a7e66d24b9285f98508414d6217e3313997aa0518c0e04bac14ba87ad57a",
+        "session_sha256": "a8b3f2901a598d9ff1cf13c5ef69f0d18af420b00fa5a97e4a60b4704d7c4263",
+        "refined": {
+            "stop": "converged",
+            "iterations": 11,
+            "residual_px": {
+                "after": {
+                    "median": 0.04751434101412984,
+                    "rms": 0.07962967949848876,
+                    "p90": 0.12743131314891384
+                },
+                "before": {
+                    "median": 0.04825114267128944,
+                    "rms": 0.07968519934785859,
+                    "p90": 0.12562259777138005
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,164 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{mymath}[2026/03/14 v2.0 Custom math macros]
+
+%%% --- Dependencies ---
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{amsthm}
+\RequirePackage{mathtools}
+\RequirePackage{bm}
+\RequirePackage{xparse}          % \NewDocumentCommand (kernel since 2020)
+\RequirePackage{expl3}           % \ExplSyntaxOn       (kernel since 2020)
+
+%%% --- Paired delimiters (starred form auto-sizes) ---
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\DeclarePairedDelimiter{\innerproduct}{\langle}{\rangle}
+\DeclarePairedDelimiter{\parens}{(}{)}
+\DeclarePairedDelimiter{\brackets}{[}{]}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+\DeclarePairedDelimiterX{\sksym}[1]{[}{]_{\times}}{#1}
+
+%%% --- Set notation: \set{x \given x > 0} ---
+\providecommand\given{}
+\newcommand\SetSymbol[1][]{%
+  \nonscript\:#1\vert\allowbreak\nonscript\:\mathopen{}}
+\DeclarePairedDelimiterX\set[1]\{\}{%
+  \,\renewcommand\given{\SetSymbol[\delimsize]}#1\,}
+
+%%% --- Math operators ---
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\trace}{tr}
+\DeclareMathOperator{\ima}{im}
+\DeclareMathOperator{\vect}{vec}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\atantwo}{atan2}
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
+\DeclareMathOperator*{\cond}{cond}
+\DeclareMathOperator*{\corr}{corr}
+\DeclareMathOperator*{\cov}{cov}
+\DeclareMathOperator{\EEb}{\mathbb{E}}
+
+%%% --- Transpose and inverse (composable superscript tokens) ---
+%   \vbR^{\tp}       transpose
+%   \vbR^{\inv}      inverse
+%   \vbR^{\invtp}    inverse-transpose
+%   \vbR^{-\tp}      also works for inverse-transpose
+\newcommand{\tp}{\top}
+\newcommand{\inv}{-1}
+\newcommand{\invtp}{-\top}
+
+% Legacy shortcuts (kept for backward compatibility with existing papers)
+\NewDocumentCommand\T{}{\top}
+\NewDocumentCommand\tr{}{^{\tp}}
+\NewDocumentCommand\invT{}{-\top}
+\NewDocumentCommand\invtr{}{^{\invtp}}
+
+%%% --- Norm shortcuts ---
+\NewDocumentCommand\sqnorm{m}{\norm{#1}^2}
+\NewDocumentCommand\sqltwonorm{m}{\norm{#1}_2^2}
+
+%%% --- Common symbols ---
+\NewDocumentCommand\quadand{}{\qquad \text{and} \qquad}
+\NewDocumentCommand\bigoh{}{\mathcal{O}\parens}  % complexity
+\NewDocumentCommand\Zz{}{\mathbb{Z}}              % integers
+\RenewDocumentCommand\Re{}{\mathbb{R}}             % reals
+\NewDocumentCommand\Rp{}{\mathbb{RP}}              % real-projective space
+\NewDocumentCommand\obj{}{\mathcal{J}}             % objective
+\NewDocumentCommand\lgn{}{\mathcal{L}}             % Lagrangian
+\NewDocumentCommand\gaussian{}{\mathcal{N}\parens} % Gaussian
+
+%%% --- Correspondences ---
+\NewDocumentCommand\cspond{mm}{#1\leftrightarrow#2}
+
+%%% --- Bold vectors ---
+% \vecbold wraps \bm; swap here to change the bolding strategy globally.
+\newcommand{\vecbold}[1]{\bm{#1}}
+
+\ExplSyntaxOn
+
+% Factory: \definevecbold{A,B,...} creates \vbA → \bm{A}, \vbB → \bm{B}, ...
+% Works for single-character tokens where the character IS the math symbol.
+\NewDocumentCommand\definevecbold{m}
+{
+  \clist_map_inline:nn { #1 }
+  { \cs_new_protected:cpn { vb##1 } { \vecbold{##1} } }
+}
+
+% Factory: \definevecboldgreek{alpha,beta,...} creates \vbalpha → \bm{\alpha}, ...
+% Constructs the control sequence from the name at definition time.
+\NewDocumentCommand\definevecboldgreek{m}
+{
+  \clist_map_inline:nn { #1 }
+  {
+    \cs_new_protected:cpx { vb##1 }
+    { \exp_not:N \vecbold { \exp_not:c {##1} } }
+  }
+}
+
+% Factory: \defineset{A,B,...} creates \sA → \mathcal{A}, ...
+\NewDocumentCommand{\defineset}{m}
+{
+  \clist_map_inline:nn { #1 }
+  { \cs_new_protected:cpn { s##1 } { \mathcal{##1} } }
+}
+
+%%% --- Row/column vectors from comma-separated lists ---
+%   \rvec{a,b,c}      → (a  b  c)     row vector
+%   \cvec{a,b,c}      → column vector
+%   \rvec{a,b,c}[b]   → [a  b  c]     bracket delimiters
+\clist_new:N \l__mymath_vectr_clist
+\NewDocumentCommand{\vectr}{O{\\}mO{p}}{
+  \clist_set:Nn \l__mymath_vectr_clist {#2}
+  \begin{#3matrix}
+  \clist_use:Nn \l__mymath_vectr_clist {#1}
+  \end{#3matrix}
+}
+
+%%% --- Partitioned matrix display ---
+\clist_new:N \l__mymath_rmat_clist
+\NewDocumentCommand{\rmat}{mO{b}}{
+  \clist_set:Nn \l__mymath_rmat_clist {#1}
+  \begin{#2matrix}
+    \horzbar &
+    \clist_use:Nn \l__mymath_rmat_clist {& \horzbar \\ \horzbar &}
+    & \horzbar
+  \end{#2matrix}
+}
+
+\clist_new:N \l__mymath_cmat_clist
+\NewDocumentCommand{\cmat}{mO{b}}{
+  \clist_set:Nn \l__mymath_cmat_clist {#1}
+  \begin{#2matrix}
+    & \clist_map_inline:Nn \l__mymath_cmat_clist { \vertbar & } \\
+    & \clist_use:Nn \l__mymath_cmat_clist {& } \\
+    & \clist_map_inline:Nn \l__mymath_cmat_clist { \vertbar & } \\
+  \end{#2matrix}
+}
+
+\ExplSyntaxOff
+
+\NewDocumentCommand{\rvec}{mO{p}}{\vectr[&]{#1}[#2]}
+\NewDocumentCommand{\cvec}{mO{p}}{\vectr{#1}[#2]}
+
+% Matrix bar decorations (used by \rmat, \cmat)
+\NewDocumentCommand{\vertbar}{}{\rule[-1ex]{0.5pt}{2.5ex}}
+\NewDocumentCommand{\horzbar}{}{\rule[.5ex]{2.5ex}{0.5pt}}
+
+%%% --- Instantiate bold symbols ---
+
+% Latin letters (all 52)
+\definevecbold{A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z}
+
+% Calligraphic sets
+\defineset{A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z}
+
+% Greek letters (lowercase + uppercase with distinct glyphs)
+\definevecboldgreek{alpha,beta,gamma,delta,epsilon,varepsilon,zeta,eta,theta,vartheta,iota,kappa,lambda,mu,nu,xi,pi,rho,varrho,sigma,varsigma,tau,upsilon,phi,varphi,chi,psi,omega,Gamma,Delta,Theta,Lambda,Xi,Pi,Sigma,Upsilon,Phi,Psi,Omega}
+
+\NewDocumentCommand\vbzero{}{\vecbold{0}}
+
+%%% --- Environments ---
+\newenvironment{smallpmatrix}{\left(\begin{smallmatrix}}{\end{smallmatrix}\right)}

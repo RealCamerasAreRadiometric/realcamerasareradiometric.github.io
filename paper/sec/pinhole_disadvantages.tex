@@ -1,0 +1,33 @@
+
+
+
+% ---------------------------------------------------
+
+% \subsection{Thin Lens Model (Radiometric)}
+% \label{sec:thin_lens}
+% Under the thin lens assumption, the lens is a disk of finite radius and infinitesimal width \cite{pharr2023physically}. Therefore, the terms thin lens and aperture are used equivalently in the following.
+
+% \textbf{Defocus}
+% All rays from a sensor position $\vbp\in\mathcal{I}$ through the thin lens intersect in a single point on the focal plane~\cite{pharr2023physically}. When $\vbp$ sees a surface that does not lie on the focal plane, the rays from $\vbp$ through the aperture intersect the scene surface in a circle of confusion, leading to a blurry defocus appearance~\cite{pharr2023physically}.
+
+% \textbf{Vignetting}
+% The solid angle $\calOmega(\vbp)$ becomes smaller towards the sensor edges. This leads to an intensity falloff to the sensor border and is, among other effects, called vignetting~\cite{pharr2023physically}.
+% We can separate this effect from the solid angle by changing the integration domain to the aperture area.
+% Let therefore $s'$ be the image distance.
+% When integrating over the aperture area $\mathcal{A}$ by using the transformation $\vbomega = (\vba - \vbp)/\lVert \vba - \vbp \rVert$~\cite{pharr2023physically},
+% the per-channel radiant flux \cref{eq:per-channel-rad-flux} for a thin lens becomes
+% \begin{align}
+%     &\Phi_c(\vbu)\label{eq:rad-flux-disent}
+%     = \int_{\mathcal{I}_{\vbu}}\int_{\mathcal{A}}\frac{\cos^4\alpha(\vba-\vbp)}{s'^2}\\
+%     &\qquad\qquad\qquad L_c(\vbx(\vbp, \vba-\vbp), \vbx(\vbp, \vba-\vbp)-\vba)\odif{\vba}\odif{\vbp}\nonumber.
+% \end{align}
+% The $\cos^4\alpha(\vba-\vbp)$ term is a well-known physical lens property and describes the vignetting for a thin lens in this formulation~\cite{Goossens_2019}.
+% We will utilize the disentangled formulation from \cref{eq:rad-flux-disent} in \cref{sec:vignetting}.
+
+
+
+
+
+
+
+% ---------------------------------------

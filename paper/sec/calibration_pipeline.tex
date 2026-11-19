@@ -1,0 +1,199 @@
+\section{Calibration by Inverse Rendering}
+\label{sec:calibration-pipeline}
+We calibrate the radiometric camera by inverse rendering: we render
+the images of a calibration target with
+\cref{eq:rad-flux-with-vignetting} and fit them to the captured RAW
+images. The rendered flux depends on the scene as well as on the
+camera, so we estimate jointly the poses $\vbTheta_e$, the
+projection $\vbTheta_d$, the focus surface $\vbTheta_f$, the aperture
+radius $r$ and the vignetting $\vbTheta_v$ of the camera, the
+lighting $\vbTheta_l$, the material $\vbTheta_m$ and the shape
+$\vbTheta_b$ of the target. We denote all of them by
+$\bar{\vbTheta}$. Let $\phi_j(\vbu)$ be the value of the RAW
+photosite $\vbu$ in view $j$ and $\sigma_j(\vbu)$ its standard
+deviation under the Poisson--Gaussian noise model of the sensor. We
+minimize
+\begin{equation}
+\label{eq:objective}
+    \sum_{j}\sum_{\vbu\in\mathcal{S}_j}\!
+    \Bigl(\frac{\phi_j(\vbu)-\Phi_j(\vbu;\bar{\vbTheta})}{\sigma_j(\vbu)}\Bigr)^{2}\!
+    + \lambda\bigl\lVert \mathrm{D}^3(\hat{\vbd}-\hat{\vbd}^{0})\bigr\rVert^{2}
+\end{equation}
+over $\bar{\vbTheta}$, where $\mathcal{S}_j$ are photosites drawn
+uniformly from those of view $j$ that see the target. The first term
+is the negative log-likelihood of the photosites, so that for
+$\lambda=0$ the minimizer is the maximum-likelihood estimate of the
+camera, the poses and the scene. The second term regularizes the
+central spline model only (\cref{sec:optimization}). The remainder of
+this section gives what the objective requires: derivatives without
+boundary terms, a lighting model, the
+reflectance and the shape of the target, and a initialization value.
+
+\subsection{Differentiation without Boundary Terms}
+\label{sec:boundary-terms}
+\begin{figure}[t]
+        \centering
+        \input{latex/fig_boundary}
+        \caption{Fixed samples (dots) miss a boundary that moves with a parameter (solid black to dashed red): none lies in the region that it sweeps, so the sampled gradient lacks its contribution (left). We remove both boundaries of the calibration (right). \emph{Top:} the samples of the aperture are placed from the fixed unit disc $\mathcal{D}$ and move with its radius $r$. \emph{Bottom:} the blur of the print makes the albedo $\rho$ smooth across an edge of the pattern. Hollow dots: after the change.}
+        \label{fig:boundary}
+\end{figure}
+The derivative of an integral whose domain, or whose integrand's
+discontinuities, depend on a parameter has a boundary term, which
+automatic differentiation of a sampled estimate misses
+(\cref{fig:boundary}, left). Differentiable renderers estimate such
+terms by sampling the boundaries
+\cite{Li:2018:DMC, Zhang:2020:PSDR, mitsuba-projective}. In the
+calibration, three of them arise: The changing aperture radius, border of the calibration target, and sharp texture edges. We avoid these as follows.
+%and we remove both by a reformulation (\cref{fig:boundary}, right).
+The change of aperture radius is addressed by integrating over the fixed unit disc as described above in \cref{sec:vignetting}. 
+%First, the aperture $\mathcal{A}$ depends on its radius $r$. We integrate over the fixed
+%unit disc $\mathcal{D}$ (\cref{eq:rad-flux-with-vignetting}): its
+%samples $\vbxi$ are placed at $\vba=\vbo+r\vbxi$ and move with the
+%radius, so that none of them crosses the rim, and the flux depends
+%on $r$ smoothly through the rays of the samples. 
+Second, the hard edges of the calibration pattern are discontinuities of the albedo that
+move over the aperture and over the pixel with the camera, the pose
+and the target shape. We model the print as its design convolved
+with a Gaussian, a $10$--$70\,\%$ edge width of $50\,\mathrm{\mu m}$
+\cite{rosalen2019cardboards}, so that the albedo is smooth. The
+boundary terms of a general scene, from silhouettes, shadows and
+the visibility at every bounce of a ray
+(\cref{sec:supp-boundaries}), do not arise in the calibration: we only 
+render the masked target $\mathcal{M}\subseteq\mathcal{I}$, which is considered smoothly illuminated within a constant scene.
+
+\subsection{Lighting}
+\label{sec:lighting}
+We represent the light of the environment by spherical harmonics of
+degree two \cite{ramamoorthi-2001, peter-pikesloanand2002precomputed},
+$L^{\text{SH}}(\vbomega;\vbTheta_l)$, with the coefficients
+$\vbTheta_l$ per color channel (\cref{sec:supp-reflectance}). A
+calibration target is planar, so every point of it sees the same
+hemisphere, and a lighting at infinite distance gives the same
+irradiance at every point of the target: any shading across the
+target would have to be explained by the vignetting. We therefore
+place the lighting on a sphere of finite radius $r_{\text{SH}}$
+about the center $\vbb_0$ of the target, the larger of the diagonal
+of the target and the largest distance of a camera from $\vbb_0$ at
+the start. The radiance that arrives at $\vbx$ from the direction
+$\vbomega$ is $L^{\text{SH}}$ in the direction
+\begin{equation}
+    \hat{\vbomega}(\vbx,\vbomega) \coloneqq \frac{\vbx + \gamma\vbomega - \vbb_0}{\lVert \vbx + \gamma\vbomega - \vbb_0 \rVert}
+\end{equation}
+from $\vbb_0$ to the point where the ray from $\vbx$ along $\vbomega$
+meets the sphere, with $\gamma>0$ such that
+$\lVert \vbx + \gamma \vbomega - \vbb_0\rVert = r_{\text{SH}}$. The
+lighting then varies over the target and separates from the
+vignetting.
+
+\subsection{Reflectance}
+\label{sec:reflectance}
+Calibration targets usually consist of a pattern printed on background material. To model its appearance properly, we estimate the reflectance distribution of these materials. The radiance that leaves a scene point $\vbx$ in the direction $\vbomega_o$ is \cite{pharr2023physically}
+\begin{align}
+    &L(\vbx,\vbomega_o)\label{eq:scene-rad}\\
+    &\coloneqq \int_{\mathcal{H}^2(\vbx)}f(\vbx, \vbomega_o,\vbomega_i)L(\vbx'(\vbx,\vbomega_i),-\vbomega_i)\cos\theta_i\odif\vbomega_i\nonumber,
+\end{align}
+where $\mathcal{H}^2(\vbx)$ is the upper hemisphere over $\vbx$,
+$\vbx'(\vbx,\vbomega_i)$ the scene or light point visible from $\vbx$
+along $\vbomega_i$, $\theta_i$ the angle between $\vbomega_i$ and the
+surface normal, and $f$ the bidirectional scattering distribution
+function. On the target, the incident radiance is the lighting of
+\cref{sec:lighting}. For $f$, we use the Cook--Torrance model
+\cite{cookTorrance} with an isotropic GGX microfacet distribution of
+roughness $\alpha$ \cite{Heitz2014Microfacet} and the Fresnel term
+of a dielectric with the index of refraction $\eta$, and a weight
+$\mu\in[0,1]$ between its diffuse part $\rho(\vbx)/\pi$, with the
+albedo $\rho$ of the print, and its specular part. We evaluate the
+integral by Monte Carlo sampling of the visible microfacet normals
+\cite{sphericalCaps} (\cref{sec:supp-reflectance}). Ink fills the
+microfacets of the print, so that inked areas are more specular than
+blank ones. We therefore blend the roughness and the index of
+refraction between a value for ink and one for the blank print by
+the albedo, $\vbTheta_m = \{\alpha_{\neg\text{ink}},
+\alpha_{\text{ink}},\eta_{\neg\text{ink}}, \eta_{\text{ink}}, \mu\}$.
+
+% Figure of Sec. 5.1 (Detector Bias), declared early so that it floats to the top of the page before the experiments.
+\begin{figure*}[t]
+        \centering
+        \input{fig/detector-bias-mitsuba}
+        \caption{The bias of a detector (column 2) is absorbed by a geometrically calibrated camera (columns 3 and 4). With the calibrated poses, the bias is pushed into the camera model (column 3); with the true poses (column 4), it shows that the poses compensate for part of it. Our radiometric refinement does not rely on a detector and removes most of the bias in both evaluations.}
+        \label{fig:detector-bias}
+\end{figure*}
+\subsection{Target Shape}
+\label{sec:target-shape}
+A printed target is not exactly planar, and its print is not exactly
+its design. We chart the board by $\vbb\in\mathcal{B}$, in units of
+its width, and model its shape by a height field
+$h:\mathcal{B}\rightarrow\mathbb{R}$ along the board normal
+$\vbn_{\mathcal{B}}$. In a view with the pose
+$(\mathrm{R},\vbt)\in\vbTheta_e$, the chart point $\vbb$ is the scene
+point
+\begin{equation}
+\label{eq:board-surface}
+    \vbs(\vbb) \coloneqq \mathrm{R}\bigl(\vbb_{\mathcal{B}} + h(\vbb)\,\vbn_{\mathcal{B}}\bigr) + \vbt,
+\end{equation}
+where $\vbb_{\mathcal{B}}$ is the point of $\vbb$ on the plane of the
+board. The height field is a thin plate spline
+\cite{thin-plate-spline} through the heights
+$\vbh\in\mathbb{R}^{25}$ at a $5\times5$ grid of nodes. A thin plate
+spline is the sum of an affine function and a bending, and affine
+heights, an offset and two tilts, describe a plane, which is already
+represented by the pose. We therefore restrict the heights to the
+pure bendings, $\vbh=\mathrm{B}\vby$, where the columns of
+$\mathrm{B}\in\mathbb{R}^{25\times22}$ span the nodal heights whose
+spline has no affine part, and optimize $\vbTheta_b\coloneqq\vby$.
+The shape then has no gauge freedom with the poses, without a
+penalty or a fixed node (\cref{sec:supp-gauge-freedoms}), and only
+22 parameters. For the spline camera, we also estimate the in-plane error of the print by
+an aspect and a skew, at which the albedo is read.
+
+The scene point of \cref{eq:rad-flux-with-vignetting} is the
+intersection of the ray from $\vba$ in the direction
+$\vbd\coloneqq\vbpi^{-1}(\vbp,\vba)$ with this surface. We solve for
+its chart point: with an orthonormal pair $\vbe_1,\vbe_2$
+perpendicular to $\vbd$,
+\begin{equation}
+\label{eq:board-intersection}
+    \vbg(\vbb) \coloneqq
+    \begin{pmatrix}\vbe_1^\top\\ \vbe_2^\top\end{pmatrix}
+    \bigl(\vbs(\vbb)-\vba\bigr) = \mathbf{0},
+\end{equation}
+a root of two equations in two unknowns that we find by
+Levenberg--Marquardt iterations from the intersection with the plane
+of the board. It gives $\vbx(\vbp,\vba)=\vbs(\vbb)$ together with the
+chart point $\vbb$ at which the albedo is read. The root is
+differentiated \wrt the camera, the pose and the heights by the
+implicit function theorem,
+$\partial\vbb/\partial\theta=-(\partial\vbg/\partial\vbb)^{-1}\,\partial\vbg/\partial\theta$,
+and not through its iterations. The effect of the shape on the
+reflectance is small, so the reflectance uses the normal of the
+plane.
+
+\subsection{Initialization and Optimization}
+\label{sec:optimization}
+The projection and the poses start from a geometric calibration
+(\cref{sec:supp-starts}), the target as a plane, the focus surface
+as the plane parallel to the sensor at the mean distance of the
+target, and the aperture radius as $f/(2N)$ with the focal length
+$f$ and the f-number $N$ of the lens. The flux is linear in the
+vignetting and in the lighting and affine in $\mu$
+(\cref{sec:supp-linear}), so they start from one pass of linear
+least-squares solves: the lighting with $V\equiv1$, then the
+vignetting, then $\mu$. We minimize \cref{eq:objective} with the
+Levenberg--Marquardt method \cite{marquardt1963algorithm}, with
+$\lambda=0$ for the parametric camera models. The nodes of the central spline at
+the border of the lens coverage are hardly constrained by the
+photosites. For this model only, the second term regularizes the
+change of the nodal directions $\hat{\vbd}\subseteq\bar{\vbTheta}$
+from their start $\hat{\vbd}^{0}$ with a P-spline penalty
+\cite{eilers1996flexible}, where $\mathrm{D}^3$ takes the third finite
+differences, the discrete change of curvature, along both axes of the
+grid and $\lambda=0.1$ relative to the data term. It
+vanishes for a locally quadratic change, so the penalty leaves a
+smooth change of the camera free and suppresses its oscillation, and
+the border nodes follow the interior.
+No other component is regularized. The parameters stay in their
+physical ranges by their parameterization: we optimize $\log r$,
+$\log\alpha$, $\log(\eta-1)$ and the logit of $\mu$, the poses on
+$SE(3)$ \cite{solà2021microlietheorystate}, and the inverse focus
+distances are kept non-negative. The gauge freedoms are removed by
+the parameterization (\cref{sec:supp-gauge-freedoms}).

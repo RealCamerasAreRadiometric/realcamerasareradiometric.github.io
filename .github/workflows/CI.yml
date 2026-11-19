@@ -1,0 +1,79 @@
+name: CI
+
+# The package lives in the subdirectory RadiometricCamera/ (registered with subdir = "RadiometricCamera"): every step names it.
+on:
+  push:
+    branches:
+      - main
+    tags: ['*']
+    paths-ignore:
+      - 'paper/**'
+      - 'site/**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    permissions:
+      actions: write
+      contents: read
+      id-token: write   # Codecov upload by OIDC, no token secret
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.13'      # the compat floor (julia = "1.13")
+          - '1'         # the newest release the compat admits (the same 1.13 until 1.14 is released)
+        os:
+          - ubuntu-latest
+    env:
+      # A hosted runner has no GPU: no `:gpu` run (the suite also skips it by itself without a functional CUDA device).
+      RC_TEST_GPU: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: RadiometricCamera
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: RadiometricCamera
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: RadiometricCamera/src,RadiometricCamera/ext
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          use_oidc: true
+          fail_ci_if_error: false
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.13'
+      - uses: julia-actions/cache@v2
+      # docs/ is a member of the package's workspace: instantiating it resolves the package and the docs together.
+      - name: Instantiate the docs environment
+        run: julia --project=RadiometricCamera/docs -e 'using Pkg; Pkg.instantiate()'
+      # The doctests, the @example blocks, checkdocs = :public and the link check; any warning fails the build (no warnonly).
+      - name: Build the documentation
+        run: julia --color=yes --project=RadiometricCamera/docs --startup-file=no RadiometricCamera/docs/make.jl

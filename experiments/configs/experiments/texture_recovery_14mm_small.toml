@@ -1,0 +1,121 @@
+# Config of record of the texture test of the blur model on the 14 mm texture photographs of 2026-11-09, SMALL defocus
+# (scripts/texture_recovery.jl; the defocus experiment, fig:texture-closeup). The camera of case texcal_14mm_spline_warped
+# (configs/experiments/radiometric_refinement.toml: Schöps's central grid with the learned aperture and focus surface on the 14 mm f/2.8
+# calibration photographs of 2026-11-09, focus taped at 1 m) is held fixed; the photographs show an A4 BlobBoards board (6eb) printed
+# with text — a flat sheet of its own, each pose from its blobs alone (BlobBoards' find_boards on its pose arm through the held camera),
+# the ground truth the printed page. The page's texture is recovered
+# under the learned blur and under the pinhole, each with the Tikhonov weight it chooses blind on the validation photographs, and scored
+# on the test photographs and against the design.
+
+[experiment]
+name = "texture_recovery"
+
+[inputs.raw_14mm_texture_small_20261109]
+tier = "rc_raw_photos"
+path = "paper-data/defocus/14mm/texture-learning"
+stage = "prepare"
+provenance = "the author's texture photographs of 2026-11-09, small defocus: 106 Sony FX3 ARW of an A4 BlobBoards board (6eb) with text, the 14 mm (EXIF lens \"DT 14mm F2.8 SAM\") at f/2.8, focus taped at 1 m, 1/15 s, ISO 100"
+
+[inputs.board_srgb_14mm_small]
+tier = "rc_baselines"
+path = "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/board_srgb"
+stage = "detect"
+provenance = "the sRGB copies of the 106 texture photographs at the fixed gain 7 (rc-results paper_2026-11-07/tools/tex14_conv.sh; 4256 × 2848, convert_board.log beside them): the images the front end of record ran BlobBoards' find_boards on (frontends_history/scripts/blob_detect.jl, drivers/blob_detect_all.sh), and the init stage's find_boards reads, grey"
+
+[inputs.blobboard_6eb_design]
+tier = "rc_baselines"
+path = "frontends/inputs/blobboard_a4/board_a4.json"
+sha256 = "63859ef3027177924fa288253f9b299d6fd9d858e9d5ac400c0038920978f2e2"
+stage = "detect"
+provenance = "board 6eb's BlobBoards design JSON (712 blobs), the board printed on the A4 sheet (with the page's text: blob_board_6eb_bca3a_text.pdf beside it): the board the front end of record searched for (frontends_history/scripts/blob_detect.jl), the gallery of the init stage's find_boards (BlobBoards renders its print master from the design); MD5 17a8d51b… as its MD5SUMS"
+
+[inputs.blobboard_a4_6eb]
+tier = "rc_calibration"
+path = "geometric_accuracy/data/target/blobboard_a4_6eb"
+stage = "init"
+provenance = "the A4 sheet: texture.png — the author's ground-truth page blob_board_6eb_bca3a_text.pdf at 300 dpi, 3 × 3 box-averaged (827 × 1169 texels of 0.254 mm); sheet.json (page_mm) and sheet_blobs.tsv (every blob of board 6eb on the page, registered by BlobBoards' blobs on that page, residual 0.006 px RMS; mm from the top-left corner, y down). The driver's sheet stage writes them as VisualGeometryToolkitIO's target record (target.json in its own run, texture.png its canvas texture), which every later stage reads"
+
+# read as the calibration's photographs are: at their green photosites on the raw grid, no gain (the init stage checks the two agree)
+[prepare.fx3_14mm_texture_small_20261109]
+raw = "raw_14mm_texture_small_20261109"
+mode = "photosites"               # the RAW photographs read, not decoded: the page solve compares at their GREEN PHOTOSITES on the raw grid (owner ruling 2026-11-12); no gain
+
+[upstream]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "texcal_14mm_spline_warped"
+state = "state.json"
+images = "fx3_14mm_texcal_20261109"
+
+[poses]
+images = "board_srgb_14mm_small"
+board_design = "blobboard_6eb_design"
+board = "blobboard_a4_6eb"
+
+# BlobBoards' own [find_boards] table (its keys; read by BlobBoards' FindBoardsConfig(table; camera) with the stack's strategy readers,
+# the camera the refinement's BoundedCamera held fixed). A key not stated is BlobBoards' configs/default.toml, as the front end of
+# record ran it (frontends_history/scripts/blob_detect.jl of tag v0.10.0: FindBoardsConfig(geometry = …) and descriptor_network_path()).
+[poses.find_boards.geometry]
+type = "pose"                                                  # the calibrated arm: P3P and its local optimization through the camera
+outlier_halfwidth = 5.0                                        # px, BlobBoards' pose-arm value (PoseGeometry; its homography arm's too)
+min_inliers = 6                                                # BlobBoards' pose-arm value (one below the homography arm's 7: P3P is tighter)
+resolve_pose_ambiguity = false                                 # BlobBoards' value: the pose of the RANSAC winner
+local_optimization_strategy = { type = "student_t_uniform" }   # BlobBoards' configs/default.toml [find_boards.geometry]
+undistortion = "none"                                          # raw pixels, the full camera in the estimator (BlobBoards' value)
+
+[texture]
+split_every = 5                # by index: k % 5 == 0 test, == 1 validation, the rest fit
+cell_mm = 25.4                 # the cells coverage is counted and the paired test runs over (100 texels)
+pixel_fraction = 0.15          # of every photograph's masked pixels, a row each
+cgls_max_iter = 500
+cgls_rtol = 1.0e-6
+min_fit_views = 1              # a cell is scored when this many fit, validation and test photographs each put ≥ min_pixels sampled pixels in it
+min_val_views = 1
+min_test_views = 1
+min_pixels = 500
+start = 0.5                    # mid-grey
+pinhole_r_m = 1.0e-6           # the pinhole's aperture radius: the chief ray alone
+seed = 20261109
+centre_rho = 0.4               # the test scores' centre (ρ < 0.4) and edge (ρ > 0.6) of the image, ρ the radius over the half-diagonal
+edge_rho = 0.6
+regularization_weights = [1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 0.1, 0.3, 1.0, 3.0, 10.0]   # β of λ ‖∇x‖², λ = β · Core's penalty_scale (the fit rows' energy per texel over the operator's m̄); β = 0 is solved too
+
+# the rotation of the split (stages folds, fold_report): fold f puts photograph k in the test set when (k − f) % split_every == 0 and in
+# the validation set when it is 1; fold 0 is the split above (Ties's held-out selection, of record). The report gives the β of the
+# folds' mean validation curve and the spread of each fold's chosen β and paired margin (owner 2026-11-15: no GCV; the rotation reported beside it)
+[folds]
+rotations = 5                  # = split_every: every photograph once a test and once a validation photograph
+
+[report]
+block_mm = 1.0                 # the texture is scored at the texel and over blocks of this size
+bootstrap = 2000
+seed = 1
+
+[figures.texture_stacked]
+# fig:texture-learned (one column; owner 2026-11-15): ONE block of the page's text, stacked top to bottom from four sources, three
+# text lines each, cut between the lines so that the text reads on — lines 1–3 the design (the ground truth), 4–6 a nearly
+# fronto-parallel training photograph on the page's texels, 7–9 the pinhole's texture, 10–12 ours — at 1:1 texels (the page's print
+# is 0.254 mm per texel), 5 screen pixels per texel
+kind = "stacked"
+asset = "texture-learned.png"
+size_in = [3.3, 1.45]
+dpi = 1150
+block_mm = [25.4, 25.4, 159.258, 245.11]   # [x0, y0, width, height] mm: the text block inside the blob border (texels 101 … 727 × 101 … 1065)
+lines_per_band = 3
+white = 0.85                         # a row of the design is blank (between two text lines) when all of it is above this
+label_fraction = 0.17                # the labels' margin on the left, of the figure's width
+variants = ["pinhole", "learned"]    # a band each, after the design and the photograph
+labels = ["ground\ntruth", "training\nphotograph", "pinhole", "ours"]
+photograph = "DSC03316.png"          # a fit photograph (photograph 64 of 106: 64 % 5 = 4), the most fronto-parallel of them: the sheet's normal 2.3° off the optical axis, the sheet 12.8° off it, at 0.49 m
+
+[figures.texture_page]
+kind = "page"
+asset = "texture-recovery-14mm-small.png"
+size_in = [7.0, 5.2]
+dpi = 300
+downsample = 2
+error_range = 0.5
+title = "Texture recovered from the 14 mm texture photographs (small defocus, f/2.8), the camera fixed: only the blur model differs"
+
+[render]
+numbers_prefix = "textureFourteenSmall"
+significant_digits = 3

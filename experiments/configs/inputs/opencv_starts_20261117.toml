@@ -1,0 +1,38 @@
+# RATIONALE
+#   question:   the paper's Table 2 / Table 3 rows need an OpenCV-14 start of the fisheye 30 cm Siemens set and a Brown–Conrady start of
+#               the zoom 48 mm f/10 Siemens set, which no front end of record made
+#   hypothesis: none (inputs: the starts, made the way every Siemens-set OpenCV start of record was made)
+#   decides:    the inputs of record si30fe_ocv14 / sizl_bc5 (radiometric_refinement.toml; chrome_evaluation_fx3_fisheye_30cm_si.toml,
+#               chrome_evaluation_fx3_zoom48_f10.toml), tier rc_baselines_2026-11-17
+#   evidence:   the tool reproduces the record of record tamron17cm_si_all_green_ocv14_cv2 (OpenCV 5.0.0) on its own dataset.bin at rms
+#               0.942937 px (equal to 6 digits), its pixel map within 0.027 px (max over the sensor)
+#   owner:      J. Pritts (2026-11-17 05:00 / 05:10: "run them ourselves", the fisheye 30 cm OpenCV-14 and the zoom Brown–Conrady)
+#   date:       2026-11-17
+#
+# The OpenCV front-end step of 2026-11-17 (AUTHOR-SIDE: its outputs are inputs of record, tier rc_baselines_2026-11-17 — the documented
+# exception for initial guesses from other systems, imported through IO). OpenCV (cv2) is not on dgx01, so no driver stage of the run of
+# record can run it; this file is its record: the tool, its version, its inputs and arguments, its outputs (each pinned where a config
+# reads it). The exact commands: experiments/tools/ocv_starts_20261117.sh (opencv_calibrate_schoeps.py, T. Harder's script of record
+# frozen at tag v0.10.0, then ocv_record.jl: IO's opencv_camera → a vgio/cameras record).
+
+[tool]
+script = "experiments/tools/opencv_calibrate_schoeps.py"   # from tag v0.10.0, with its siemens_board.py (imported from beside it)
+converter = "experiments/tools/ocv_record.jl"              # the port of T. Harder's frontends_history/scripts/ocv_record.jl (v0.10.0) to IO 0.10.6
+commands = "experiments/tools/ocv_starts_20261117.sh"
+opencv = "4.12.0"                                       # the desktop's python3 cv2 (2026-11-17); the records of record of 2026-11-10 used 5.0.0
+python = "3"                                            # the desktop's system python3
+io = "0.10.6"                                           # VisualGeometryToolkitIO of the converter (vgio/cameras/v6.0)
+
+[starts.fisheye30cm_ocv14]
+schoeps_run = "frontends schoeps/43a409607a28914d ([schoeps.fisheye30cm_siemens_w30] of configs/experiments/frontends.toml)"
+args = "--texfeat-size 4000 4000 --page-mm 1000 1000 --model ocv14 --min-features 20"   # MINF = 20, as every Siemens record's log states (fe_si7.sh, v0.10.0)
+output = "geometric_accuracy/records/fisheye30cm_si_all/fisheye30cm_si_all_green_ocv14_cv2.json"   # 162 views, rms 0.845 px
+md5 = "cb0fd4db246be51eb63b7a33dc5d68e8"
+raw = "geometric_accuracy/night_stars/data/fx3-fisheye-siemens-30cm-all/opencv_w30/ocv14/calibration.json"
+
+[starts.zoom48_bc5]
+schoeps_run = "frontends schoeps/732112ae6c6130a6 ([schoeps.zoom48_f10_siemens_w20] of configs/experiments/frontends.toml)"
+args = "--texfeat-size 4000 4000 --page-mm 1000 1000 --model pinhole --min-features 20"   # OpenCV's default model (k1 k2 p1 p2 k3): Brown–Conrady
+output = "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json"      # 89 views, rms 0.677 px
+md5 = "436bb3dcc549ec346b293ea2e7c9a20f"
+raw = "geometric_accuracy/night_stars/data/fx3-zoom48-f10-siemens-all/opencv_w20/pinhole/calibration.json"

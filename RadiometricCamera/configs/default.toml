@@ -1,0 +1,199 @@
+# The defaults of a radiometric calibration (RadiometricCamera.PipelineOptions): every key with its default, one comment each — THE
+# one statement of them: every option's keyword default reads this file, baked at precompile (src/options/tables.jl: Core's
+# config_toml mechanism; an edit recompiles the package). A config (`pipeline_options(path)`, bin/refine.jl --config=<file>
+# [--set table.key=value ...]) states only what differs; an unknown table or key is refused.
+# A switch is the string "on" | "off" (RC 0.11.4, owner 2026-11-15): TOML true/false is refused, naming the new spelling.
+
+fixed = []           # the blocks held at their start: poses, camera (the geometric camera's parameters), focus, aperture, material,
+                     #   vignetting, lighting, inplane; none by default (RC 0.11.0: lm.fixed moved here, "grid" renamed "camera")
+
+[io]
+images = ""              # the photographs (16-bit linear PNG unless `linearize`); required except for a self-check (selfcheck.only)
+out = ""                 # the output directory; required
+linearize = "off"        # decode sRGB photographs
+channel = "RGB"          # "R" | "G" | "B": that channel replaces all three in every photograph, so the fit sees it alone; "RGB" = as photographed.
+                         #   RAW or decoded is the photograph's TYPE, by its file (load_photo): a RAW photograph is read at its green
+                         #   photosites on the raw grid (one measurement each: "G"), a decoded image as stored
+views = []               # image names to use (a subset); empty = all
+init = ""                # "grid:<record>" | "lens:<record>": replaces the front-end's start model ("lens:" = a Core pixel camera record)
+checkpoint_each = "off"  # write lens_it<N>.json | grid_it<N>.json, poses_it<N>.json, state_it<N>.json after every iteration
+render_init = "off"      # diagnostic: render the start state and return
+render_state = ""        # diagnostic: render the masked pixels with this state file (state.json) and return (the state's page_flip holds)
+raw = ""                 # blob front-end: the photographs' RAW files (each the image's stem, .cr2/.arw/.nef/.dng): the camera settings from EXIF
+# lens_identity = {make = "Sigma", model = "14mm F1.4 DG DN"}   # OPTIONAL (absent = EXIF's lens; make, model, serial, one at least):
+#                                                            # the lens, where EXIF misnames it (an adapted lens)
+
+[frontend]
+type = "blob"                          # the start geometry: "blob" (a calibration session's records) | "schoeps" (a Schöps run on a printed page)
+session = ""                           # blob: the session's VisualGeometryToolkitIO records {camera.json, targets_1.json, trajectory_1.json,
+                                       #   target_poses.json, textures/} and its observations record observations.json (vgio/observations)
+schoeps = ""                           # schoeps: the central-generic run dir: its imports {camera.json, detections.json} when a front-end stage wrote them, else the tool's {intrinsics0.yaml, dataset.bin} (schoeps_run_file)
+texture = ""                           # schoeps: the printed design (PNG, gamma 1)
+texture_features = ""                  # schoeps: dataset.bin of the detector run on the texture (star ids → texture positions)
+texture_features_size = [1124, 1590]   # the texture size [px] the feature file was detected on
+texture_downsample = 1                 # box-average factor of the texture
+page_mm = [210.0, 297.0]               # schoeps: the page size [mm]
+print_scale = 1.0                      # the print's scale relative to the design
+pose_distances = [0.4, 0.8, 1.5, 3.0]  # schoeps: the starting distances [m] of the multi-start pose fit
+
+[camera]
+sensor_mm = 22.3     # sensor width [mm]
+f_mm = 17.0          # nominal focal length [mm] (the nominal pinhole of a grid start; the aperture start)
+fnumber = 8.0        # f-number N of the aperture start r₀ = f / (2N)
+lens_coverage = "sensor"   # where light falls on the sensor: "sensor" = the lens lights the whole sensor (its rectangle; nothing is
+                           #   measured), else the path of the capture set's measured image region (an rc/image_region/v1.0 record:
+                           #   its keyed step, Features' detect_image_circle on the set's own frames; owner ruling 2026-11-15)
+sensor_characterisation = ""   # the body's sensor characterisation (a vgio/sensor_characterisation record): each RAW photograph's sensor
+                               #   model (black, noise, defects) resolved from it by its EXIF; empty = none named (a named path that
+                               #   does not exist is refused); "none" is retired (RC 0.11.2): `sensor_model = "off"`
+sensor_model = "auto"          # whether the run uses the sensor model: "auto" (the owner's default, 2026-11-15: a record present —
+                               #   named above, or stated by the camera a run continues or predicts — is used; none: the file's black,
+                               #   one info line), "on" (a record required: refused without one), "off" (a record present is NOT used:
+                               #   a loud warning, estimation and prediction may then disagree)
+
+[grid]
+lattice = "derived"            # the geometry lattice of a grid start (owner rulings 2026-11-15): "derived" = the start source's OWN
+                               #   lattice (T. Schöps's camera) extended over the sensor ∩ lens coverage, split exactly by the
+                               #   integer m whose present nodes come closest to `node_count` without exceeding it (no node_count:
+                               #   m = 1, his cell; `exact_start`) | "node_count" = square cells over the image region's bounding
+                               #   box, the present nodes nearest `node_count` from below (a PARAMETRIC start: `region_start`).
+                               #   Derivation of the default: every grid start of record but the blob front end's parametric session
+                               #   cameras is a Schöps start, and his own lattice (m = 1) runs the 14 mm refinement at 88 s/it on the
+                               #   GPU against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits (dgx01 A/B, 2026-11-15).
+                               #   The wrong mode for a source is refused at its start, never ignored.
+# node_count = 7875            # no default: "node_count" requires it (a parametric start states it); "derived" reads it as its
+                               #   target / bound of present nodes (a case states today's present count at m = 1)
+smoothness = { type = "pspline", order = 3, weight = 0.1 }   # [grid.smoothness], the smoothness of the grid's interior nodes:
+                               # "pspline" (its `order`-th differences of the correction along both lattice axes: Δ³) | "bending" (weight
+                               # alone) | "none" (no penalty holds a gauge); its weight β relative to the data energy Σϕ² per node, or
+                               # "gcv" = chosen by generalized cross-validation on the linearization of the grid problem at the start
+nodes = "interior"             # the nodes the lens holds, its parameters: "interior" (those the imaged region reaches; the others absent,
+                               # never read) | "all" (every node)
+# start_perturbation = {sigma_px = 0.5, seed = 7}   # OPTIONAL, no default (absent = none; both keys required): the start grid's
+#                                                   # direction controls rotated by sigma_px / f px rad RMS per tangent axis (StableRNG(seed))
+
+[focus]                # EXPERIMENT (focus-ab): the focus surface's parameterisation (src/experiments/focus_ab.jl)
+variant = "A"          # "A" sensor-grid TPS, all free | "B" its nodes outside the support frozen | "C" direction-chart TPS | "D" spherical spline
+node_count = 0         # C / D: node count of the cap (0 = A's 25; RC 0.11.4, was `nodes`)
+lens_coverage_scale = 0.9  # A / B: the 5 × 5 grid's nodes kept inside the lens coverage scaled by 0.9 about its centre (as [masks]
+                       #   lens_coverage_scale: an image circle's semi-axes; was `node_rho_max`, RC 0.11.4), i.e. within ρ ≤ 0.9 of its normalised radius (1 = its rim): over the circle's
+                       #   box the grid's nodes lie at ρ = 0, ½, √2/2 ≈ 0.707 (the inner 3 × 3), 1 (the side midpoints, ON the rim), ≥ 1.118 (outside);
+                       #   0.9 is inside the gap (0.707, 1) with a margin of ≥ 0.1 on either side, so the rim's four are dropped by design, whatever
+                       #   the ellipse's orientation (2026-11-15: they ran to infinite focus); the sensor's rectangle keeps every node
+smoothness = { type = "bending", weight = 0.0 }   # [focus.smoothness]: the focus surface's bending smoothness, weight β (0 = none) | "none"
+support_min = 0.0      # A / B: a focus node with less than this share of the mean data weight is dependent (the vignetting's rule, node_support); 0 = every node with a pixel is free (the rule before 2026-11-15)
+perturb = []           # [σ, seed]: the start's free nodal values × exp(σ z); empty = none
+
+[masks]
+samples_per_view = 27500   # the samples per view, drawn uniformly without replacement from its USABLE observations (inside the sampling region, the
+                           #   board valid, the observed channel's photosites, no defect, uncensored; owner 2026-11-15), so every camera gets the
+                           #   same count: 27 500 ≈ the 27 548 per view (median) of the fisheye f/4's dome run of 2026-11-10 (the RGB route), the
+                           #   count the focus surface was determined with; a view with fewer uses them all (its shortfall recorded)
+gradient_bias = 0.0        # α: each usable observation drawn ∝ u^α (`draw_samples`' weighted draw without replacement, its stable
+                           #   stream), u ∈ (0, 1] the ECDF rank of its edge strength over the view's usable observations (rank-based:
+                           #   invariant to contrast and exposure); 0 = the uniform draw itself (no detector run), > 0 favours edges.
+                           #   Derivation of 0 (owner decision 2026-11-16, the sampling-strategy experiment's record rc-results-0.11/sampling_strategy/record/952231f4538a4b78: uniform best on
+                           #   both cases and both metrics; paired 95 % CIs, α = 1
+                           #   − uniform): the 14 mm texture at 1 mm +0.0099 [+0.0092, +0.0106] (worse) and its Thorlabs held-out median
+                           #   +0.0046 px [+0.0000, +0.0097] (worse); the fisheye f/4 indistinguishable on the median, +0.040 px at p95. RC 0.11.4's
+                           #   α = 1 (the fisheye scoring alone) is not kept; the ECDF draw stays an option (the sampling-strategy arms)
+edge_detector = { type = "gaussian_derivative", sigma = 1.5 }   # the edge strength g the draw ranks ([masks.edge_detector]):
+                           #   g = |∇(G_σ ∗ photograph)|, Features' Förstner filters normalized over the usable observations. σ = 1.5 px:
+                           #   the modelled blur on the fisheye dome is ≈ 0.9 px (circle of confusion f·r·|1/d_f − 1/d| ≈ 950 px × 1.67 mm ×
+                           #   0.43 m⁻¹ ≈ 0.7 px, with the photosite and interpolation blur 1/√3 px), and on a RAW photograph the filter reads
+                           #   the green quincunx (spacing √2 ≈ 1.41 px), so σ ≥ √2 keeps ≥ 2 photosites per σ per axis: 1.5 px
+edge_fraction = 0.0        # q ∈ [0, 1): > 0 the rule of 2026-10-31 (RC ≤ 0.11.3's configs of record; in 0.11.5 a mode of the one draw for the
+                           #   sampling-strategy experiment): a uniform pool of samples_per_view / q usable observations, its strongest-|∇ϕ|² share q; only with
+                           #   gradient_bias = 0. 0 = the weighted draw above
+addon_samples = 0          # M ≥ 0: M samples per view MORE than samples_per_view, drawn ∝ u^β (β = addon_gradient_bias) from the other usable
+                           #   observations on the same stream (the add-on of the sampling-strategy experiment: does the geometry/defocus trade-off
+                           #   of the edge bias come from the fixed budget?); 0 = none
+addon_gradient_bias = 0.0  # β of the add-on; stated ≠ 0 only with addon_samples > 0 (inapplicable otherwise: an error)
+seed = 1                   # random seed of the masks
+lens_coverage_scale = 1.0  # the photometric pixels are sampled inside the lens coverage scaled about its centre by this factor (both
+                           #   semi-axes of an image circle; the sensor's rectangle is not scaled) — sampling only: the camera's coverage,
+                           #   its nodes and the vignetting chart stay the measured ones. 1.0: the whole measured coverage (the owner,
+                           #   2026-11-15; 0.9 an ablation only). 0.9 cut the rim's photometric bias (fisheye 10 cm: Thorlabs chrome RMS 3.15 → 2.77 px
+                           #   on identical dots) but on the fisheye 30 cm left ρ 0.9–1.0 without photometric data: its grid nodes
+                           #   drifted (ray change median 0.55°, max 9.3°) and the dots there worsened (RMS 3.9 → 14.7 px) — the
+                           #   ablation radiometric_refinement_ablation_lens_coverage_scale.toml measures exactly this
+
+[rendering]
+N = 8              # radiance samples
+n_rho = 3          # aperture quadrature, radial nodes
+n_phi = 8          # aperture quadrature, angular nodes
+n_p = 2            # sensor samples per pixel side
+hammersley = "off" # the N radiance samples from the Hammersley set, shifted per key, instead of pseudo-random draws: same N, about half the noise
+
+[lighting]
+sh_order = 2       # l_max of the lighting L^SVSH
+
+[material]
+alpha_ink = 0.15         # α_ink start
+alpha_noink = 0.4        # α_¬ink start
+eta_ink = 1.6            # η_ink start
+eta_noink = 1.33         # η_¬ink start
+mu = 0.5                 # μ start
+mu_bounds = [0.0, 1.0]   # bounds of μ
+
+[vignetting]
+model = "radial"           # the radial profile about the principal point, the one field a refinement fits (Core's tag; the key is
+                           # accepted for the configs of record, another tag is refused)
+node_count = 19      # the profile's nodes (the first two tied: one parameter fewer; RC 0.11.4, was `coefficients`). Derivation (T. Harder,
+                     #   2026-11-15; Core 0.10.11's projective knots): on the projective chart 19 nodes put 16 functions on the fitted
+                     #   pixels (d ≤ r_max), at the linear 16's knot spacing r_max / 13, and p − 1 knots past the rim at that spacing,
+                     #   then the span to ρ = 1 — the resolution of the linear 16 of record, no pixel ever clamped
+degree = 3           # spline degree
+support_min = 0.1    # a node with less than this share of the mean data weight is dependent (constant continuation); 0 = any pixel supports
+# the gauge V(centre) = 1 is exact (the centre's free direction eliminated); no key pins it
+smoothness = { type = "pspline", order = 3, weight = 0.0 }   # [vignetting.smoothness]: the closed-form vignetting solve's Δ³ penalty over the
+                          # free nodes (weight normalized as the grid's; 0 = none; "gcv" = chosen by generalized cross-validation
+                          # in every solve; not with sweep.joint) | "none"
+boundary_order = 2   # the dependent nodes' extrapolation past the supported nodes, 2 (Δ²c = 0) | 3 (Δ³c = 0)
+chart = "projective"  # the chart of the normalized radius: projective ρ = d / (r_max + d) (Core 0.10.11's knots: the linear chart's pixel
+                     # spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1: no pixel is ever clamped, whatever the
+                     # centre; T. Harder 2026-11-15) | linear ρ = d / r_max (uniform knots; the golden siemens_coarse_full's)
+# the radial profile's centre is the camera's principal point, fixed (RadiometricCamera.vignetting_center; 2026-11-11)
+
+[warping]
+degree = 0           # > 0: the board warping h is free (grid route)
+heights_mm = []      # start / fixed nodal heights [mm] (the 15 nodal heights); empty = flat
+inplane = "none"     # "aspect_skew": the in-plane print error (a, u) — Core's Aspect ∘ Skew (x += u·y, then x by e^a, y by e^-a) — is free; "inplane" in fixed holds it
+inplane_start = []   # start (a, u) of the in-plane print error (the log-stretch of x against y, the shear); empty = the design as printed
+
+[edge]
+sdf = ""                            # the design's distance map → the printed-edge albedo: a vgio/raster record (distance_map.json, experiments scripts/distance_maps.jl); empty = none
+ink_spread_mm = 0.0                 # ink spread δ [mm], held
+print_sigma_mm = 0.028              # print blur σ_print [mm], the edge's width, held
+
+[lm]
+max_iter = 50        # LM iterations at most: the safety cap (owner ruling 2026-11-11); a tolerance stop ends a converged run first
+max_time = 10800.0   # wall-clock budget of the LM [s]
+ftol = 5.0e-4        # Core's LmStops `ftol` (NLLSsolver reldcost): stop once an accepted step lowers the cost by less than ftol · F.
+                     #   Derivation (owner 2026-11-15): √(2/N), the cost's relative noise over N = samples_per_view × views residuals —
+                     #   a smaller decrease is below what the data resolve. ONE literal from the largest-N case of record, texcal_14mm
+                     #   (16 528 × 465 ≈ 7.7e6 → √(2/7.7e6) = 5.1e-4 → 5.0e-4): every other case has fewer residuals, a larger noise,
+                     #   so this stops none of them earlier than its data resolve (the conservative choice). A tolerance stop is a
+                     #   converged run; only `max_iter` (the safety cap) is † (the mapping is Core's, 0.10.11; RC maps nothing)
+xtol_rel = 1.0e-8    # Core's LmStops `xtol_rel` (Core 0.10.11): Ceres' relative step test, stop once ‖Δx‖ ≤ xtol_rel · (‖x‖ + xtol_rel),
+                     #   Euclidean norms of the step and of the free variables (owner 2026-11-15; the key Core's name, 2026-11-16). The
+                     #   absolute step test (Core's `xtol`, NLLSsolver's dstep) is Core's of record: no key here
+log = ""             # EXPERIMENT (nlls5): append a per-iteration line of the LM to this file; empty = none
+
+[sweep]
+lm_chunk = 0         # LM iterations between closed-form (lighting, vignetting, μ) sweeps; 0 = no sweeps
+iterations = 5       # block-solve iterations of one sweep
+joint = "off"        # solve the closed-form blocks jointly (solve_radiometry_gn!)
+
+[resume]
+state = ""             # continue from this state file (state.json)
+iteration_offset = 0   # iteration numbering of the resumed run
+sweep = "off"          # closed-form sweep on the resumed state
+
+[selfcheck]
+only = "off"         # write the bearing self-check of the detections through the start model and return
+poses = ""           # score under this state file's poses instead of the refit
+
+[compute]
+backend = "gpu"     # "gpu" (any KernelAbstractions GPU backend; falls back to the CPU without a functional GPU) | "cpu"
+jacobian_chunk = 4   # dual partials per GPU kernel launch

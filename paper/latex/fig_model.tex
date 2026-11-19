@@ -1,0 +1,82 @@
+% fig_model.tex — the lift of a central geometric model, for a perspective and for a fisheye projection (hand-written TikZ).
+% The geometric model sets the direction d(p) at the center of projection o; the lift adds the aperture, whose rays meet in
+% the point of focus x_f(p) on the focus surface F.
+\usetikzlibrary{intersections}%
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=1cm, y=1cm, >=stealth, font=\footnotesize,
+    ray/.style={line width=0.45pt, blue!70!black},
+    chief/.style={line width=0.75pt, black},
+    inside/.style={line width=0.3pt, densely dashed, black!55},
+    axis/.style={line width=0.3pt, densely dotted, black!60},
+    dim/.style={line width=0.3pt, black!60}]
+  % ---------- the parts both panels share
+  \newcommand{\rccamera}{%
+    \draw[axis] (-0.25,0) -- (1.75,0);
+    \draw[line width=1pt] (0,-1.0) -- (0,1.0);
+    \node[anchor=south] at (0,1.0) {$\mathcal{I}$};
+    \draw[line width=1.8pt] (1.0,0.45) -- (1.0,1.0) (1.0,-0.45) -- (1.0,-1.0);
+    \node[anchor=south] at (1.0,1.0) {$\mathcal{A}$};
+    \coordinate (p) at (0,0.6); \coordinate (o) at (1.0,0);
+    \coordinate (a1) at (1.0,0.45); \coordinate (a2) at (1.0,-0.45);
+    \draw[inside] (p) -- (a1) (p) -- (a2) (p) -- (o);
+    \fill (p) circle (1.2pt) node[anchor=east, inner sep=2pt] {$\vbp$};
+    \fill (o) circle (1.2pt);
+    \fill[blue!70!black] (a2) circle (1.2pt);}
+  % ---------- left: a perspective projection; the ray leaves o along the line from p
+  \begin{scope}
+    \rccamera
+    \node[anchor=north east, inner sep=1.5pt] at (o) {$\vbo$};
+    \node[anchor=north east, inner sep=1.5pt] at (a2) {$\vba$};
+    \coordinate (xf) at (2.75,-1.05);
+    \draw[line width=0.9pt, red!75!black] plot[smooth, tension=0.7] coordinates {(2.62,1.25) (2.78,0.1) (2.75,-1.05) (2.60,-1.85)};
+    \node[red!75!black, anchor=south] at (2.62,1.25) {$\mathcal{F}$};
+    \path[name path=sceneA] plot[smooth, tension=0.8] coordinates {(3.95,1.25) (3.75,0.4) (3.92,-0.5) (3.74,-1.3) (3.9,-2.05)};
+    \path[overlay, name path=rA0] (o) -- ($(o)!2.2!(xf)$);
+    \path[overlay, name path=rA1] (a1) -- ($(a1)!2.2!(xf)$);
+    \path[overlay, name path=rA2] (a2) -- ($(a2)!2.2!(xf)$);
+    \path[name intersections={of=sceneA and rA0, by=s0}];
+    \path[name intersections={of=sceneA and rA1, by=s1}];
+    \path[name intersections={of=sceneA and rA2, by=s2}];
+    \draw[chief] (o) -- (s0);
+    \draw[chief, ->] (o) -- ($(o)!0.42!(xf)$);
+    \draw[dim] (1.92,0.12) -- ($(o)!0.30!(xf)$);
+    \node[anchor=south west, inner sep=1pt] at (1.80,0.10) {$\hat{\vbd}(\vbp)$};
+    \draw[ray] (a1) -- (s1) (a2) -- (s2);
+    \draw[ray, ->] (a2) -- ($(a2)!0.5!(xf)$);
+    \node[blue!70!black, anchor=north, inner sep=2pt] at (1.75,-0.82) {$\vbpi^{-1}(\vbp,\vba)$};
+    \draw[line width=1pt] plot[smooth, tension=0.8] coordinates {(3.95,1.25) (3.75,0.4) (3.92,-0.5) (3.74,-1.3) (3.9,-2.05)};
+    \node[anchor=south] at (3.9,1.25) {scene};
+    \draw[line width=2.2pt, blue!70!black, line cap=round] (s1) -- (s0) -- (s2);
+    \draw[dim] (3.30,-2.02) -- ($(s0)+(-0.07,-0.05)$);
+    \node[blue!70!black, anchor=north, inner sep=1.5pt] at (3.05,-1.98) {region seen by $\vbp$};
+    \fill[red!75!black] (xf) circle (1.7pt);
+    \node[anchor=south west, inner sep=1pt] at ($(xf)+(0.10,0.16)$) {$\vbx_f(\vbp)$};
+    \node[anchor=north] at (1.9,-2.45) {lifted perspective};
+  \end{scope}
+  % ---------- right: a fisheye projection; the model turns the ray at o, and the points of focus surround the camera
+  \begin{scope}[xshift=4.75cm]
+    \rccamera
+    \draw[axis] (o) -- ++(1.15,-0.69);  % the continuation of the line from p: the direction of a perspective model
+    \coordinate (xf) at ($(o)+(-62:1.45)$);
+    \draw[line width=0.9pt, red!75!black] ($(o)+(62:1.45)$) arc[start angle=62, end angle=-92, radius=1.45];
+    \node[red!75!black, anchor=south west, inner sep=1pt] at ($(o)+(58:1.45)$) {$\mathcal{F}$};
+    \path[name path=sceneB] plot[smooth, tension=0.8] coordinates {($(o)+(42:2.25)$) ($(o)+(12:2.1)$) ($(o)+(-18:2.25)$) ($(o)+(-48:2.1)$) ($(o)+(-76:2.25)$) ($(o)+(-100:2.15)$)};
+    \path[overlay, name path=rB0] (o) -- ($(o)!2.4!(xf)$);
+    \path[overlay, name path=rB1] (a1) -- ($(a1)!2.4!(xf)$);
+    \path[overlay, name path=rB2] (a2) -- ($(a2)!2.4!(xf)$);
+    \path[name intersections={of=sceneB and rB0, by=t0}];
+    \path[name intersections={of=sceneB and rB1, by=t1}];
+    \path[name intersections={of=sceneB and rB2, by=t2}];
+    \draw[chief] (o) -- (t0);
+    \draw[chief, ->] (o) -- ($(o)!0.5!(xf)$);
+    \draw[dim] (1.72,0.12) -- ($(o)!0.32!(xf)$);
+    \node[anchor=south west, inner sep=1pt] at (1.60,0.10) {$\hat{\vbd}(\vbp)$};
+    \draw[ray] (a1) -- (t1) (a2) -- (t2);
+    \draw[line width=1pt] plot[smooth, tension=0.8] coordinates {($(o)+(42:2.25)$) ($(o)+(12:2.1)$) ($(o)+(-18:2.25)$) ($(o)+(-48:2.1)$) ($(o)+(-76:2.25)$) ($(o)+(-100:2.15)$)};
+    \draw[line width=2.2pt, blue!70!black, line cap=round] (t1) -- (t0) -- (t2);
+    \fill[red!75!black] (xf) circle (1.7pt);
+    \node[anchor=west, inner sep=3pt] at (xf) {$\vbx_f(\vbp)$};
+    \node[anchor=north] at (1.9,-2.45) {lifted fisheye};
+    \node[anchor=south west, inner sep=1pt] at ($(o)+(42:2.25)$) {scene};
+  \end{scope}
+\end{tikzpicture}}%

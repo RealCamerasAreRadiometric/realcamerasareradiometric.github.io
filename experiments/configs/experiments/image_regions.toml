@@ -1,0 +1,23 @@
+# Config of record of the image-region steps (scripts/image_regions.jl; src/image_region.jl; owner ruling 2026-11-15): the lens
+# coverage of every capture set is ONE keyed step, which every consumer reads — no circle typed into a config, no ellipse copied
+# from a log, no shared image-circle photographs. Each config below states its sets' coverage (`lens_coverage`: "sensor", or
+# "image_region:<name>" of its [image_regions.<name>]: the set's own frames, pinned by their sha256, and the detector's settings);
+# this driver measures every region they name, once per step (two configs naming the same frames and settings share it by its key).
+# Every config of record with an [image_regions] table is listed here (the suite checks it: test/image_region_tests.jl).
+#
+#   julia --project=experiments experiments/scripts/image_regions.jl [--plan] [--stage=detect]
+
+[experiment]
+name = "image_regions"
+
+[inputs]
+# none of its own: each region's frames are an input of the config that names it
+
+[measure]
+configs = [
+    "configs/experiments/radiometric_refinement.toml",               # the fisheye 10 cm AprilGrid set (f/22)
+    "configs/experiments/radiometric_refinement_vignetting.toml",     # the 14 mm's f/4 session (housing; the diffuser DSC04161), the fisheye's f/4 Siemens set
+    "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml", # the fisheye 10 cm chrome set: its session's AprilGrid step (the same key as the refinement's)
+    "configs/experiments/frontends.toml",                             # the fisheye 30 cm Siemens set (its own frames; owner 2026-11-16: the paper's fisheye Siemens set)
+    "configs/experiments/chrome_evaluation_fx3_fisheye_30cm_si.toml", # the fisheye 30 cm chrome set: its session's Siemens step (the same key as the front end's)
+]

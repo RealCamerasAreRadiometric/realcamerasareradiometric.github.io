@@ -1,0 +1,18 @@
+# Config of record of scripts/regenerate_paper.jl, the one entry point that regenerates the paper's generated assets: the stages
+# of each experiment driver of the numbers config's [runs] experiments (the one list of drivers, in its
+# order; each driver in a module of its own), then the number macros (scripts/numbers.jl from [runs] numbers), then verify and
+# deploy of every figure config of record (configs/figures/*.toml with a [render] table). scripts/calibrate.jl is not a stage: no
+# paper asset reads its cases (the package's golden gate runs them).
+
+[experiment]
+name = "regenerate_paper"
+generator = "scripts/regenerate_paper.jl"
+
+[runs]
+numbers = "configs/figures/numbers.toml"
+
+[gpu]
+# Each driver declares its GPU stages (GPU_STAGES: the stages whose [pipeline] tables run bin/refine.jl on compute.backend = gpu).
+# Without --gpu they are not run: a pending one stops the regeneration and names --gpu; a complete one is reused. With --gpu the
+# regeneration is refused unless GPU 0 has at least this much memory free (GiB).
+min_free_gib = 20

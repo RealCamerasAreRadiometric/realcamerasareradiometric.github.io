@@ -1,0 +1,71 @@
+% The paper (release build); the LaTeX template is the CVF author kit, https://github.com/cvpr-org/author-kit
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE: the release (arXiv) build, with page numbers
+\usepackage[pagenumbers]{cvpr}
+
+\usepackage{latex/style/mymath}
+\usepackage{latex/style/eccvabbrv}
+\usepackage{derivative}
+\usepackage{tikz}
+\usepackage{tikz-3dplot}
+\usetikzlibrary{decorations.pathreplacing}
+
+\usepackage{amsmath}
+\usepackage{aligned-overset}
+\usepackage{cancel}
+\usepackage{multicol}
+\usepackage{upgreek}
+\usepackage{xcolor}
+\usepackage{pgfplots}\pgfplotsset{compat=1.18}
+
+
+\usepackage{mathrsfs}
+\usepackage{upgreek}
+\DeclareSymbolFont{euler}{U}{eur}{m}{n}
+\DeclareMathSymbol{\calOmega}{\mathalpha}{euler}{"0A}
+
+% disable all todos
+% \renewcommand{\todo}[2][]{}
+
+% Import additional packages in the preamble file, before hyperref
+\input{preamble}
+
+% The numbers the prose quotes, generated from the results (REPRODUCE.md); never typed here.
+\input{latex/numbers}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+\title{Real Cameras are Radiometric}
+
+\author{Ties Harder \quad Felix Seegr\"aber \quad David Nakath \quad Hendrik Sauer \quad Kevin K\"oser \quad James Pritts\\
+Kiel University, Germany\\
+}
+
+\begin{document}
+\maketitle
+% \input{sec/0_abstract}
+\input{sec/0_abstract_new}
+\input{sec/introduction}
+\input{sec/related_work}
+\input{sec/image_formation}
+\input{sec/ablation}
+\input{sec/pinhole_disadvantages}
+% \input{sec/approach}
+\input{sec/approach_new}
+\input{sec/calibration_pipeline}
+\input{sec/experiments}
+\input{sec/conclusion}
+
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{main}
+}
+
+% The supplementary material, in the same document so that its cross-references to the paper resolve
+\input{sec/X_suppl}
+
+\end{document}

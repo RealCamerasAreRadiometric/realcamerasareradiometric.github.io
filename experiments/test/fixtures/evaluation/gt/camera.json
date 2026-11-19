@@ -1,0 +1,34 @@
+{
+    "schema": "vgio/cameras/v4",
+    "pixel_frame": "colmap",
+    "cameras": [
+        {
+            "name": "cam",
+            "width": 5208,
+            "height": 3476,
+            "K": {
+                "fx": 932.4473684210526,
+                "fy": 932.4473684210526,
+                "cx": 2604.0,
+                "cy": 1738.0,
+                "skew": 0.0
+            },
+            "lens": {
+                "equidistant": [],
+                "radial": [
+                    [
+                        -0.041666666666666664,
+                        0.0005208333333333333,
+                        -3.1001984126984127e-6,
+                        1.076457782186949e-8
+                    ],
+                    []
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "model": "the true lens of the renders",
+        "source": "<dev-checkout>/paper/radiometric-camera-board-space/src/experiments/detector-bias/lenses/fisheye_equisolid_932px.json"
+    }
+}

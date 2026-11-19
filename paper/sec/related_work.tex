@@ -1,0 +1,95 @@
+\section{Related Work}
+\label{sec:related-work}
+
+
+\paragraph{Lens models.} The thin lens
+\cite{Hecht+2023,pharr2023physically} gives the perspective camera a
+finite aperture, so that a scene point off the plane of focus is
+imaged to a circle of confusion. It is tied to the perspective projection and has
+no natural counterpart in classic distortion models \cite{kannala-brandt, double-sphere, Brown1966DecenteringDO, Conrady1919DecentredL}. The plane of focus and the vignetting that emerge from this model are too simple to capture the actual phenomena. The
+surface of best focus of a real lens is curved, which is known in
+optics as field curvature \cite{Kingslake2010}. Tang and Kutulakos
+\cite{tang2013aberrated} derive the blur of a rotationally symmetric
+lens as an integral over its aperture and show that field curvature
+acts as a defocus that depends on the position in the image. This is
+what a focus surface describes, and it justifies our design, which
+replaces their fixed, symmetric dependence by a free-form one. Their
+analysis is theoretical, and the aberrations for which the rays of a
+sensor position no longer meet in a point are not part of our model. Models that trace the
+rays through the lens elements \cite{kolb1995realistic} need the
+optical design of the lens, which manufacturers rarely publish. The
+neural lens model of Xian \etal \cite{xian2023neurallens} replaces the
+distortion of a pinhole camera by an invertible network and models the
+vignetting as a gain per pixel of the image, without an aperture. The thin lens is also the only finite aperture of the
+differentiable renderer Mitsuba
+\cite{NimierDavidVicini2019Mitsuba2,Mitsuba3}. Its cameras are
+perspective and without lens distortion, and the aperture radius and
+the focus distance of its thin lens are not differentiable parameters,
+so neither the projection of a general central model nor its aperture
+and focus can be calibrated with it. Our calibration keeps every
+camera parameter differentiable: neither a parameter-dependent
+discontinuity nor a parameter-dependent integration domain remains in
+its formulation.
+
+\paragraph{Radiometric calibration and image corrections.} Radiometric calibration methods
+estimate the vignetting, often together with the response function,
+from the pixel values of overlapping images
+\cite{Kim-PAMI-2008,single-image-vignetting,direct-sparse-odometry}.
+In \cite{Kim-PAMI-2008,xian2023neurallens} the vignetting is an empirical function of the image position, and
+each pixel value is related to the radiance of a single scene point.
+Reconstruction methods likewise add corrections around a geometric
+camera, such as per-image gains \cite{brown2007automatic}, appearance
+embeddings \cite{martinbrualla2021nerfw} or blur kernels
+\cite{ma2022deblurnerf}. These compensate for the unmodeled radiometry in the image, where
+defocus, which depends on the depth of the scene point, cannot be
+corrected consistently. The radiometric camera models it inside the
+camera, as an integral over its aperture.
+
+\paragraph{Calibration from pixel values.} Kang and Weiss
+\cite{kang2000calibrate} obtain a rough focal length of a perspective
+camera from the $\cos^4$ falloff in a single image of a uniform
+surface. Rehder \etal \cite{rehder2017direct} formulate a
+maximum-likelihood calibration on the image intensities by rendering
+the target. They assume an evenly lit target and no vignetting, and
+take a single radiance sample per pixel, to which they attribute that
+their static calibration is no more precise than one from features;
+defocus, vignetting and uneven lighting are named as future work.
+Hannemose \etal \cite{Hannemose_2019} also render the target densely,
+with a pinhole camera with Brown--Conrady distortion, but their
+calibration is photometric and not radiometric: the rendering blurs
+the texture with a Gaussian whose width is a free parameter of each
+interest point, and it models neither the lighting nor the intensity
+scale of the image. A separate line calibrates the
+blur of a lens as a learned point spread function, apart from the
+projection of the camera \cite{lin2023blurfields}. In the radiometric
+camera, the defocus follows from the aperture and the focus surface of
+the same model that projects the scene, for any central projection,
+and it is calibrated together with the vignetting, the lighting and
+the target.
+
+% Ties's TODO, addressed by the paragraphs above (11-17):
+% Discuss related work w.r.t. our contributions ! Why cant Mitsuba with thin lens just do what we are proposing? Where is our formulation different from PBR-book and why. Or we just implemented something that has been known for a long time ?
+% As compared to Hannemose_2019: what is it they cant do ?
+% Does it really help to have unsharpness/vignetting (this must be shown in the experiments then)
+
+% \textbf{I (Ties) would say it is as follows:\\
+% Camera sensors measure radiometric properties, not geometric properties\\
+% $\Rightarrow$ A bias in the camera model propagates through the subsequent computations. a) the reduction of the sensor measurements to geometric measurements by applying a detector leads to a higher reprojection error in calibration, b) without modeling the aperture and defocus, the defocus will be absorbed \eg in texture learning\\
+% $\Rightarrow$ There exists \eg the thin lens model, the thick lens model and very accurate models which model every lens intersection\\
+% $\qquad\Rightarrow$ Thin lens and thick lens don't model distortion; the complex models are too complex\\
+% $\Rightarrow$ we need a generic lens model which includes distortion, vignetting and defocus\\
+% $\Rightarrow$ Using thin lens + distortion is not sufficient because the focus surface of a thin lens is per definition a plane, but for a fisheye for example it is more like a sphere, which is shown in \cref{fig:focus-surfaces}\\
+% In total, we need:\\
+% I: Distortion $\Rightarrow$ We can use every distortion model in our pipeline (Geometric accuracy experiment)\\
+% II: Aperture for defocus $\Rightarrow$ A camera model which does not model blur introduces a bias in inverse rendering (Texture learning experiment)\\
+% III: A focus surface $\Rightarrow$ The focus surfaces differ between lenses (\cref{fig:focus-surfaces})\\
+% IV: Vignetting $\Rightarrow$ Not modeling the vignetting will also introduce a bias in inverse rendering (we do not show that) and is useful for example in panorama stitching (Vignetting experiment)
+% }
+
+
+
+
+
+% Moved into the introduction (the paragraph on radiometric extensions of the camera), 11-17:
+% \subsection{Photometric Camera Calibration}
+% Hannemose et al. (2019) \cite{Hannemose_2019} perform a photometric camera calibration. Therefore, they blur the texture of the calibration board, project the board into a 2D image and minimize the difference between the pixel values of the original captured calibration board and the rendered one. This method does not account for lighting, which is crucial when using a photometric or radiometric loss.

@@ -1,0 +1,130 @@
+# TEST FIXTURE (2026-11-05): the HX400V prototype config, retired from configs/experiments; test/chrome_evaluation_tests.jl exercises the driver on it.
+# Config of record of the chrome evaluation experiment (scripts/chrome_evaluation.jl): the Thorlabs R3L3S7N1 negative grid
+# distortion target (17 × 17 clear 0.500 mm dots at 5.000 mm on chrome-coated soda-lime glass; the maker's dimensions to ±0.005 mm)
+# photographed 17 times by a Sony DSC-HX400V (4.3 mm, f/8, 1/400 s, ISO 80, 5184 × 3888 JPEG), backlit on a light panel and seen
+# through the glass. Its first stage, `detect`, is VisualGeometryToolkitFeatures' Förstner operator (detect_foerstner) on every photograph:
+# each dot is a circular point of Förstner & Gülch with its 2 × 2 covariance. Its second stage, `index`, registers each photograph's
+# circular points against the grid of the target record through the camera of record (a random dot's neighbours give the
+# plane's pose by P3P in VisualGeometryToolkitEstimation's RANSAC, the correspondences on the infinite lattice; src/chrome_evaluation.jl). The calibration against the target record is not codified yet.
+#
+# Every detector keyword (detect_sfop's and the seeded detect_foerstner's) is a key of [detect], with no code default (the driver
+# refuses a missing one); the values are the reference implementation's (ip_fop.m's code, as detect_foerstner documents). Each
+# photograph's integration scale is SFOP's, per detection: no per-photograph table.
+#
+# Paths are relative to data_root(): VGTK_DATA_ROOT, data/exp_raw, or the artifact view of the tiers of configs/data_artifacts.toml
+# (scripts/fetch_data.jl; data/README.md). Each input's `tier` is a tier of that catalog.
+
+[experiment]
+name = "chrome_evaluation"
+
+# ---- the inputs (data_root()-relative), each with the stage that requires it and how it was made -------------------------------
+[inputs.photos]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/photos/f8_exp400_iso80"
+stage = "detect"
+provenance = "the 17 photographs DSC01289.JPG … DSC01305.JPG of the Thorlabs R3L3S7N1 target, backlit on a light panel and seen through the glass (Sony DSC-HX400V, 4.3 mm, f/8, 1/400 s, ISO 80, 5184 x 3888 JPEG as the camera wrote it), captured on 2026-10-21 (LightRigCalibration.jl data/thorlabs_target/f8_exp400_iso80)"
+
+# The target record: the grid stage index registers against (its nominal points; rows, columns and spacing from its provenance design).
+[inputs.target]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"
+stage = "index"
+provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024): vgio/target/v2, 17 x 17 dots at 5.000 mm, calibration Rigid; byte-identical on regeneration"
+
+# The camera of record the dots are registered through (stage index): vgio/cameras/v3, the camera [index] camera_name.
+[inputs.camera]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/camera/cameras.json"
+stage = "index"
+provenance = "the Sony DSC-HX400V at 4.3 mm (5184 x 3888, COLMAP pixels): K and a one-parameter division lens (lift radial [[], [0.00786]]), camera hx400v-4.3mm; LightRigCalibration.jl's calibration of 2026-10-21"
+
+# ---- stage detect: detect_foerstner on each photograph ----------------------------------------------------------------------------
+# The photograph is decoded by JpegTurbo (jpeg_decode, 8-bit sRGB as the camera wrote it) and read as grey, Gray.(·) (Rec. 601 luma of
+# the sRGB values; no linearisation). The detections are COLMAP pixel coordinates of the photograph.
+[detect]
+sensor_characterisation = ""   # the photographs are decoded inputs (no photosites): no sensor model (the photo kind decides); Förstner's documented a-posteriori covariance
+photos = "photos"                 # the input whose files are the photographs
+image = "luma"                    # the detector's grey image: the JPEG as the camera wrote it, read as grey (no linearisation)
+precision = "Float32"             # detect_foerstner's element type T (Float32 | Float64; the reference computes in Float64)
+device = "cpu"                    # the KernelAbstractions backend (cpu; the run of record)
+noise_sigma = 2.0                 # the image noise, in 8-bit grey levels (ip_fop.m's code value)
+derivative = "gaussian2d"         # gaussian2d | gaussian1d
+derivative_sigma = 1.0            # px
+polarity = "light"                # the backlit dots are bright on the dark chrome: Features' polarity gate keeps light blobs only, a dark blob (a gap, a shadow) never seeds (owner 2026-11-14)
+precision_threshold = 0.5         # px: the largest accepted point standard deviation (detect_sfop's T_w = 1/precision_threshold²)
+significance_level = 0.999        # of the F-test that labels a point corner or circular
+
+photographs = [                 # the photographs detected (each its own scale: detect_sfop); the others are [detect.excluded]
+    "DSC01289.JPG",
+    "DSC01290.JPG",
+    "DSC01291.JPG",
+    "DSC01292.JPG",
+    "DSC01293.JPG",
+    "DSC01294.JPG",
+    "DSC01295.JPG",
+    "DSC01296.JPG",
+    "DSC01297.JPG",
+    "DSC01298.JPG",
+    "DSC01299.JPG",
+    "DSC01300.JPG",
+    "DSC01301.JPG",
+    "DSC01303.JPG",
+    "DSC01304.JPG",
+]
+
+[detect.excluded]
+"DSC01302.JPG" = "the farthest, most oblique view: the dots are under a pixel and dim (the grid spans ~470 x 160 px); detect_foerstner finds 0–1 circular points at integration_sigma 0.7–2.5 (noise_sigma 2.0), 18 at most with noise_sigma 1.0"
+"DSC01305.JPG" = "as DSC01302 (the grid spans ~500 x 140 px): 0–1 circular points at integration_sigma 0.7–2.5, noise_sigma 1.0 or 2.0"
+
+# ---- stage index: the circular points registered against the grid of the target record --------------------------------------------
+# The detections are the detect run's (detections/<photo>.csv, its photographs); the points labelled `label` are registered. The
+# registration (src/chrome_evaluation.jl register_grid) is VisualGeometryToolkitEstimation's RANSAC on GridPoseProblem:
+#   1. the minimal sample (GridSeedSampler): a random point, the seed, and two of its 8 nearest points wound by angle around it a
+#      quarter turn apart, nb[k] and nb[k + 2], k ∈ {1, 2}; inside the grid one parity is its edge neighbours, so the sample is the
+#      lattice's (0, 0), (1, 0), (0, 1). Neither which edge neighbour is (1, 0) nor the turn's direction is drawn: on an infinite
+#      lattice of identical dots every rotation and mirror of a pose registers the same dots;
+#   2. the pose: with the camera of record the plane's pose [r₁ r₂ t] is P3P's on the sample's bearings (every root), kept when it
+#      predicts the seed's opposite neighbour, node (−1, 0), within seed_tolerance px;
+#   3. the correspondences: each point's ray met with the target plane under the pose and rounded to the nearest node of the
+#      INFINITE lattice; its residual is its distance, px, from that node's projection, scored by RANSAC's scorer ([index] scoring);
+#   4. RANSAC's local optimization ([index.local_optimization_strategy]): ICP from a hypothesis — its lattice assignment under the pose, and
+#      the pose refined on its bearings by VisualGeometryToolkitEstimation's absolute-pose refinement, the Triggs-corrected Huber LM,
+#      until the assignment is unchanged; RANSAC re-scores the refined pose;
+#   5. the inliers' nodes, the nearest point per node, are placed in the record's 17 × 17 grid by the window holding most of them.
+#      A photograph with fewer than min_assigned points is refused.
+[index]
+target = "target"                 # the input: the target record
+camera = "camera"                 # the input: the cameras file
+camera_name = "hx400v-4.3mm"      # the camera of that file (and the sensor the measurements name)
+target_id = "thorlabs_r3l3s7n1"   # the target's id in the measurements and in the rig they resolve in (targets.json)
+label = "circular"                # the detections registered
+scoring = { type = "msac" }        # RANSAC's scorer (the stack's SCORING_TAGS): MSAC on the board-plane residual (mm) of the Hungarian's one-to-one matches; its threshold is NOT stated here — it is half the target record's pitch (2.5 mm at 5 mm), the assignment's dustbin, derived in code (owner 2026-11-14)
+seed_tolerance = 5.0              # px: the seed's opposite neighbour from its predicted node (−1, 0), at most
+rng_seed = 1                      # of the StableRNG of the RANSAC draws
+min_assigned = 145                # half the record's 289 points: fewer means the registration locked onto a patch, not the grid
+
+# VisualGeometryToolkitEstimation's RansacConfig: the adaptive trial schedule (success_prob) between min_trials and max_trials.
+[index.ransac]
+success_prob = 0.999
+max_trials = 500
+min_trials = 20
+
+# RANSAC's local optimization (src/chrome_evaluation.jl register_grid; owner 2026-11-14): Estimation's Irls strategy at the Gaussian
+# shape — plain least squares, not robust: the scorer's matches of the hypothesis are within its threshold by construction — on
+# those matches, frozen (the GridPoseProblem's refine!: the board-plane residuals, mm, by Core's chart LM; the Hungarian is not
+# re-run), at most max_iter iterations.
+[index.local_optimization_strategy]
+type = "irls"
+loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
+max_iter = 10
+
+# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
+# is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
+[index.refine_strategy]
+type = "none"                     # a refine's least squares (optimization_strategy = nothing)
+
+# The photographs of the detect stage not registered, each with its reason (description: the run is keyed by their names).
+[index.excluded]
+"DSC01297.JPG" = "the camera of record fits it worst (4.1 px RMS once refined): the unrefined pose of a 3-point sample reaches 128 of its 289 dots within threshold, under min_assigned, until the RANSAC has its local optimization"
+"DSC01304.JPG" = "far and oblique (pitch ~15 px, 200 of 289 dots detected): the camera of record's misfit (4 px RMS on DSC01297) is the gate there (0.25 pitch, ~4 px); the registration assigns 179 points over 23 columns of the 17, so the window is a guess"

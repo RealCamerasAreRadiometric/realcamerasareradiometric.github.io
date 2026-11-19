@@ -1,0 +1,42 @@
+{
+    "uid": "291",
+    "bundle": "blob_board_291_84825.json",
+    "schema": "blobboards/board/v1",
+    "config_hash": "29184825c9807c2a3e7afd80fc196a64a45f9c45772793f14d81def6f609777c",
+    "frame": "BlobBoards :world — canvas centre, y-up, mm; chart b1 along +x (texture columns), b2 along −y (rows from the top)",
+    "pattern_origin_mm": [
+        -65.00933333333333,
+        65.00933333333333,
+        0.0
+    ],
+    "pattern_u_mm": [
+        130,
+        0,
+        0
+    ],
+    "pattern_v_mm": [
+        0,
+        -130,
+        0
+    ],
+    "pattern_size_mm": [
+        130,
+        130
+    ],
+    "canvas_size_mm": [
+        150,
+        150
+    ],
+    "pattern_px": [
+        6143,
+        6143
+    ],
+    "print_density_dpi": 1200,
+    "cutoff": 1.77,
+    "world_rect_mm": [
+        -75,
+        -75,
+        150,
+        150
+    ]
+}

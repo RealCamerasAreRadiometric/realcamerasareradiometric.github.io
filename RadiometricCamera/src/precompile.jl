@@ -1,0 +1,81 @@
+# The precompile workload (PrecompileTools): tiny but real instances of the package's hot paths, run once while the package image is
+# built, so that their native code is cached in it and a fresh process (a test worker, a pipeline run) does not compile it again.
+# The suite's items spent 89 % of their time compiling (the RC 0.3.0 gate), most of it in these paths. CPU only, no data files, no
+# output: a synthetic texture and two views of the 24 × 24 test scene. The types are the ones the tests and the pipeline use
+# (Float64, a 3 × 3 focus spline, a 4 × 4 vignetting surface, lighting of order 2), since compiled code is cached per argument type.
+#
+# No NLLSsolver solve runs here: NLLSsolver's `optimize!` evaluates into its own module (`getiterator`), which a precompiling
+# package may not do. The workload builds each route's problem and evaluates its cost blocks' residuals and Jacobians instead (the
+# LM's flags as an `Int`, the tests' as a static number), which is where the compilation is; the LM loop around them is compiled
+# on first use.
+
+@setup_workload begin
+    W = H = 24
+    tex = [0.5 + 0.4 * sin(0.7i + 1.3c) * cos(0.5j) for i in 1:32, j in 1:32, c in 1:3]
+    poses = [EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
+                          SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
+    pixel_camera(lens) = VgtkCore.BoundedCamera(CameraModel(LogicalIntrinsics(CameraCalibrationMat(SMatrix{3, 3}(30.912, 0, 0, 0, 30.912, 0, 12.24, 11.52, 1))), lens),
+                                                VgtkCore.Size2(W, H))
+    vignetting() = VgtkCore.with_control_points(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2),
+                                                [1.0 - 0.1 * (i + j) / 8 for i in 1:4, j in 1:4])
+    # the residual and the Jacobian of a problem's first cost block, with every variable free
+    function first_block(prob, blocks)
+        r = first(blocks)
+        vars = NLLSsolver.getvars(r, prob.variables)
+        flags = 2^length(vars) - 1
+        NLLSsolver.computeresidual(r, vars...)
+        NLLSsolver.computeresjac(flags, r, vars...)                 # the LM's flags
+        NLLSsolver.computeresjac(static(flags), r, vars...)         # the tests'
+        return nothing
+    end
+    @compile_workload begin
+        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        scene = Scene(board, W, H)
+        focus_t = Focus(FocusSpline(grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
+        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+        a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
+        light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)
+        mat = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+        st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
+        # a state of the scene seen through `lens`, its targets rendered at the truth
+        function state(lens, scene_ = scene, st_ = st; kw...)
+            views = [View(p, lens, focus_t, 0.0386) for p in poses]
+            masks = [compute_mask(v, scene_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for v in views]   # the workload's CPU states
+            targets = [render_view(k, views[k], vignetting(), mat, light, scene_, st_, masks[k]) for k in 1:2]
+            return CalibrationState(scene_, st_, views, vignetting(), with_μ(mat, 0.5), light, targets; masks, kw...)
+        end
+        per_view(s; kw...) = ((prob, _) = build_problem(s; kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
+        per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
+
+        # the closed-form radiometry and the parametric (per-view) blocks on Core's lenses: the double sphere (a free board
+        # warping), Kannala–Brandt, OpenCV's 14 coefficients, the division lens and a fixed lens
+        ds = pixel_camera(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)))
+        s = state(ds)
+        parts = all_parts(s)
+        solve_Θ_l!(s, parts); solve_Θ_v!(s, parts); solve_μ!(s, parts)
+        solve_radiometry_gn!(s, parts; max_iter = 1)
+        cost(s); render_all(s)
+        per_view(s)
+        per_view(state(ds); height_degree = 1)
+        per_view(state(pixel_camera(VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0))))
+        per_view(state(pixel_camera(VgtkIO.opencv_lens(zeros(14)))))
+        per_view(state(pixel_camera(VgtkIO.opencv_lens(zeros(14)))); fixed = (:cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
+        per_view(state(pixel_camera(VgtkCore.Division(0.144, -0.293))))
+        per_view(state(pixel_camera(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0))); fixed = (:f, :aspect, :cx, :cy, :k))
+
+        # the grid lens (Core's central generic model): evaluate, project, back-project, and its per-tile blocks (with the warping)
+        g = grid_model(ds, 10, 10)
+        𝐩 = SVector(10.0, 13.0)
+        d = _chief_ray(g, 𝐩); project(g, d); backproject(g, 𝐩); in_domain(g, 𝐩)
+        grid_angular_error(g, ds)
+        sg = state(g)
+        per_tile(sg)
+        per_tile(sg; height_degree = 2)
+
+        # the pipeline's options: the defaults, an override, the record's round trip through TOML
+        opts = pipeline_options(Dict{String, Any}(); set = ["lm.max_iter=2"])
+        TOML.print(IOBuffer(), config_dict(opts))
+        pipeline_options(config_dict(opts))
+        _drain_device_pool!()          # the evaluations' pooled workers: a package image cannot hold a task
+    end
+end

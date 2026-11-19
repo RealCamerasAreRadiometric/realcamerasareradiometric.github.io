@@ -1,0 +1,414 @@
+# ---------------------------------------------------------------------------
+# Radiant flux of pixel 𝐮 (paper eq. rad-flux-with-vignetting: the aperture integral divided by |𝒜| = πr²), with the aperture
+# integral pulled back to the fixed unit disc 𝒟 (𝐚 = r â, d𝐚 = r² dâ):
+#
+#   Φ_c(𝐮; Θ̄) ≈ 1/(πr²) ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟 r² L_c(π̂⁻¹(𝐩, r â; Θ_c), π̂⁻¹(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
+#              =  1/π    ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟    L_c(π̂⁻¹(𝐩, r â; Θ_c), π̂⁻¹(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
+#
+# The r² of the substitution cancels against the normalisation: the rule's weights are r² w̃ (Σ w̃ = π) and Φ_pixel divides its sum
+# by πr², so r is no scale of the flux and enters through the nodes r â alone (the defocus).
+#
+# The whole cos⁴α(𝐚 − 𝐩)/s′² obliquity (cos-fourth law) is absorbed into the vignetting spline V — a
+# pure sensor-position factor: the small intra-aperture variation of cos α (order sin θ · r/d_s) is
+# dropped, the same approximation the cos³α/s′² cancellation already makes. This removes the image
+# distance from the model (it entered only through cos α) and with it the flat d_s ↔ V direction.
+#
+# evaluated with the deterministic sensor/aperture quadrature rules of quadrature.jl
+# (sensor rule = mean over ℐ_𝐮, see SensorQuadrature) and the Monte-Carlo radiance
+# estimator of radiance.jl. Only masked pixels are rendered: a pixel is kept when its
+# whole circle of confusion (every footprint corner × every aperture border sample)
+# lands on the board with padding δ, so no boundary term appears: the r-dependence of the domain
+# sits in the integrand (r² w̃_l, r â_l), and ∂Φ/∂r is an interior derivative like every other
+# (a dual seed on r).
+# ---------------------------------------------------------------------------
+
+"""
+    RenderSettings
+
+Quadrature rules and radiance sampler shared by all renders. Φ is the aperture integral divided by |𝒜| = πr²: the aperture's
+radius is then no scale of the flux, so it cannot trade against the lighting's.
+
+    RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8, seed = 42, hammersley = false)
+"""
+struct RenderSettings{T, NS, NA, NB}
+    sensor::SensorQuadrature{T, NS}
+    aperture::ApertureQuadrature{T, NA, NB}
+    sampler::RadianceSampler
+end
+function RenderSettings(; n_𝐩::Integer = 2, n_ρ::Integer = 3, n_φ::Integer = 8, N::Integer = 8, seed::Integer = 42,
+                        hammersley::Bool = false, T = Float64)
+    return RenderSettings(SensorQuadrature{T}(n_𝐩), ApertureQuadrature{T}(n_ρ, n_φ), RadianceSampler(N; seed, hammersley))
+end
+
+"""
+    Scene
+
+Fixed scene data — the board 𝓑 and the image size `W × H` — and the surface parameters `surface::BoardSurface` (the board warping
+h and the printed-edge parameters, warping.jl), which every render receives by value. `Scene(board, W, H)` is the plane.
+"""
+struct Scene{B <: PrintedTarget, T}
+    board::B
+    W::Int
+    H::Int
+    surface::BoardSurface{T}
+    function Scene(board::B, W::Integer, H::Integer, surface::BoardSurface{T}) where {B <: PrintedTarget, T}
+        return new{B, T}(board, Int(W), Int(H), surface)
+    end
+end
+Scene(board::PrintedTarget{T}, W::Integer, H::Integer) where {T} = Scene(board, Int(W), Int(H), BoardSurface{T}())
+"""The scene with its surface parameters replaced."""
+with_surface(sc::Scene, surf::BoardSurface) = Scene(sc.board, sc.W, sc.H, surf)
+"""The board's rays of a render of `scene` (`BoardRays`): its warping's relief."""
+@inline BoardRays(scene::Scene) = BoardRays(scene.board, scene.surface.h)
+Adapt.adapt_structure(to, s::Scene) = Scene(adapt(to, s.board), s.W, s.H, s.surface)
+
+"""Linear pixel id used in the sample keys (column-major over the `H × W` image)."""
+@inline pixel_id(u::Integer, v::Integer, H::Integer) = UInt64((u - 1) * H + v)
+
+"""Per-sensor-sample seed of the hoisted `t̂` value: slot `fbase + ks` of a dual (the focus chain rule —
+`∂Φ/∂t̂_i = Σ_ks ∂Φ/∂t̂(𝐩_ks) · gᵢ(𝐩_ks)` with the TPS nodal weights `g` applied on the host). `nothing`: no seed."""
+@inline _t̂_seeded(x, ::Nothing, ks::Integer) = x
+"""The unit partial of slot `slot` as a dual of `P` partials (zero when the slot is outside `1:P`: a sentinel or another chunk's)."""
+@inline _unit_partial(::Type{Tag}, ::Type{V}, slot::Integer, ::Val{P}) where {Tag, V, P} =
+    ForwardDiff.Dual{Tag}(zero(V), ForwardDiff.Partials(ntuple(i -> i == slot ? one(V) : zero(V), Val(P))))
+"""
+    _seed_tangents(x) -> (e₁, e₂)
+
+An orthonormal basis of the plane across the direction `x` (any length; Frisvad's: smooth in `x` everywhere but at −ẑ, the backward
+axis no lens images, so the device's Float32 and the host's Float64 direction of a sample give the same basis up to rounding, with
+no branch to fall on different sides of).
+"""
+@inline function _seed_tangents(x::StaticVector{3})
+    n = normalize(x)
+    a = 1 / (1 + n[3])
+    b = -n[1] * n[2] * a
+    return SVector(1 - n[1] * n[1] * a, b, -n[1]), SVector(b, 1 - n[2] * n[2] * a, -n[2])
+end
+"""Chief-direction seed (grid-lens chain rule): the raw direction `x = _chief_ray(𝐩_ks)` moved across itself by duals with unit partials
+in the 2 slots `base + 2(ks−1) + c`, `x + ε₁e₁ + ε₂e₂` (`_seed_tangents`); the dual type is taken from the (already dual) hoisted
+`t̂` value. The flux sees a chief direction only through its normalisation, so its gradient in `x` has no part along `x` and the two
+slots carry all of it: `∂Φ/∂x = (∂Φ/∂ε₁)e₁ + (∂Φ/∂ε₂)e₂` (`_dir_gradient`) — the chain rule, exact; the patch columns' parameters
+are untouched (the host fans this gradient out to them as before)."""
+@inline _dir_seeded(x, ::Nothing, ks::Integer, _) = x
+@inline function _dir_seeded(x::StaticVector{3}, base::Integer, ks::Integer, ::ForwardDiff.Dual{Tag, V, P}) where {Tag, V, P}
+    # add-a-seed (like _t̂_seeded): keeps existing partials when the chief ray is itself dual (per-view
+    # lens AD); out-of-chunk/sentinel slots contribute all-zero partials — branch-free for the device
+    b = base + 2 * (ks - 1)
+    e1, e2 = _seed_tangents(ForwardDiff.value.(x))
+    ε1 = _unit_partial(Tag, V, b + 1, Val(P)); ε2 = _unit_partial(Tag, V, b + 2, Val(P))
+    return SVector(ntuple(c -> x[c] + (ε1 * e1[c] + ε2 * e2[c]), Val(3)))
+end
+"""The raw chief direction's gradient `∂Φ/∂x` from its two seed partials `g₁, g₂` (`_dir_seeded`) at the direction `x`."""
+@inline function _dir_gradient(g1, g2, x::StaticVector{3})
+    e1, e2 = _seed_tangents(x)
+    return g1 * e1 + g2 * e2
+end
+"""EXPERIMENT (focus-ab): the seeded `t̂` and the unit chief direction of a sensor sample. Kind 0 (the sensor chart) in the original
+order; the direction charts (kinds 1, 2) evaluate t̂ AT the (seeded) chief direction, so the lens's / grid directions' partials reach t̂
+through the chart (the dual template of the direction seeds is a zero of the focus's element type)."""
+@inline function _focus_and_dir(view::View, 𝐩, fseed, dirseed, ks::Integer)
+    f = view.focus
+    if f.kind == 0
+        t̂s = _t̂_seeded(t̂(f, 𝐩), fseed, ks)
+        return t̂s, normalize(_dir_seeded(_chief_ray(view.lens, 𝐩), dirseed, ks, t̂s))
+    end
+    tmpl = _t̂_seeded(zero(eltype(f.w)), fseed, ks)
+    dch = normalize(_dir_seeded(_chief_ray(view.lens, 𝐩), dirseed, ks, tmpl))
+    return _t̂_seeded(t̂_dir(f, dch), fseed, ks), dch
+end
+@inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
+    slot = fbase + ks
+    (1 <= slot <= P) || return x
+    return x + ForwardDiff.Dual{Tag}(zero(V), ForwardDiff.Partials(ntuple(i -> i == slot ? one(V) : zero(V), Val(P))))
+end
+
+"""
+    HeightRays(h)
+
+The height mode of [`Φ_pixel`](@ref) (the device Jacobian's nodal-height columns): `h` are the board warping's nodal heights as
+duals seeded with the unit partials (one slot per height), and only the relief of the pixel's rays sees them. The heights reach the
+flux only through each ray's parameter `s` on the warped board (𝐱 = 𝐨 + s 𝐝: the board frame, the footprint and the ray do not
+depend on h), so a ray's sensitivities are the outer product `∂L/∂s ⊗ ∂s/∂h` — `∂s/∂h` from the dual relief (Core's implicit-function-theorem root),
+`∂L/∂s` from ONE dual slot carried through the radiance estimator — instead of `HEIGHT_NC` slots carried through it. `Φ_pixel`
+then returns the `3 × HEIGHT_NC` matrix `∂Φ/∂h` (the chain rule of the evaluated objective; equal to the seeded-height partials up
+to rounding). The other arguments of the call are plain (no seeds).
+"""
+struct HeightRays{V <: StaticVector{HEIGHT_NC}}
+    h::V
+end
+struct HeightRayTag end
+@inline _pixel_rays(::Nothing, scene::Scene) = BoardRays(scene)
+@inline _pixel_rays(hr::HeightRays, scene::Scene) = BoardRays(scene.board, hr.h)   # Core: the height-field Newton's hit, its height partials by one IFT step
+@inline _ray_zero(::Nothing, ::Type{T}) where {T} = zero(SVector{3, T})
+@inline _ray_zero(::HeightRays, ::Type{T}) where {T} = zero(SMatrix{3, HEIGHT_NC, T, 3 * HEIGHT_NC})
+"""The ray's board point as the radiance estimator sees it: as intersected, or (height mode) on the ray at a one-slot dual `s`."""
+@inline _ray_point(::Nothing, s, 𝐱, o, d) = 𝐱
+@inline _ray_point(::HeightRays, s, 𝐱, o, d) =
+    o + ForwardDiff.Dual{HeightRayTag}(ForwardDiff.value(s), ForwardDiff.Partials((one(ForwardDiff.value(s)),))) * d
+"""A ray's weighted radiance `wL` added to the disc sum: as it is, or (height mode) `∂(wL)/∂s ⊗ ∂s/∂h`."""
+@inline _ray_add(::Nothing, inner, wL, s) = inner + wL
+@inline _ray_add(::HeightRays, inner::SMatrix{3, NH}, wL, s) where {NH} =
+    inner + SMatrix{3, NH}(ntuple(q -> ForwardDiff.partials(wL[(q - 1) % 3 + 1], 1) * ForwardDiff.partials(s, (q - 1) ÷ 3 + 1), Val(3 * NH)))
+
+"""
+    RadianceRecord(out, base) / RadianceRays(J, base)
+
+The radiance-Jacobian modes of [`Φ_pixel`](@ref) (the device Jacobian): `L_c` depends on the parameters only through its local
+inputs ℓ — the albedo ρ, the roughness α, the refractive indices η, the outgoing direction ω_l and the board point 𝐱 — and channel c
+reads ρ and η only through ρ_c and η_c, so `RAD_NL` = 8 local slots carry its whole derivative: one shared by ρ_c, α, one shared by
+η_c, ω_l's two tangent components (ω_l is a unit vector: its partials are tangent, `_seed_tangents`) and 𝐱's three.
+`RadianceRecord`: at the plain parameters, each ray's `[L | ∂L/∂ℓ]` (`RadianceJac`) is written to `out[base + ray]` (ray
+`(ks − 1) NA + la` of the pixel) and its value used. `RadianceRays`: the ray's ℓ, dual in the chunk's (or the height mode's) slots,
+replaces the estimator by its linearisation at the record, `L⁰ + J (ℓ − value(ℓ))` — the chain rule (∂L/∂θ = ∂L/∂ℓ · ∂ℓ/∂θ), so a
+chunk's partials skip the estimator. A ray the record did not reach reads as zero radiance with zero partials (the buffer is zeroed),
+as `L_c` returns for a ray the board does not face.
+"""
+struct RadianceRecord{A}
+    out::A
+    base::Int
+end
+struct RadianceRays{A}
+    J::A
+    base::Int
+end
+struct RadianceTag end
+const RAD_NL = 8
+"""A ray's `[L | ∂L/∂ℓ]` in the kernels' float type `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend)."""
+const RadianceJac{T} = SMatrix{3, 1 + RAD_NL, T, 3 * (1 + RAD_NL)}
+"""The radiance of a ray (`Φ_pixel`'s ray `ri`): `L_c`, or one of its radiance-Jacobian modes (`RadianceRecord`, `RadianceRays`)."""
+@inline _ray_radiance(::Nothing, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω) = L_c(bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+@inline function _ray_radiance(lr::RadianceRecord, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+    ω_l, T, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
+    front || return zero(SVector{3, T})
+    D = ForwardDiff.Dual{RadianceTag, T, RAD_NL}
+    ε(j) = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials(ntuple(i -> i == j ? one(T) : zero(T), Val(RAD_NL))))
+    e1, e2 = _seed_tangents(ω_l)
+    L = _radiance_mc(bd, m, lt, sm, key, ρ .+ ε(1), α + ε(2), η .+ ε(3), ω_l + ε(4) * e1 + ε(5) * e2,
+                     SVector(𝐱[1] + ε(6), 𝐱[2] + ε(7), 𝐱[3] + ε(8)), D)
+    @inbounds lr.out[lr.base + ri] = eltype(lr.out)(ntuple(q -> (c = (q - 1) % 3 + 1; j = (q - 1) ÷ 3;
+                                                              j == 0 ? ForwardDiff.value(L[c]) : ForwardDiff.partials(L[c], j)), Val(3 * (1 + RAD_NL))))
+    return SVector(ntuple(c -> ForwardDiff.value(L[c]), Val(3)))
+end
+@inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
+@inline _δ(x::Real) = zero(x)
+@inline function _ray_radiance(lr::RadianceRays, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
+    front || return zero(SVector{3, Tz})
+    e1, e2 = _seed_tangents(ForwardDiff.value.(ω_l))
+    q4 = _δ(dot(e1, ω_l)); q5 = _δ(dot(e2, ω_l)); qα = _δ(α)
+    q6 = _δ(𝐱[1]); q7 = _δ(𝐱[2]); q8 = _δ(𝐱[3])
+    G = @inbounds lr.J[lr.base + ri]
+    return SVector{3, Tz}(ntuple(c -> G[c, 1] + G[c, 2] * _δ(ρ[c]) + G[c, 3] * qα + G[c, 4] * _δ(η[c]) + G[c, 5] * q4 + G[c, 6] * q5 +
+                                      G[c, 7] * q6 + G[c, 8] * q7 + G[c, 9] * q8, Val(3)))
+end
+
+"""
+    Φ_pixel(u, v, k, view, vig, mat, light, scene, settings) -> SVector{3}
+
+Radiant flux of pixel `(u, v)` of view `k`. `@inline`: in the device kernels a Julia-level inline lets the compiler optimize the
+dual arithmetic across the call (the backend's `always_inline` only inlines at the LLVM level) — the GPU Jacobian is 12% faster.
+`hrays`: a `HeightRays` for the `3 × HEIGHT_NC` nodal-height partials instead of the flux. `lrays`: a radiance-Jacobian
+mode (`RadianceRecord`, `RadianceRays`) for the rays' radiance.
+"""
+@inline function Φ_pixel(u::Integer, v::Integer, k::Integer, view::View{T}, vig::AbstractVignetting, mat::Material,
+                 light::EnvironmentLight, scene::Scene, st::RenderSettings, fseed = nothing, dirseed = nothing,
+                 hrays = nothing, lrays = nothing) where {T}
+    bd = scene.board
+    Tz = promote_type(T, eltype(mat.𝛈_ink), eltype(coefficients(light)), eltype(control_points(vig)))
+    acc = _ray_zero(hrays, Tz)
+    pid = pixel_id(u, v, scene.H)
+    rays = _pixel_rays(hrays, scene)                                    # the board warping h's relief, formed once for the pixel's rays
+    @inbounds for ks in 1:length(st.sensor)
+        𝐩 = 𝐩_sample(st.sensor, ks, u, v)
+        V𝐩 = vig(𝐩)
+        t̂s, dch = _focus_and_dir(view, 𝐩, fseed, dirseed, ks)   # t̂ and the UNIT chief direction, hoisted once per sensor sample (seeded, then normalised)
+        inner = _ray_zero(hrays, Tz)
+        for la in 1:n_disc(st.aperture)
+            𝐚 = 𝐚_sample(st.aperture, la, view.r)
+            o, d = world_ray_dir(view, 𝐚, dch, t̂s)
+            s, 𝐱 = intersect_board(rays, o, d)                               # the board warping h (the plane when zero)
+            (isfinite(ForwardDiff.value(s)) && ForwardDiff.value(s) > 0) || continue
+            𝐱ᵣ = _ray_point(hrays, s, 𝐱, o, d)
+            𝐛 = chart(bd, 𝐱ᵣ)
+            L = _ray_radiance(lrays, (ks - 1) * n_disc(st.aperture) + la, bd, scene.surface, mat, light, st.sampler,
+                              SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d)
+            inner = _ray_add(hrays, inner, 𝐚_weight(st.aperture, la, view.r) * L, s)
+        end
+        acc += (st.sensor.weights[ks] * V𝐩) * inner
+    end
+    return acc / (π * view.r^2)
+end
+
+"""
+    compute_mask(view, scene, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
+
+Pixel mask: `true` where the chief ray and every (footprint corner × aperture border sample)
+ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with `external`. `board_valid` over every pixel
+of `external` (all of them without one): one kernel on `backend`, required. A caller that needs only some of the pixels (the start's
+draw, `draw_samples`) tests those alone through `BoardValidity`.
+"""
+function compute_mask(view::View, scene::Scene, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
+    H, W = scene.H, scene.W
+    ids = external === nothing ? collect(1:(H * W)) : findall(vec(external))   # column-major: (u − 1) H + v
+    mask = falses(H, W)
+    mask[ids[board_valid(view, scene, st, ids; δ, backend)]] .= true
+    return mask
+end
+
+"""
+    board_valid(view, scene, settings, ids; δ, backend) -> BitVector
+
+The mask test (`compute_mask`'s) of the pixels `ids` (column-major linear indices `(u − 1) H + v`) alone, in `ids`' order: one
+kernel over them (`_MaskAt` on Core's `pointwise!`) on `backend` (the caller's device: a state's or a run's `rc_backend`;
+KernelAbstractions' CPU() threads it over the pixels). THE mask test: `compute_mask` over a region, `BoardValidity` over a draw's
+candidates.
+"""
+function board_valid(view::View, scene::Scene, st::RenderSettings, ids::AbstractVector{<:Integer}; δ::Real, backend)
+    isempty(ids) && return falses(0)
+    out = KernelAbstractions.zeros(backend, Bool, length(ids))
+    VgtkCore.pointwise!(_MaskAt(view, scene.board, st.aperture, Int32(scene.H), Float64(δ)), out, adapt(backend, UInt32.(ids));
+                        exec = VgtkCore.OnBackend(backend))
+    KernelAbstractions.synchronize(backend)
+    return BitVector(Array(out))
+end
+
+"""
+    BoardValidity(view, scene, settings; δ, backend)
+
+The mask test of one view as a function of pixel ids: `t(ids)` is `board_valid(view, scene, settings, ids; δ, backend)`.
+The start's draw (`draw_samples`) calls it on the candidates it needs, in its keys' order, instead of the whole region.
+"""
+struct BoardValidity{V <: View, S <: Scene, R <: RenderSettings, B}
+    view::V
+    scene::S
+    settings::R
+    δ::Float64
+    backend::B
+end
+BoardValidity(view::View, scene::Scene, st::RenderSettings; δ::Real, backend) = BoardValidity(view, scene, st, Float64(δ), backend)
+(t::BoardValidity)(ids::AbstractVector{<:Integer}) = board_valid(t.view, t.scene, t.settings, ids; t.δ, t.backend)
+
+"""The mask test of a pixel id (`compute_mask`): its chief ray and every footprint corner × aperture border ray on the board inside
+`[δ, 1−δ]²`, in front of the camera."""
+struct _MaskAt{V, B, A}
+    view::V
+    board::B
+    aperture::A
+    H::Int32
+    δ::Float64
+end
+Adapt.@adapt_structure _MaskAt
+const _MASK_CORNERS = (SVector(-0.5, -0.5), SVector(0.5, -0.5), SVector(-0.5, 0.5), SVector(0.5, 0.5), SVector(0.0, 0.0))
+@inline function (f::_MaskAt)(id::UInt32)
+    u, v = _decode_px(id, f.H)
+    view, bd, ap = f.view, f.board, f.aperture
+    for c in _MASK_CORNERS
+        𝐩 = 𝐩_of_pixel(u + c[1], v + c[2])
+        in_domain(view.lens, 𝐩) || return false
+        o, d = world_ray(view, 𝐩, 𝔭)
+        s, 𝐱 = intersect_board(bd, o, d)
+        (isfinite(s) && s > 0 && inside(chart(bd, 𝐱), f.δ)) || return false
+        for j in 1:n_border(ap)
+            𝐚, _, _, _ = 𝐚_border(ap, j, view.r)
+            o, d = world_ray(view, 𝐩, 𝐚)
+            s, 𝐱 = intersect_board(bd, o, d)
+            (isfinite(s) && s > 0 && inside(chart(bd, 𝐱), f.δ)) || return false
+        end
+    end
+    return true
+end
+
+"""Ordered list of masked pixels `(u, v)` (column-major over the image)."""
+masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)]
+
+"""
+    render_view(k, view, vig, mat, light, scene, settings, mask) -> Array{Float64, 3}
+
+`H × W × 3` image of view `k` (zeros outside the mask): the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on the CPU backend, in the arguments'
+float type.
+"""
+function render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
+                     scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool})
+    px = masked_pixels(mask)
+    img = zeros(Float64, scene.H, scene.W, 3)
+    isempty(px) && return img
+    ids = [UInt32((u - 1) * scene.H + v) for (u, v) in px]
+    Φ = _device_rows(_FluxAt(Int32(k), Int32(scene.H), view, vig, mat, light, scene, st), KernelAbstractions.CPU(), ids)
+    for (i, (u, v)) in enumerate(px), c in 1:3
+        img[v, u, c] = Φ[3 * (i - 1) + c]
+    end
+    return img
+end
+
+"""
+    masked_vector(img, px; channel = 0) -> Vector{Float64}
+
+The observed vector `ϕ` of the masked pixels `px`, in the residual's layout (`𝔯 = Φ − ϕ`): for `channel = 0` the three channels of
+`img` (H × W × 3) per pixel, channel fastest (index `3(i−1)+c`); for `channel = c` that channel alone, ONE entry per pixel
+(`fit_channels`). A single plane `img` (H × W: one measurement per pixel, the green photosites) is one entry per pixel and
+needs a single-channel state (`channel` 1–3).
+"""
+function masked_vector(plane::AbstractMatrix{<:Real}, px::AbstractVector; channel::Integer = 0)
+    channel > 0 || throw(ArgumentError("masked_vector: a single plane is one measurement per pixel: a single-channel state (channel 1–3)"))
+    return Float64[plane[v, u] for (u, v) in px]
+end
+function masked_vector(img::AbstractArray{<:Real, 3}, px::AbstractVector; channel::Integer = 0)
+    channel > 0 && return Float64[img[v, u, channel] for (u, v) in px]
+    out = Vector{Float64}(undef, 3 * length(px))
+    for (i, (u, v)) in enumerate(px), c in 1:3
+        out[3 * (i - 1) + c] = img[v, u, c]
+    end
+    return out
+end
+
+"""
+    tie_channels(light::EnvironmentLight, c) -> EnvironmentLight
+    tie_channels(mat::Material, c) -> Material
+
+A single-channel state's parameters (`CalibrationState`'s `channel = c`): every channel's lighting coefficients, and every
+channel's refractive indices `η_ink`, `η_¬ink`, are channel `c`'s. No residual reads the other channels, so they are no parameters
+of the fit (`LightingVar`, `MaterialVar`): they follow channel `c`, so a render or a record of the state shows the measured
+channel's values in all three.
+"""
+function tie_channels(light::EnvironmentLight, c::Integer)
+    a = Matrix(coefficients(light))
+    return with_coefficients(light, a[[light_tie(c, ch) for ch in 1:3], :])
+end
+function tie_channels(m::Material, c::Integer)
+    θ = Θ_m_nonlinear(m)
+    return with_nonlinear(m, SVector(ntuple(i -> θ[material_tie(c)[i]], Val(8))))
+end
+
+# ---- the single-channel layout: THE statement of which coordinates a channel-`c` fit keeps and what the others follow ---------------
+"""
+    material_tie(c) -> NTuple{8, Int}
+
+The single-channel layout of the material's 8 nonlinear coordinates (`Θ_m_nonlinear`'s order: `α_ink, α_¬ink, η_ink[1:3],
+η_¬ink[1:3]`): each coordinate's source in a channel-`c` fit — the α's their own, every channel's η_ink channel `c`'s (`2 + c`),
+every η_¬ink channel `c`'s (`5 + c`); `c = 0` (the three channels) each its own. `material_sources(c)` are the sources, the fit's
+coordinates in order. `tie_channels`, `MaterialVar`'s update, the Jacobian's columns (`_channel_jacobian`) all read it.
+"""
+material_tie(c::Integer) = c == 0 ? ntuple(identity, 8) : (1, 2, 2 + c, 2 + c, 2 + c, 5 + c, 5 + c, 5 + c)
+"The material coordinates a channel-`c` fit estimates (the distinct sources of `material_tie(c)`, in order)."
+material_sources(c::Integer) = Tuple(unique(material_tie(c)))
+"""The source channel of lighting channel `ch` in a channel-`c` fit (`c` itself; `ch` for the three channels): every channel's SH
+coefficients follow the measured one's. `tie_channels`, `LightingVar`'s update, the Jacobian's columns and the joint radiometric solve
+read it."""
+light_tie(c::Integer, ch::Integer) = c == 0 ? ch : c
+"""
+    material_tie_basis(c) -> Matrix{Float64}
+
+The material's channel ties as the block's basis (8 × `length(material_sources(c))`): column `j` is the full block's coordinates that
+follow the fit's coordinate `j` (`material_tie`: ones where it is their source). A channel-`c` block's step is the basis times its
+coordinates (`MaterialVar`'s update); its Jacobian columns are the full ones times the basis (`_channel_jacobian`), the other
+channels' columns being zero on channel `c`'s rows.
+"""
+material_tie_basis(c::Integer) = (t = material_tie(c); s = material_sources(c); [Float64(t[i] == s[j]) for i in 1:8, j in eachindex(s)])
+"""
+    light_tie_basis(c, nsh) -> Matrix{Float64}
+
+The lighting's channel ties as the block's basis (`3 nsh` × `nsh` for a channel-`c` fit, the identity for `c = 0`): every channel's
+coefficient `j` follows channel `c`'s (`light_tie`). `LightingVar`'s update and `_channel_jacobian` read it, as `material_tie_basis`.
+"""
+light_tie_basis(c::Integer, nsh::Integer) = c == 0 ? Matrix{Float64}(I, 3nsh, 3nsh) :
+    [Float64((i - 1) ÷ 3 + 1 == j) for i in 1:3nsh, j in 1:nsh]      # coefficient (ch, j) at 3(j − 1) + ch: every channel follows channel c's j

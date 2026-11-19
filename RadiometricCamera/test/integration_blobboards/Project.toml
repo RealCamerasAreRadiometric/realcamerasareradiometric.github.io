@@ -1,0 +1,31 @@
+# Environment of the migration stages C and D (run_integration_tests.sh: test_session_outputs.jl, test_vgc_contract.jl): the package
+# with the EXR reader of the fixture's truth maps (FileIO / ImageIO) and the stack packages the tests name. Until 2026-10-29 these
+# stages ran in experiments/Project.toml, retired with that tree; this is its [deps] minus what the two scripts never load.
+# A member of the repository's workspace (the root Project.toml's [workspace]), so it resolves with the package in the
+# one root Manifest, on the stack's wave-10 compat:
+#   julia --project=test/integration_blobboards -e 'using Pkg; Pkg.instantiate()'
+[deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NLLSsolver = "50b5cf9e-bf7a-4e29-8981-4280cbba70cb"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RadiometricCamera = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
+VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
+VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
+
+[sources]
+RadiometricCamera = {path = "../.."}
+
+[compat]
+julia = "1.13"
+VisualGeometryToolkitCore = "0.11.1"
+VisualGeometryToolkitEstimation = "0.12"
+VisualGeometryToolkitFeatures = "0.9.8"
+VisualGeometryToolkitIO = "0.10.6"

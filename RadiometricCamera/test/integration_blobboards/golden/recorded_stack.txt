@@ -1,0 +1,8 @@
+BlobBoards 0.22.0  VisualGeometryCore 0.16.0  VisualGeometryIo 0.7.0
+RadiometricCamera env: VisualGeometryCore 0.6.0 at <dev-checkout>/VisualGeometryCore.jl
+BlobBoards.jl 1a60721 version = "0.22.0"
+RobustVisualGeometry.jl 81839b6 version = "0.16.1"
+VisualGeometryFeatures.jl 5cbe839 version = "0.6.4"
+VisualGeometryIo.jl 7ecddfb version = "0.7.0"
+VisualGeometryCore.jl 5062584 version = "0.6.0"
+recorded 2026-10-25 10:15:37 from test/integration_blobboards/work/run-20261025-101048

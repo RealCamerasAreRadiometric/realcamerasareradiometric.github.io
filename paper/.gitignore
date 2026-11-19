@@ -1,0 +1,11 @@
+# the LaTeX build (make): build/ holds main.pdf, paper.pdf, supp.pdf and the auxiliary files
+/build/
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+/*.pdf

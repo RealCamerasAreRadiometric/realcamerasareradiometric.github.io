@@ -1,0 +1,84 @@
+# The experiments that reproduce the paper: a DrWatson paper project (VisualGeometryToolkitEval
+# PaperProjects, new_paper_project), not a package. It uses RadiometricCamera from this repository
+# (../RadiometricCamera, [sources]); its Manifest is never tracked.
+name = "experiments"
+
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDNN_jll = "62b44479-cb7b-5706-934f-f13b2eb2e645"   # LoMa on the GPU: Features' ONNX Runtime CUDA provider loads cuDNN 9's CUDA 12 build from this JLL's artifact, located in the active environment (never loaded as a module)
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+DelaunayTriangulation = "927a84f5-c5f4-47a5-9785-b46e178433df"
+DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+Hungarian = "e91730f6-4275-51fb-a7a0-7064cfbd3b39"   # the chrome index's one-to-one correspondence of backprojected dots and board nodes (the stack has no assignment solver)
+ImageMorphology = "787d08f9-d448-5407-9aad-5290dd7ab264"   # the chrome index's one-connected-component rule: label_components on the board window
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"           # PanoramaStitching's example: Features' decoded-RAW FileCache (its JLD2 extension)
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JpegTurbo = "b835a17e-a41a-41e7-81f0-2f016b05efe0"
+LibRaw_jll = "d66ac3f3-933a-5ab8-8aa2-9e591b3c5af3"     # PanoramaStitching's example loads it (`using LibRaw_jll`); the drivers get the decoder through RadiometricCamera
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LocalOptimizationDoneRight = "87a2e6a3-7afc-471f-bd1b-aa3740a29cd9"
+NLLSsolver = "50b5cf9e-bf7a-4e29-8981-4280cbba70cb"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+PNGFiles = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
+PanoramaStitching = "5b03ddb8-fc94-4165-83c9-5c94f3367646"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RadiometricCamera = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
+VisualGeometryToolkitEval = "86c88899-11c8-4b8e-8d7a-f01a8ab99b28"
+VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
+VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
+
+[sources]
+RadiometricCamera = {path = "../RadiometricCamera"}
+
+[compat]
+Adapt = "4"
+BlobBoards = "0.7.2"
+CUDA = "5"
+CUDNN_jll = "9.28 - 9"
+CairoMakie = "0.15"
+ColorTypes = "0.12"
+DelaunayTriangulation = "1.7"
+DrWatson = "2.19"
+Hungarian = "0.7"
+ImageMorphology = "0.4.7"
+JLD2 = "0.6.7"
+JSON = "1"
+JpegTurbo = "0.1"
+LibRaw_jll = "0.22.2"
+LinearAlgebra = "1"
+LocalOptimizationDoneRight = "0.7.0"
+NLLSsolver = "5.3.4"
+NPZ = "0.4"
+PNGFiles = "0.4.5"
+PanoramaStitching = "0.10.0"  # the Core 0.11 cascade (0.10.0: refine_rotations / refine_camera_and_rotations return Core's LM verdict, no number moves); fit_vignetting and score_seams require saturation_margin_px (0.9.0); symmetric saturation masks; ring_correspondences; seam numbers on the fit's observations
+Printf = "1"
+RadiometricCamera = "0.1"
+Random = "1"
+ReTestItems = "1.35"
+SHA = "0.7, 1"
+StableRNGs = "1.1"
+StaticArrays = "1"
+Statistics = "1"
+StatsBase = "0.34"
+TOML = "1.0.3"
+VisualGeometryToolkitCore = "0.11.1"
+VisualGeometryToolkitEstimation = "0.12"
+VisualGeometryToolkitEval = "0.9.2"
+VisualGeometryToolkitFeatures = "0.9.8"
+VisualGeometryToolkitIO = "0.10.6"
+julia = "1.13"

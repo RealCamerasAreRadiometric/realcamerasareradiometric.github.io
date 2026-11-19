@@ -1,0 +1,57 @@
+# Config of record of the sensor characterisation (scripts/sensor_characterisation.jl; owner ruling D12: the experiment renamed,
+# its dark statistics replaced by Core's master_dark / defect_onsets): the Sony ILME-FX3 at ISO 100, the campaign of
+# 2026-11-13 of David Nakath's protocol (raw_noise_experiments_outline.md, raw_noise_characterization.md and the notes
+# raw_noise_experiments_13_11_2026.md beside the sets in the tier), the Tamron 20 mm (EXIF LensModel "E 20mm F2.8 F050") at f/10,
+# 14-bit uncompressed RAW, long-exposure and high-ISO noise reduction off on every frame:
+#   E1_E2/<exposure>  lens-cap dark frames, one burst per exposure of the paper's sets and 1/8000 s. E1 (the channel black, the read noise) is
+#                     the 1/8000 s burst of 50 frames; E2 (each exposure's Dark — the record's Darks, one per band —, the defects at
+#                     every exposure, the photon transfer's intercepts) every burst
+#   E4/<exposure>     the photon transfer curve: the Expodisc diffuser on the lens in diffuse light, 5–7 frames at each of the 21
+#                     exposures (111 frames)
+# The record it writes is the one the configs of record read (input fx3_sensor_characterisation of radiometric_refinement*.toml and
+# the green chrome evaluations; the run's summary.toml says whether it equals it). E5 (PRNU) is out of the record (Phase 1).
+#
+#   julia --project=experiments experiments/scripts/sensor_characterisation.jl [--plan] [--stage=evaluate]
+#
+# THE BODY: EXIF states no body serial (Sony's InternalSerialNumber is in the makernotes only, which Features does not read): the
+# record names the body by make and model, as every FX3 photograph's EXIF does. No sensor temperature is recorded.
+# The inputs are of VisualGeometryToolkitEval's tier "unpublished" (dgx01: /raid/data/jpr/containers, the campaign's tier
+# rc_sensor_characterisation_20261113 linked there from the paper-data mirror; configs/data_artifacts.toml's SENSOR MODELS block): the
+# frames' tree is pinned by its MANIFEST.tsv (sha256 per file), the record of record by its sha256.
+
+[experiment]
+name = "sensor_characterisation"
+
+[characterise]
+dark = "1_8000"                 # E1: the protocol's black-level and read-noise burst (50 frames at the shortest exposure, 1/8000 s: no dark
+                                # current), its folder of the E1_E2 tree; its exposure as its frames' EXIF state it
+false_defects = 0.01            # Core master_dark's expected false defects over the whole sensor (its default, the record of record's): a
+                                # Gaussian photosite is flagged at z = Φ⁻¹(1 − 0.01/(2N)), N = 12.2 M photosites (z ≈ 6.0)
+tier = "rc_sensor_characterisation_20261113"   # the campaign's tier name as its MANIFEST.tsv rows state it (paths <tier>/<set>/…: the
+                                # record's provenance names each set it read by the SHA-256 of those rows; the tier of 2026-11-13)
+
+[inputs.dark_frames]
+tier = "unpublished"
+path = "rc_sensor_characterisation_20261113/E1_E2"
+stage = "evaluate"
+provenance = "the campaign's lens-cap dark frames (458 ARW: 21 exposures 1/8000 s … 3.2 s, 20–50 frames each; Sony ILME-FX3, Tamron 20 mm capped, f/10, ISO 100), captured on 2026-11-13 11:41–13:39 (David Nakath; the share's folder blacklevel_sensor_noise/E1_E2), every file in MANIFEST.tsv (input manifest)"
+
+[inputs.ptc_frames]
+tier = "unpublished"
+path = "rc_sensor_characterisation_20261113/E4"
+stage = "evaluate"
+provenance = "the campaign's photon transfer series (111 ARW: 5–7 frames of the Expodisc-diffused light at each of the 21 exposures), captured on 2026-11-13 14:54–15:08 (the share's folder blacklevel_sensor_noise/E4), every file in MANIFEST.tsv (input manifest)"
+
+[inputs.manifest]
+tier = "unpublished"
+path = "rc_sensor_characterisation_20261113/MANIFEST.tsv"
+sha256 = "27c8e821ff723ffeb36ddd53be789e70721339fdc3034676b4381ec8af8703af"   # sha256sum of the campaign's manifest (dgx01, 2026-11-14)
+stage = "evaluate"
+provenance = "the campaign's manifest: bytes, sha256 and md5 per file, paths relative to the paper-data root (rsync from the share on 2026-11-13, every file verified against the share read through the desktop's mount); the record's provenance names each set it read by the SHA-256 of its rows"
+
+[inputs.record_of_record]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # the configs of record's input fx3_sensor_characterisation
+stage = "evaluate"
+provenance = "the FX3's characterisation of record (the refinements' input fx3_sensor_characterisation, made on dgx01 2026-11-14 by the scratch recipe this driver codifies): the run compares the record it writes against it"

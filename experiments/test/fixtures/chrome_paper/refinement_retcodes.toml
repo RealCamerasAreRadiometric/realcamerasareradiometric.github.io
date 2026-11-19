@@ -1,0 +1,50 @@
+# The radiometric refinements' LM ReturnCode per chrome set and refined model (the fixture of chrome_refinement_retcode)
+
+[fisheye_si27]
+si27fe_bc5_refined = "Success"
+si27fe_ds_refined = "Success"
+si27fe_kb_refined = "Success"
+si27fe_ocv14_refined = "Success"
+si27fe_spline_refined = "Success"
+
+[fisheye_tenth]
+ag10fe_bc5_refined = "Success"
+ag10fe_ds_refined = "Success"
+ag10fe_kb_refined = "Success"
+ag10fe_ocv14_refined = "Success"
+ag10fe_spline_refined = "Success"
+
+[fourteen]
+ag30_bc5_refined = "Success"
+ag30_ds_refined = "Success"
+ag30_kb_refined = "MaxTime"
+ag30_ocv14_refined = "Success"
+ag30_spline_refined = "Success"
+si30_bc5_refined = "Success"
+si30_ds_refined = "Success"
+si30_kb_refined = "Success"
+si30_ocv14_refined = "Success"
+si30_spline_pinhole_refined = "Success"
+si30_spline_refined = "Success"
+
+[tamron_ag08]
+ag08ta_bc5_refined = "Success"
+ag08ta_ds_refined = "Success"
+ag08ta_kb_refined = "Success"
+ag08ta_ocv14_refined = "Success"
+ag08ta_spline_refined = "Success"
+
+[tamron_la]
+sitla_spline_pinhole_refined = "Success"
+sitla_spline_refined = "Success"
+
+[tamron_si17]
+si17ta_bc5_refined = "Success"
+si17ta_ds_refined = "Success"
+si17ta_kb_refined = "Success"
+si17ta_ocv14_refined = "Success"
+si17ta_spline_refined = "Success"
+
+[zoom48]
+sizl_spline_pinhole_refined = "unfinished"
+sizl_spline_refined = "Success"

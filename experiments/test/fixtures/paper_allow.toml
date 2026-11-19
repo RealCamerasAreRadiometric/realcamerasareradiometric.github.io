@@ -1,0 +1,59 @@
+# The paper-project findings in the MANUSCRIPT's own files (T. Harder's text and his generators'
+# figure files), deferred with their reasons: the manuscript is the co-author's and is not rewritten for the checks (REPRODUCE.md).
+# Read by test/paper_project_tests.jl (as VisualGeometryToolkitEval DataPolicyAllow entries: rule = the reproduce violation's kind,
+# file, a match of its message) and test/reproduce_tests.jl. An entry that matches nothing fails the suite as stale.
+
+# \input{\rcfigdir/<panel>}: the external generators' figures (rms_figure.py, pgf/*.py, tools/*.py) read their panels through the
+# folder macro \rcfigdir (default fig) so that a host can move them; the panels are named in the asset index's provenance.
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/teaser.tex"
+match = "\\rcfigdir/teaser/"
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/detector-bias-mitsuba.tex"
+match = "\\rcfigdir/detector-bias-mitsuba/"
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/convergence-rms.tex"
+match = "\\rcfigdir/convergence-rms/"
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/vignetting.tex"
+match = "\\rcfigdir/vignetting/"
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/focus-surfaces.tex"
+match = "\\rcfigdir/focus-surfaces/"
+[[allow]]
+rule = "unresolved_reference"
+file = "../paper/fig/texture-learned.tex"
+match = "\\rcfigdir/texture-learned/"
+
+# A literal that equals a value numbers.tex defines without being that number: TikZ coordinates and scales (fig_model.tex), a weight
+# (calibration_pipeline.tex), a figure's layout (focus-surfaces.tex), the data set's counts (X_suppl.tex) and the supplement tables'
+# own numbers (typed by refinement_table.py; a table carries its numbers, never macros).
+[[allow]]
+rule = "macro_literal"
+file = "../paper/latex/fig_model.tex"
+match = "re-types the generated macro"
+[[allow]]
+rule = "macro_literal"
+file = "../paper/sec/calibration_pipeline.tex"
+match = "re-types the generated macro"
+[[allow]]
+rule = "macro_literal"
+file = "../paper/fig/focus-surfaces.tex"
+match = "re-types the generated macro"
+[[allow]]
+rule = "macro_literal"
+file = "../paper/sec/X_suppl.tex"
+match = "re-types the generated macro"
+[[allow]]
+rule = "macro_literal"
+file = "../paper/fig/refinement-table-supp-a.tex"
+match = "re-types the generated macro"
+[[allow]]
+rule = "macro_literal"
+file = "../paper/fig/refinement-table-supp-b.tex"
+match = "re-types the generated macro"

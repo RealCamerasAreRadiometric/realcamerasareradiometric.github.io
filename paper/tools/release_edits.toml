@@ -1,0 +1,25 @@
+# The release edits of the Overleaf text: anchored, exact replacements that sync_overleaf.sh applies after the flattening (paths
+# are already fig/, latex/, sec/). Each `old` must occur exactly once (twice is an error); an `old` that no longer occurs is
+# reported as "not applicable" (the upstream text changed: drop the edit, or redo it on the new text).
+#
+# Release mechanics only: no edit decides the authors' text. The tool FAILS on any \todo / \TODO left in the text — an open note
+# of the authors is resolved on Overleaf, never here (owner, 2026-11-19).
+
+# Comments of the public tree (no reference to a submission; no file the release does not ship)
+
+[[edit]]
+id = "comment-runtime-placement"
+file = "sec/X_suppl.tex"
+why = "comment: the placement of the runtime section, without the reference to a submitted version"
+old = '''% The runtime is the LAST section and its table carries the number A6 although it comes before Tabs. A4 and A5 in the
+% source, so that the section and table numbers the submitted paper refers to (Secs. A.1 to A.13, Tabs. A1 to A5) do
+% not change. The table counter is set back after it.'''
+new = '''% The runtime as its own section: its table carries the number A6 although it comes before Tabs. A4 and A5 in the source,
+% so that the numbers of Secs. A.1 to A.13 and Tabs. A1 to A5 do not change. The table counter is set back after it.'''
+
+[[edit]]
+id = "comment-fig-model-single"
+file = "latex/fig_model.tex"
+why = "comment: fig_model_single.tex is not read by the build (pruned)"
+old = '''F. The one-panel version is fig_model_single.tex.'''
+new = '''F.'''

@@ -1,0 +1,35 @@
+{
+    "schema": "vgio/cameras/v4",
+    "pixel_frame": "colmap",
+    "cameras": [
+        {
+            "name": "cam",
+            "width": 5208,
+            "height": 3476,
+            "K": {
+                "fx": 932.4473684210526,
+                "fy": 932.4473684210526,
+                "cx": 2604.0,
+                "cy": 1738.0,
+                "skew": 0.0
+            },
+            "lens": {
+                "equidistant": [],
+                "radial": [
+                    [
+                        -0.041666666666666664,
+                        0.0005208333333333333,
+                        -3.1001984126984127e-6,
+                        1.076457782186949e-8
+                    ],
+                    []
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "model": "kannala_brandt (equisolid fisheye: 2 sin(θ/2) as the θ_d polynomial)",
+        "source": "synthetic: the Sony FX3 + Sigma 8 mm f/4 EX DG circular fisheye (image circle 2154 px = 180° at 762 px/rad on the 4256-px FX3 frame) scaled to the 5208 × 3476 sensor of the experiment; equisolid r = 2 f sin(θ/2) written as the Kannala–Brandt series to θ⁹ (0.01 px at 90°)",
+        "migrated_from": "RadiometricCamera lens JSON (lens_type kannala_brandt, theta in chart units)"
+    }
+}

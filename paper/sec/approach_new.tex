@@ -1,0 +1,89 @@
+
+% \section{Radiometric Camera Model}
+% \label{sec:radiometric-camera-model}
+% Let $\mathcal{B}\subseteq\mathbb{R}^2$ be the surface of a calibration target.
+% To bridge between common pinhole-based models and a radiometric back-projection, we back-project a sensor position onto a circle of confusion instead of a single scene point or a single direction. However, many geometric camera models define a forward projection instead of a back-projection function. To transform a forward projection into a back-projection, we numerically invert the function locally per sample.
+
+% \subsection{Radiometric Back-projection}
+% In the thin lens model, all rays from a sensor position $\vbp\in\mathcal{I}$ through the aperture $\mathcal{A}$ intersect in a single point on the plane of focus \cite{pharr2023physically}. For a more complex lens system (under the absence of some lens effects), the focus surface is a more general geometry $\mathfrak{F}\subseteq\mathbb{R}^3$ \cite{Hecht+2023}. By learning the focus surface, we can equip every common model with real-lens defocus properties as follows:
+% let $\vbp\in\mathcal{I}$ be a sensor position, $\mathfrak{p}\in\mathbb{R}^3$ the center of projection and $r\in\mathbb{R}_{>0}$ the radius of the aperture centered in $\mathfrak{p}$ parallel to the sensor plane.
+% Let furthermore
+% \begin{align*}
+%     \vbpi^{-1}: \mathcal{I}\rightarrow \mathbb{R}^3 | \mathcal{P}(\mathbb{R}^3) | \mathbb{R}^2
+% \end{align*}
+% be a central back-projection model (or the sample-wise inversion of a forward projection model), mapping a sensor position $\vbp$ to a distorted ray direction ($\mathbb{R}^3$).
+% For simplicity, we identify the ray direction ($\mathbb{R}^3$) with the corresponding straight line ($\mathcal{P}(\mathbb{R}^3)$) and also with the scene intersection point ($\mathbb{R}^3$ or $\mathbb{R}^2$ in surface coordinates), all denoted by the same symbol $\vbpi^{-1}$. The meaning will be clear from the context. Let
+% \begin{align*}
+%     \mathfrak{f}: \mathcal{I} \rightarrow \mathbb{R}^3,
+%     \quad\{\mathfrak{f}(\vbp)\} \coloneqq \vbpi^{-1}(\vbp) \cap \mathfrak{F}
+% \end{align*}
+% define the 3D intersection position of the distorted ray from $\vbp\in\mathcal{I}$ through $\mathfrak{p}$ with the focus surface $\mathfrak{F}$.
+% The distorted direction of a ray starting in $\vbp$ through an arbitrary aperture position $\vba\in\mathcal{A}$ becomes the direction from $\vba$ towards $\mathfrak{f}(\vbp)$.
+% This gives us the ability to extend the back-projection function $\vbpi^{-1}$ over the aperture area by
+% \begin{align*}
+%     \hat{\vbpi}^{-1}: \mathcal{I} \times \mathcal{A} \rightarrow \mathbb{R}^3 | \mathcal{P}(\mathbb{R}^3) | \mathbb{R}^2,
+%      \quad(\vbp, \vba) \mapsto
+%     \frac{\mathfrak{f}(\vbp) - \vba}{\lVert \mathfrak{f}(\vbp) - \vba \rVert},
+% \end{align*}
+% where we again identify with $\hat{\vbpi}^{-1}$ the ray direction, corresponding line, and the scene surface intersection.
+% By construction, we have $\hat{\vbpi}^{-1}(\vbp,\mathfrak{p}) = \vbpi^{-1}(\vbp)$.
+% $\hat{\vbpi}^{-1}$ is our proposed radiometric extension of a classical central (back-)projection model. The distortion is applied exactly as proposed in the chosen central (back-)projection model $\vbpi^{-1}$, \eg the Kannala-Brandt model \cite{TODO} or Brown-Conrady model \cite{TODO}. While the standard model $\vbpi^{-1}(\cdot)$ back-projects to a single ray, the extension $\hat{\vbpi}^{-1}(\cdot,\mathcal{A})$ back-projects to a circle of confusion.
+
+% To avoid intersection computations, we do not represent the focus (Petzval) surface explicitly. Instead, we are using a function
+% \begin{align*}
+%     t: \mathcal{I} \rightarrow \mathbb{R}, \quad \vbp \mapsto \lVert \mathfrak{f}(\vbp) - \mathfrak{p} \rVert,
+% \end{align*}
+% which provides the distance from $\mathfrak{p}$ to the intersection point $\mathfrak{f}(\vbp)$ along the distorted direction so that for $\hat{\vbd}(\vbp)\coloneqq\frac{\vbpi^{-1}(\vbp)}{\lVert \vbpi^{-1}(\vbp) \rVert}$, we get
+% \begin{align*}
+%     \mathfrak{f}(\vbp) = \mathfrak{p} + t(\vbp)\hat{\vbd}(\vbp).
+% \end{align*}
+% Modeling the depth $t$ directly will lead to problems during the optimization since (WLOG $\mathfrak{p} = 0$)
+% \begin{align*}
+%     \lim_{t \to \infty}\frac{\partial}{\partial t} \frac{t(\vbp)\hat{\vbd}(\vbp) - \vba}{\lVert t(\vbp)\hat{\vbd}(\vbp) - \vba \rVert}=0,
+% \end{align*}
+% \ie the gradient is almost zero when the focus surface is far away.
+% To improve the optimization process for far-distance focus, we compute instead the inverse depth \cite{unified-inverse-depth, direct-sparse-odometry}
+% \begin{align*}
+%     \hat{t}: \mathcal{I} \rightarrow \mathbb{R}, \quad \vbp \mapsto \frac{1}{t(\vbp)}.
+% \end{align*}
+% For numeric stability, we further rewrite
+% \begin{align*}
+%     \hat{\vbpi}^{-1}(\vbp,\vba)
+%     = \frac{\mathfrak{p} + \frac{1}{\hat{t}(\vbp)}\hat{\vbd}(\vbp)-\vba}{\lVert \mathfrak{p} + \frac{1}{\hat{t}(\vbp)}\hat{\vbd}(\vbp) -\vba \rVert}
+%     = \frac{\hat{t}(\vbp)(\mathfrak{p}-\vba) + \hat{\vbd}(\vbp)}{\lVert\hat{t}(\vbp)(\mathfrak{p}-\vba) + \hat{\vbd}(\vbp)\rVert}.
+% \end{align*}
+% We model $\hat{t}$ by a thin plate spline \cite{thin-plate-spline} for smoother physical constraints:
+% let $\{\vbp_i \in \mathcal{I}\}_{i\in\{1,\dots,N\}}$, $N\in\mathbb{N}$ be the nodes of an equally spaced $5\times5$ grid over the sensor with corresponding inverse focus distance values $\{\hat{t}_i\}_{i\in\{1,\dots,N\}}$. These values are the parameters of the focus surface which will be optimized during the calibration.
+% The grid is laid over the bounding box of the illuminated region, and only the nodes inside that region that the initial model images are used.
+% Since the vignetting is included in a separate model, as described in the next sections, the irradiance in a sensor position is normalized by the corresponding aperture area, \ie $\Phi_c(\vbu)=\int_{\mathcal{I}_{\vbu}}\frac{E_c(\vbp)}{\pi r^2}\odif{\vbp}$.
+
+
+
+
+
+% \subsection{Vignetting}
+% \label{sec:vignetting}
+% We assume a radial-symmetric vignetting \wrt the \textbf{TODO sensor center $\mathfrak{i}\in\mathcal{I}$ $\rightarrow$ principle point in reality, so extend spline border handling!} and use the disentangled formulation of the radiant flux over the aperture area from \cref{eq:rad-flux-disent} to have more freedom in modeling the vignetting by a B-spline
+% \begin{align*}
+%     V: \mathcal{I} \rightarrow \mathbb{R}, \quad \vbp \mapsto \sum_{i=0}^n N_{i,p}\Bigl(\frac{\lVert \vbp-\mathfrak{i} \rVert}{r_{\text{max}}}\Bigr)P_{i},
+% \end{align*}
+% defined over a clamped uniform knot vector in $[0,1]$ of size $n+p+2$, where $p\coloneqq 3$ is the degree of the piecewise polynomials and $N_{i,p}$ are the corresponding basis functions \cite{piegl1997nurbs}.
+% $\vbTheta_v = \{P_{i}\}_{i\in\{0,\dots,n\}}\subseteq\mathbb{R}$ are the control points of the B-spline to be optimized, where we choose $n\coloneqq 15$ \cite{piegl1997nurbs}.
+% $r_{\text{max}}$ is the largest distance from the sensor centre to an illuminated pixel.
+% The radiant flux becomes
+% \begin{align}
+%     &\Phi_c(\vbu)
+%     \approx \int_{\mathcal{I}_{\vbu}}\frac{V(\vbp)}{\pi r^2}
+%     \int_{\mathcal{A}}L_c(\hat{\vbpi}^{-1}(\vbp,\vba),\hat{\vbpi}^{-1}(\vbp,\vba)-\vba)\nonumber\\
+%     &\qquad\qquad\qquad\qquad\qquad\quad\cdot\cancel{\frac{\cos^4\alpha(\vba-\vbp)}{s'^2}}\odif{\vba}\odif{\vbp}
+%     \label{eq:rad-flux-with-vignetting}.
+% \end{align}
+% \begin{align*}
+%     \text{We define } \hat{E}_c(\vbp,\vba)\coloneqq L_c(\hat{\vbpi}^{-1}(\vbp,\vba),\hat{\vbpi}^{-1}(\vbp,\vba)-\vba).
+% \end{align*}
+
+
+
+
+
+

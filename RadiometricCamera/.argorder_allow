@@ -1,0 +1,2 @@
+all_parts MUTATES-NO-BANG  # its "mutation" is the state's lazily built device cache (`_ensure_device!`: a transparent memo of the scene and pixels on the backend, as every rendering read of the state forms it — cost, render_all); no value of the state changes
+draws TYPE-AFTER-INPUT  # the sampler is the RNG (a counter-based stream: the key and index pick a draw), so it takes the RNG's slot before the type, as Random's `rand(rng, T, dims)`

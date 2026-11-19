@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# Precision conversion of the pipeline containers (Float64 host state → Float32
+# device kernels and back): VisualGeometryToolkitCore's `convert_eltype(T, x)` on the package's types — element types only,
+# no re-solves, no re-sampling; the TPS coefficients, knots etc. are converted
+# verbatim. The lens methods live next to their lens types.
+# ---------------------------------------------------------------------------
+
+VgtkCore.convert_eltype(::Type{T}, f::Focus{S, N}) where {T, S, N} =
+    Focus{T, N}(SVector{N}(SVector{2, T}.(f.nodes)), SVector{N, T}(f.t̂_i), SVector{N, T}(f.w), SVector{3, T}(f.a), f.kind)
+VgtkCore.convert_eltype(::Type{T}, v::View) where {T} =
+    View(_pose_eltype(T, v.pose), VgtkCore.convert_eltype(T, v.lens), VgtkCore.convert_eltype(T, v.focus), T(v.r))
+
+VgtkCore.convert_eltype(::Type{T}, q::SensorQuadrature{S, NS}) where {T, S, NS} =
+    SensorQuadrature{T, NS}(SVector{NS}(SVector{2, T}.(q.offsets)), SVector{NS, T}(q.weights))
+VgtkCore.convert_eltype(::Type{T}, q::ApertureQuadrature{S, NA, NB}) where {T, S, NA, NB} =
+    ApertureQuadrature{T, NA, NB}(SVector{NA}(SVector{2, T}.(q.â)), SVector{NA, T}(q.w̃), SVector{NB, T}(q.φ_border), SVector{NB, T}(q.w_border))
+VgtkCore.convert_eltype(::Type{T}, st::RenderSettings) where {T} =
+    RenderSettings(VgtkCore.convert_eltype(T, st.sensor), VgtkCore.convert_eltype(T, st.aperture), st.sampler)
+
+function VgtkCore.convert_eltype(::Type{T}, b::PrintedTarget) where {T}
+    sd = b.sdf === nothing ? nothing : T.(b.sdf)
+    return PrintedTarget(b.target, VgtkCore.Quad{T}(b.quad), SVector{2, T}(b.size), T(b.facing), T.(b.texture), sd, SVector{2, T}(b.page_mm),
+                         VgtkCore.convert_eltype(T, b.warping))
+end
+VgtkCore.convert_eltype(::Type{T}, s::Scene) where {T} = Scene(VgtkCore.convert_eltype(T, s.board), s.W, s.H, VgtkCore.convert_eltype(T, s.surface))

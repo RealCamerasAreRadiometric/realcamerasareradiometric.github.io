@@ -1,0 +1,77 @@
+# RATIONALE
+#   question:   which board parameterisation is right for each camera model family (Brown–Conrady, OpenCV-14, Kannala–Brandt, Double
+#               Sphere; the central spline as the control), judged ONLY by the held-out Thorlabs (chrome) error
+#   hypothesis: the global (parametric) models lack degrees of freedom, so during the radiometric refinement the board's warping
+#               parameters absorb lens error: the photometric fit improves while the geometry worsens
+#   decides:    the [warping] settings of record (degree, inplane) per model family for RC 0.11.5's run of record
+#   decided:    heights only for the global models (inplane = "none"), the heights and the in-plane aspect/skew kept for the central spline
+#               (owner 2026-11-16: "heights only for the global models", one board mode so the run of record moves quickly;
+#               radiometric_refinement.toml); the ablation itself never ran (cut from the run of record the same day)
+#   evidence:   Tamron si17ta (Siemens at 17 cm), held-out Thorlabs median: KB start 0.184 px → refined 0.262, DS 0.227 → 0.308, rel-RMS
+#               improved ~7 %, the fitted TPS heights reach ±1.9 mm, in-plane aspect 0.06 % (rc-results-ba-0114 chrome_evaluation
+#               evaluate 6f5def62558d3328 summary.tsv)
+#   owner:      J. Pritts
+#   date:       2026-11-16
+#   discussion: rc0114_before_after.md (the before/after write-up of the evidence; a session scratchpad of 2026-11-16, not in the repository)
+#
+# Config of record of the board warping ablation (scripts/warping_ablation.jl; src/warping_ablation.jl). An experiment is the config of
+# record plus keyword OVERRIDES, never a copied case (src/drivers.jl `override_variant`, the rule of `expand_overrides`): every case
+# below is a case of [upstream] radiometric_refinement as it is there, refined once per [modes.<name>] with that mode's [pipeline]
+# keys set (`set`) and the keys it makes unusable deleted (`unset`: INAPPLICABLE_KEYS' rule — a value the run cannot use is never
+# stated); a mode that sets and unsets nothing IS the case (its run of record, by its key).
+#
+# The cases are ENUMERATED, never listed here: every chrome set of [upstream] chrome_evaluation_paper (an excluded set's config left
+# out: configs/excluded.toml) and in it every capture set (a refinement case's `images`) that holds a global-model case (a [evaluate]
+# model of kind "lens" naming a case) — its every global-model case and its central-spline case (kind "grid": the control), each
+# paired with the start the chrome set scores beside it (the model labelled <prefix>_<model>_start). A Schöps-started spline case
+# whose start subdivides his lattice (a `grid.node_count`: m > 1, the slow lattice) is refused.
+#
+# The scoring is each chrome set's own protocol of record (its [evaluate] table: the rotation-centre motion fit with the camera held,
+# holdout on, its bootstrap), through the chrome evaluation's scorer (src/chrome_evaluation.jl `score_chrome_models`): one scoring per
+# chrome set of every start and every mode's refinement, the head-to-head on the dots every one of them scores, each model's coverage
+# and its all-dots score beside it; the paired photograph bootstrap of every mode against [ablation] reference and of every mode
+# against its start.
+#
+#   julia --project=experiments experiments/scripts/warping_ablation.jl [--plan] [--stage=upstream,refine,evaluate,record,figure] [--mode=a,b] [--case=a,b] [--chrome=a,b]
+
+[experiment]
+name = "warping_ablation"
+
+[inputs]
+# none of its own: the photographs, starts, detections and target are the upstream configs' inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"    # the cases, as they are there (the runs of record)
+chrome_evaluation_paper = "configs/experiments/chrome_evaluation_paper.toml"  # the chrome sets of the paper, which enumerate the cases
+
+# A: no out-of-plane heights and no in-plane print error — the board as designed.
+[modes.rigid]
+label = "rigid board"
+set = { "warping.degree" = 0, "warping.inplane" = "none" }   # degree 0: no free TPS heights (configs/default.toml's); "none": no Aspect ∘ Skew
+unset = ["warping.inplane_start"]                            # the in-plane start acts only with inplane = "aspect_skew": deleted
+
+# B: the out-of-plane TPS heights as the config of record (its degree), no in-plane print error.
+[modes.heights]
+label = "heights only"
+set = { "warping.inplane" = "none" }
+unset = ["warping.inplane_start"]                            # as in rigid
+
+# C: the heights and the in-plane print error (inplane = "aspect_skew"): the config of record itself (owner ruling 2026-11-13).
+[modes.both]
+label = "heights + in-plane (of record)"
+set = {}
+unset = []
+
+[ablation]
+reference = "both"             # the A − C and B − C differences: each mode against the config of record
+variant = "motion_heldout"     # the headline: the parity-interleaved hold-out (the paper's chrome tables' variant)
+in_sample_variant = "motion"   # beside it: the in-sample fit
+stats = ["median_px", "mean_px", "p95_px", "rms_px"]   # the paper's four statistics (the chrome tables')
+
+# The figure and the table (src/warping_ablation.jl write_warping_figure; styles: src/figure_style.jl rows `warping start`,
+# `warping rigid`, `warping heights`, `warping both`): the held-out median of the start and of every mode per capture set and model.
+[figure]
+asset_dir = "warping_ablation"   # plotsdir("warping_ablation/"): warping_ablation.tex, table_warping_ablation.tex, figure_styles.tex, preview.tex (+ .pdf)
+ylabel = "Thorlabs held-out median (px)"
+label = "tab:warping-ablation"
+caption = "Board warping ablation: the held-out Thorlabs chrome-board median [px] of each model's geometric start and of its radiometric refinement with a rigid board (A), with the out-of-plane heights only (B) and with the heights and the in-plane print error (C, the configuration of record), and the paired photograph-bootstrap 95\\,\\% intervals of A $-$ C and B $-$ C (* where an interval excludes 0)."

@@ -1,0 +1,37 @@
+# RATIONALE
+#   question:   do the timing's stages (start, time, record) run end to end before the replicates of record are submitted?
+#   hypothesis: none: a smoke run, never a result (the experiment's rationale: configs/supplement/timing.toml)
+#   decides:    whether the replicates of record may be submitted
+#   evidence:   the smoke run's logs
+#   owner:      J. Pritts (2026-11-18: "a smoke run of 1 case × 2 repeats to validate the stage")
+#   date:       2026-11-18
+#
+# The smoke run of the timing experiment (configs/supplement/timing.toml): the same stages on two replicates of the case with the LM
+# capped at 2 iterations (a refine-only key: the case's own start is read by its key), so the start, the time and the record stages
+# are exercised in minutes before the run of record's replicates are submitted. Not a result: its products are keyed apart.
+#
+#   julia --project=experiments experiments/scripts/timing.jl --config=experiments/configs/supplement/timing_smoke.toml [--plan] [--stage=…]
+
+[experiment]
+name = "timing"
+
+[inputs]
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
+
+[timing]
+case = "si30_spline_warped"   # timing.toml's case (owner 2026-11-18)
+replicates = 2                # the fewest a standard deviation needs (the smoke's two GPUs)
+warmup = 1                    # timing.toml's
+
+[overrides]
+"lm.max_iter" = 2             # smoke only: two LM iterations per solve (refine-only: the start is the case's own)
+
+[record]
+macro_prefix = "timing"       # the number macros \timing<Name> (Eval's number_macro_name)
+seconds_digits = 1            # wall seconds printed at 0.1 s (the replicates spread by seconds over ≈ 13 min)
+label = "Sigma 14\\,mm, Siemens stars, central spline"   # the runtime table's data-set row, as the paper's tables name the set (refinement-table-supp-a.tex)
+runtime_table_asset = "timing_smoke/runtime-table.tex"        # plotsdir(): the supplement's runtime table (the paper's table style; deployed as ../paper/fig/runtime-table.tex)
+table_asset = "timing_smoke/table_timing.tex"                 # plotsdir(): the per-run table (each replicate's times)
+statement_asset = "timing_smoke/timing_statement.tex"         # plotsdir(): the supplement's one-sentence statement, its numbers the macros

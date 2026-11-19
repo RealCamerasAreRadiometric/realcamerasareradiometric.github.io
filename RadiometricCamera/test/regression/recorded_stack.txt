@@ -1,0 +1,24 @@
+# The stack the package golden values (golden_migration_snd_try.json) were recorded on, 2026-10-25.
+julia 1.12.6
+VisualGeometryCore 0.6.0 = git@github.com:prittjam/VisualGeometryCore.jl.git @ 5062584efda4ca0ff761f47cd5f6604e310fddfc (local path dependency, checkout clean: yes)
+# package environment (Pkg.status):
+  Project RadiometricCamera v0.2.0
+  Status `<dev-checkout>/paper/radiometric-camera-snd/Project.toml`
+  ⌃ [79e6a3ab] Adapt v4.7.0
+  ⌅ [052768ef] CUDA v5.11.3
+  ⌃ [f6369f11] ForwardDiff v1.4.5
+    [a09fc81d] ImageCore v0.10.5
+    [0f8b85d8] JSON3 v1.14.3
+  ⌅ [63c18a36] KernelAbstractions v0.9.42
+  ⌅ [7ed4a6bd] LinearSolve v5.12.0
+    [50b5cf9e] NLLSsolver v4.1.0
+    [f57f5aa1] PNGFiles v0.4.5
+    [aedffcd0] Static v1.4.6
+  ⌃ [90137ffa] StaticArrays v1.9.19
+  ⌃ [10745b16] Statistics v1.11.4
+    [297d53b8] VisualGeometryCore v0.6.0 `<dev-checkout>/VisualGeometryCore.jl`
+    [37e2e46d] LinearAlgebra v1.12.0
+    [de0858da] Printf v1.11.0
+    [9a3f8284] Random v1.11.0
+    [9e88b42a] Serialization v1.11.0
+  Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated`

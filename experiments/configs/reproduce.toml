@@ -1,0 +1,464 @@
+# The stage graph of record of the paper: every result and figure from the published inputs, in one command
+# (VisualGeometryToolkitEval Reproduce, the runner: its docs, "One command: the runner"). This file is data only: which launcher
+# runs which driver on which config of record, after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's,
+# a machine profile shipped with VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml; _template.toml to add one);
+# where this project's data and results are on each machine is [sites.<name>] below.
+#
+#   bash experiments/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#   bash experiments/scripts/reproduce/reproduce_results_desktop.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#
+# Without --only: every stage below that is not `default = false` — the paper's experiments, the regeneration and the results
+# branch. --only=<stage>,… runs those and what they run after (a finished stage is reused by its run key: the runner's manifests
+# under <results root>/_reproduce); --no-deps those alone. Each stage's launcher (scripts/slurm/*.sbatch, common.sh; the per-case
+# experiments' one case_task.sbatch, its EXPERIMENT and STAGES the stage's env) and its driver
+# (julia --project=experiments experiments/scripts/<driver>.jl --config=<config>) stay callable on their own. The case selections the
+# launchers read (CASES, CHROME_CASES, VIG_CASES, TEXTURE_SETS, SETS) select here too.
+# Paths are relative to the repository root, where the jobs are submitted from.
+
+[project]
+name = "experiments"
+workdir = "../.."
+julia_project = "experiments"
+# the code every stage runs: a change here re-keys every stage (the drivers then reuse their own complete runs by their keys);
+# a change elsewhere (the paper's text, the docs) reuses the finished stages
+code = ["RadiometricCamera/Project.toml", "RadiometricCamera/src", "RadiometricCamera/bin", "experiments/Project.toml", "experiments/src", "experiments/scripts"]
+
+[sites.dgx01]
+# the paper data root of record on dgx01 (REPRODUCE.md); the results base of the runner's launches beside it, never
+# experiments/data/exp_pro (the runs of record)
+data_root = "/raid/data/jpr/rc-vgtk-root"
+results_root = "/raid/data/jpr/rc-results-0.9"
+# data of record no artifact publishes (VisualGeometryToolkitEval's tier `unpublished`, each input pinned by its sha256): the
+# external calibrators' container images (configs/experiments/frontends.toml): the directory of the images (its README holds the digests),
+# never a parent of the results root (Eval refuses a write under an input tier's root)
+tiers = { unpublished = "/raid/data/jpr/containers" }
+
+[sites.desktop]
+# the owner's workstation: the data ladder's own binding (experiments/data/exp_raw: a link, or the artifact view that
+# scripts/fetch_data.jl builds) and a results base of this checkout's own (ignored by git)
+data_root = "experiments/data/exp_raw"
+results_root = "experiments/data/results"
+
+# Resources per stage (over the site profile's, VisualGeometryToolkitEval configs/sites/dgx01.toml: 2 CPUs for a stage that declares
+# none since Eval 0.8; its 0.7 profile's 28 reserved the node at a load of ≈ 6, dgx01 2026-11-13): CPUs by measured or stated need; memory per CPU
+# the node ratio, 8480M, always (owner rule; a stage that needs more memory gets more CPUs, its measured peak
+# stated); a GPU stage also gets the site's gres (1 GPU). A stage's CPUs are its drivers' thread count, which keys
+# their runs (src/drivers.jl execution_threads) and which the drivers that read another experiment's runs look them up by, so every
+# keyed stage of a launch runs at ONE count: 8 (a case's prepare run is read at the case's count; regenerate_paper reads them all).
+# The golden stage's 8 is its recording's; setup and results_branch key nothing. Each stage's time limit is ≈ 2× its measured runtime
+# (the rehearsal of 2026-11-13): equal-priority jobs backfill only when their --time fits the window, so an 8–13 h request for a 1 h
+# task held the node idle. A case array's limit no longer derives from pipeline.lm.max_time (36000 s: the LM's own cap, unchanged).
+# ---- the environment ------------------------------------------------------------------------------------------------------------
+[[stage]]
+name = "setup"
+what = "the experiments environment, inside the scheduler: Pkg.instantiate, precompile (experiments and the package, CUDA and the GPU extensions included), CPU only: GPU tasks never compile"
+time = "00:30:00"         # setup measured 3m19s (rehearsal 2026-11-13, 12 CPUs; 2.5 min of it the precompile): ≈ 2× with the registry update
+cpus_per_task = 12      # the prep: 12 CPUs (dgx01 2026-11-13: a 32-CPU precompile ran at ~5 cores; Pkg.precompile is bounded by the
+mem_per_cpu = "8480M"   # dependency chain); the one compile of a launch, every later task only loads
+sbatch = "experiments/scripts/slurm/setup.sbatch"
+
+# ---- the printed boards' edge distance maps: one keyed step per map, which every edge.sdf / distance_map reads through [runs] ----------
+[[stage]]
+name = "distance_maps"
+what = "the printed boards' edge distance maps (src/distance_maps.jl): the generator's sdf.f32 + sdf.json as IO raster records, once before the case arrays that read them"
+time = "00:30:00"         # not yet measured: two conversions of 245-256 MB float32 files into compressed TIFF payloads and the load: minutes, with margin
+cpus_per_task = 8       # CPU only (a conversion of two files, no device work): the launch's one thread count (8, above), though nothing here is thread-keyed
+mem_per_cpu = "8480M"   # 68 GB: far above the 8000 × 8000 float32 values (256 MB) a few times over
+after = ["setup"]
+sbatch = "experiments/scripts/slurm/distance_maps.sbatch"
+job_name = "rc-distance-maps"
+driver = "experiments/scripts/distance_maps.jl"
+config = "experiments/configs/experiments/distance_maps.toml"
+
+# ---- the capture sets' lens coverage: one keyed step per measured image region, which every consumer reads -------------------------
+[[stage]]
+name = "image_regions"
+what = "the capture sets' measured image regions (src/image_region.jl): detect_image_circle on each set's own frames, one GPU; every consumer reads the records"
+time = "00:30:00"         # not yet measured: 7 steps of 1–7 RAW frames each (a decode of the green cells and detect_image_circle on the device, seconds each) and the load: minutes, with margin
+cpus_per_task = 8       # GPU stage at the launch's one thread count (8, above): the RAW decodes on the host, the log-polar resampling on the device
+mem_per_cpu = "8480M"
+after = ["setup"]
+sbatch = "experiments/scripts/slurm/image_regions.sbatch"
+job_name = "rc-image-regions"
+driver = "experiments/scripts/image_regions.jl"
+config = "experiments/configs/experiments/image_regions.toml"
+gpu = true
+# the configs whose image regions it measures (configs/experiments/image_regions.toml [measure] configs)
+inputs_from = [
+    { config = "experiments/configs/experiments/image_regions.toml", key = "measure.configs", base = "experiments" },
+]
+
+# ---- §I calibration accuracy --------------------------------------------------------------------------------------------------------
+[[stage]]
+name = "radiometric_refinement_prepare"
+what = "the chrome sets' decode and detect, once before the array (CPU: the RAW decode, and detect, which only checks the inputs of record)"
+time = "00:30:00"         # prepare measured 8 s on a reused decode; a fresh decode of a set some minutes: the limit ≈ 2× a fresh one, with margin
+cpus_per_task = 8       # CPU only: the decode (Features' load_raw, LibRaw, threaded over photographs); detect checks inputs (no device work)
+mem_per_cpu = "8480M"   # keep LibRaw busy without reserving 28; 68 GB
+after = ["setup", "frontends_init"]   # its detect reads the front-end runs ([runs]: Schöps and the fits), which frontends_init produces
+sbatch = "experiments/scripts/slurm/prepare.sbatch"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement.toml"
+env = { EXPERIMENT = "radiometric_refinement" }
+job_name = "rc-prepare-radiometric_refinement"
+
+[[stage]]
+name = "radiometric_refinement"
+what = "the geometric-accuracy refinements (tab:refinement-chrome; tab:defocus), one GPU per case"
+time = "04:00:00"         # a case measured 50 min (ag10fe_bc5) to over 1 h 30 min (ag08ta, the 50-iteration LM cap) at 8 CPUs, 1 GPU (rehearsal 2026-11-13): ≈ 2× the longest
+cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM and the closed-form blocks run on the device; the host threads
+mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB (the rehearsal 2026-11-13: peak RSS 3.0-3.7 GB)
+after = ["radiometric_refinement_prepare", "image_regions", "distance_maps"]
+sbatch = "experiments/scripts/slurm/case_task.sbatch"
+env = { EXPERIMENT = "radiometric_refinement", STAGES = "start,refine" }
+job_name = "rc-refinement-chrome"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement.toml"
+gpu = true
+array = { from = "cases", select_env = "CHROME_CASES" }
+
+# ---- §III texture -----------------------------------------------------------------------------------------------------------------
+[[stage]]
+name = "texture_recovery"
+what = "the texture sheet's photographs, poses, page solve per fold of the split, scores, comparison and summary.md per set (fig:texture-learned); its camera is radiometric_refinement's texcal case"
+time = "03:00:00"         # per fold (5, [folds]) the decode and sample (minutes) and the page solve 138–156 s on a B200 (cvpr-eff 2026-11-13); the poses, evaluate, compare and report minutes: ≈ 2×, with margin
+cpus_per_task = 28      # 28 × 8480M = 237 GB: the run of record 2026-11-16 OOM-killed the poses phase at 8 CPUs (68 GB, job 21643); GPU stage: the page rows and solves are KernelAbstractions kernels on the device (cvpr-eff 2026-11-13: 138-156 s on
+mem_per_cpu = "8480M"   # a B200); 8 host threads for the RAW decode, 68 GB
+after = ["radiometric_refinement"]
+sbatch = "experiments/scripts/slurm/texture_recovery.sbatch"
+driver = "experiments/scripts/texture_recovery.jl"
+config = "experiments/configs/experiments/texture_recovery_{item}.toml"
+gpu = true
+array = { items = ["14mm_small"], select_env = "TEXTURE_SETS" }
+# no GPU held through CPU work (the GPU split, dgx01 2026-11-13): the decode, the sheet and the poses (BlobBoards' find_boards through
+# the held camera) on the CPU, the page solves (GPU_STAGES refine, folds) on one GPU, the scores and the report on the CPU again
+phases = [
+    { name = "poses", gpu = false, env = { TEXTURE_STAGES = "prepare,detect,sheet,init" }, time = "03:00:00" },   # 3 h: the run of record 2026-11-16 spent > 30 min in init alone (79 GB, 8 threads)   # the decode and the poses: minutes (the whole set 9.2 min, launch 20261115_032416)
+    { name = "solve", gpu = true, env = { TEXTURE_STAGES = "refine,folds" } },                                     # 5 folds × the page solve 138–156 s on a B200
+    { name = "scores", gpu = false, env = { TEXTURE_STAGES = "evaluate,fold_report,compare,report" }, time = "01:00:00" },
+]
+
+# ---- STUDY: the sampling strategy (configs/studies/; run only when named: default = false) ----------------------------------------
+[[stage]]
+name = "sampling_strategy_upstreams"
+what = "the sampling-strategy experiment's configs (the variants as overrides of the cases of record) and each case's prepare, front-end runs and image region, once before its arms"
+time = "01:00:00"         # the 14 mm's Schöps run 766 s (frontends_detect, 2026-11-13) and the decodes minutes; the fisheye 3 min (dgx01 2026-11-15): ≈ 2× the 14 mm's
+cpus_per_task = 8       # GPU stage: the Schöps tool and the image region on the device; 8 host threads (the experiment's one thread count)
+mem_per_cpu = "8480M"
+# after the products of record it shares (the decodes, the front ends' runs, the image regions): reused by their keys, never made twice
+after = ["setup", "distance_maps", "image_regions", "frontends_init", "radiometric_refinement_prepare", "radiometric_refinement_vignetting_prepare"]
+sbatch = "experiments/scripts/slurm/sampling_strategy.sbatch"
+env = { STAGES = "configs,prepare" }
+job_name = "samp-prepare"
+driver = "experiments/scripts/sampling_strategy.jl"
+config = "experiments/configs/studies/sampling_strategy.toml"
+gpu = true
+default = false
+
+[[stage]]
+name = "sampling_strategy"
+what = "the sampling-strategy arms (5 variants × the 14 mm and the fisheye f/4), ONE arm per GPU: the start, the lattice guard, the refinement"
+time = "04:00:00"         # one arm alone: the fisheye's 50 LM iterations at ≈ 88 s ≈ 73 min, the 14 mm's 25 ≈ 37 min (2026-11-15), the start 10 min: ≈ 2× the fisheye's
+cpus_per_task = 8       # GPU stage: one arm per GPU (a GPU-bound refinement gets one GPU: packed 3 per GPU ran ≈ 2–3× slower), 8 threads (the experiment's one count)
+mem_per_cpu = "8480M"
+# after the refinements of record: an arm whose options are its case's own IS that case's run (reused by its key), never made beside it
+after = ["sampling_strategy_upstreams", "radiometric_refinement", "radiometric_refinement_vignetting"]
+sbatch = "experiments/scripts/slurm/sampling_strategy.sbatch"
+env = { STAGES = "refine" }
+job_name = "samp-arms"
+driver = "experiments/scripts/sampling_strategy.jl"
+config = "experiments/configs/studies/sampling_strategy.toml"
+gpu = true
+array = { items = ["fisheye_f4:uniform", "fisheye_f4:old037", "fisheye_f4:ecdf_a1", "fisheye_f4:ecdf_a2", "fisheye_f4:addon",
+                   "texcal_14mm:uniform", "texcal_14mm:old037", "texcal_14mm:ecdf_a1", "texcal_14mm:ecdf_a2", "texcal_14mm:addon"], select_env = "ARM_PACKS" }   # one arm per task (sampling_strategy.sbatch: a pack of one)
+default = false
+
+[[stage]]
+name = "sampling_strategy_score"
+what = "the sampling-strategy scores: the chrome evaluation of record on the arms (and with the context), the texture experiment on each 14 mm arm and its compare, the record, the figure and the table"
+time = "04:00:00"         # the chrome detect and index once per set (minutes on a GPU), each evaluate minutes; the texture page solve per arm 138–156 s on a B200 (cvpr-eff 2026-11-13) and its poses: ≈ 2×
+cpus_per_task = 28      # the memory of the texture page's host assembly (8 CPUs × 8480M ran out at the first page, dgx01 2026-11-15; the texture launcher's
+                        #   28); the threads stay 8 (sampling_strategy.sbatch: the thread count keys the refinements this stage reads)
+mem_per_cpu = "8480M"
+after = ["sampling_strategy", "chrome_evaluation", "texture_recovery"]   # the chrome detect and index and the texture of record: reused by their keys
+sbatch = "experiments/scripts/slurm/sampling_strategy.sbatch"
+env = { STAGES = "evaluate,texture,compare,record,figure" }
+job_name = "samp-score"
+driver = "experiments/scripts/sampling_strategy.jl"
+config = "experiments/configs/studies/sampling_strategy.toml"
+gpu = true
+default = false
+# the texture runs' page solves on one GPU; the chrome scores (the detect and index made upstream), the compare, the record and the
+# figure on the CPU
+phases = [
+    { name = "texture", gpu = true, env = { STAGES = "texture" } },
+    { name = "score", gpu = false, cpus_per_task = 8, env = { STAGES = "evaluate,compare,record,figure" }, time = "03:00:00" },
+]
+
+# ---- §II vignetting -------------------------------------------------------------------------------------------------------------
+[[stage]]
+name = "radiometric_refinement_vignetting_prepare"
+what = "the f/4 sets' decode and detect, once before the array (CPU: the RAW decode, and detect, which only checks the inputs of record)"
+time = "00:30:00"         # as radiometric_refinement_prepare
+cpus_per_task = 8       # CPU only: the decode (Features' load_raw, LibRaw, threaded over photographs); detect checks inputs (no device work)
+mem_per_cpu = "8480M"   # keep LibRaw busy without reserving 28; 68 GB
+after = ["setup", "frontends_init"]   # its detect reads the front-end runs ([runs]: Schöps and the fits), which frontends_init produces
+sbatch = "experiments/scripts/slurm/prepare.sbatch"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement_vignetting.toml"
+env = { EXPERIMENT = "radiometric_refinement_vignetting" }
+job_name = "rc-prepare-radiometric_refinement_vignetting"
+
+[[stage]]
+name = "radiometric_refinement_vignetting"
+what = "the f/4 refinements (fig:focus-surfaces reads the fisheye's), one GPU per case"
+time = "04:00:00"         # as radiometric_refinement (the same LM on the f/4 sets)
+cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM and the closed-form blocks run on the device; the host threads
+mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB (the rehearsal 2026-11-13: peak RSS 3.0-3.7 GB)
+after = ["radiometric_refinement_vignetting_prepare", "image_regions", "distance_maps"]
+sbatch = "experiments/scripts/slurm/case_task.sbatch"
+env = { EXPERIMENT = "radiometric_refinement_vignetting", STAGES = "start,refine" }
+job_name = "rc-refinement-chrome-vignetting"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement_vignetting.toml"
+gpu = true
+array = { from = "cases", select_env = "VIG_CASES" }
+
+# ---- the chrome evaluations: every chrome set of the paper, the stages chrome_evaluation_paper's sets stage runs (reused there) ------
+
+[[stage]]
+name = "chrome_evaluation"
+what = "every chrome set of chrome_evaluation_paper.toml: the decode (CPU), the Förstner detect (GPU), the registration through the index camera (CPU), one array task per set"
+time = "01:00:00"         # the index phase's: 18 set tasks in a 940 s span (the index grid, cvpr-eff 2026-11-13): ≈ 2× with margin
+cpus_per_task = 8       # the launch's one thread count (8, above)
+mem_per_cpu = "8480M"
+after = ["setup", "image_regions", "frontends_init"]   # the coverage records; the index camera of a Siemens set is a front end's fit
+sbatch = "experiments/scripts/slurm/chrome_evaluation.sbatch"
+job_name = "rc-chrome-evaluation"
+driver = "experiments/scripts/chrome_evaluation_paper.jl"
+config = "experiments/configs/experiments/chrome_evaluation_paper.toml"
+array = { from = "chrome", select_env = "CHROME_SETS" }
+inputs_from = [
+    { config = "experiments/configs/experiments/chrome_evaluation_paper.toml", key = "chrome.*.config", base = "experiments" },
+]
+phases = [
+    { name = "decode", gpu = false, env = { STAGES = "prepare" }, time = "01:00:00" },   # Features' load_raw of ≈ 250 RAW photographs, threaded: minutes
+    { name = "detect", gpu = true, env = { STAGES = "detect" } },                       # detect_sfop → detect_foerstner on the device: minutes per set
+    { name = "index", gpu = false, env = { STAGES = "index" } },
+]
+
+[[stage]]
+name = "chrome_evaluation_score"
+what = "every chrome set's evaluate: each start and refinement of its [evaluate] models scored on the registered dots (CPU: the rotation-centre motion fits)"
+time = "01:00:00"         # each evaluate minutes (sampling_strategy_score's, 2026-11-15): ≈ 2× with margin
+cpus_per_task = 8
+mem_per_cpu = "8480M"
+after = ["chrome_evaluation", "radiometric_refinement", "radiometric_refinement_vignetting"]   # the refinements it scores
+sbatch = "experiments/scripts/slurm/chrome_evaluation.sbatch"
+job_name = "rc-chrome-evaluation-score"
+env = { STAGES = "evaluate" }
+driver = "experiments/scripts/chrome_evaluation_paper.jl"
+config = "experiments/configs/experiments/chrome_evaluation_paper.toml"
+array = { from = "chrome", select_env = "CHROME_SETS" }
+
+# ---- the front ends: the start and index cameras of the Siemens-star sets, results the refinements read ([runs]) -------------------
+# One array task per [cases.<set>] of configs/experiments/frontends.toml (FE_SETS selects); the decode, the fits and the comparisons
+# on CPUs, Schöps's camera_calibration on one GPU (its pinned container image, an input of tier unpublished). They run only with
+# --only. Sizes: the decode 6 CPUs (one photograph per thread, ≈ 100 MB each), the tool 4 CPUs and its GPU, a fit or a comparison
+# 2 CPUs (single-threaded); 8480M per CPU, the node's ratio.
+[[stage]]
+name = "frontends_prepare"
+what = "the Siemens-star photographs decoded by Features (the green cells) and written as the tool's 8-bit images"
+after = ["setup"]
+sbatch = "experiments/scripts/slurm/frontends.sbatch"
+env = { STAGE = "prepare" }
+job_name = "rc-frontends-prepare"
+driver = "experiments/scripts/frontends.jl"
+config = "experiments/configs/experiments/frontends.toml"
+array = { from = "cases", select_env = "FE_SETS" }
+cpus_per_task = 6
+mem_per_cpu = "8480M"
+time = "00:45:00"   # measured 6–10 min per set (2026-11-13: zoom 171 photographs 551 s, 14 mm 168 in 531 s, fisheye 150 in 360 s), most of it Features 0.8.3's extract_capture_settings compile (fixed in 0.8.4)
+default = false
+
+[[stage]]
+name = "frontends_detect"
+what = "T. Schöps's camera_calibration in its pinned container on each set, imported onto the raw grid through IO (one GPU per set)"
+after = ["frontends_prepare", "image_regions"]
+sbatch = "experiments/scripts/slurm/frontends.sbatch"
+env = { STAGE = "detect" }
+job_name = "rc-frontends-detect"
+driver = "experiments/scripts/frontends.jl"
+config = "experiments/configs/experiments/frontends.toml"
+gpu = true
+array = { from = "cases", select_env = "FE_SETS" }
+cpus_per_task = 4
+mem_per_cpu = "8480M"
+time = "00:30:00"   # measured 4–14 min (camera_calibration 169 s zoom, 663 s fisheye, 766 s 14 mm; the container 8 s, the import 6 s): the 14 mm × 2
+default = false
+
+[[stage]]
+name = "frontends_init"
+what = "the index cameras: Estimation's fit of a parametric lens to each set's imported detections"
+after = ["frontends_detect"]
+sbatch = "experiments/scripts/slurm/frontends.sbatch"
+env = { STAGE = "init" }
+job_name = "rc-frontends-init"
+driver = "experiments/scripts/frontends.jl"
+config = "experiments/configs/experiments/frontends.toml"
+array = { from = "cases", select_env = "FE_SETS" }
+cpus_per_task = 2
+mem_per_cpu = "8480M"
+time = "00:10:00"   # measured 2 min (the fit 19–52 s, the rest loading)
+default = false
+
+[[stage]]
+name = "frontends_evaluate"
+what = "each set's start and index camera against its start of record (the validation of the front ends)"
+after = ["frontends_init"]
+sbatch = "experiments/scripts/slurm/frontends.sbatch"
+env = { STAGE = "evaluate" }
+job_name = "rc-frontends-evaluate"
+driver = "experiments/scripts/frontends.jl"
+config = "experiments/configs/experiments/frontends.toml"
+array = { from = "cases", select_env = "FE_SETS" }
+cpus_per_task = 2
+mem_per_cpu = "8480M"
+time = "00:10:00"   # measured 2–3 min
+default = false
+
+# ---- no paper asset reads these: only with --only ---------------------------------------------------------------------------------
+[[stage]]
+name = "chrome_index_grid"
+what = "the chrome index stage's comparison grid: every chrome set under every scorer variant of chrome_index_grid.toml, against its baseline (a measurement; no paper asset reads it)"
+time = "02:00:00"         # the index grid: 18 set tasks in a 940 s span (cvpr-eff 2026-11-13); this job its detect phase: ≈ 2×, with margin
+cpus_per_task = 8       # the index stage's 8 threads (its launcher's; the thread count keys every run, [execution] threads)
+mem_per_cpu = "8480M"
+after = ["setup"]
+sbatch = "experiments/scripts/slurm/chrome_index_grid.sbatch"
+driver = "experiments/scripts/chrome_index_grid.jl"
+config = "experiments/configs/experiments/chrome_index_grid.toml"
+gpu = true
+# the chrome sets' configs of record it runs under each variant (their inputs: the photographs, the target, the cameras)
+inputs_from = [
+    { config = "experiments/configs/experiments/chrome_evaluation_paper.toml", key = "chrome.*.config", base = "experiments" },
+]
+default = false
+
+[[stage]]
+name = "sensor_characterisation"
+what = "the FX3's sensor characterisation at ISO 100 by Core's estimators (master_dark, defect_onsets, photon_transfer): the record the refinements read"
+cpus_per_task = 8       # CPU: one task decoding the campaign's 569 E1_E2 and E4 frames one burst at a time, at the project's thread count
+mem_per_cpu = "8480M"   # 68 GB: the largest burst (1.2 GB of codes) and the E4 series (2.7 GB) many times over
+after = ["setup"]
+sbatch = "experiments/scripts/slurm/sensor_characterisation.sbatch"
+job_name = "rc-sensor-char"
+driver = "experiments/scripts/sensor_characterisation.jl"
+config = "experiments/configs/experiments/sensor_characterisation.toml"
+time = "00:05:00"       # 2× the measured 87 s (dgx01 2026-11-14, 16 CPUs, warm depot: 569 frames decoded and the record written)
+default = false
+
+[[stage]]
+name = "golden"
+what = "the package's golden calibration cases against their recorded outputs (on the GPU, the device of record; GOLDEN_CASES, GOLDEN_TOL), one array task per case"
+time = "01:00:00"         # a golden case 3–4 min (siemens_coarse_full ≈ 3 min; 2026-11-13): with the load, ≈ 2× with margin
+cpus_per_task = 8       # 8 threads as the goldens were recorded (golden/RECORDED.toml julia_num_threads: the closed-form start sums
+mem_per_cpu = "8480M"   # over thread chunks, so the count is part of the arithmetic)
+after = ["setup", "distance_maps"]
+sbatch = "experiments/scripts/slurm/golden.sbatch"
+gpu = true                    # the goldens' device of record (golden/RECORDED.toml device "gpu", owner 2026-11-13)
+# the cases are the array's items, so they key the stage's run (a launch with other GOLDEN_CASES is another run, never a reuse);
+# GOLDEN_CASES selects a subset
+array = { items = ["siemens_coarse_full"], select_env = "GOLDEN_CASES" }
+default = false
+
+# ---- the convergence experiment: the bias of Schöps's method per LM iteration (no paper asset reads it yet: only with --only) ------
+[[stage]]
+name = "convergence"
+what = "per case, its refinement of record with a checkpoint per iteration, its chrome set's index, the record convergence.json (the bearing divergence and the Thorlabs scores per LM iteration) and the dual-axis pgfplots figure; one GPU per case"
+time = "06:00:00"         # not yet measured: the ag10fe refinement ≈ 1 h 30 min at 50 iterations (the rehearsal's longest case, 2026-11-13), the chrome set's detect minutes, 51 iterations scored in-sample and held out (3 rotation-centre fits each, seconds to a minute): ≈ 2× with margin
+cpus_per_task = 8       # GPU stage at the launch's one thread count (8, above): the refinement's LM and the chrome detect on the device; the
+mem_per_cpu = "8480M"   # scoring on the host. 68 GB (the refinements' peak RSS 3.0-3.7 GB, rehearsal 2026-11-13)
+after = ["radiometric_refinement_prepare", "image_regions", "distance_maps"]   # the refinement reads the prepared sets and the front ends' runs, the chrome set its image region
+sbatch = "experiments/scripts/slurm/case_task.sbatch"
+env = { EXPERIMENT = "convergence", STAGES = "refine,chrome,convergence,figure" }
+job_name = "rc-convergence"
+driver = "experiments/scripts/convergence.jl"
+config = "experiments/configs/experiments/convergence.toml"
+gpu = true
+array = { from = "cases", select_env = "CONVERGENCE_CASES" }
+default = false
+
+# ---- STUDY: the board warping ablation (configs/studies/; only with --only) ----
+
+[[stage]]
+name = "warping_ablation"
+what = "every global-model case of the paper's chrome sets and its capture set's central spline, refined per board mode (rigid, heights, of record) and scored on its chrome set: warping_ablation.json/.tsv and its pgfplots figure and table; one array task (one GPU) per mode"
+time = "06:00:00"         # the refine phase's: one shard's refinements in turn, ≤ 3 of the 75 rows (two to refine, mode "both" the runs of record), 50 min – 1 h 30 min each (radiometric_refinement's rehearsal, 2026-11-13): ≈ 1.5× the sum
+cpus_per_task = 8       # 8 CPUs as radiometric_refinement's array (the thread count keys every run: its runs of record are reused, mode "both")
+mem_per_cpu = "8480M"
+# after the products it shares: the refinements of record (mode "both" IS them, by their keys) and the chrome sets' detect and index
+after = ["radiometric_refinement", "chrome_evaluation", "image_regions", "distance_maps"]
+sbatch = "experiments/scripts/slurm/warping_ablation.sbatch"
+job_name = "rc-warping-ablation"
+driver = "experiments/scripts/warping_ablation.jl"
+config = "experiments/configs/studies/warping_ablation.toml"
+gpu = true
+# 25 shards of the refinements (every mode, WARP_MODES selects): a GPU-bound refinement gets one GPU, ≤ 3 per shard in turn
+array = { items = ["0/25", "1/25", "2/25", "3/25", "4/25", "5/25", "6/25", "7/25", "8/25", "9/25", "10/25", "11/25", "12/25",
+                   "13/25", "14/25", "15/25", "16/25", "17/25", "18/25", "19/25", "20/25", "21/25", "22/25", "23/25", "24/25"], select_env = "WARP_SHARDS" }
+phases = [
+    { name = "upstream", gpu = false, per_item = false, time = "01:00:00" },  # every chrome set's upstreams: the detect and index are chrome_evaluation's (reused), the rest checks
+    { name = "refine", gpu = true, per_item = true },                          # task k: shard k's refinements, one at a time on its one GPU
+    { name = "score", gpu = false, per_item = false, time = "04:00:00" },     # the scorings (CPU: the rotation-centre fits and the 10,000-draw bootstraps), the record, the figure
+]
+default = false
+
+# ---- the paper --------------------------------------------------------------------------------------------------------------------
+[[stage]]
+name = "regenerate_paper"
+what = "scripts/regenerate_paper.jl --gpu --results-branch: the figure drivers' pending stages, numbers.tex and verify into plots/ (nothing deployed into paper/: the results branch carries it)"
+time = "02:00:00"         # not yet measured: every GPU stage of its drivers is upstream (chrome_evaluation), so the figures, tables and numbers only: ≈ 1 h with margin
+cpus_per_task = 8       # CPU stage at the launch's one thread count (8, above): the drivers it runs find the experiments'
+mem_per_cpu = "8480M"   # runs by their keys, thread count included
+after = ["radiometric_refinement", "texture_recovery", "radiometric_refinement_vignetting", "chrome_evaluation_score"]
+sbatch = "experiments/scripts/slurm/regenerate_paper.sbatch"
+driver = "experiments/scripts/regenerate_paper.jl"
+config = "experiments/configs/figures/regenerate_paper.toml"
+env = { REGENERATE_RESULTS_BRANCH = "1" }
+gpu = false             # no GPU held for the figures: a GPU stage still pending stops it and names --gpu (regenerate_paper.sbatch)
+# the drivers it runs (configs/figures/numbers.toml [runs] experiments) and the chrome sets chrome_evaluation_paper runs
+inputs_from = [
+    { config = "experiments/configs/figures/numbers.toml", key = "runs.experiments", base = "experiments" },
+    { config = "experiments/configs/experiments/chrome_evaluation_paper.toml", key = "chrome.*.config", base = "experiments" },
+]
+
+[[stage]]
+name = "results_branch"
+what = "the regenerated figures, tables and numbers.tex on a results branch of the paper (results/<stamp>-<commit>), for review; accept_results brings them in"
+time = "00:30:00"         # one Julia writing the branch (minutes)
+cpus_per_task = 2       # single-threaded (git and one julia writing the branch)
+mem_per_cpu = "8480M"
+after = ["regenerate_paper"]
+results_branch = true
+
+[[stage]]
+name = "paper_pdf"
+what = "the paper's PDF (make -C paper): of the checked-out paper, so after accept_results (--only=paper_pdf --no-deps)"
+cpus_per_task = 2       # single-threaded (make, pdflatex)
+mem_per_cpu = "8480M"
+after = ["results_branch"]
+command = ["make", "-C", "paper"]
+time = "01:00:00"
+default = false
+
+[results_branch]
+# the repository (the workdir): the renders under experiments/plots go to the manuscript, ../paper beside the experiments
+project = "."
+# the renders regenerate_paper leaves in plots/ (the figures) and plots/latex/ (the generated tables and numbers.tex), each that
+# the paper already holds (a render of no paper asset stays out)
+assets = [
+    { from = "experiments/plots/*.png", to = "paper/fig", submitted_only = true },
+    { from = "experiments/plots/latex/*.tex", to = "paper/latex", submitted_only = true },
+]
+artifacts = "experiments/Artifacts.toml"

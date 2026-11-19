@@ -1,0 +1,64 @@
+% fig_boundary.tex — why a boundary that moves with a parameter is missed by fixed samples, and how the calibration removes it
+% (hand-written TikZ). Top: the aperture and its radius r (boundary term III). Bottom: an edge of the pattern (I, II).
+\usetikzlibrary{arrows.meta}%
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=1cm, y=1cm, >=stealth, font=\footnotesize,
+    smp/.style={fill=blue!70!black, draw=none},
+    smpn/.style={fill=white, draw=blue!70!black, line width=0.4pt},
+    bnd/.style={line width=0.7pt, black},
+    moved/.style={line width=0.7pt, red!75!black, densely dashed},
+    dim/.style={line width=0.3pt, black!60}]
+  % ONE aperture (radius 0.82, growing to 0.98) and ONE pattern of samples inside it, as (distance from the center, angle):
+  % the same in the left cell, in the unit disc and in the right cell
+  \def\pts{0/0, 0.36/40, 0.36/160, 0.36/280, 0.70/100, 0.70/220, 0.70/340, 0.58/5, 0.64/55, 0.60/185}
+  % headers
+  \node[anchor=south] at (2.1,1.3) {\textbf{boundary moves}};
+  \node[anchor=south] at (6.2,1.3) {\textbf{reformulated}};
+  \node[rotate=90, anchor=south] at (0.55,0) {aperture radius $r$};
+  \node[rotate=90, anchor=south] at (0.55,-3.0) {pattern edge};
+  \draw[dim] (4.05,1.75) -- (4.05,-4.1);
+  % ---- top left: the samples are fixed; the ring that the growing rim sweeps holds none
+  \fill[red!22, even odd rule] (2.1,0) circle (0.98) (2.1,0) circle (0.82);
+  \draw[bnd] (2.1,0) circle (0.82);
+  \draw[moved] (2.1,0) circle (0.98);
+  \foreach \r/\a in \pts { \fill[smp] ($(2.1,0)+(\a:\r)$) circle (1.4pt); }
+  \foreach \r/\a in {1.20/25, 1.18/75, 1.20/130, 1.18/185, 1.20/235, 1.18/285} { \fill[smp] ($(2.1,0)+(\a:\r)$) circle (1.4pt); }
+  \node[anchor=west, inner sep=1pt] at (3.18,-0.92) {$\mathcal{A}(r)$};
+  \draw[dim] (2.74,-0.52) -- (3.20,-0.88);
+  \node[anchor=north] at (2.1,-1.36) {no sample changes};
+  % ---- top right: the same aperture and the same samples, placed from the fixed unit disc; they move out with the rim
+  \draw[bnd] (4.85,0) circle (0.5);
+  \foreach \r/\a in \pts { \fill[smp] ($(4.85,0)+(\a:0.6098*\r)$) circle (1.1pt); }
+  \node[anchor=south] at (4.85,0.52) {$\mathcal{D}\ni\vbxi$};
+  \draw[->, line width=0.5pt] (5.42,0) -- (5.82,0);
+  \node[anchor=north, inner sep=1pt] at (5.4,-0.75) {$\vba=\vbo+r\,\vbxi$};
+  \draw[bnd] (7.0,0) circle (0.82);
+  \draw[moved] (7.0,0) circle (0.98);
+  \foreach \r/\a in \pts {
+    \draw[blue!70!black, line width=0.5pt] ($(7.0,0)+(\a:\r)$) -- ($(7.0,0)+(\a:1.1951*\r)$);
+    \fill[smp] ($(7.0,0)+(\a:\r)$) circle (1.4pt);
+    \draw[smpn] ($(7.0,0)+(\a:1.1951*\r)$) circle (1.4pt);
+  }
+  \node[anchor=north] at (7.0,-1.36) {every sample moves};
+  % ---- bottom left: a sharp edge moves between fixed samples; no sample changes
+  \draw[dim, ->] (0.95,-3.75) -- (3.25,-3.75);
+  \draw[dim, ->] (0.95,-3.75) -- (0.95,-2.15);
+  \node[anchor=east, inner sep=2pt] at (0.95,-2.3) {$\rho$};
+  \fill[red!22] (2.0,-3.6) rectangle (2.16,-2.5);
+  \draw[bnd] (0.95,-3.6) -- (2.0,-3.6) -- (2.0,-2.5) -- (3.15,-2.5);
+  \draw[moved] (2.16,-3.6) -- (2.16,-2.5);
+  \foreach \x/\y in {1.2/-3.6, 1.6/-3.6, 2.55/-2.5, 2.95/-2.5} { \fill[smp] (\x,\y) circle (1.5pt); }
+  \node[anchor=north] at (2.1,-3.78) {no sample changes};
+  % ---- bottom right: the blurred edge; every sample near it changes
+  \draw[dim, ->] (4.55,-3.75) -- (7.95,-3.75);
+  \draw[dim, ->] (4.55,-3.75) -- (4.55,-2.15);
+  \node[anchor=east, inner sep=2pt] at (4.55,-2.3) {$\rho$};
+  \draw[bnd, domain=4.55:7.85, samples=60, smooth] plot (\x, {-3.05 + 0.55*tanh((\x-6.05)/0.42)});
+  \draw[moved, domain=4.55:7.85, samples=60, smooth] plot (\x, {-3.05 + 0.55*tanh((\x-6.22)/0.42)});
+  \foreach \x in {5.45, 5.85, 6.25, 6.65, 7.05} {
+    \draw[blue!70!black, line width=0.4pt] (\x, {-3.05 + 0.55*tanh((\x-6.05)/0.42)}) -- (\x, {-3.05 + 0.55*tanh((\x-6.22)/0.42)});
+    \fill[smp] (\x, {-3.05 + 0.55*tanh((\x-6.05)/0.42)}) circle (1.5pt);
+    \draw[smpn] (\x, {-3.05 + 0.55*tanh((\x-6.22)/0.42)}) circle (1.5pt);
+  }
+  \node[anchor=north] at (6.25,-3.78) {every sample changes};
+\end{tikzpicture}}%

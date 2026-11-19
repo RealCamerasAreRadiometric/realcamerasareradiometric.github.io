@@ -1,0 +1,35 @@
+{
+    "schema": "vgio/cameras/v4",
+    "pixel_frame": "colmap",
+    "cameras": [
+        {
+            "name": "cam",
+            "width": 4256,
+            "height": 2848,
+            "K": {
+                "fx": 931.5695974339352,
+                "fy": 930.0511348999313,
+                "cx": 2138.174901428363,
+                "cy": 1441.6152469323451,
+                "skew": 0.0
+            },
+            "lens": {
+                "equidistant": [],
+                "radial": [
+                    [
+                        -0.025577960597659054,
+                        -0.005630087685389645,
+                        0.002316610008695912,
+                        -0.0008390988034946086
+                    ],
+                    []
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "model": "fisheye10cm_all_green_kb_cv2",
+        "source": "/scratch/shared/tha/rc-data/vgtk-root-main/geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-10cm-all/opencv/fisheye/calibration.json",
+        "note": "cv2.fisheye.calibrate (Kannala–Brandt k1..k4) on the ArucoDetector corners of the green copies"
+    }
+}

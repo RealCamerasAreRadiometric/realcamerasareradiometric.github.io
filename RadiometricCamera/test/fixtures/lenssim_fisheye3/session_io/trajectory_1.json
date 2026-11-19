@@ -1,0 +1,83 @@
+{
+    "schema": "vgio/trajectory/v3",
+    "length_unit": "mm",
+    "rotation_encoding": "quaternion_wxyz_hamilton",
+    "transform_convention": "x_to = R * x_from + t",
+    "from": "target:291",
+    "to": "view:cam",
+    "frames": [
+        {
+            "t": 1,
+            "image": "train_01.png",
+            "pose": {
+                "rotation": [
+                    0.07740445264713171,
+                    -0.7028586154421366,
+                    -0.7028524626240573,
+                    0.0774385769010435
+                ],
+                "translation": [
+                    -0.3169028075446448,
+                    0.0029612974351261273,
+                    88.03280569773868
+                ]
+            }
+        },
+        {
+            "t": 2,
+            "image": "train_02.png",
+            "pose": {
+                "rotation": [
+                    0.15758240456067418,
+                    -0.6854676634109932,
+                    -0.7066639878303762,
+                    -0.07699270416357007
+                ],
+                "translation": [
+                    0.1829598214368371,
+                    0.8291181502648044,
+                    69.06600301102338
+                ]
+            }
+        },
+        {
+            "t": 3,
+            "image": "train_03.png",
+            "pose": {
+                "rotation": [
+                    0.05006238494658235,
+                    0.7051495760287907,
+                    0.6669325945442789,
+                    0.23549680969030878
+                ],
+                "translation": [
+                    0.11771777484050717,
+                    0.8474239088576958,
+                    56.26804663199523
+                ]
+            }
+        }
+    ],
+    "provenance": {
+        "migrated_from": "RadiometricCamera session export (session.json, geometry.json, pattern.png)",
+        "session_sha256": "a8b3f2901a598d9ff1cf13c5ef69f0d18af420b00fa5a97e4a60b4704d7c4263",
+        "geometry_sha256": "2672a7e66d24b9285f98508414d6217e3313997aa0518c0e04bac14ba87ad57a",
+        "refined": {
+            "residual_px": {
+                "before": {
+                    "rms": 0.07968519934785859,
+                    "median": 0.04825114267128944,
+                    "p90": 0.12562259777138005
+                },
+                "after": {
+                    "rms": 0.07962967949848876,
+                    "median": 0.04751434101412984,
+                    "p90": 0.12743131314891384
+                }
+            },
+            "iterations": 11,
+            "stop": "converged"
+        },
+        "not_migrated": "stacked, doublesphere, central_generic: functions of the camera"
+    }
+}

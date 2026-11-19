@@ -1,0 +1,346 @@
+# Config of record of the chrome-board evaluation of the chrome set fisheye_10cm_ag (scripts/chrome_evaluation.jl): ONE config per chrome set,
+# every model scored on it a row of [evaluate] models (10 rows). Merged 2026-11-12 (RC 0.9 round 3) from the
+# 5 per-model configs chrome_evaluation_fx3_fisheye_10cm_ag[_<model>].toml, which differed only in their models row and its start input:
+# detect, index and the [evaluate] settings were the same in every one (src/chrome_evaluation.jl; test/chrome_evaluation_tests.jl).
+#
+# The set: the chrome-board evaluation of the FX3 + 8 mm fisheye chrome photographs (fx3_fisheye_10cm; scripts/chrome_evaluation.jl):
+# Förstner detection of the 289 backlit dots of the Thorlabs R3L3S7N1 target, their registration against the target's grid (RANSAC
+# through the camera of record), and the evaluation of the set's cases of configs/experiments/radiometric_refinement.toml and their starts (one
+# rotation centre for the set, from the poses of the index stage's RANSAC local optimization). The settings (as the 30 cm configs:
+# each dot's own integration scale selected by SFOP (detect_sfop, then the seeded
+# detect_foerstner), which replaced one integration σ for the set (4.0 here: the dots imaged 1.6–2.6× larger than at 30 cm)).
+
+[experiment]
+name = "chrome_evaluation"
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
+
+[inputs.fx3_sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+stage = "detect"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+
+[inputs.raw]
+tier = "rc_raw_photos"
+path = "paper-data/geometric-accuracy/fisheye/chrome-april"
+stage = "prepare"
+provenance = "the 154 chrome photographs of the FX3 + the 8 mm fisheye (EXIF lens \"DT 8mm F4 SAM\") at f/22 of 2026-11-05 (the user's Dropbox folder fisheye10cmChrome, DSC06825 … DSC06978; the chrome board at ≈ 10 cm, the distance of the AprilGrid photographs fisheye10cmAprilGrid400; rotation about one point): the RAW photographs (.ARW) the retired decoded copies (rc_baselines chrome/*.photos, decoded by scripts/py/convert_raw.py) were made from (owner 2026-11-14: every chrome set read from its RAW through Features' raw module); on the cluster only"
+
+[inputs.raw_fisheye_aprilgrid_10cm]
+tier = "rc_raw_photos"
+path = "paper-data/geometric-accuracy/fisheye/april-grid"
+stage = "evaluate"
+provenance = "the AprilGrid photographs of the FX3 + 8 mm fisheye at f/22 and ≈ 10 cm of 2026-11-05, the chrome photographs' capture session (DSC06999 … follow the chrome set's DSC06825 … DSC06978): the session's coverage frames ([image_regions.fx3_fisheye_aprilgrid_10cm])"
+
+# The chrome set's lens coverage (src/image_region.jl; owner ruling 2026-11-15): the fisheye's image circle lies inside the frame. The
+# chrome photographs are backlit dots on dark chrome — no lit rim to measure — so the region is the capture session's, measured on the
+# session's AprilGrid frames at the same f/22 (the frames radiometric_refinement.toml's ag10fe cases name: the one step, by its key).
+[image_regions.fx3_fisheye_aprilgrid_10cm]
+input = "raw_fisheye_aprilgrid_10cm"
+frames = { "DSC06999.ARW" = "9f247c56446c1a412785ba98cbd5e3e2789909e2be9d0001c65a3807caf09da4", "DSC07081.ARW" = "a8a7f909671525c4dad94722cd1436031e49a51869cf9e57a59b45f43c9b2ab1", "DSC07182.ARW" = "6ac0bcd5d011e539c24d25788e92f043faf61ad0a5cc5bebc34de83b957fff5b", "DSC07283.ARW" = "c59987c562de3ff54f87dcb3202b45ed24085ba22b430251296cbe66e4cb686e", "DSC07365.ARW" = "d8ad8543f23092ab23673815b6a0437c9f1fa233bc325d51b4dcbea3efaad9ef" }   # sha256sum on dgx01 (2026-11-15)
+image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+seed = 1                       # as radiometric_refinement.toml's: the same step
+
+[inputs.target]
+tier = "rc_thorlabs"
+path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"
+sha256 = "9fd2754a2aa7e278a18d95df15e07140b87bc115dec47be169adebe085fab880"   # sha256sum of the file of record (the local data root and dgx01's rc-vgtk-root agree, 2026-11-12)
+stage = "index"
+provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024): 17 x 17 dots at 5.000 mm, calibration Rigid (vgio/target/v3 by vgio_migrate_tree)"
+
+[inputs.camera]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_kb_cv2.json"
+stage = "index"
+provenance = "the Kannala–Brandt lens of OpenCV's cv2.fisheye.calibrate on the fisheye's AprilGrid photographs at ≈ 10 cm (configs/experiments/radiometric_refinement.toml, case ag10fe_kb_warped's start): the index's camera"
+
+[prepare.fx3_fisheye10cm_chrome]
+raw = "raw"
+mode = "photosites"               # read, not decoded: the RAW photographs linked with their EXIF (Features' load_raw_metadata); detect reads each mosaic
+
+[detect]
+sensor_characterisation = "fx3_sensor_characterisation"   # the FX3's record of record (input fx3_sensor_characterisation): each RAW re-linearised under its frame's model, its Poisson–Gaussian noise propagated into the detections' covariances
+photos = "fx3_fisheye10cm_chrome"
+image = "raw_green"               # the RAW mosaics behind prepare's set, Features' bilinear green on the raw grid under each frame's sensor model; raw pixels
+precision = "Float32"
+device = "gpu"                   # detect_foerstner on the GPU (KernelAbstractions; device 0 of the job)
+derivative = "gaussian2d"
+derivative_sigma = 2.0                # raw px: 1.0 green cell (the value of record on the green cells until RC 0.10.2) × 2 raw px per cell
+polarity = "light"                # the backlit dots are bright on the dark chrome: Features' polarity gate keeps light blobs only, a dark blob (a gap, a shadow) never seeds (owner 2026-11-14)
+precision_threshold = 1.0             # raw px: SFOP's point σ gate, 0.5 green cell (the value of record until RC 0.10.2) × 2 raw px per cell
+significance_level = 0.999
+
+photographs = [                 # the photographs detected (each its own scale: detect_sfop); the others are [detect.excluded]
+    "DSC06825.ARW",
+    "DSC06826.ARW",
+    "DSC06827.ARW",
+    "DSC06828.ARW",
+    "DSC06829.ARW",
+    "DSC06830.ARW",
+    "DSC06831.ARW",
+    "DSC06832.ARW",
+    "DSC06833.ARW",
+    "DSC06834.ARW",
+    "DSC06835.ARW",
+    "DSC06836.ARW",
+    "DSC06837.ARW",
+    "DSC06838.ARW",
+    "DSC06839.ARW",
+    "DSC06840.ARW",
+    "DSC06841.ARW",
+    "DSC06842.ARW",
+    "DSC06843.ARW",
+    "DSC06844.ARW",
+    "DSC06845.ARW",
+    "DSC06846.ARW",
+    "DSC06847.ARW",
+    "DSC06848.ARW",
+    "DSC06849.ARW",
+    "DSC06850.ARW",
+    "DSC06851.ARW",
+    "DSC06852.ARW",
+    "DSC06853.ARW",
+    "DSC06854.ARW",
+    "DSC06855.ARW",
+    "DSC06856.ARW",
+    "DSC06857.ARW",
+    "DSC06858.ARW",
+    "DSC06859.ARW",
+    "DSC06860.ARW",
+    "DSC06861.ARW",
+    "DSC06862.ARW",
+    "DSC06863.ARW",
+    "DSC06864.ARW",
+    "DSC06865.ARW",
+    "DSC06866.ARW",
+    "DSC06867.ARW",
+    "DSC06868.ARW",
+    "DSC06869.ARW",
+    "DSC06870.ARW",
+    "DSC06871.ARW",
+    "DSC06872.ARW",
+    "DSC06873.ARW",
+    "DSC06874.ARW",
+    "DSC06875.ARW",
+    "DSC06876.ARW",
+    "DSC06877.ARW",
+    "DSC06878.ARW",
+    "DSC06879.ARW",
+    "DSC06880.ARW",
+    "DSC06881.ARW",
+    "DSC06882.ARW",
+    "DSC06883.ARW",
+    "DSC06884.ARW",
+    "DSC06885.ARW",
+    "DSC06886.ARW",
+    "DSC06887.ARW",
+    "DSC06888.ARW",
+    "DSC06889.ARW",
+    "DSC06890.ARW",
+    "DSC06891.ARW",
+    "DSC06892.ARW",
+    "DSC06893.ARW",
+    "DSC06894.ARW",
+    "DSC06895.ARW",
+    "DSC06896.ARW",
+    "DSC06897.ARW",
+    "DSC06898.ARW",
+    "DSC06899.ARW",
+    "DSC06900.ARW",
+    "DSC06901.ARW",
+    "DSC06902.ARW",
+    "DSC06903.ARW",
+    "DSC06904.ARW",
+    "DSC06905.ARW",
+    "DSC06906.ARW",
+    "DSC06907.ARW",
+    "DSC06908.ARW",
+    "DSC06909.ARW",
+    "DSC06910.ARW",
+    "DSC06911.ARW",
+    "DSC06912.ARW",
+    "DSC06913.ARW",
+    "DSC06914.ARW",
+    "DSC06915.ARW",
+    "DSC06916.ARW",
+    "DSC06917.ARW",
+    "DSC06918.ARW",
+    "DSC06919.ARW",
+    "DSC06920.ARW",
+    "DSC06921.ARW",
+    "DSC06922.ARW",
+    "DSC06923.ARW",
+    "DSC06924.ARW",
+    "DSC06925.ARW",
+    "DSC06926.ARW",
+    "DSC06927.ARW",
+    "DSC06928.ARW",
+    "DSC06929.ARW",
+    "DSC06930.ARW",
+    "DSC06931.ARW",
+    "DSC06932.ARW",
+    "DSC06933.ARW",
+    "DSC06934.ARW",
+    "DSC06935.ARW",
+    "DSC06936.ARW",
+    "DSC06937.ARW",
+    "DSC06938.ARW",
+    "DSC06939.ARW",
+    "DSC06940.ARW",
+    "DSC06941.ARW",
+    "DSC06942.ARW",
+    "DSC06943.ARW",
+    "DSC06944.ARW",
+    "DSC06945.ARW",
+    "DSC06946.ARW",
+    "DSC06947.ARW",
+    "DSC06948.ARW",
+    "DSC06949.ARW",
+    "DSC06950.ARW",
+    "DSC06951.ARW",
+    "DSC06952.ARW",
+    "DSC06953.ARW",
+    "DSC06954.ARW",
+    "DSC06955.ARW",
+    "DSC06956.ARW",
+    "DSC06957.ARW",
+    "DSC06958.ARW",
+    "DSC06959.ARW",
+    "DSC06960.ARW",
+    "DSC06961.ARW",
+    "DSC06962.ARW",
+    "DSC06963.ARW",
+    "DSC06964.ARW",
+    "DSC06965.ARW",
+    "DSC06966.ARW",
+    "DSC06967.ARW",
+    "DSC06968.ARW",
+    "DSC06969.ARW",
+    "DSC06970.ARW",
+    "DSC06971.ARW",
+    "DSC06972.ARW",
+    "DSC06973.ARW",
+    "DSC06974.ARW",
+    "DSC06975.ARW",
+    "DSC06976.ARW",
+    "DSC06977.ARW",
+    "DSC06978.ARW",
+]
+
+[detect.excluded]
+
+[index]
+target = "target"
+camera = "camera"
+camera_name = "cam"
+target_id = "thorlabs_r3l3s7n1"
+label = "circular"
+scoring = { type = "msac" }        # RANSAC's scorer (the stack's SCORING_TAGS): MSAC on the board-plane residual (mm) of the Hungarian's one-to-one matches; its threshold is NOT stated here — it is half the target record's pitch (2.5 mm at 5 mm), the assignment's dustbin, derived in code (owner 2026-11-14)
+# At ≈ 10 cm only 9 of the 154 photographs get all 289 dots assigned (the detections are complete: 289 circular in every photograph; the
+# residuals through the camera grow smoothly over the target, most 280–288 assigned), so the evaluation rests on those 9. Tried:
+# 16 px assigns all in 20, but some photographs space their dots only 20–25 px apart, where 16 px could take a neighbour; the
+# 27.10 Kannala–Brandt fit as the camera, 6; the refined lens of case ag10fe_kb_warped, 13 (and it is an evaluated model) — no central camera
+# registers most of these photographs within 8 px (index rms ≈ 3 px), not used.
+seed_tolerance = 5.0
+rng_seed = 1
+min_assigned = 145
+
+[index.ransac]
+success_prob = 0.999               # the chrome configs' value of record since their renames (2026-11-12), above Estimation's default 0.99 (configs/default.toml [ransac])
+max_trials = 10000                 # Estimation's default (configs/default.toml [ransac]): the cap, never reached (after4: every photograph stopped at min_trials)
+min_trials = 200                   # owner 2026-11-14: twice the 100 that every photograph of after4 stopped at (the confidence rule is met far earlier — the grid sampler's draws are correct at the right parity), as margin
+
+# RANSAC's local optimization (src/chrome_evaluation.jl register_grid; owner 2026-11-14): Estimation's Irls strategy at the Gaussian
+# shape — plain least squares, not robust: the scorer's matches of the hypothesis are within its threshold by construction — on
+# those matches, frozen (the GridPoseProblem's refine!: the board-plane residuals, mm, by Core's chart LM; the Hungarian is not
+# re-run), at most max_iter iterations.
+[index.local_optimization_strategy]
+type = "irls"
+loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
+max_iter = 10
+
+# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
+# is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
+[index.refine_strategy]
+type = "none"                     # a refine's least squares (optimization_strategy = nothing)
+
+[index.excluded]
+
+[inputs.start_ag10fe_bc5]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_bc5_cv2.json"
+stage = "evaluate"
+provenance = "the start of case ag10fe_bc5_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model (rc-results night_2026-11-06/tools/fe_ag.sh, fe_si.sh)"
+
+[inputs.start_ag10fe_ds]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_ds_kalibr.json"
+stage = "evaluate"
+provenance = "the start of case ag10fe_ds_warped (configs/experiments/radiometric_refinement.toml): the Double Sphere start (Kalibr ds-none on an AprilGrid set; a DS fit to Schöps's detections on a Siemens set — rc-results night_2026-11-06/tools/fe_ds.sh)"
+
+[inputs.start_ag10fe_kb]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_kb_cv2.json"
+stage = "evaluate"
+provenance = "the start of case ag10fe_kb_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model (rc-results night_2026-11-06/tools/fe_ag.sh, fe_si.sh)"
+
+[inputs.start_ag10fe_ocv14]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_ocv14_cv2.json"
+stage = "evaluate"
+provenance = "the start of case ag10fe_ocv14_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model (rc-results night_2026-11-06/tools/fe_ag.sh, fe_si.sh)"
+
+[inputs.start_ag10fe_spline]
+tier = "rc_baselines"
+path = "geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-10cm-all/schoeps_dense_aruco_green"
+stage = "evaluate"
+provenance = "the start of case ag10fe_spline_warped: T. Schöps's central-generic (configs/experiments/radiometric_refinement.toml)"
+
+[evaluate]
+index = "stage"
+target = "target"
+optimization_strategy = { type = "triggs", loss = "huber" }   # the rotation-centre refine (src/chrome_evaluation.jl evaluate_grid_models: Estimation's refine_camera_and_poses on RotationCenterViews, the camera held): the Triggs-corrected Huber LM at the efficiency table's Huber constant for d = 2 (Core's efficiency_constant(HuberShape, 2)) × the index stage's pooled noise scale (a refine estimates none)
+iterations = 80
+profile_bins = 10
+lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the session's measured image region: the radial profile about its centre out to its rim (centre (2126.8, 1434.9), rmax 1095 px as typed before 2026-11-15)
+centre_rho = 0.4                # the summary's centre region: ρ = |𝐩 − centre| / rmax below 0.4 (the regions of record)
+edge_rho = 0.6                  # the summary's edge region: ρ above 0.6
+holdout = "on"                  # the parity-interleaved hold-out (motion_heldout, the paper's headline; owner 2026-11-15): each fit on one parity of the grid nodes, scoring the other
+bootstrap = { resamples = 10000, seed = 20261115, alpha = 0.05 }   # the paired photograph bootstrap of the comparisons (src/chrome_evaluation.jl paired_differences, Eval's bootstrap_ci): 10,000 draws (the owner's count, 2026-11-15: the 2.5 % / 97.5 % tails each rest on 250 draws), StableRNG of the date of the ruling, the 95 % interval
+# every refinement against its start (its label with _start for _refined) and every model against the Schöps baseline of its target (T. Schöps's own camera; the label's prefix): model − reference
+comparisons = [
+    {model = "ag10fe_bc5_refined", reference = "ag10fe_bc5_start"},
+    {model = "ag10fe_ds_refined", reference = "ag10fe_ds_start"},
+    {model = "ag10fe_kb_refined", reference = "ag10fe_kb_start"},
+    {model = "ag10fe_ocv14_refined", reference = "ag10fe_ocv14_start"},
+    {model = "ag10fe_spline_refined", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_bc5_start", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_bc5_refined", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_ds_start", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_ds_refined", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_kb_start", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_kb_refined", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_ocv14_start", reference = "ag10fe_spline_start"},
+    {model = "ag10fe_ocv14_refined", reference = "ag10fe_spline_start"},
+]
+max_unassigned = 8                # through the central camera of record most photographs leave a few rim dots > 8 px off
+                                  # (all 289 detected); a labelling shifted by a whole spacing would leave a row of 17 unassigned, so ≤ 8
+                                  # keeps it pinned. The unassigned dots are those where the camera of record (case ag10fe_kb_warped's start)
+                                  # is worst, so the selection still leans toward that start, ≤ 8 of 289 dots per photograph.
+models = [
+    {label = "ag10fe_bc5_start", kind = "lens", input = "start_ag10fe_bc5"},
+    {label = "ag10fe_bc5_refined", kind = "lens", case = "ag10fe_bc5_warped"},
+    {label = "ag10fe_ds_start", kind = "lens", input = "start_ag10fe_ds"},
+    {label = "ag10fe_ds_refined", kind = "lens", case = "ag10fe_ds_warped"},
+    {label = "ag10fe_kb_start", kind = "lens", input = "start_ag10fe_kb"},
+    {label = "ag10fe_kb_refined", kind = "lens", case = "ag10fe_kb_warped"},
+    {label = "ag10fe_ocv14_start", kind = "lens", input = "start_ag10fe_ocv14"},
+    {label = "ag10fe_ocv14_refined", kind = "lens", case = "ag10fe_ocv14_warped"},
+    {label = "ag10fe_spline_start", kind = "schoeps", input = "start_ag10fe_spline"},   # the Schöps baseline: T. Schöps's OWN camera (his run's camera record), never a grid re-estimated from it (src/chrome_evaluation.jl check_schoeps_baseline)
+    {label = "ag10fe_spline_refined", kind = "grid", case = "ag10fe_spline_warped"},
+]

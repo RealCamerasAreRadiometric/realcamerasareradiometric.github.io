@@ -1,0 +1,197 @@
+\section{Experiments}
+\label{sec:experiments}
+\label{sec:dataset}
+We show that geometric calibration is biased by its feature detections
+(\cref{sec:detector-bias}) and that the radiometric camera improves
+the geometric accuracy (\cref{sec:geometric-accuracy}), compare the
+learned vignetting with a measured flat field
+(\cref{sec:experiment-vignetting}) and validate the focus model
+(\cref{sec:experiment-defocus}). All captures are RAW images of a Sony
+ILME-FX3 ($4256\times2848$ pixels) and are listed in
+\cref{sec:supp-dataset} together with the runtime for each experiment; all errors are in pixels of this image. 
+
+% Table of Sec. 5.2 (Geometric Accuracy), declared here so that it floats to the top of the page where the experiments start.
+\begin{table*}[t]
+        \centering
+        \input{fig/refinement-table-ci}
+        \caption{Reprojection error on the held-out high-precision target, geometric start $\rightarrow$ radiometric refinement, for each camera model, lens and calibration target. The refined value is bold where it is significantly lower than the start and italic where it is significantly higher (95\,\% bootstrap interval of the difference, \cref{tab:supp-refinement-a}); the mean and the RMS are in \cref{tab:supp-refinement-b}. --: Brown--Conrady cannot represent the $180^\circ$ field of view of the fisheye.}
+        \label{tab:refinement-chrome}
+\end{table*}
+\subsection{Detector Bias}
+\label{sec:detector-bias}
+Feature detectors introduce a measurement bias that degrades the
+regressed camera model. We rendered 10,000 images each of the
+AprilGrid \cite{furgale2013unified,olson2011apriltag} with an FOV
+camera model \cite{devernay2001straight}, which has a mild
+distortion, and of the Siemens-star target of Schöps \etal
+\cite{10000params} with a Double Sphere model \cite{double-sphere},
+which has a strong fisheye distortion, in evenly lit calibration
+scenes. The second column of \cref{fig:detector-bias} shows
+the displacement between the true projection of each feature and its
+detection, for the AprilGrid detector of OpenCV \cite{opencv_library}
+(top) and the Siemens-star detector of Schöps \etal (bottom). Both
+detectors exhibit a bias that grows toward the image border. The third
+column projects the features with the camera and the poses of a
+calibration. In the geometric calibration, OpenCV-14 for the AprilGrid
+and the central spline for the Siemens stars, the detection bias is
+absorbed by both the camera and the poses, whereas the radiometric
+refinement largely removes it. The fourth column substitutes the true
+poses for the estimated ones, which isolates the camera model. This
+column is the relevant one: the poses are discarded after the
+calibration, and a downstream task depends on the camera alone.
+The geometrically calibrated camera has absorbed a strong bias from
+the feature detections, also for the highly flexible spline of Schöps
+\etal, and our radiometric refinement removes most of it.
+
+
+
+
+\subsection{Geometric Accuracy}
+\label{sec:geometric-accuracy}
+We lift four commonly used central parametric camera models,
+Brown--Conrady \cite{Brown1966DecenteringDO}, the 14-parameter model
+of OpenCV \cite{opencv_library}, Kannala--Brandt \cite{kannala-brandt}
+and Double Sphere \cite{double-sphere}, and the central generic spline
+model of Schöps \etal \cite{10000params} to the radiometric camera. We
+calibrate them on three lenses chosen for their diverse fields of view
+and distortions (\cref{tab:dataset-lenses}): a Tamron 20\,mm
+wide-angle lens with barrel distortion ($94^\circ$ diagonal field of
+view), a Sigma 14\,mm rectilinear wide-angle lens ($114^\circ$) and a
+Sigma 8\,mm circular fisheye ($180^\circ$). We captured two
+standard calibration targets, the Siemens-star target of Schöps \etal
+\cite{10000params} and an AprilGrid \cite{furgale2013unified}, each
+$1\,\mathrm{m}\times1\,\mathrm{m}$ and printed directly on Alu-Dibond,
+at $f/22$ (the fisheye's Siemens
+stars at $f/32$) and ISO\,100, to minimize defocus and thus give
+optimal conditions to the geometric camera models, which do not model
+defocus. Each model is started from the geometric calibration of its
+native tool where the tool supports the model and the target, and
+from our own estimator otherwise (\cref{sec:supp-starts}). The
+radiometric refinement samples 8,192 photosites per image for the
+parametric models and 16,384 for the spline.
+
+The test set consists of backlit images of the Thorlabs R3L3S7N1
+high-precision distortion target \cite{thorlabsR3L3S7N1}, captured
+by rotating the camera about a pivot, which reduces the poses to one
+rotation per view. Every dot is evaluated with a pose that it did
+not help to fit (\cref{sec:supp-chrome-evaluation}). 
+% \begin{figure}[t]
+%         \centering
+%         \input{fig/color-wheels}
+%         \caption{\protect\input{fig/color-wheels-caption}}
+%         \label{fig:color-wheels}
+% \end{figure}
+
+\Cref{tab:refinement-chrome} compares the reprojection error of each
+model at its geometric start and after the radiometric refinement on
+the Thorlabs test set (\cref{tab:supp-dataset}). We call a change significant where the 95\,\% bootstrap interval of
+the paired difference excludes zero (\cref{sec:supp-chrome-evaluation}).
+The radiometric refinement lowers the
+median reprojection error significantly in 82\,\% of the 28\
+combinations of model, lens and target (23, by 9 to 57\,\%), raises
+it significantly in 11\,\% (three, all on the Tamron 20\,mm), and
+lowers the $95$th percentile significantly in all of them, by 9 to
+65\,\%. On the Sigma 14\,mm and on the fisheye, no model is
+significantly worse in any statistic.
+\Cref{fig:convergence-rms} follows the two refinements of the
+central spline on the Sigma 14\,mm over their iterations. In both,
+the error on the held-out target falls throughout, while the error
+with respect to the detections that the geometric calibration was
+fitted to rises after the first four iterations (from $0.59$ to
+$0.71$\,px on the Siemens stars and from $0.56$ to $0.68$\,px on the
+AprilGrid). The test error decreases while the training error
+increases, which shows the bias: the refinement moves the camera
+away from the biased detections that its start was fitted to. We attribute part of this bias to the freedom of the
+geometric calibration: The feature wise parametrization of the target in \cite{10000params} allows to absorb the bias, while our lower parameter parametrization (\cref{sec:target-shape}) cannot. 
+
+\begin{figure}[t]
+        \centering
+        \input{fig/convergence-rms}
+        \caption{Median reprojection error during the radiometric refinement of the central spline on the Sigma 14\,mm, with respect to the detections that the geometric calibration was fitted to and on the held-out high-precision target. After the first iterations the curves diverge in both panels: the error on the detections rises while the error on the held-out target falls, which shows that the geometric calibration had absorbed the bias of its detector.}
+        \label{fig:convergence-rms}
+\end{figure}
+
+\subsection{Vignetting}
+\label{sec:experiment-vignetting}
+\begin{figure}[t]
+        \centering
+        \input{fig/vignetting}
+        \caption{Normalized vignetting along the direction of the sensor diagonal through the principal point: the $\cos^4$ falloff of the thin lens and our learned vignetting against the measured flat field.}
+        \label{fig:vignetting}
+\end{figure}
+% Figure of Sec. 5.4 (Defocus), declared here so that it floats to the top of that section's page.
+\begin{figure*}[t]
+        \centering
+        \begin{minipage}[c]{0.43\textwidth}
+                \centering
+                \input{fig/focus-surfaces}
+        \end{minipage}\hfill
+        \begin{minipage}[c]{0.54\textwidth}
+                \centering
+                \input{fig/texture-learned}
+        \end{minipage}
+        \caption{The focus model. \emph{Left:} the learned focus surfaces, a hemisphere for the fisheye at $f/4$ and a plane for the Tamron 20\,mm at $f/8$. \emph{Right:} a texture estimated from defocused images. The radiometric camera recovers sharp text, whereas the pinhole camera has to put the blur of the images into the texture.}
+        \label{fig:focus-surfaces}
+        \label{fig:texture-learned}
+\end{figure*}
+We use the three lenses of \cref{sec:geometric-accuracy} and the
+spline model with Siemens-star captures at a large aperture ($f/4$; $f/2.8$ for the
+Tamron) for stronger vignetting, and one flat-field image per lens
+(\cref{tab:supp-dataset}): the lens, with its hood on, covered by a
+white acrylic plate and lit by diffuse daylight through a light
+diffuser. \Cref{fig:vignetting} compares, along the
+direction of the sensor diagonal through the principal point, the
+learned vignetting, a B-spline (\cref{sec:vignetting}),
+with the flat field, read off the green photosites, and with the
+$\cos^4$ falloff of the thin lens. All profiles are normalized at the
+principal point. The learned vignetting follows the flat field for all
+three lenses: its RMS deviation along this line, in units of the
+value at the principal point, is $0.009$ for the 14\,mm lens, $0.042$ for the
+fisheye and $0.025$ for the Tamron, against $0.244$, $0.199$ and
+$0.059$ for the $\cos^4$ falloff.
+
+
+\subsection{Defocus}
+\label{sec:experiment-defocus}
+We validate the focus model in three ways. First,
+\cref{fig:focus-surfaces} (left) shows the focus surfaces learned with the
+spline model for the Tamron 20\,mm at $f/8$ and for the fisheye at
+$f/4$: a plane for the wide-angle lens and a hemisphere for the
+fisheye, as expected for these lens types
+\cite{Kingslake2010,wide-field-of-view-2017}.
+
+Second, we solve a first multi-view radiometric problem with the
+calibrated camera: we estimate the unknown reflectance of a surface
+from many defocused views of it by inverse rendering. With a pinhole
+aperture, the estimated texture has to explain the defocus of the
+images and is blurred. We calibrate the Sigma 14\,mm at $f/2.8$ on
+Siemens stars, once with the aperture and the focus surface and once
+as a pinhole, and estimate the texture of a board with printed text
+from 63 defocused images with each camera. \Cref{fig:texture-learned} (right)
+compares both textures with the printed design: the radiometric
+camera recovers sharp text where the pinhole camera returns the blur
+of the images. Since the calibration works with relative irradiance,
+a texture is recovered only up to a scale and an offset, which we fit
+once per texture before comparing it with the design. With the design
+ranging from 0 to 1, the RMS difference to it is $0.177$ for the
+radiometric camera and $0.235$ for the pinhole, and it is lower for
+the radiometric camera on 99\,\% of the page.
+
+
+
+
+Third, we ablate the focus model on two lenses with visible defocus,
+the Tamron 20\,mm at $f/8$ with the spline model and a 24--70\,mm zoom
+lens at 48\,mm and $f/10$ with Brown--Conrady, by refining the same
+geometric start once with the aperture and the focus
+surface and once as a pinhole. \Cref{tab:defocus} shows that modeling
+the aperture and the focus surface lowers the median reprojection
+error on the Thorlabs target by 25\,\% and 16\,\% compared with the
+pinhole refinement, both significantly; on the Tamron, the pinhole
+refinement is even worse than the geometric start.
+\begin{table}[t]
+        \centering
+        \input{fig/defocus-table-ci}
+        \caption{Defocus ablation on the held-out target: the refinement as a pinhole and with the aperture and the focus surface, and their difference with its 95\,\% bootstrap interval. Bold and italic as in \cref{tab:refinement-chrome}.}
+        \label{tab:defocus}
+\end{table}

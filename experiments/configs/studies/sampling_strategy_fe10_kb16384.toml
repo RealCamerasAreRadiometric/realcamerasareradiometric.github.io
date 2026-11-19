@@ -1,0 +1,52 @@
+# RATIONALE
+#   question    does the paper's fisheye (AprilGrid at 10 cm) Kannala-Brandt refinement change with 16,384 photosites per photograph instead of
+#               the counts of record (6,000 for the parametric models, 16,528 for the spline; no derivation, see sampling_strategy_kb_count.toml)?
+#   hypothesis  16,384 (2^14) lowers the held-out Thorlabs error of the fisheye Kannala-Brandt, whose image circle the count of record samples sparsely
+#   decides     whether the fisheye cases' samples_per_view of record changes (owner, after this record)
+#   decided     the counts of record 8,192 / 16,384 (owner 2026-11-16 23:30; radiometric_refinement.toml [kinds]); this record: ag10fe_kb_warped
+#               16,384 vs 6,000, held-out Thorlabs median 1.5885 vs 1.5882 px, Δ +0.0004 [−0.0024, +0.0042] px n.s. (153 photographs,
+#               44,006 dots; 2026-11-17 00:35)
+#   evidence    this experiment's record: the two arms, their LM trajectories and the paired Thorlabs bootstrap — fisheye KB 16,384:
+#               Δ median +0.0004 [−0.0024, +0.0042] px, n.s.
+#   owner       J. Pritts (2026-11-16 23:17: one at 16,384 on a fisheye, after the 32,768 run)
+#   date        2026-11-16
+#
+# A side experiment (experiments as overrides): the five fisheye 10 cm cases of record, each at its count of record (the arm `record`:
+# the case unchanged, so the run of record's product by its key) and at 32,768, the uniform draw. Not a release, not the paper's numbers.
+#   julia --project=experiments experiments/scripts/sampling_strategy.jl --config=experiments/configs/studies/sampling_strategy_fe10_count.toml [--plan]
+
+[experiment]
+name = "sampling_strategy"
+
+[inputs]
+
+[sampling_strategy]
+cases = ["fe10_kb"]
+variants = ["record", "n16384"]         # run order
+reference = "record"                    # every paired difference is n16384 - record (each case's own count of record)
+headline = ["n16384"]
+label = "fisheye KB at 16,384 (side experiment, 2026-11-16)"
+dome_tolerance = 0.12                   # derivation: as the config of record sampling_strategy.toml (the edge-sampling sweep's dome criterion)
+
+# ---- the arms ------------------------------------------------------------------------------------------------------------------
+[variants.record]
+"masks.gradient_bias" = 0.0             # the case of record unchanged (its uniform draw at its own samples_per_view): the run of record's product
+
+[variants.n16384]
+"masks.gradient_bias" = 0.0
+"masks.samples_per_view" = 16384        # owner 2026-11-16 23:17: "one at 16,384 on a fisheye" (2^14)
+
+# ---- the cases: the paper's fisheye 10 cm models -------------------------------------------------------------------------------
+[cases.fe10_kb]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "ag10fe_kb_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
+context = ["ag10fe_spline_start", "ag10fe_kb_start"]
+
+[runtime]
+reference_s_per_iteration = { fe10_kb = 60.0 }   # derivation: order of the run of record's fisheye refinements per LM iteration; 2x slower is reported
+regression_factor = 2.0
+
+[figure]
+asset = "fig_sampling_fe10_kb16384.tex"
+table = "tab_sampling_fe10_kb16384.tex"

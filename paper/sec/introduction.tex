@@ -1,0 +1,172 @@
+%------------------------------------
+% Introduction start (draft of 11-16, James: the continuum from geometric
+% camera models to multi-view radiometry; Ties's version is commented below)
+\section{Introduction}
+\label{sec:introduction}
+Reconstruction pipelines such as COLMAP \cite{schoenberger2016sfm}
+describe the camera with a few central projection models:
+Brown--Conrady \cite{Brown1966DecenteringDO} for perspective lenses,
+Kannala--Brandt \cite{kannala-brandt} and Double Sphere
+\cite{double-sphere} for fisheyes, and generic spline models
+\cite{10000params,spline-camera} where a parametric model falls short.
+These are the cameras of multiple-view geometry. They model where a
+scene point is imaged, but not how much light arrives there. All of
+them assume a pinhole aperture, \ie that a single ray connects a scene
+point with the sensor. With a pinhole aperture every scene point is in
+focus and no light is lost toward the image border, so these models
+cannot represent defocus or vignetting.
+
+\suppressfloats[t]% keeps the figure out of the left column, so it goes to the top of the right one
+\begin{figure}[t]
+        \centering
+        \input{fig/teaser}
+        \caption{\protect\input{fig/teaser-caption}}
+        \label{fig:teaser}
+\end{figure}
+
+% ---- the full-width version of Table 1 (descriptive entries), kept for reference ----
+% \begin{table*}[t]
+%   \centering
+%   \begingroup
+%   \footnotesize\setlength{\tabcolsep}{3.2pt}%
+%   \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}lllll@{}}
+%     \toprule
+%      & \textbf{Projection} & \textbf{Finite Aperture} & \textbf{Focus} & \textbf{Vignetting} & \textbf{Calibrated from Images} \\
+%     \midrule
+%     \multicolumn{6}{@{}l@{}}{\underline{\textit{Camera models}}} \\
+%     Thin lens \cite{pharr2023physically}, Mitsuba \cite{Mitsuba3} & perspective & \checkmark & plane & $\cos^4$ & -- \\
+%     Lens-design ray tracing \cite{kolb1995realistic} & from the lens design & \checkmark & from the lens design & from the lens design & -- \\
+%     Tang and Kutulakos \cite{tang2013aberrated} & perspective & \checkmark & field curvature & $\cos^4$, occlusion & -- (theory) \\
+%     \addlinespace
+%     \multicolumn{6}{@{}l@{}}{\underline{\textit{Calibration methods}}} \\
+%     Kang and Weiss \cite{kang2000calibrate} & perspective & -- & -- & $\cos^4$, linear term & focal length \\
+%     Kim and Pollefeys \cite{Kim-PAMI-2008} & -- & -- & -- & radial polynomial & vignetting, response \\
+%     Neural lens model \cite{xian2023neurallens} & pinhole, learned distortion & -- & -- & gain per pixel & distortion, vignetting \\
+%     Rehder \etal \cite{rehder2017direct} & pinhole, radial distortion & -- & -- & -- & intrinsics, single ray \\
+%     Hannemose \etal \cite{Hannemose_2019} & pinhole, Brown--Conrady & -- & -- & -- & intrinsics, single ray \\
+%     Lens blur fields \cite{lin2023blurfields} & calibrated separately & blur in the image & -- & divided out & blur \\
+%     \addlinespace
+%     \multicolumn{6}{@{}l@{}}{\underline{\textit{Radiometric (ours)}}} \\
+%     Radiometric camera & \textbf{any central model} & \textbf{\checkmark} & \textbf{free-form surface} & \textbf{generic function} & \textbf{all, jointly} \\
+%     \bottomrule
+%   \end{tabular*}
+%   \endgroup
+%   \caption{Projection, finite aperture, focus and vignetting of prior camera models and calibration methods and of the radiometric camera (ours), and what each calibrates from images.}
+%   \label{tab:related}
+% \end{table*}
+
+In this paper, we make two major contributions, the \textit{radiometric camera} and its \textit{calibration}. The \textit{first} is a model that lifts any central geometric camera model to a radiometric
+one. The lifted model keeps
+the projection of the geometric model and replaces the pinhole
+aperture by a finite aperture with a free-form focus surface and a
+generic vignetting function. Setting the aperture to a pinhole
+recovers the geometric model. To our knowledge, it is the first model
+that generalizes the central camera models in common use with the major
+radiometric components of a lens, its aperture, focus and vignetting,
+\textit{and} that is calibrated in all of them jointly from images of a
+standard calibration target (\cref{tab:related}).
+
+The radiometric camera unlocks more complex multi-view radiometric
+problems, in which several views jointly constrain radiometric
+unknowns such as the radiant intensity distribution and the pose of a
+light source
+\cite{weber2001practical,park2014nonisotropic,visentini2015simultaneous,santo2018pinmotion}
+or the attenuation of water
+\cite{bryson2016truecolor,skinner2017automatic,akkaynak2019seathru,nakath2021insitu}.
+We aim to solve such problems generatively, \ie by a maximum-likelihood estimate of the scene,
+which requires an image-formation model that predicts the measurements
+of the sensor from the scene. The camera is the last stage of this
+model. The irradiance at a sensor point is gathered over the cone of rays that the
+aperture admits, and where the lens is out of focus, these rays come
+from different scene points. Earlier radiometric extensions of
+geometric cameras relate each sensor value to the radiance of a single
+scene point, or add corrections to the image
+\cite{Kim-PAMI-2008,rehder2017direct,Hannemose_2019}. The difficulty in extending a geometric camera to
+radiometry is that the quantities to be added depend on exactly the components that the
+pinhole aperture removed. The \textit{radiometric} camera
+restores them, so that the irradiance becomes the integral over the whole
+aperture. We address its \textit{calibration} by inverse rendering on the RAW photosites, whose values are
+proportional to the irradiance that they receive, from the same
+images of standard calibration targets as a geometric
+calibration. The constraints are not the incidences of detected
+features with their projections, but the relative radiant flux of the
+photosites, which the same target under the same lighting must explain
+in every view.
+
+However, differentiating a camera
+with a finite aperture gives rise to boundary terms, from the
+aperture, the discontinuous edges of the calibration pattern and from
+visibility, which bias the gradients of standard differentiable
+renderers \cite{Zhang:2020:PSDR}. Moreover, the lighting, the reflectance and the shape of
+the target have to be estimated simultaneously without being confused
+with the camera's defocus and vignetting. We give a single formulation
+that resolves all of these difficulties. Neither a parameter-dependent
+discontinuity nor a parameter-dependent integration domain remains in
+it, the focus surface is parameterized so that its gradient does not
+vanish, the lighting varies over the target so that it separates from
+the vignetting, the gauge freedoms between the camera,
+the lighting and the target are fixed exactly, the shape of the
+target is a bending of the board with few parameters, and the linear
+structure of the model in the lighting and the vignetting gives a
+closed-form start. We use the calibration to validate the components
+of the model in three respects. \textit{First}, they benefit the geometric
+accuracy. We show that the feature detections of widely used
+calibration tools are biased, and that the radiometric calibration,
+which uses none, lowers the reprojection error on a held-out
+high-precision target. \textit{Second}, their estimated parameters represent
+the physical phenomena. The focus surface is learned as a plane for a wide-angle lens and as
+a hemisphere for a fisheye, and the vignetting function reproduces a
+flat field measured through a diffuser. \textit{Third}, the calibrated camera
+solves a first multi-view radiometric problem: it recovers the
+unknown in-focus reflectance of a texture from defocused images.
+
+% Introduction end
+%------------------------------------
+
+
+% ---- Ties's introduction of 11-16, kept for reference ----
+% The pinhole camera models the process of image formation geometrically by postulating that all light rays reaching the sensor must have passed through the pinhole.
+% From a geometrical point of view, this enables using projective geometry on primitives like points, lines or conics and a rich and beautiful theory has been established on multi-view relations based on those entities.
+% However, real cameras measure the amount of light energy falling onto a pixel, and not the parameters of a line, a corner or a circle.
+% To counteract the physically limited pinhole model, lens models have been developed, reaching from a lens of infinitesimal width to the expression of all lens surfaces in an objective.
+% Models like the thin lens model \cite{TODO} are too limited whereas the complex physical model are in practice intractable.
+% Besides the introduction of lens models, methods have been introduced that directly work with the image signal (\cite{D,E,F}), for example inverse rendering \cite{TODO}.
+% To benefit from both worlds, we lift the existing easy-to-use geometric camera models into radiometry.
+% To do so, we model the lens by a thin lens and equip it with pinhole-distortion methods, generic defocus and vignetting properties.
+% There exist other methods to model the vignetting and defocus like TODO.
+% However, our method differs since our camera model directly inherits these radiometric properties.
+% To achieve this and simultaneously keep the simplicity of the thin lens model as well as the geometric projection models, we extend the thin lens and geometric models with generic vignetting and generic defocus properties.
+% We demonstrate on several lenses that such a model outperforms the state-of-art in geometric camera calibration.
+% We show that the learned vignetting from our radiometric camera calibration matches a flat field measure and is physically much more accurate and adaptive compared to the vignetting which the thin lens model inherits.
+% We verify that we learn a plane as focus surface for a ``standard'' lens and a sphere for a fisheye lens.
+% % We propose to use our radiometric model in every inverse rendering downstream task.
+% We present that a biased radiometric camera model (\eg pinhole model) can propagate a bias through inverse rendering.
+% We show this by the downstream task of texture optimization.
+
+\begin{table}[t]
+  \centering
+  \begingroup
+  \footnotesize\setlength{\tabcolsep}{2pt}%
+  \newcommand{\y}{\checkmark}\newcommand{\p}{(\checkmark)}\newcommand{\n}{--}%
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}ccccc@{}}
+    \toprule
+     & \textbf{Proj.} & \textbf{Apert.} & \textbf{Focus} & \textbf{Vign.} & \textbf{Calib.} \\
+    \midrule
+    Thin lens \cite{pharr2023physically}, Mitsuba \cite{Mitsuba3} & \p & \y & \p & \p & \n \\
+    Lens-design ray tracing \cite{kolb1995realistic} & \p & \y & \p & \p & \n \\
+    Tang and Kutulakos \cite{tang2013aberrated} & \p & \y & \p & \p & \n \\
+    \addlinespace
+    Kang and Weiss \cite{kang2000calibrate} & \p & \n & \n & \p & \p \\
+    Kim and Pollefeys \cite{Kim-PAMI-2008} & \n & \n & \n & \y & \p \\
+    Neural lens model \cite{xian2023neurallens} & \y & \n & \n & \y & \p \\
+    Rehder \etal \cite{rehder2017direct} & \p & \n & \n & \n & \p \\
+    Hannemose \etal \cite{Hannemose_2019} & \p & \n & \n & \n & \p \\
+    Lens blur fields \cite{lin2023blurfields} & \n & \p & \n & \n & \p \\
+    \addlinespace
+    \textbf{Radiometric camera (ours)} & \y & \y & \y & \y & \y \\
+    \bottomrule
+  \end{tabular*}
+  \endgroup
+  \caption{Prior camera models (top) and calibration methods (middle) against the radiometric camera: any central projection, a finite aperture, a free-form focus surface, a generic vignetting function, and the joint calibration of all of them from images. \checkmark: general; (\checkmark): restricted, \eg to the perspective projection, a plane of focus, the $\cos^4$ falloff or a subset of the parameters; --: not modeled. \Cref{sec:related-work} gives the details.}
+  \label{tab:related}
+\end{table}

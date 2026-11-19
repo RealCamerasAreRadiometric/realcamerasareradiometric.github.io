@@ -1,0 +1,17 @@
+set	model	variant	stat	start	refined	change_pct	photos_start	photos_refined	dots_start	dots_refined	retcode_start	retcode_refined	retcode_refinement	converged	coverage_dots_start	coverage_dots_refined	coverage_fraction_start	coverage_fraction_refined	refined_all	photos_refined_all
+Tamron 20 mm, Siemens stars ($f/8$)	pinhole (no defocus)	motion	median_px	2.119686	2.006974	-5.317391349473466	57	86	15732	24252	Success	Success	Success	true	15732	24252	1.0	1.0	2.006974	86
+Tamron 20 mm, Siemens stars ($f/8$)	pinhole (no defocus)	motion	mean_px	2.958382	2.793068	-5.587986946918957	57	86	15732	24252	Success	Success	Success	true	15732	24252	1.0	1.0	2.793068	86
+Tamron 20 mm, Siemens stars ($f/8$)	pinhole (no defocus)	motion	p95_px	6.930628	5.419208	-21.807836172999036	57	86	15732	24252	Success	Success	Success	true	15732	24252	1.0	1.0	5.419208	86
+Tamron 20 mm, Siemens stars ($f/8$)	pinhole (no defocus)	motion	rms_px	3.351662	3.694944	10.242142554947362	57	86	15732	24252	Success	Success	Success	true	15732	24252	1.0	1.0	3.694944	86
+Tamron 20 mm, Siemens stars ($f/8$)	with aperture + focus surface	motion	median_px	2.119686	0.453143	-78.62216384879648	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.453143	24
+Tamron 20 mm, Siemens stars ($f/8$)	with aperture + focus surface	motion	mean_px	2.958382	0.618418	-79.09607346177741	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.618418	24
+Tamron 20 mm, Siemens stars ($f/8$)	with aperture + focus surface	motion	p95_px	6.930628	1.200247	-82.68198783717725	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	1.200247	24
+Tamron 20 mm, Siemens stars ($f/8$)	with aperture + focus surface	motion	rms_px	3.351662	0.593928	-82.279597405705	57	24	15732	6600	Success	Success	Success	true	15732	6600	1.0	1.0	0.593928	24
+zoom 48 mm (f/10)	pinhole (no defocus)	motion	median_px	1.417471	0.383424	-72.95013442955799	128	85	35584	23375	Success	Success	unfinished	false	35584	23375	1.0	1.0	0.383424	85
+zoom 48 mm (f/10)	pinhole (no defocus)	motion	mean_px	1.798084	0.521807	-70.97983186547458	128	85	35584	23375	Success	Success	unfinished	false	35584	23375	1.0	1.0	0.521807	85
+zoom 48 mm (f/10)	pinhole (no defocus)	motion	p95_px	3.894811	1.062859	-72.71089662630614	128	85	35584	23375	Success	Success	unfinished	false	35584	23375	1.0	1.0	1.062859	85
+zoom 48 mm (f/10)	pinhole (no defocus)	motion	rms_px	2.274042	0.524377	-76.94075131417978	128	85	35584	23375	Success	Success	unfinished	false	35584	23375	1.0	1.0	0.524377	85
+zoom 48 mm (f/10)	with aperture + focus surface	motion	median_px	1.417471	1.329454	-6.209439205458172	128	48	35584	13104	Success	Success	Success	true	35584	13104	1.0	1.0	1.329454	48
+zoom 48 mm (f/10)	with aperture + focus surface	motion	mean_px	1.798084	1.741797	-3.130387679329774	128	48	35584	13104	Success	Success	Success	true	35584	13104	1.0	1.0	1.741797	48
+zoom 48 mm (f/10)	with aperture + focus surface	motion	p95_px	3.894811	4.251001	9.145244788514765	128	48	35584	13104	Success	Success	Success	true	35584	13104	1.0	1.0	4.251001	48
+zoom 48 mm (f/10)	with aperture + focus surface	motion	rms_px	2.274042	2.114834	-7.001102002513586	128	48	35584	13104	Success	Success	Success	true	35584	13104	1.0	1.0	2.114834	48

@@ -1,0 +1,58 @@
+# RATIONALE
+#   question    does the radiometric refinement improve with more photosites per photograph? The run of record's counts (6,000 for the
+#               parametric models, 16,528 for the spline) have no derivation: 6,000 is T. Harder's night run of 2026-10-31
+#               (si_14mm_bc5, max_pixels_per_view), carried into the configs of record as "handover" (2026-11-03); 16,528 arrived with the
+#               spline cases (2026-11-05)
+#   hypothesis  16,384 samples per photograph lowers the refinement's cost trajectory and the held-out Thorlabs error of the
+#               Kannala-Brandt model against 6,000, at the same seed and draw
+#   decides     whether the parametric cases' samples_per_view of record stays 6,000 (owner, after this record)
+#   decided     the counts of record 8,192 per photograph for every global model, 16,384 for every spline (owner 2026-11-16 23:30;
+#               radiometric_refinement.toml [kinds]); this record: si30_kb_warped 16,384 vs 6,000, held-out Thorlabs median 0.3281 vs
+#               0.3287 px, Δ −0.0006 [−0.0015, +0.0003] px n.s. (141 photographs, 40,744 dots; rc-results-0.11.5, 2026-11-16 16:45)
+#   evidence    this experiment's record: the two arms' LM trajectories and their paired Thorlabs bootstrap — KB 14 mm 16,384 vs 6,000:
+#               Δ median −0.0006 [−0.0015, +0.0003] px, n.s.; the trajectories agree to ≈ 0.1 %
+#   owner       J. Pritts (2026-11-16: "run one with 16,384, compare the iterations and see if it's improving")
+#   date        2026-11-16
+#
+# A side experiment (experiments as overrides): the sampling-strategy driver on ONE case of record, si30_kb_warped (14 mm, Siemens
+# stars, Kannala-Brandt, the run of record's config), two arms of the uniform draw that differ only in samples_per_view. Not a
+# release, not the paper's numbers.
+#   julia --project=experiments experiments/scripts/sampling_strategy.jl --config=experiments/configs/studies/sampling_strategy_kb_count.toml [--plan]
+
+[experiment]
+name = "sampling_strategy"
+
+[inputs]
+
+[sampling_strategy]
+cases = ["si30_kb"]
+variants = ["n6000", "n16384"]          # run order
+reference = "n6000"                     # every paired difference is n16384 - n6000
+headline = ["n16384"]
+label = "sample count (side experiment, 2026-11-16)"
+dome_tolerance = 0.12                   # derivation: as the config of record sampling_strategy.toml (the edge-sampling sweep's dome criterion)
+
+# ---- the arms: the uniform draw (alpha = 0) at two counts; every draw key the mode reads stated --------------------------------
+[variants.n6000]
+"masks.gradient_bias" = 0.0
+"masks.samples_per_view" = 6000         # the case's count of record (radiometric_refinement.toml si30_kb_warped)
+
+[variants.n16384]
+"masks.gradient_bias" = 0.0
+"masks.samples_per_view" = 16384        # owner 2026-11-16: 2^14, about 2.7 x the count of record
+
+# ---- the case -------------------------------------------------------------------------------------------------------------------
+[cases.si30_kb]
+refinement = "configs/experiments/radiometric_refinement.toml"
+case = "si30_kb_warped"
+chrome = "configs/experiments/chrome_evaluation_fx3_14mm_central30cm.toml"
+context = ["si30_spline_start", "si30_kb_start"]   # the set's Schöps baseline and Kannala-Brandt start (as the config of record's texcal_14mm)
+
+[runtime]
+reference_s_per_iteration = { si30_kb = 60.0 }   # derivation: the run of record's si30_kb_warped refinement (about 25 min at 6,000 samples):
+                                                  #   order of a minute per LM iteration; a run 2x slower is reported as a regression
+regression_factor = 2.0
+
+[figure]
+asset = "fig_sampling_count.tex"
+table = "tab_sampling_count.tex"
