@@ -4,6 +4,8 @@
 #                     #   cross-references between them resolve, as the author kit intends)
 #   make paper        # build/paper.pdf: the pages of build/main.pdf before the supplement
 #   make supp         # build/supp.pdf: the supplement, from its "Supplementary Material" title page on
+#   make teaser       # build/teaser.png: the teaser figure alone (tools/teaser_standalone.tex), for the project page
+#                     #   (= make teaser-pdf teaser-png; CI's paper job compiles the PDF and runs `make teaser-png`)
 #   make figures      # regenerate every generated asset (../experiments/scripts/regenerate_paper.jl)
 #   make figures-gpu  # ... plus the CUDA figures
 #   make check        # the experiments' suite (../experiments/test/runtests.jl: a paper project has no UUID, Pkg.test refuses)
@@ -20,7 +22,7 @@ TEXENV    := TEXINPUTS=.: BIBINPUTS=.: BSTINPUTS=.:
 PROJ_DIR := $(PAPER_DIR)/../experiments
 JL := julia --startup-file=no --project=.
 
-.PHONY: all pdf paper supp figures figures-gpu check figcheck clean
+.PHONY: all pdf paper supp teaser teaser-pdf teaser-png figures figures-gpu check figcheck clean
 
 all: paper supp
 
@@ -41,6 +43,16 @@ supp: pdf
 	@cd $(PAPER_DIR) && s=$(SUPP_PAGE); \
 	if [ -z "$$s" ]; then echo "supp: build/main.pdf has no 'Supplementary Material' page (is sec/X_suppl.tex input in main.tex?)" >&2; exit 1; fi; \
 	qpdf --empty --pages $(BUILD)/main.pdf $$s-z -- $(BUILD)/supp.pdf && echo "supp: build/supp.pdf = pages $$s-end"
+
+# The teaser for the project page (site/build.sh): fig/teaser.tex compiled at the paper's column width, rasterized at
+# 600 dpi (3.28 in -> ~1970 px wide, twice the page's display width) on a white background.
+teaser: teaser-pdf teaser-png
+
+teaser-pdf:
+	cd $(PAPER_DIR) && $(TEXENV) $(LATEXMK) $(LFLAGS) tools/teaser_standalone.tex
+
+teaser-png:
+	cd $(PAPER_DIR) && pdftoppm -png -r 600 -singlefile $(BUILD)/teaser_standalone.pdf $(BUILD)/teaser
 
 # Staleness guard: warn when result-affecting code or a config of record changed
 # in a commit after the last one that regenerated the numbers (latex/numbers.tex

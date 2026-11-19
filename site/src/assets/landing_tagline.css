@@ -1,4 +1,4 @@
-/* The landing hero, centred: project name, subtitle, the author block and the
+/* The landing page's own styles (index.md). The landing hero, centred: project name, subtitle, the author block and the
    buttons. Scoped to #landing like DocumenterLandingPage's own rules, which
    use the id and would otherwise win. The tagline holds the author block
    (authors and venue, one per line); the plugin renders it as plain
@@ -22,3 +22,13 @@
 
 /* The Paper button until the arXiv URL is in index.md: shown, greyed, not a link. */
 #landing a[href="#"] { opacity: 0.45; pointer-events: none; cursor: default; }
+
+/* The paper's teaser under the hero (index.md): the figure at the full content width on white, as in the paper, with a
+   thin border and padding; on the dark themes it stays white (the figure is drawn for white paper). */
+.landing-teaser { margin: 1.5rem 0; }
+.landing-teaser img { display: block; width: 100%; height: auto; background: #fff; padding: 0.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; box-sizing: border-box; }
+.landing-teaser figcaption { margin-top: 0.5rem; font-size: 0.9em; text-align: center; opacity: 0.85; }
+html.theme--documenter-dark .landing-teaser img, html.theme--catppuccin-frappe .landing-teaser img,
+html.theme--catppuccin-macchiato .landing-teaser img, html.theme--catppuccin-mocha .landing-teaser img {
+    border-color: rgba(255, 255, 255, 0.2); }

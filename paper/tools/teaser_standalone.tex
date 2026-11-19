@@ -1,0 +1,16 @@
+% The paper's teaser (fig/teaser.tex) alone on a page, for the project page (site/build.sh copies build/teaser.png into it).
+% Built from paper/ by `make teaser` (latexmk, then pdftoppm) and by the paper job of .github/workflows/site.yml.
+% It typesets fig/teaser.tex exactly as the paper does: in a box of the paper's column width (cvpr.sty: \textwidth 6.875in,
+% \columnsep 0.3125in, two columns), with the paper's 10pt Times fonts (cvpr.sty loads times) and pgfplots compat 1.18.
+\documentclass[10pt,border=0pt]{standalone}
+\usepackage{times}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}\pgfplotsset{compat=1.18}
+\input{preamble}
+\begin{document}
+\begin{minipage}{\dimexpr(6.875in-0.3125in)/2\relax}
+\centering
+\input{fig/teaser}
+\end{minipage}
+\end{document}

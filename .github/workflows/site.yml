@@ -24,17 +24,29 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      # paper/Makefile's `make pdf` (latexmk, the same flags), in a pinned TeX Live 2024 image; the PDF is never committed.
+      # paper/Makefile's `make pdf` and `make teaser-pdf` (latexmk, the same flags), in a pinned TeX Live 2024 image:
+      # build/main.pdf and build/teaser_standalone.pdf (the teaser alone, tools/teaser_standalone.tex). Never committed.
       - uses: xu-cheng/latex-action@v3
         with:
           texlive_version: 2024
           working_directory: paper
-          root_file: main.tex
+          root_file: |
+            main.tex
+            tools/teaser_standalone.tex
           args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error -outdir=build
+      # paper/Makefile's `make teaser-png`: the teaser for the project page, build/teaser.png (pdftoppm, poppler-utils).
+      - name: Rasterize the teaser
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends poppler-utils make
+          sudo chown -R "$(id -u):$(id -g)" paper/build   # the TeX container may have written it as root
+          make -C paper teaser-png
       - uses: actions/upload-artifact@v4
         with:
           name: paper
-          path: paper/build/main.pdf
+          path: |
+            paper/build/main.pdf
+            paper/build/teaser.png
           if-no-files-found: error
           retention-days: 7
 

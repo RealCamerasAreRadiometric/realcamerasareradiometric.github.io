@@ -44,7 +44,16 @@ features:
 <!-- ARXIV: the arXiv URL goes in the "arXiv" action above and in the Paper and Citation sections below -->
 ```
 
-<!-- TEASER: the paper's figures go here later (owner, 2026-11-10) -->
+```@raw html
+<!-- The paper's teaser (paper/fig/teaser.tex and teaser-caption.tex): the image is rendered from the paper's source by
+     `make -C paper teaser` (CI: the paper job) and copied here by site/build.sh; the caption is the paper's, as text. -->
+<figure class="landing-teaser">
+  <img src="assets/landing/teaser.png" width="1969" height="942"
+       alt="Top: a crop of a panorama stitched without vignetting correction, where the seams between the images show as dark bands, and the same crop with our vignetting correction, where they vanish. Bottom: three lines of a printed page, cut into four parts from left to right: the ground truth, a defocused training photograph, the texture learned with a pinhole camera, which stays blurred, and the texture learned with our radiometric camera, which is sharp.">
+  <figcaption>Our radiometric camera model can be applied in downstream tasks like vignetting correction in panorama
+  stitching or texture learning in inverse rendering.</figcaption>
+</figure>
+```
 
 A camera model with an aperture, a focus surface and a vignetting function around any central geometric model, calibrated from the light the sensor measures.
 
