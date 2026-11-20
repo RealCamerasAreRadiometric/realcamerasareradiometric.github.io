@@ -32,8 +32,67 @@ struct RadiometricCameraModel{L, F <: Focus, T <: Real, V <: AbstractVignetting}
     aperture_radius::T
     vignetting::V
 end
+"""
+    RadiometricCameraModel(lens; focus, aperture_radius, vignetting = V ≡ 1)
+
+The radiometric camera composed from its geometric camera `lens` (a VisualGeometryToolkitCore camera bounded by its image: a
+`BoundedCamera` of a `CameraModel` over any Core lens, or a grid model) by adding the three parts a geometric camera lacks:
+
+- `focus`: the focus surface, a [`Focus`](@ref), or a distance in metres — the surface focused at that distance everywhere
+  (`Focus(lens, distance)`, a 3 × 3 thin plate spline on the camera's image);
+- `aperture_radius`: the radius r of the aperture disc, metres;
+- `vignetting`: Core's `AbstractVignetting` on the camera's image; by default V ≡ 1 as a flat 4 × 4 quadratic B-spline surface over
+  the image (`TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2)`), the surface a calibration then estimates.
+
+The image size is the geometric camera's (`extent`): it is stated once. The camera's parts are replaced one at a time by
+[`with_lens`](@ref), [`with_focus`](@ref), [`with_aperture_radius`](@ref) and [`with_vignetting`](@ref).
+"""
+function RadiometricCameraModel(lens::VgtkCore.BoundedCamera; focus, aperture_radius::Real,
+                                vignetting::AbstractVignetting = _flat_vignetting(lens))
+    return RadiometricCameraModel(lens, _focus_surface(lens, focus), aperture_radius, vignetting)
+end
+_focus_surface(lens, focus::Focus) = focus
+_focus_surface(lens, distance::Real) = Focus(lens, distance)
+"""The image rectangle `[0, W] × [0, H]` of a bounded geometric camera (COLMAP pixels): the domain of its focus and vignetting surfaces."""
+_image_rect(lens::VgtkCore.BoundedCamera) = ((W, H) = VgtkCore.extent(lens); VgtkCore.Rect(0, 0, W, H))
+"""V ≡ 1 on the camera's image: the flat 4 × 4 quadratic B-spline surface (Core's `TensorProductVignetting`)."""
+_flat_vignetting(lens::VgtkCore.BoundedCamera) = VgtkCore.TensorProductVignetting((4, 4), _image_rect(lens); degree = 2)
+
+"""
+    Focus(lens, focus_distance; nodes = 3, T = Float64)
+
+The constant focus surface `𝔱 ≡ focus_distance` (metres) on the `nodes × nodes` grid of the image of the geometric camera `lens` (its
+`extent`): `Focus(nodes, focus_distance, W, H)`.
+"""
+Focus(lens::VgtkCore.BoundedCamera, focus_distance::Real; nodes::Integer = 3, T = Float64) =
+    ((W, H) = VgtkCore.extent(lens); Focus(nodes, focus_distance, W, H; T))
+
+"""The camera with its geometric camera (the lens, Θ_d) replaced."""
+with_lens(c::RadiometricCameraModel, lens) = RadiometricCameraModel(lens, c.focus, c.aperture_radius, c.vignetting)
+"""The camera with its focus surface (Θ_f) replaced."""
+with_focus(c::RadiometricCameraModel, f::Focus) = RadiometricCameraModel(c.lens, f, c.aperture_radius, c.vignetting)
+"""The camera with its aperture radius r (metres) replaced."""
+with_aperture_radius(c::RadiometricCameraModel, r::Real) = RadiometricCameraModel(c.lens, c.focus, r, c.vignetting)
 """The camera with its vignetting replaced."""
 with_vignetting(c::RadiometricCameraModel, v::AbstractVignetting) = RadiometricCameraModel(c.lens, c.focus, c.aperture_radius, v)
+"""
+    focus(camera::RadiometricCameraModel) -> Focus
+
+The camera's focus surface (Θ_f).
+"""
+focus(c::RadiometricCameraModel) = c.focus
+"""
+    aperture_radius(camera::RadiometricCameraModel)
+
+The camera's aperture radius r, in metres.
+"""
+aperture_radius(c::RadiometricCameraModel) = c.aperture_radius
+"""
+    lens(camera::RadiometricCameraModel)
+
+The camera's geometric model π⁻¹ (Θ_d): Core's pixel camera or a grid model.
+"""
+lens(c::RadiometricCameraModel) = c.lens
 # the geometric camera's maps (Core's contract generics), forwarded to the lens
 VgtkCore.project(c::RadiometricCameraModel, X) = VgtkCore.project(c.lens, X)
 VgtkCore.backproject(c::RadiometricCameraModel, 𝐩) = VgtkCore.backproject(c.lens, 𝐩)

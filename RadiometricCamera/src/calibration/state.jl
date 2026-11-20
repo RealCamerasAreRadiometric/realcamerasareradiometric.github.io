@@ -170,19 +170,19 @@ view_of(s::CalibrationState, k::Integer) = View(s.poses[k], s.camera)
 
 The geometric model π⁻¹ (Θ_d) the views share: Core's pixel camera or a grid model.
 """
-lens(s::CalibrationState) = s.camera.lens
+lens(s::CalibrationState) = lens(s.camera)
 """
     focus(s::CalibrationState) -> Focus
 
 The focus surface (Θ_f) the views share.
 """
-focus(s::CalibrationState) = s.camera.focus
+focus(s::CalibrationState) = focus(s.camera)
 """
     aperture_radius(s::CalibrationState)
 
 The aperture radius r the views share, in metres.
 """
-aperture_radius(s::CalibrationState) = s.camera.aperture_radius
+aperture_radius(s::CalibrationState) = aperture_radius(s.camera)
 """The scene's surface parameters: the board warping h and the print's edge parameters (`BoardSurface`)."""
 board_surface(s::CalibrationState) = s.scene.surface
 """Replace the scene's surface parameters (host precision: the scene's element type)."""
