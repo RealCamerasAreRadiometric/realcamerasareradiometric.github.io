@@ -481,7 +481,7 @@ function _tile_dev!(r::PerTileResidual)
     end
     sh(a) = _shared_read_only!(s.backend, a)                  # read on the window's queues too, written only here
     d = (; px = sh(adapt(s.backend, ids)), idx = sh(_index_list(s.backend, length(ids))), pix = sh(adapt(s.backend, Int32.(r.pix))),
-          ϕ = sh(adapt(s.backend, r.ϕt)), ω = _device_weights(s.backend, r.ωt), layouts = Dict{Tuple{Int, Tuple{Vararg{Symbol}}}, Any}())
+          ϕ = sh(adapt(s.backend, r.ϕt)), ω = _device_weights(s.backend, r.ωt), layouts = Dict{Any, Any}())
     r.dev[] = d
     return d
 end
@@ -516,7 +516,7 @@ function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::_PoseBlock, p0
     ent = _view_batch!(s, r, vars, true)
     ivs = ent === nothing ? (1:length(r.pix)) : r.pix
     ent === nothing && (ent = _tile_batch(r, vars, true))
-    return (; _tile_jacobian(r, ent, lay, vars...; ivs, varflags)..., ent.flux, ivs)
+    return (; _tile_jacobian(r, ent, lay, vars...; ivs)..., ent.flux, ivs)
 end
 
 """The per-tile `computeresjac` as host arrays: ONE implementation on every backend (the pixel functors of device/jacobian_kernels.jl on the state's
@@ -755,20 +755,20 @@ end
 
 
 """
-    _tile_jacobian(r, ent, lay, vars...; ivs = r.pix, varflags) -> (; J, res, T, lay)
+    _tile_jacobian(r, ent, lay, vars...; ivs = r.pix) -> (; J, res, T, lay)
 
 One tile's Jacobian on the state's backend from the view-level device buffers `ent` (`_batch_launch`; the tile's pixels at the
 buffer's pixels `ivs`): the row kernel (`_jacobian_row!`) over the tile's pixels — the AD scatter, the focus chain, the patch fan-out
 on the tile's window lens, the parts' and the heights' columns — `J` (the layout's full
 columns × the measured rows) and the residual `res` on the backend, the column map `T` to the problem's coordinates
-(`_column_map`) and the layout (its device form cached per `varflags` and the material block's `material_fixed` in the tile's device data). The non-finite
+(`_column_map`) and the layout (its device form cached, keyed by the layout itself, in the tile's device data). The non-finite
 entries are scrubbed where the blocks are formed (`_gauss_newton_blocks`, `_host_jacobian`). The same kernels' values and the same
 per-entry arithmetic as the host assembly it replaced.
 """
 function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::_Patch{PX, PY},
                         p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
                         ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold,
-                        lt::LightingVar; ivs = r.pix, varflags) where {N, PX, PY}
+                        lt::LightingVar; ivs = r.pix) where {N, PX, PY}
     s = r.state
     be = s.backend
     NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
@@ -785,7 +785,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     VgtkCore._launch_rows!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(s.scene.H), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
-                           _cached_layout(td.layouts, (Int(varflags), material_fixed(m)), be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
+                           _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N),
                            s.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,
                            need_g ? adapt(be, _window_bases(lens64, PX, PY)) : nothing, r.P0, need_g ? (Val(PX), Val(PY)) : nothing,

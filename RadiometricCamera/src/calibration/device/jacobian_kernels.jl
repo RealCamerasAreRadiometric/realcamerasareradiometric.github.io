@@ -220,11 +220,13 @@ const _DEVICE_COPIES = WeakKeyDict{Any, Any}()
 """Held while a lazily built entry of a state's device cache or a device copy is formed (`_device_copy`, `_cached_layout`,
 `_view_layouts`, `_focus_weights`): the views' jobs run concurrently (`_windowed`)."""
 const _DEVICE_CACHE_LOCK = ReentrantLock()
-"""The device form (`_kernel_layout`) of the layout `lay` under the key `key` of the dictionary `cache` (a view's varflags in the
-state's device cache, a tile's in its own), formed once."""
-_cached_layout(cache::AbstractDict, key, be, lay) =
+"""The device form (`_kernel_layout`) of the layout `lay` in the dictionary `cache` (the state's device cache for a view, a tile's
+own), formed once. The key is the layout itself (compared by value): varflags and `material_fixed` alone do not determine it — the
+free board heights (`NH`), the in-plane print error (`NI`) and the block sizes change its slots, and a layout cached under a
+coarser key was read against another layout's slot rows (`S`), past their end."""
+_cached_layout(cache::AbstractDict, be, lay) =
     lock(() -> get!(() -> (k = _kernel_layout(be, lay); _shared_read_only!(be, k.scatter); k.free === nothing || _shared_read_only!(be, k.free); k),
-                    cache, key), _DEVICE_CACHE_LOCK)
+                    cache, lay), _DEVICE_CACHE_LOCK)
 
 """
     _column_map(lay, c, foc, ap, m) -> T
@@ -419,20 +421,20 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
     VgtkCore._launch_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(s.scene.H), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
-                           _cached_layout(_view_layouts(s), (Int(varflags), material_fixed(m)), be, lay), ph, (J, NV), hh,
+                           _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
     _note_block_bytes!(s, _device_bytes(rays, hrays === rays ? nothing : hrays, S, hh, ph, flux, Jd, rd) +
                        sum(sizeof, hs; init = 0))
     return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, foc, ap, m))
 end
-"""The device layouts of the views' Jacobians by varflags and the material block's `material_fixed` (`_cached_layout`; every view of a state has the
-same layout), kept in the device cache."""
+"""The device layouts of the views' Jacobians, keyed by the layout (`_cached_layout`; every view of a state has the same layout for
+the same free blocks), kept in the device cache."""
 function _view_layouts(s::CalibrationState)
     return lock(_DEVICE_CACHE_LOCK) do
         dc = _ensure_device!(s)
         d = get(dc, :view_layouts, nothing)
-        d === nothing && (d = Dict{Tuple{Int, Tuple{Vararg{Symbol}}}, Any}(); s.device_cache = merge(dc, (; view_layouts = d)))
+        d === nothing && (d = Dict{Any, Any}(); s.device_cache = merge(dc, (; view_layouts = d)))
         d
     end
 end

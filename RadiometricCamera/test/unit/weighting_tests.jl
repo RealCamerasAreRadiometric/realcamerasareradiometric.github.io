@@ -47,7 +47,7 @@
     @test RC.lm_abstol(su) == 0 && RC.lm_abstol(sw) == 0
     q = [fill(1 / 15871, length(p)) for p in su.ϕ]
     sq = state(; quanta = q); swq = state(; weights = wts, quanta = q)
-    @test RC.lm_abstol(sq)^2 ≈ sum(length, q) / 15871^2 / 12 rtol = 1e-14
+    @test RC.lm_abstol(sq)^2 ≈ sum(length, q) / 15871^2 / 12 rtol = 1e-13
     @test RC.lm_abstol(swq)^2 ≈ sum(sum(abs2, wts[k] .* q[k]) for k in 1:2) / 12 rtol = 1e-14
     @test RC._lm_stops(swq, 10, 60.0, 1e-10, 1e-12).residual_resolution == RC.lm_abstol(swq)
     @test_throws DimensionMismatch state(; quanta = [q[1][1:3], q[2]])

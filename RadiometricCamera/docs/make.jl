@@ -7,7 +7,7 @@ using RadiometricCamera
 # Build with
 #     julia +1.13 --project=docs --startup-file=no docs/make.jl [build directory]
 # (--startup-file=no: a startup.jl that activates another environment overrides --project); the site lands in docs/build/, or
-# in the directory given (site/build.sh passes <site>/docs).
+# in the directory given (site/build.sh gives <site>/docs).
 makedocs(;
     build = isempty(ARGS) ? "build" : abspath(ARGS[1]),
     # The repository root, which holds the package in its subdirectory RadiometricCamera/ (Documenter takes the source paths
