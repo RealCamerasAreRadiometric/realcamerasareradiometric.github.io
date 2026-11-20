@@ -395,7 +395,8 @@ loop of chief-ray hits).
 | RadiometricCamera, goldens (39 checks, rtol 1e-10) | ee6c96b | 39 succeed; no golden re-recorded |
 | docs build (`docs/make.jl`) | ee6c96b | exit 0, no warning |
 | experiments, CPU tier + GPU item | 30ad4c2, ee6c96b | 4,713 + 8 succeed, 6 marked broken before this branch |
-| RadiometricCamera, all tiers | bfbce88 (the branch's code head) | running when this was written; see the hand-back |
+| RadiometricCamera, all tiers in one Pkg.test | 016a6e7 (the branch's code head) | CPU tier 16,189 succeed (3 marked broken before this branch), GPU tier 521, goldens 39 |
+| experiments, CPU tier + GPU item | 016a6e7 | 4,713 + 8 succeed, 6 marked broken before this branch |
 
 The GPU items had not run since the camera-first refactor; they succeed on the branch.
 
