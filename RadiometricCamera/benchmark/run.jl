@@ -7,6 +7,8 @@
 #     backend=cpu|gpu     the state's device (`rc_backend`); the forward stages that take a backend run on it too      [cpu]
 #     size=320x240        the image, pixels                                                                             [320x240]
 #     views=3             the photographs                                                                               [3]
+#     pixels=0            the measured pixels per view: every `n`-th masked pixel so that about `pixels` remain (a real
+#                         run samples 8,192 to 16,384 per photograph); 0: every masked pixel                             [0]
 #     reps=3              timed runs per stage after the first (the minimum is reported)                                [3]
 #     stages=<regex>      only the stages whose name matches                                                            [all]
 #     out=<file.json>     the results as a record (benchmark/compare.jl reads two of them)                              [none]
@@ -44,6 +46,7 @@ option(key, default) = (i = findfirst(a -> startswith(a, key * "="), ARGS); i ==
 const BACKEND = option("backend", "cpu")
 const W, H = parse.(Int, split(option("size", "320x240"), "x"))
 const VIEWS = parse(Int, option("views", "3"))
+const PIXELS = parse(Int, option("pixels", "0"))
 const REPS = parse(Int, option("reps", "3"))
 const STAGES = Regex(option("stages", "."))
 const OUT = option("out", "")
@@ -72,12 +75,20 @@ function benchmark_scene()
     camera = RC.RadiometricCameraModel(lens, RC.Focus(3, 1.5, W, H), 0.04, vig)
     cpu = KA.CPU()
     masks = [RC.compute_mask(camera, p, scene, settings; δ = 0.02, backend = cpu) for p in poses]
+    PIXELS > 0 && (masks = map(thinned, masks))
     photos = [RC.render_view(k, camera, poses[k], mat, light, scene, settings, masks[k]) for k in 1:VIEWS]
     start_light = EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH)
     # the timed states: a perturbed start on the benchmark's device
     state(lens_ = lens) = RC.CalibrationState(scene, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
                                               RC.Material(; μ = 0.7), start_light, photos; masks, backend = BE)
     return (; board, scene, settings, poses, light, mat, camera, masks, photos, state, lens)
+end
+
+"The mask with every `n`-th of its pixels kept, about `PIXELS` of them."
+function thinned(mask)
+    ids = findall(mask); n = max(1, length(ids) ÷ PIXELS)
+    out = falses(size(mask)); out[ids[1:n:end]] .= true
+    return out
 end
 
 # ---- the measurement ---------------------------------------------------------------------------------------------------------------
@@ -216,7 +227,7 @@ function main()
         commit = try readchomp(`git -C $(@__DIR__) rev-parse --short HEAD`) catch; "" end
         record = Dict{String, Any}("schema" => "rc/benchmark/v1.0", "label" => LABEL, "commit" => commit, "julia" => string(VERSION),
                                    "threads" => Threads.nthreads(), "backend" => BACKEND, "device" => device_name(), "size" => [W, H], "views" => VIEWS,
-                                   "masked_pixels" => npx, "reps" => REPS, "stages" => results,
+                                   "masked_pixels" => npx, "pixels" => PIXELS, "reps" => REPS, "stages" => results,
                                    "inferred" => Dict(n => Dict("type" => v.type, "concrete" => v.concrete) for (n, v) in inf))
         open(io -> JSON.print(io, record, 2), OUT, "w")
         println("\nwrote ", OUT)
