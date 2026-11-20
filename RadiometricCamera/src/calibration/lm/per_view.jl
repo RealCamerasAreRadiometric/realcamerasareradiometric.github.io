@@ -361,10 +361,11 @@ struct JacTag end
 
 """
 Column bookkeeping shared by the CPU and GPU Jacobians. AD slots cover only the genuinely nonlinear
-blocks (pose 6, distortion ND, focus NS sample slots, material ∖ {μ} 8, with a free board warping the NH = HEIGHT_NC nodal heights
-(`height_cols`: HEIGHT_NFREE columns, the raw partials folded through the material block's basis by the caller), with a free in-plane
+blocks (pose 6, distortion ND, focus NS sample slots, material ∖ {μ} 8, with a free in-plane
 print error its NI = INPLANE_NC parameters (`inplane_cols`, plain seeds in the scatter), the aperture radius 1;
-`P = 14 + ND + NS + NH + NI (+1)`); the
+`P = 14 + ND + NS + NI (+1)`). A free board warping's NH = HEIGHT_NC nodal heights take no slot (`height_cols`: HEIGHT_NFREE
+columns, the height kernel's raw partials folded through the material block's basis by the row kernel): a slot no chunk seeds
+widened every dual of the CPU's one chunk by 25 partials and split it in two. The
 vignetting, lighting and μ columns are **analytic** — Φ is linear in Θ_v and Θ_l and affine in μ, so their columns are the
 per-pixel `pixel_parts` responses (same quadrature nodes and CRN draws as the render: exact per realisation). The aperture
 column is the AD partial of r seeded through the unit-disc rule `r² w̃_l L_c(·, r â_l)` (the derivative of the fixed-domain
@@ -381,8 +382,8 @@ function _jacobian_layout(varflags, N::Integer, NS::Integer, NF::Integer, NV::In
     if _bit(varflags, 1); for i in 1:6; push!(scatter, (ncol + i, off_e + i, 0)); end; ncol += 6; end
     if _bit(varflags, 2); for i in 1:ND; push!(scatter, (ncol + i, off_d + i, 0)); end; ncol += ND; end
     if _bit(varflags, 3); focus_cols = (ncol + 1):(ncol + N); ncol += N; end     # chain rule over NS t̂-sample slots
-    off_h = off_m + 8                                      # nodal-height seeds (NH of them: a free board warping) after the 8 material parameters
-    off_i = off_h + NH                                     # the in-plane print error's seeds (NI of them) after the heights
+    off_h = off_m + 8                                      # where the dual slots continue after the 8 material parameters. The nodal heights take none:
+    off_i = off_h                                          # their columns are the height kernel's (`_heights_device`); the in-plane print error's seeds (NI of them)
     off_r = off_i + NI                                     # the scalar aperture radius: one slot after the material (the heights, the in-plane error)
     if _bit(varflags, 4)
         col_r = ncol + 1; ncol += 1

@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "run.jl"))
 using RadiometricCamera: VgtkCore
 
 function linearization()
-    c = benchmark_scene(); s = c.state(); problem, _ = RC.build_problem(s)
+    c = benchmark_scene(); s = c.state(); problem, _ = RC.build_problem(s; height_degree = HEIGHT_DEGREE)
     r, vars, flags = first_block(problem, view_blocks(problem))
     pose, dist, foc, ap, m, vg, lt = vars
     dc = RC._ensure_device!(s); be = s.backend; F = RC._kernel_float(be); G = RC.HIGH_FLOAT
@@ -33,7 +33,7 @@ function linearization()
     high = G !== F
     hk = high ? RC._height_inputs(s, view0, VgtkCore.model(vg), m, lt.light) : nothing
     hrays = high ? record(hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st) : rays
-    c0s = RC._chunk_starts(lay.P, C, lay.off_h, RC.n_height(m))
+    c0s = applicable(RC._chunk_starts, lay.P, C) ? RC._chunk_starts(lay.P, C) : RC._chunk_starts(lay.P, C, lay.off_h, RC.n_height(m))
     plan = RC._chunk_plan(c0s, F, (vigk, lk, dc.scene, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.scene, hk.st, hrays))
     low = findfirst(p -> !p[4], plan); hi = findfirst(p -> p[4], plan)
     chunk(p) = RC._view_chunk(Val(p[2]), s, r, lay, p[1], C, pose, dist, foc, ap, m, p[3]...)
@@ -42,7 +42,7 @@ function linearization()
         return 1e3 * minimum((t = time_ns(); f(); KA.synchronize(be); (time_ns() - t) / 1e9) for _ in 1:REPS)
     end
     out = Dict{String, Any}("backend" => BACKEND, "device" => device_name(), "pixels" => npx, "slots" => lay.P, "columns" => lay.ncol, "chunk" => C,
-                            "chunks_low" => count(p -> !p[4], plan), "chunks_high" => count(p -> p[4], plan), "float" => string(F), "label" => LABEL)
+                            "warp" => WARP, "heights" => HEIGHT_DEGREE, "chunks_low" => count(p -> !p[4], plan), "chunks_high" => count(p -> p[4], plan), "float" => string(F), "label" => LABEL)
     out["flux_ms"] = best(() -> RC._device_rows(RC._flux_functor(s, k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, px))
     out["record_ms"] = best(() -> record(vk, vigk, mk, lk, scenek, stk))
     high && (out["record_high_ms"] = best(() -> record(hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st)))
@@ -52,6 +52,10 @@ function linearization()
         RC._parts_device(be, px, k, Hh, vk, vigk, mk, lk, scenek, stk, J, NV) :              # (before the parts took the record's hits)
         RC._parts_device(be, px, idx, k, Hh, vk, vigk, mk, lk, scenek, stk, J, NV; rays)
     out["parts_ms"] = best(parts)
+    if !isempty(lay.height_cols)                           # the nodal heights' kernel (free heights)
+        hi_in = hk === nothing ? (view = vk, vig = vigk, mat = mk, light = lk, scene = scenek, st = stk) : hk
+        out["heights_ms"] = best(() -> RC._heights_device(be, px, idx, k, Hh, hi_in.view, hi_in.vig, hi_in.mat, hi_in.light, hi_in.scene, hi_in.st, m.surface.h; rays = hrays))
+    end
     hs = chunk(plan[something(low, hi)])
     out["slots_ms"] = best(() -> RC._slot_rows(be, [(0, hs, C)], lay.P, npx))
     v = RC._view_jacobian(flags, r, vars...)

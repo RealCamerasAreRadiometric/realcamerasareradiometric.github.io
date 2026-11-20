@@ -309,7 +309,6 @@ Base.@propagate_inbounds function _height_row!(rows, hh, iv::Integer, B, height_
     end
     return nothing
 end
-"""The chunk starts of a device Jacobian of `P` dual slots in chunks of `C`: every slot but the nodal heights' (`off_h + 1 … off_h + NH`,
-the height kernel's; the heights are not seeded in the chunks), each chunk the slots `c0 + 1 … c0 + C`."""
-_chunk_starts(P::Integer, C::Integer, off_h::Integer, NH::Integer) =
-    NH == 0 ? collect(0:C:(P - 1)) : vcat(collect(0:C:(off_h - 1)), collect((off_h + NH):C:(P - 1)))
+"""The chunk starts of a device Jacobian of `P` dual slots in chunks of `C`: each chunk the slots `c0 + 1 … c0 + C` (the nodal
+heights are no slots: the height kernel's)."""
+_chunk_starts(P::Integer, C::Integer) = collect(0:C:(P - 1))

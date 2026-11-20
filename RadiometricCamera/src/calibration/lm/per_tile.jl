@@ -226,7 +226,7 @@ The aperture's one column is the scalar r, seeded in ONE slot `off_r + 1`; `NH` 
 rotation's gauge, `rotation_gauge_coordinates`; zeros: none); `fixed` the material block's (`material_fixed`: with `:material` Θ_m's
 9 columns stay zero, as `_jacobian_layout`'s).
 AD slots: `off_e = 0 | off_dir = 6 (2NS: a chief direction's two tangent seeds per sensor sample, `_dir_seeded`) | off_f = 6 + 2NS (NS) |
-off_m = 6 + 3NS (8) | off_h (NH) | off_i (NI) | off_r | P`.
+off_m = 6 + 3NS (8) | off_i = off_h (NI) | off_r | P` (the nodal heights take no slot: the height kernel's columns).
 """
 function _tile_layout(varflags, N::Integer, NS::Integer, PXY::Integer, NF::Integer, NV::Integer, J::Integer,
                       NH::Integer = 0, NI::Integer = 0; free = nothing,
@@ -236,8 +236,8 @@ function _tile_layout(varflags, N::Integer, NS::Integer, PXY::Integer, NF::Integ
     scatter = Tuple{Int, Int, Int}[]; col_r = 0; μ_col = 0
     vig_cols = 1:0; light_cols = 1:0; focus_cols = 1:0; height_cols = 1:0; inplane_cols = 1:0
     patch_cols = MVector{4, Int}(0, 0, 0, 0)
-    off_h = off_m + 8                                       # nodal-height seeds (NH of them) after the 8 material parameters
-    off_i = off_h + NH                                      # the in-plane print error's seeds (NI of them) after the heights
+    off_h = off_m + 8                                       # where the dual slots continue after the 8 material parameters: the nodal heights take none
+    off_i = off_h                                           # (the height kernel's columns); the in-plane print error's seeds (NI of them)
     mat_col0 = -1                                           # the column before the material block's (−1: the block is fixed)
     if _bit(varflags, 1)
         for i in 1:6; push!(scatter, (ncol + i, off_e + i, 0)); end
@@ -722,7 +722,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
             HIGH_FLOAT === F || (hrecordf = (be, px, idx, k, H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st))   # (CPU: the chunks' record)
             lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st, m.surface.h))
         end
-        plan = _chunk_plan(_chunk_starts(P, C, lay.off_h, lay.NH), F, (lens32, dc.scene),
+        plan = _chunk_plan(_chunk_starts(P, C), F, (lens32, dc.scene),
                            hk === nothing ? nothing : (hk.view.lens, hk.scene))
         for (c0, Fc, inputs, high) in plan
             push!(jacf, (c0, _tile_chunk(Val(Fc), c0, C, lay, pose, foc, ap, m, inputs..., high)))

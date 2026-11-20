@@ -12,8 +12,7 @@
     _slot_rows(be, chunks, P, npx) -> S
 
 The dual chunks' partials (`chunks`: `(c0, out, C)` per chunk, `out` its `_JacAt` rows on the device, `3(1 + C)` floats per pixel)
-gathered into one Float64 array `S[slot, c, i]` on the backend (`P` slots, the three channels, `npx` pixels; a slot of no chunk — a
-nodal height's — is zero): the layout the row kernel reads. Queued on this task's queue.
+gathered into one Float64 array `S[slot, c, i]` on the backend (`P` slots, the three channels, `npx` pixels): the layout the row kernel reads. Queued on this task's queue.
 """
 function _slot_rows(be, chunks, P::Integer, npx::Integer)
     S = KA.zeros(be, Float64, P, 3, npx)
@@ -405,7 +404,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     need_h = !isempty(lay.height_cols)
     stk = VgtkCore.convert_eltype(F, s.settings)
     C = _jac_chunk(s, P)
-    c0s = _chunk_starts(P, C, lay.off_h, NH)                         # the heights: the height kernel's (below), not dual slots
+    c0s = _chunk_starts(P, C)                                        # (the heights: the height kernel's, below; no dual slots)
     # linear blocks: analytic columns from the parts kernel, so vignetting and lighting are plain here (not duals with zero
     # partials: the same values and partials, fewer registers)
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)

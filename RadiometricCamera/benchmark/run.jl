@@ -9,6 +9,9 @@
 #     views=3             the photographs                                                                               [3]
 #     pixels=0            the measured pixels per view: every `n`-th masked pixel so that about `pixels` remain (a real
 #                         run samples 8,192 to 16,384 per photograph); 0: every masked pixel                             [0]
+#     warp=0|1            the board warped (a saddle of nodal heights, held) instead of flat: every ray then meets the height
+#                         field by Core's Newton instead of the plane                                                    [0]
+#     heights=0|1         the board warping's nodal heights free in the LM stages and the Jacobians (`height_degree = 1`)  [0]
 #     reps=3              timed runs per stage after the first (the minimum is reported)                                [3]
 #     stages=<regex>      only the stages whose name matches                                                            [all]
 #     out=<file.json>     the results as a record (benchmark/compare.jl reads two of them)                              [none]
@@ -49,6 +52,8 @@ const BACKEND = option("backend", "cpu")
 const W, H = parse.(Int, split(option("size", "320x240"), "x"))
 const VIEWS = parse(Int, option("views", "3"))
 const PIXELS = parse(Int, option("pixels", "0"))
+const WARP = option("warp", "0") == "1"
+const HEIGHT_DEGREE = option("heights", "0") == "1" ? 1 : 0
 const REPS = parse(Int, option("reps", "3"))
 const STAGES = Regex(option("stages", "."))
 const OUT = option("out", "")
@@ -64,7 +69,9 @@ function benchmark_scene()
     f = 30.9 * W / 24
     K = CameraCalibrationMat(f, 0.0, 0.0, 0.0, f, 0.0, W / 2, H / 2, 1.0)
     lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
-    scene = RC.Scene(board, W, H)
+    saddle(𝐛) = (q = 𝐛 .- 0.5; 0.08 * q[1]^2 - 0.04 * q[1] * q[2] + 0.06 * q[2]^2)       # the tests' saddle (metres on the 2 m board)
+    surface = WARP ? RC.BoardSurface(; h = SVector{RC.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])) : RC.BoardSurface{Float64}()
+    scene = RC.Scene(board, W, H, surface)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:VIEWS]
     b = RC.𝔟(board); r_SH = RC.sphere_radius(b, [p.t for p in poses])
@@ -154,7 +161,7 @@ function stages(c)
     add("linear_joint", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s; joint = true); cost(s)[1]))
     # per view
     function view_setup()
-        s = c.state(); problem, _ = RC.build_problem(s)
+        s = c.state(); problem, _ = RC.build_problem(s; height_degree = HEIGHT_DEGREE)
         r, vars, flags = first_block(problem, view_blocks(problem))
         return s, r, vars, flags
     end
@@ -162,13 +169,13 @@ function stages(c)
     add("view_products", () -> ((s, r, vars, flags) = view_setup(); j = RC._view_jacobian(flags, r, vars...);
                                 () -> RC._gauss_newton_blocks(j.J, j.res, j.T, j.lay, s.run)))
     add("view_normal_equations", () -> ((s, r, vars, flags) = view_setup(); () -> RC._block_normal_equations(flags, r, vars)))
-    add("lm1_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 1); cost(s)[1]))
-    add("lm3_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 3); cost(s)[1]))
+    add("lm1_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm3_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # per tile
     grid = Ref{Any}(nothing)
     grid_state() = (grid[] === nothing && (grid[] = RC.grid_model(c.lens, 20, 15)); c.state(grid[]))
     add("tile_normal_equations", () -> begin
-        s = grid_state(); problem, idx = RC.build_problem_grid(s)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s; height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         () -> RC._with_registered(s, problem, idx) do
@@ -176,7 +183,7 @@ function stages(c)
         end
     end)
     add("tile_rows_products", () -> begin           # the same tiles again within one registration: the view's batch is its memoized one
-        s = grid_state(); problem, idx = RC.build_problem_grid(s)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s; height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
@@ -185,9 +192,9 @@ function stages(c)
             t0 = time_ns(); v = sweep(); Span(v + length(tiles), (time_ns() - t0) / 1e9)
         end
     end)
-    add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1); cost(s)[1]))
+    add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s; joint = true); RC.run_lm!(s; maxiters = 3); cost(s)[1]))
+    add("calibration", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s; joint = true); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     return list
 end
 
@@ -248,7 +255,7 @@ function main()
         commit = try readchomp(`git -C $(@__DIR__) rev-parse --short HEAD`) catch; "" end
         record = Dict{String, Any}("schema" => "rc/benchmark/v1.0", "label" => LABEL, "commit" => commit, "julia" => string(VERSION),
                                    "threads" => Threads.nthreads(), "backend" => BACKEND, "device" => device_name(), "size" => [W, H], "views" => VIEWS,
-                                   "masked_pixels" => npx, "pixels" => PIXELS, "reps" => REPS, "stages" => results,
+                                   "masked_pixels" => npx, "pixels" => PIXELS, "warp" => WARP, "heights" => HEIGHT_DEGREE, "reps" => REPS, "stages" => results,
                                    "inferred" => Dict(n => Dict("type" => v.type, "concrete" => v.concrete) for (n, v) in inf))
         open(io -> JSON.print(io, record, 2), OUT, "w")
         println("\nwrote ", OUT)
