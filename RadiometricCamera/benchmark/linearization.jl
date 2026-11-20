@@ -6,7 +6,7 @@
 #
 # The scene and the state are benchmark/run.jl's (included: its options, its scene). Each kernel of the per-view Jacobian
 # is launched alone on the state's backend and awaited, with the inputs `_view_jacobian` gives it (this file follows that function:
-# when it changes, this follows): the flux, the radiance record in the kernels' float and in `HIGH_FLOAT`, one dual chunk in each
+# when it changes, this follows): the flux, the radiance record in the kernels' float (or its rounding from the `HIGH_FLOAT` record) and in `HIGH_FLOAT`, one dual chunk in each
 # float (`chunk` partials: the state's `jacobian_chunk` on a device, every slot on the CPU), the linear blocks' parts, the gather
 # of the slots, the Gauss–Newton products, and the whole (`_view_jacobian`, whose chunks overlap on a device). Milliseconds, the
 # minimum of `reps` runs after a first; `chunks` is the number of chunk launches of the whole in each float.
@@ -29,10 +29,11 @@ function linearization()
     vk = RC.adapt(be, VgtkCore.convert_eltype(F, view0)); mk = VgtkCore.convert_eltype(F, m.mat)
     scenek = RC.with_surface(dc.scene, VgtkCore.convert_eltype(F, m.surface))
     record(args...) = RC._radiance_record_device(be, px, idx, k, Hh, args...)
-    rays = record(vk, vigk, mk, lk, scenek, stk)
     high = G !== F
     hk = high ? RC._height_inputs(s, view0, VgtkCore.model(vg), m, lt.light) : nothing
-    hrays = high ? record(hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st) : rays
+    hrays = high ? record(hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st) : record(vk, vigk, mk, lk, scenek, stk)
+    rounded = high && isdefined(RC, :_record_as)            # the kernels'-float record: the HIGH_FLOAT record rounded (before: a record of its own)
+    rays = !high ? hrays : rounded ? RC._record_as(F, hrays) : record(vk, vigk, mk, lk, scenek, stk)
     c0s = applicable(RC._chunk_starts, lay.P, C) ? RC._chunk_starts(lay.P, C) : RC._chunk_starts(lay.P, C, lay.off_h, RC.n_height(m))
     plan = RC._chunk_plan(c0s, F, (vigk, lk, dc.scene, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.scene, hk.st, hrays))
     low = findfirst(p -> !p[4], plan); hi = findfirst(p -> p[4], plan)
@@ -44,7 +45,7 @@ function linearization()
     out = Dict{String, Any}("backend" => BACKEND, "device" => device_name(), "pixels" => npx, "slots" => lay.P, "columns" => lay.ncol, "chunk" => C,
                             "warp" => WARP, "heights" => HEIGHT_DEGREE, "chunks_low" => count(p -> !p[4], plan), "chunks_high" => count(p -> p[4], plan), "float" => string(F), "label" => LABEL)
     out["flux_ms"] = best(() -> RC._device_rows(RC._flux_functor(s, k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, px))
-    out["record_ms"] = best(() -> record(vk, vigk, mk, lk, scenek, stk))
+    rounded ? (out["record_round_ms"] = best(() -> RC._record_as(F, hrays))) : (out["record_ms"] = best(() -> record(vk, vigk, mk, lk, scenek, stk)))
     high && (out["record_high_ms"] = best(() -> record(hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st)))
     low === nothing || (out["chunk_ms"] = best(() -> chunk(plan[low])))
     hi === nothing || (out["chunk_high_ms"] = best(() -> chunk(plan[hi])))

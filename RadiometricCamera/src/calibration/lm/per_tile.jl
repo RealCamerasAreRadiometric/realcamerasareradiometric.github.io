@@ -734,8 +734,10 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
     vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
     return _on_worker() do
         fo = _launch_rows(fluxf, be, px)
-        rays = recordf === nothing ? nothing : _launch_record(recordf...)
-        hrays = hrecordf === nothing ? rays : _launch_record(hrecordf...)
+        # the estimator once per ray: in `HIGH_FLOAT` where a chunk needs it, that record rounded for the others (`_record_as`)
+        hrays = hrecordf === nothing ? nothing : _launch_record(hrecordf...)
+        rays = recordf === nothing ? nothing : hrays === nothing ? _launch_record(recordf...) : _record_as(F, hrays)
+        hrays === nothing && (hrays = rays)
         ho = heightf === nothing ? nothing : _launch_rows(_height_functor(heightf..., px, hrays), be, idx; workgroupsize = 128)
         co = [(c0, hi ? _launch_rows(_JacAt(Int32(k), Int32(H), vd, hk.vig, md, hk.light, sd, hk.st, Val(C), fb, db, px, hrays), be, idx; workgroupsize = 128) :
                         _launch_rows(_JacAt(Int32(k), Int32(H), vd, vig32j, md, l32j, sd, st32, Val(C), fb, db, px, rays), be, idx; workgroupsize = 128))

@@ -227,6 +227,17 @@ function _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
     return out
 end
 
+"""
+    _record_as(F, record) -> record in the float `F`
+
+A radiance record (`_launch_record`, in `HIGH_FLOAT`) in the kernels' float `F`: the same numbers, rounded (one device broadcast,
+queued on this task's queue). A device linearization needs the record in both floats — `HIGH_FLOAT` for the pose's chunks and the
+heights, the kernels' float for the other chunks and the parts — and ran the estimator once in each (the kernels'-float record
+29 ms of a 76,800-pixel view's 127 ms on a B200, 2026-11-20); the rounded `HIGH_FLOAT` record is the more accurate of the two (the
+Float32 estimator's α and η derivatives are up to 0.4 % off at a printed edge, `HIGH_FLOAT`).
+"""
+_record_as(::Type{F}, record) where {F} = reinterpret(RadianceJac{F}, F.(reinterpret(eltype(eltype(record)), record)))
+
 """The resident threads of the radiance-record kernel by backend type (`_note_capacity!`): the capacity the blocks' window divides
 (`_window_width`); `nothing` on a backend without an occupancy query. Keyed by the backend, not one value: the package image's
 precompile workload runs on the CPU backend (one thread), and a single slot carried its value into every session's device runs."""

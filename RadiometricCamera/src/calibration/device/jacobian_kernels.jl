@@ -410,12 +410,18 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)
     vk = adapt(be, VgtkCore.convert_eltype(F, view0))                 # adapt: a grid lens carries arrays
     mk = VgtkCore.convert_eltype(F, m.mat); scenek = with_surface(dc.scene, VgtkCore.convert_eltype(F, m.surface))
-    rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk)   # the estimator once per ray
-    _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
     G = HIGH_FLOAT                                             # the heights' and the pose chunks' float type and inputs
     hk = _needs_high(F, need_h) ? _height_inputs(s, view0, VgtkCore.model(vg), m, lt.light) : nothing
-    hrays = G === F || hk === nothing ? rays :                        # (the CPU backend: the chunks' record is already Float64)
-            _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st)
+    # the estimator once per ray: in `HIGH_FLOAT` where a chunk needs it (a device: the pose's), and then that record's numbers
+    # rounded to the kernels' float for the other chunks and the parts (`_record_as`), not a second record
+    if G === F || hk === nothing                               # (the CPU backend: the chunks' record is already Float64)
+        rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk)
+        hrays = rays
+    else
+        hrays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st)
+        rays = _record_as(F, hrays)
+    end
+    _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
     hrays === rays || _shared_read_only!(be, hrays)
     plan = _chunk_plan(c0s, F, (vigk, lk, dc.scene, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.scene, hk.st, hrays))
     hs = _each_chunk(be, plan) do (c0, Fc, inputs, _)                 # the chunks' launches overlap (one worker queue each)
