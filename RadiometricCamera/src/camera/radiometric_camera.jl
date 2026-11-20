@@ -92,7 +92,7 @@ aperture_radius(c::RadiometricCameraModel) = c.aperture_radius
 
 The camera's geometric model π⁻¹ (Θ_d): Core's pixel camera or a grid model.
 """
-lens(c::RadiometricCameraModel) = c.lens
+VgtkCore.lens(c::RadiometricCameraModel) = c.lens
 # the geometric camera's maps (Core's contract generics), forwarded to the lens
 VgtkCore.project(c::RadiometricCameraModel, X) = VgtkCore.project(c.lens, X)
 VgtkCore.backproject(c::RadiometricCameraModel, 𝐩) = VgtkCore.backproject(c.lens, 𝐩)
