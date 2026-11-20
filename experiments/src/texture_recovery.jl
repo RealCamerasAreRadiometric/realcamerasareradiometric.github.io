@@ -358,7 +358,7 @@ function image_circle_of(camera::RC.RadiometricCameraModel)
 end
 
 """
-    sheet_board(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterisation = nothing) -> NamedTuple
+    sheet_scene(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterisation = nothing) -> NamedTuple
 
 The photographs in `images_dir` (`photo_file` of each pose's name) are read through RadiometricCamera's ONE entry point under the
 camera's own observation model (`photo_set(camera, files; characterisation)`, `sample_pixels`; owner 2026-11-15: a camera predicts
@@ -372,11 +372,11 @@ and their decoded files (`images_dir/<name>`), the sheet as the scene's board (`
 printed-edge parameters: the calibration board's warping is never evaluated on the sheet), its ray intersector, the vignetting, the
 render settings (the calibration's own, `camera.settings`: the quadrature), the design (`design_png`, the green channel, as a `TW × TH` matrix [x, y]) and its texel size.
 """
-function sheet_board(cc::RC.CalibratedCamera, target, sheet, design_png::AbstractString, images_dir::AbstractString, poses, W::Integer, H::Integer;
+function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::AbstractString, images_dir::AbstractString, poses, W::Integer, H::Integer;
                      characterisation::Union{Nothing, AbstractString} = nothing)
-    isempty(poses) && throw(ArgumentError("sheet_board: no poses"))
+    isempty(poses) && throw(ArgumentError("sheet_scene: no poses"))
     cc.observation.channel in (:G, :RGB) ||
-        throw(ArgumentError("sheet_board: the page solve observes the green channel; the camera was calibrated on $(cc.observation.channel) alone"))
+        throw(ArgumentError("sheet_scene: the page solve observes the green channel; the camera was calibrated on $(cc.observation.channel) alone"))
     camera = cc.model; settings = cc.settings
     𝐨, 𝐮, 𝐯, _ = page_frame(sheet.page_w, sheet.page_h)
     names = [String(p[1]) for p in poses]
@@ -388,8 +388,8 @@ function sheet_board(cc::RC.CalibratedCamera, target, sheet, design_png::Abstrac
     img = VgtkFeatures.load_linear_image(design_png); TH, TW = size(img, 1), size(img, 2)
     design = Matrix{Float64}(permutedims(Float64.(img[:, :, 2])))                           # [x, y]
     page_mm = (1e3 * sheet.page_w, 1e3 * sheet.page_h); tex_mm = page_mm[1] / TW
-    abs(page_mm[2] / TH - tex_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_board: the design's texels are not square ($(page_mm[1] / TW) × $(page_mm[2] / TH) mm)"))
-    abs(tex_mm - sheet.texel_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_board: the design's texel $(tex_mm) mm is not the sheet target's $(sheet.texel_mm) mm"))
+    abs(page_mm[2] / TH - tex_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texels are not square ($(page_mm[1] / TW) × $(page_mm[2] / TH) mm)"))
+    abs(tex_mm - sheet.texel_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texel $(tex_mm) mm is not the sheet target's $(sheet.texel_mm) mm"))
     return (; names, images_dir = String(images_dir), photos, camera, poses = cam_poses, bd, surf, board, rays, sett = settings, design, TW, TH,
             tex_mm, page_mm, W = Int(W), H = Int(H), learned_r = camera.aperture_radius)
 end
