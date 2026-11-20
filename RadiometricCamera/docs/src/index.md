@@ -50,33 +50,35 @@ Julia 1.13 or later. A CUDA GPU is optional: the CPU backend runs everything, mo
 
 ## A first example
 
-A 24 × 24 px fisheye camera 1.5 m in front of a printed checkerboard: the example renders the radiant flux of every pixel the
+A 320 × 240 px fisheye camera 1.5 m in front of a printed checkerboard: the example renders the radiant flux of every pixel the
 board covers, through the camera's aperture and focus surface.
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore
 using RadiometricCamera: Focus, Material, PrintedTarget, RenderSettings, Scene, View, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
 
-# A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 24 × 24 px fisheye
+# A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
 # camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
-K = CameraCalibrationMat(30.9, 0.0, 0.0, 0.0, 30.9, 0.0, 12.0, 12.0, 1.0)
-camera = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(24, 24))
-pose = inv(lookat(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)))   # camera → world, metres
+W, H = 320, 240                               # the image, in pixels
+K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)   # focal length 412 px, principal point at the centre
+camera = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+# camera → world, metres: lookat_pose(camera centre, the point it looks at, the world's up direction, which fixes the roll)
+pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
 
 # The radiometric camera: the fisheye focused at 1.5 m, aperture radius 4 cm, V ≡ 1 (a flat 4 × 4 B-spline surface, Core's).
-vignetting = TensorProductVignetting((4, 4), Rect(0, 0, 24, 24); degree = 2)
-rcam = RadiometricCameraModel(camera, Focus(3, 1.5, 24, 24), 0.04, vignetting)
+vignetting = TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2)
+rcam = RadiometricCameraModel(camera, Focus(3, 1.5, W, H), 0.04, vignetting)
 view = View(pose, rcam)                       # one photograph: its pose and the camera
-scene = Scene(board, 24, 24)
+scene = Scene(board, W, H)
 light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # Core's light, L ≡ 1
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 mask = compute_mask(view, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
 img = render_view(1, view, vignetting, Material(), light, scene, settings, mask)
-count(mask)                     # 576: the board covers every pixel
-Φ = Φ_pixel(12, 12, 1, view, vignetting, Material(), light, scene, settings)
-Φ ≈ img[12, 12, :]              # true: the render is Φ_c(𝐮) of each pixel
+count(mask)                     # 76800 = W × H: the board covers every pixel
+Φ = Φ_pixel(160, 120, 1, view, vignetting, Material(), light, scene, settings)   # the pixel 𝐮 = (u, v) = (160, 120)
+Φ ≈ img[120, 160, :]            # true: the render is Φ_c(𝐮) of each pixel (img is H × W × 3: row v, column u)
 ```
 
 ## Documentation

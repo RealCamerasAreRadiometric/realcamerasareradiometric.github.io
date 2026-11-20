@@ -12,7 +12,9 @@ block below runs when the documentation is built.
 
 The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The camera is
 VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels, over a
-double-sphere fisheye lens; any Core lens plugs in the same way.
+double-sphere fisheye lens; any Core lens plugs in the same way. The image is `W × H` = 320 × 240 pixels (the `BoundedCamera`'s
+`Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration runs at the
+sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
 
 ```@example tutorial
 using RadiometricCamera, VisualGeometryToolkitCore
@@ -21,9 +23,10 @@ using RadiometricCamera: Focus, Material, PrintedTarget, RenderSettings, Scene, 
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
-K = CameraCalibrationMat(30.9, 0.0, 0.0, 0.0, 30.9, 0.0, 12.0, 12.0, 1.0)
-camera = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(24, 24))
-scene = Scene(board, 24, 24)
+W, H = 320, 240                                   # the image, in pixels
+K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)
+camera = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+scene = Scene(board, W, H)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide
 ```
@@ -39,8 +42,9 @@ Two poses (camera → world, metres) around the board, each a [`View`](@ref) of 
 distance: the defocus is the focus surface's).
 
 ```@example tutorial
-poses = [inv(lookat(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))) for k in 1:2]
-views = [View(p, camera, Focus(3, 1.5, 24, 24), 0.04) for p in poses]
+# lookat_pose(camera centre, the point it looks at — the board's centre, the world's up direction, which fixes the roll)
+poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:2]
+views = [View(p, camera, Focus(3, 1.5, W, H), 0.04) for p in poses]
 b = 𝔟(board)
 r_SH = sphere_radius(b, [p.t for p in poses])
 nothing # hide
@@ -57,7 +61,7 @@ of degree 2, and the true material has the diffuse weight μ = 0.4.
 
 ```@example tutorial
 xs = range(-0.5, 0.5; length = 4)
-vignetting_true = VisualGeometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, 24, 24); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
+vignetting_true = VisualGeometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; μ = 0.4)
@@ -73,7 +77,7 @@ blocks and the photographs ϕ. It starts here from a flat vignetting, a grey lig
 ½ Σ‖Φ − ϕ‖² and the relative RMS residual.
 
 ```@example tutorial
-s = CalibrationState(scene, settings, copy(views), TensorProductVignetting((4, 4), Rect(0, 0, 24, 24); degree = 2), Material(; μ = 0.7),
+s = CalibrationState(scene, settings, copy(views), TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), Material(; μ = 0.7),
                      EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos; masks)
 cost(s)
 ```

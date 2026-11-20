@@ -46,8 +46,8 @@
     Base.include(readme, $(repr(joinpath(env, "readme_example.jl"))))
     using Test
     @testset "README example" begin
-        @test count(readme.mask) == 576                          # "576: the board covers every pixel"
-        @test readme.Φ ≈ readme.img[12, 12, :]                   # "true: the render is Φ_c(𝐮) of each pixel"
+        @test count(readme.mask) == readme.W * readme.H == 76800  # "76800 = W × H: the board covers every pixel"
+        @test readme.Φ ≈ readme.img[120, 160, :]                 # "true: the render is Φ_c(𝐮) of each pixel" (row v, column u)
         @test all(>(0), readme.img[:, :, 1][readme.mask])
     end
     """)
