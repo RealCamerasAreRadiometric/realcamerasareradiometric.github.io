@@ -276,8 +276,38 @@ function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
         _scrub!(J, lay, run)
         g, H = Array(_rows_times(J, r)), Array(J * J')
     end
-    Ts = SparseArrays.sparse(T)
-    return Ts' * g, Matrix(Ts' * (H * Ts))
+    return _in_problem_coordinates(SparseArrays.sparse(T), g, H)
+end
+"""
+    _in_problem_coordinates(T, g, H) -> (Tᵀg, TᵀHT)
+
+The full-column products `g = J r` and `H = J Jᵀ` in the problem's coordinates under the sparse column map `T`
+(`ncol × n`): one pass over `T`'s stored entries per output entry, written straight into the `n` and `n × n` results (no
+`ncol × n` intermediate: a tile's 289² values twice per block were 3.5 GB of host allocation per grid linearization of 864 tiles).
+"""
+function _in_problem_coordinates(T::SparseArrays.SparseMatrixCSC{Float64}, g::Vector{Float64}, H::Matrix{Float64})
+    n = size(T, 2); rows = SparseArrays.rowvals(T); vals = SparseArrays.nonzeros(T)
+    gp = Vector{Float64}(undef, n); Hp = Matrix{Float64}(undef, n, n)
+    @inbounds for j in 1:n
+        rj = SparseArrays.nzrange(T, j)
+        acc = 0.0
+        for q in rj
+            acc += vals[q] * g[rows[q]]
+        end
+        gp[j] = acc
+        for i in 1:n
+            acc = 0.0
+            for p in SparseArrays.nzrange(T, i)             # (Tᵀ H T)[i, j] = Σ_p T[a_p, i] Σ_q H[a_p, b_q] T[b_q, j]
+                a = rows[p]; inner = 0.0
+                for q in rj
+                    inner += H[a, rows[q]] * vals[q]
+                end
+                acc += vals[p] * inner
+            end
+            Hp[i, j] = acc
+        end
+    end
+    return gp, Hp
 end
 """
     _rows_times(J, r) -> J r
