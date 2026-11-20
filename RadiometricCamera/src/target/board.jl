@@ -45,7 +45,7 @@ height_nparams(degree::Integer) = degree <= 0 ? 0 : HEIGHT_NC
 """
     height_manifold(b) -> VgtkCore.TargetManifold
 
-The manifold of the board `b`'s nodal heights: Core's `TargetManifold` of a `HeightField` over its page's [`warping_nodes`](@ref).
+The manifold of the board `b`'s nodal heights: Core's `TargetManifold` of a `HeightField` over its page's `warping_nodes`.
 Core's thin-plate kinds are pure bending and have no gauge: the nodal heights move only within the heights whose interpolant on
 these nodes has no affine term (the piston and the two tilts are the poses'), so they are never parameters. The affine rows depend
 on the aspect, so each page has its own manifold.
