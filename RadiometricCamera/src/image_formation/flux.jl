@@ -372,23 +372,28 @@ end
 masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)]
 
 """
-    render_view(k, camera, pose, mat, light, scene, settings, mask) -> Array{Float64, 3}
+    render_view(k, camera, pose, mat, light, scene, settings, mask; backend = CPU()) -> Array{Float64, 3}
 
 `H × W × 3` image of photograph `k`, `camera` (a [`RadiometricCameraModel`](@ref)) at `pose` (camera → world), zeros outside the
-mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on the CPU backend, in the arguments' float type. `k` is the
-photograph's index: it keys the common random numbers of the radiance, so photograph `k` of a state renders with its index.
+mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (KernelAbstractions' `CPU()` by default; a device:
+`rc_backend("gpu")`), in the backend's kernel float as a state's kernels (`_kernel_float`: Float64 on the CPU backend, Float32 on a
+device, where the image agrees with the CPU's to Float32 rounding). `k` is the photograph's index: it keys the common random numbers
+of the radiance, so photograph `k` of a state renders with its index.
 """
 render_view(k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight, scene::Scene,
-            st::RenderSettings, mask::AbstractMatrix{Bool}) =
-    _render_view(k, View(pose, camera), camera.vignetting, mat, light, scene, st, mask)
+            st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU()) =
+    _render_view(k, View(pose, camera), camera.vignetting, mat, light, scene, st, mask; backend)
 """The kernels' form of [`render_view`](@ref): the camera at its pose as a `View`, the vignetting apart."""
 function _render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                      scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool})
+                      scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU())
     px = masked_pixels(mask)
     img = zeros(Float64, scene.H, scene.W, 3)
     isempty(px) && return img
-    ids = [UInt32((u - 1) * scene.H + v) for (u, v) in px]
-    Φ = _device_rows(_FluxAt(Int32(k), Int32(scene.H), view, vig, mat, light, scene, st), KernelAbstractions.CPU(), ids)
+    F = _kernel_float(backend)
+    ids = adapt(backend, [UInt32((u - 1) * scene.H + v) for (u, v) in px])
+    as(x) = F === _float_of(st) ? x : VgtkCore.convert_eltype(F, x)          # (arguments already in the kernels' float: as they are, no copy)
+    flux = _FluxAt(Int32(k), Int32(scene.H), adapt(backend, as(view)), as(vig), as(mat), as(light), adapt(backend, as(scene)), as(st))
+    Φ = _device_rows(flux, backend, ids)
     for (i, (u, v)) in enumerate(px), c in 1:3
         img[v, u, c] = Φ[3 * (i - 1) + c]
     end

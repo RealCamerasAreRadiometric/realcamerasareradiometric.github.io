@@ -111,6 +111,10 @@ end
         # render parity (Float64 CPU vs Float32 GPU; different draw precision → tolerance)
         img_cpu = render_all(s_cpu)[1]; img_gpu = render_all(s_gpu)[1]
         @test maximum(abs, img_gpu .- img_cpu) / maximum(img_cpu) < 2e-3
+        # render_view on the device (its `backend`): the flux kernel in Float32 there, the CPU's image to Float32 rounding
+        img_dev = render_view(1, camera_t, poses[1], mat_t, light_t, scene, st, masks[1]; backend = CUDABackend())
+        @test size(img_dev) == size(targets[1]) && maximum(abs, img_dev .- targets[1]) / maximum(targets[1]) < 2e-3
+        @test render_view(1, camera_t, poses[1], mat_t, light_t, scene, st, masks[1]; backend = RadiometricCamera.KernelAbstractions.CPU()) == targets[1]
         # residual and Jacobian parity
         prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)
         rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]

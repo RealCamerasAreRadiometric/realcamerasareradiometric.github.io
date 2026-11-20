@@ -30,7 +30,7 @@
 # change that moves numbers shows here before any test does). A device stage is timed to the value on the host (its kernels
 # awaited). The stages:
 #
-#   forward        mask, render, pixel (1000 × Φ_pixel), flux (the flux kernel of one view), cost (every view's residual)
+#   forward        mask, render (on the backend), pixel (1000 × Φ_pixel), flux (the flux kernel of one view), cost (every view's residual)
 #   closed form    parts (all_parts), radiometry_normal_equations, linear_blocks (Θ_l → Θ_v → μ), linear_joint (the joint LM)
 #   per view       view_jacobian (record, dual chunks, parts, rows), view_products (JᵀJ, Jᵀr of that Jacobian),
 #                  view_normal_equations (the two), lm1_view, lm3_view (run_lm!, 1 and 3 iterations)
@@ -149,7 +149,9 @@ function stages(c)
     add(name, make) = occursin(STAGES, name) && push!(list, name => make)
     # forward
     add("mask", () -> () -> count(RC.compute_mask(c.camera, c.poses[k], c.scene, c.settings; δ = 0.02, backend = BE)))
-    add("render", () -> () -> RC.render_view(k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]))
+    render(; kw...) = RC.render_view(k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]; kw...)
+    on_backend = hasmethod(RC.render_view, Tuple{map(typeof, (k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]))...}, (:backend,))
+    add("render", () -> () -> on_backend ? render(; backend = BE) : render())      # (before render_view took a backend: the CPU's)
     add("pixel", () -> () -> (s = zero(SVector{3, Float64});
                               for i in 1:1000; s += RC.Φ_pixel(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings); end; s))
     add("flux", () -> (s = c.state(); () -> RC._flux_device(s, k, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light)))
