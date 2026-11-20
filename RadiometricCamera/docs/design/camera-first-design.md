@@ -6,8 +6,7 @@ poseidon (one whole NVIDIA B200 per GPU job; CPU jobs 16 threads on Emerald Rapi
 `time_ns` around calls that return their values to the host (device kernels awaited); no vendor profiler was used
 except where a line says so. Records: `/cluster/projects/vgtk/logs/rc-perf/results/*.json`.
 
-Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the texture experiment · 5 performance · 6 open
-decisions.
+Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the texture experiment · 5 performance · 6 decisions.
 
 ---
 
@@ -152,7 +151,7 @@ construction time.
    returns the `Lens` of a camera; RC's `lens(state)` (and now `lens(camera)`) return the geometric camera. Two
    meanings of one word across the stack. Recommendation: rename the field and accessor to `geometric` (the docs
    already say "the geometric camera"), refusing the old spelling by name as the package does elsewhere. Public API
-   break; needs the owner's decision (question 1).
+   break; decided: section 6, decision 1.
 2. **No `convert_eltype`/`Adapt` method for `RadiometricCameraModel`.** Every kernel takes a `View`, so none is
    needed today; adding both (four lines) would let user kernels take the camera itself. Low value until someone
    needs it.
@@ -177,7 +176,7 @@ Ranked by measured gain. "Done" items are commits on the branch; the rest are re
 | B | A FLAT board ran the same Newton in the chunks: `is_warped` was true for any dual-typed height vector, and chunks carry the heights as dual constants | same profile (flat scene) | `is_warped` reads the numbers; plane hit returned in the height field's types (1c4dc5f) | flat chunk per pixel 304 → 59 µs; B200 flat view: chunks 162.6 → 26.4 ms | columns ≤ 1.1e-14 |
 | C | A device linearization ran the radiance estimator twice (Float32 and Float64 records) | B200: F32 record 29 ms + F64 record 67 ms of a 127 ms view | the F32 record is the F64 record rounded (30ad4c2) | −29 ms (flat 76,800 px), −12.8 ms (warped 16,384 px) | **device numbers change**: the F32 chunks' columns now use the F64 estimator's partials rounded to F32 — towards the CPU's values (the F32 estimator is up to 0.4 % off at a printed edge, `HIGH_FLOAT`'s own measurement). CPU unchanged. Decision 2. |
 | D | `J r` on CUDA: CUBLAS's gemv of a wide matrix | gate probe (B200 slice): gemv 73 × 230,400 F64 14.9 ms; gemm of the same 0.33 ms | one-column gemm in the CUDA extension (d63e422) | products 17.5 → ~2.6 ms per full view | device gradient 3.5e-14 relative |
-| E | The column map T was uploaded and applied by three dense device products per block | gate probe: 0.84 ms of a tile's 1.43 ms | `J r`, `J Jᵀ` on the backend, T applied on the host as a sparse matrix (a6fdd8b) | measured in the next benchmark run | colour states bitwise the same (checked on a view); single-channel ties may round |
+| E | The column map T was uploaded and applied by three dense device products per block | gate probe: 0.84 ms of a tile's 1.43 ms; on the CPU two dense ncol³ products per tile | `J r`, `J Jᵀ` on the backend, T applied on the host from its stored entries (a6fdd8b, bfbce88) | a view's products 17.5 → 0.4 ms together with D. For a grid's tiles on a B200 the effect is small and mixed: one grid LM iteration (65 × 50 lattice) 3.13 → 2.88 s, a single view's tile sweep 0.281 → 0.31–0.33 s (same job, A/B) — the tile path stays latency-bound (recommendation 1) | colour states bitwise the same (checked on a view); single-channel ties may round |
 | F | KernelAbstractions' CPU workgroups of 1024 left small views to few threads | 1,728-px view on 32 threads: flux 49 ms at the default, 5.4 ms at 16 px per group, same bits | per-pixel kernels and the row kernel in groups of 16 on the CPU backend (3a20b71) | small views up to 9× per kernel; no change for ≥ 16 k px per thread-count | none (bitwise) |
 | G | The nodal heights reserved 25 dual slots no chunk seeds | layout: P = 50 with free heights, the CPU's one chunk 50 wide and split in two | heights take no slot (d1ab18f) | CPU warped view with free heights 212 → 180 ms (local) | ≤ 3.6e-15 absolute |
 | H | `render_view` ran on the CPU only | B200: CPU render 0.46 s, device flux kernel 7 ms for the same view | `render_view(…; backend)` (dd1e3d1) | 65× for a device render | additive API |
@@ -195,7 +194,7 @@ Ranked by measured gain. "Done" items are commits on the branch; the rest are re
 | 6 | Host allocation per linearization: the record buffer is allocated and zeroed per view per call (CPU: 2.3 GB per full view) | benchmark `view_jacobian` bytes | reuse per-task buffers as the Jacobian's already do (`_jacobian_buffers`) | GC pressure; a few % | low | none |
 | 7 | `CalibrationState.backend::Any`, `device_cache::Any` (a NamedTuple grown by `merge`), `start::Any` | `cost(state)` infers `Tuple{Any, Any}`, `all_parts(state)` an abstract `RadiometryParts` | a type parameter for the backend; a small mutable `DeviceCache` struct with typed optional fields | none measurable (function barriers hold); clarity, fewer locks around `merge` | low | none (internal fields) |
 | 8 | `Φ_pixel` allocates 4.4 kB per call on the cluster's Julia 1.13.3 (0 B on 1.13.4 locally) | benchmark `pixel` bytes | investigate when 1.13.4 is on the cluster; likely an escape-analysis difference in `View(pose, camera)` | host-only path | — | none |
-| 9 | `src/experiments/` (focus-ab) lives inside the package's hot path: `t̂(camera, 𝐩)` branches on `focus.kind` per sensor sample | code | when the experiment is decided, make the chart a type parameter of `Focus` (dispatch, no branch) or remove kinds 1–2 | small; simplicity | owner's call (question 5) | internal |
+| 9 | `src/experiments/` (focus-ab) lives inside the package's hot path: `t̂(camera, 𝐩)` branches on `focus.kind` per sensor sample | code | when the experiment is decided, make the chart a type parameter of `Focus` (dispatch, no branch) or remove kinds 1–2 | small; simplicity | decided: section 6, decision 5 | internal |
 | 10 | `closed_form.jl` holds `pixel_parts`/`_linear_rows` (image formation) beside the solves | layout | move the parts to `image_formation/parts.jl` | none; layout | trivial | none |
 
 ### 3.3 Proposed for VisualGeometryToolkitCore
@@ -257,12 +256,11 @@ and on a B200), so the textures are the same numbers. The recorded sums of squar
 pages. The experiments' suite at 30ad4c2: 4713 checks succeed, 6 marked broken before this branch, and the GPU item's
 8 checks succeed.
 
-Timings (`experiments/tools/texture_benchmark.jl`, synthetic sheet, 10 photographs): the baseline and branch jobs are
-running; the table is in section 5.3.
+Timings: section 5.3 (the refine stage 9.4 → 1.3 s on a B200, the same numbers).
 
 **Next for the experiment** (not done): a Jacobi preconditioner from `diag(AᵀA)` (the squared column norms: one
 reduction over `Aᵀ`'s rows) — `cgls` already accepts `diagonal` — would cut iterations on pages with uneven coverage;
-it changes the iterates, so the textures of record would move within the solver's tolerance (question 4).
+it changes the iterates, so the textures of record would move within the solver's tolerance (decided: section 6, decision 4).
 
 ---
 
@@ -280,9 +278,9 @@ B200, flat board, 76,800 pixels, 25 slots, 73 columns:
 | chunk F32 (× 5) | 17.0 | 3.0 | 2.9 |
 | chunk F64 (× 2) | 38.8 | 6.1 | 6.1 |
 | parts | 10.0 | 10.5 | 10.7 |
-| products | 17.4 | 17.6 | 17.5 (→ ~2.6 with D: pending run) |
+| products | 17.4 | 17.6 | 17.5 (0.4 at ee6c96b: D, E) |
 | **view Jacobian** | **235.5** | **127.0** | **103.4** |
-| **view normal equations** | **251.7** | **146.3** | **126.2** |
+| **view normal equations** | **251.7** | **146.3** | **126.2** (104.3 at ee6c96b) |
 
 B200, warped board, free heights, 16,384 pixels (a run's sample size):
 
@@ -308,48 +306,84 @@ CPU (16 threads), flat 76,800 pixels / warped 16,384 pixels with free heights:
 | parts | 544 | 514 | 411 | 108 | 112 |
 | **view Jacobian** | **6259** | **3875** | **4352** | **2238** | **1970** |
 
-### 5.2 Stages (`benchmark/run.jl`, seconds, best of 3)
+### 5.2 Stages (`benchmark/run.jl`, seconds, best of 3; B200, one whole GPU per job)
 
-B200, 320 × 240, 3 views, every masked pixel (228,421), flat:
+320 × 240, 3 views, every masked pixel (228,421), flat board:
 
-| stage | baseline | 115f782 | note |
-|---|---:|---:|---|
-| mask | 0.0011 | 0.0012 | |
-| render (CPU kernel) | 0.48 | 0.46 | on the device from dd1e3d1: the flux kernel, 0.007 |
-| flux (one view) | 0.0073 | 0.0072 | |
+| stage | baseline (main) | ee6c96b | speed-up |
+|---|---:|---:|---:|
+| mask | 0.0011 | 0.0011 | |
+| render | 0.48 (the CPU kernel) | 0.0076 (on the device) | 63× |
+| flux (one view) | 0.0073 | 0.0075 | |
 | cost (3 views) | 0.0203 | 0.0200 | |
 | parts | 0.049 | 0.049 | |
-| radiometry normal equations | 0.049 | 0.050 | |
-| linear blocks | 0.42 | 0.39 | 398 MB host (recommendation 5) |
+| radiometry normal equations | 0.049 | 0.049 | |
+| linear blocks | 0.42 | 0.41 | |
 | linear joint | 0.47 | 0.47 | |
-| view Jacobian | 0.239 | 0.132 | |
-| view normal equations | 0.254 | 0.149 | |
-| LM, 1 iteration, per view | 1.95 | 1.33 | |
-| LM, 3 iterations, per view | 3.30 | 2.12 | |
-| a view's tiles: normal equations | 0.555 | 0.292 | 6 tiles (20 × 15 lattice) |
-| LM, 1 iteration, grid | 2.00 | 1.27 | |
-| calibration (joint closed form + 3 LM iterations) | 2.46 | 1.83 | |
+| view Jacobian | 0.239 | 0.109 | 2.2× |
+| view products | 0.0176 | 0.0005 | 35× |
+| view normal equations | 0.254 | 0.108 | 2.4× |
+| LM, 1 iteration, per view | 1.95 | 1.12 | 1.7× |
+| LM, 3 iterations, per view | 3.30 | 1.73 | 1.9× |
+| a view's tiles: normal equations (6 tiles) | 0.555 | 0.235 | 2.4× |
+| LM, 1 iteration, grid (20 × 15) | 2.00 | 1.21 | 1.7× |
+| calibration (joint closed form + 3 LM iterations) | 2.46 | 1.68 | 1.5× |
 
-CPU, 16 threads, the same scene: view Jacobian 6.23 → 3.75 s; view normal equations 6.38 → 3.82 s; the forward and
-closed-form stages unchanged (flux 0.46, cost 1.4, parts 1.8, linear blocks 3.8, joint 6.5 s). LM, 1 iteration per
-view at 115f782: 24.5 s (baseline run still in the queue).
+1280 × 960, 8 views × 16,384 sampled pixels, warped board, free heights (a run's shape):
 
-The runs with C, D, E, H together (66ddb38 and later), the realistic warped set (8 views × 16,384 px) for the baseline,
-the run's 65 × 50 lattice (108 tiles a view) and the texture benchmark are in progress; this section will be updated
-with them.
+| stage | baseline | ee6c96b | speed-up |
+|---|---:|---:|---:|
+| render | 0.43 (CPU) | 0.017 | 25× |
+| view Jacobian | 0.103 | 0.075 | 1.37× |
+| view normal equations | 0.102 | 0.075 | 1.36× |
+| LM, 1 iteration, per view | 1.65 | 1.23 | 1.35× |
+| LM, 3 iterations, per view | 3.25 | 2.31 | 1.4× |
+| a view's tiles: normal equations (6 tiles) | 0.264 | 0.152 | 1.7× |
+| LM, 1 iteration, grid (20 × 15) | 1.94 | 1.26 | 1.5× |
+| calibration | 4.63 | 3.30 | 1.4× |
 
-### 5.3 Texture page solve
+The same with the run's 65 × 50 lattice (108 tiles a view):
 
-Pending (jobs `base-gpu`, `head3-gpu`: `tex` set).
+| stage | baseline | d63e422 | bfbce88 |
+|---|---:|---:|---:|
+| a view's tiles: normal equations | 0.390 | 0.281 | 0.31–0.33 |
+| the tiles' rows and products alone | 0.137 | 0.138 | 0.144–0.159 |
+| LM, 1 iteration, grid | 3.60 | 3.13 | 2.88 |
 
-### 5.4 Tests
+The warped runs gain less than the flat ones because what remains is the Float64 record (27–33 ms of a view's 75),
+the heights kernel (19 ms) and, in the grid route, the tiles' assembly (as much as the view's kernels): the Core
+proposals 3.3 a–c and recommendation 1.
 
-- RadiometricCamera suite on the cluster (Pkg.test, bounds checks on), at 30ad4c2: the CPU tier 16,188 checks succeed,
-  0 fail, 3 marked broken before this branch, 1 error — `ExplicitImports` reported the import of `lens` stale after
-  the accessor was added; fixed in 66ddb38 (run in progress). The GPU tier and the goldens run after the CPU tier in
-  that job: results pending.
-- Experiments suite at 30ad4c2 (CPU tier + GPU item on a B200 slice): 4,713 + 8 checks succeed, 6 marked broken before
-  this branch.
+CPU, 16 threads (`benchmark/linearization.jl` above; `run.jl`, 320 × 240 flat): view Jacobian 6.23 → 3.75 s, view
+normal equations 6.38 → 3.82 s; the forward and closed-form stages unchanged (flux 0.46, cost 1.4, parts 1.8, linear
+blocks 3.8, joint 6.5 s). LM, 1 iteration per view at 115f782: 24.5 s; grid 26.5 s.
+
+### 5.3 Texture page solve (`experiments/tools/texture_benchmark.jl`, B200; 10 photographs, 739,848 sampled rows, 443,339 fit rows, 22.0 M fit nonzeros, 240 × 336 texels; warm calls)
+
+| | baseline | 66ddb38 | speed-up |
+|---|---:|---:|---:|
+| the rows (footprints → operators' rows) | 4.88 s | 0.123 s | 40× |
+| the fit operator (A, Aᵀ, D, Dᵀ on the device) | 0.795 s | 0.069 s | 11.5× |
+| the three solves (`page_solves`) | 0.228 s | 0.228 s | — |
+| `run_page` (both blur models, records) | 9.40 s | 1.28 s | 7.3× |
+
+Unchanged to every printed digit: the iterations (245, 195, 76), the textures' checksums (114911.70310207602;
+`run_page` 114911.82477413118), the fit nonzeros' energy and the recorded test and fit sums of squares. Not timed
+warm and still on the host: `sample_pixels` (15.5 s first call for 10 photographs: the photograph's read and a host
+loop of chief-ray hits).
+
+### 5.4 Tests (cluster, Julia 1.13.3)
+
+| Suite | Commit | Result |
+|---|---|---|
+| RadiometricCamera, CPU tier (Pkg.test, bounds checks) | ee6c96b | 16,189 checks succeed, 0 fail, 0 error, 3 marked broken before this branch |
+| RadiometricCamera, GPU tier (12 items, B200 slice) | ee6c96b | 521 succeed |
+| RadiometricCamera, goldens (39 checks, rtol 1e-10) | ee6c96b | 39 succeed; no golden re-recorded |
+| docs build (`docs/make.jl`) | ee6c96b | exit 0, no warning |
+| experiments, CPU tier + GPU item | 30ad4c2, ee6c96b | 4,713 + 8 succeed, 6 marked broken before this branch |
+| RadiometricCamera, all tiers | bfbce88 (the branch's code head) | running when this was written; see the hand-back |
+
+The GPU items had not run since the camera-first refactor; they succeed on the branch.
 
 ### 5.5 Numbers that changed, and why
 
@@ -357,30 +391,30 @@ Pending (jobs `base-gpu`, `head3-gpu`: `tex` set).
 |---|---|---|---|
 | chunk partials from the tangent plane / plane hit (A, B) | Jacobian columns, every backend | ≤ 2.2e-14 of a column's norm | the same derivative (implicit-function theorem), another rounding |
 | narrower duals (G) | Jacobian with free heights | ≤ 3.6e-15 absolute | the same partials in a narrower dual |
-| F32 record = F64 record rounded (C) | device only: the F32 chunks' columns and the parts' hits | up to the F32 estimator's own error (≤ 0.4 % of a column at a printed edge), towards the CPU's values | the F64 estimator is the more accurate one; `HIGH_FLOAT` exists because the F32 one is not accurate enough for the pose |
+| F32 record = F64 record rounded (C) | device only: the F32 chunks' columns and the parts' hits | up to the F32 estimator's own error (≤ 0.4 % of a column at a printed edge), towards the CPU's values | the F64 estimator is the more accurate one; accepted by the owner (decision 2) |
 | one-column gemm for `J r` (D) | device gradient | 3.5e-14 relative | summation order |
-| T applied sparsely (E) | single-channel states' ties | rounding | summation order; colour states bitwise |
-| texture error sums (I) | recorded sse | last bits | CSR row sums instead of CSC column sums; the textures are unchanged |
+| T applied from its stored entries (E) | single-channel states' ties | rounding | summation order; colour states bitwise |
+| texture error sums (I) | recorded sse | none seen at 17 digits on the benchmark | CSR row sums instead of CSC column sums; the textures are unchanged |
 
 The residuals (the cost) are the same bits everywhere. No golden was re-recorded.
 
 ---
 
-## 6. Open decisions for the owner
+## 6. Decisions
 
-1. **`lens` vs `geometric`.** Rename the camera's field and accessor so that "lens" means Core's lens everywhere?
-   (Public break; I held it back.)
-2. **Finding C changes device numbers** (towards the CPU's). Accept, or keep two estimator runs for bit-continuity of
-   device runs of record?
-3. **Core changes.** May 3.3 a (bitwise-neutral, branch ready locally) be pushed and released as a Core patch? Do you
-   want 3.3 b–g as issues or as branches?
-4. **Texture experiment.** Is a Jacobi-preconditioned CGLS acceptable for the page solves (iterates change within
-   the tolerance), and should the scored subsets' errors stay on the device as now?
-5. **focus-ab.** Is the experiment decided? Its `kind` branch sits in the hot path (recommendation 9).
-6. **Grid route.** Recommendation 1 (one launch per view for all tiles) is the largest remaining device gain I see for
-   the paper's spline runs and the largest change. Go ahead on this branch, or separately?
-7. **README example.** The README, the docs' index and the landing page now show the composed constructor, which
-   0.1.0 as registered does not have. Keep for the next release, or revert the three pages until then?
-8. **Default vignetting** of the composed constructor: the flat 4 × 4 surface (as the README used), or required?
-9. **CPU workgroup of 16 pixels** is a fixed number in `_pixel_workgroup` (no option, as the window's width is
-   derived): fine, or derive it from the thread count?
+The owner's answers (2026-11-20) to the nine questions of this report's first version, and where each stands on the branch.
+
+| # | Question | Decision | Status |
+|---|---|---|---|
+| 1 | `lens` vs `geometric` | RENAME: the field, `geometric(camera)` / `geometric(state)`, the constructor's first argument, `with_lens` → `with_geometric`; the old spellings refused by name (src/api.jl); docs, README / index / landing, examples, experiments, tests follow | **not started** (≈ 150 sites; `r.lens`, `st.lens`, `m0.lens`, `ds.lens₀` are OTHER structs' fields and stay; the records' JSON keys are a separate question to settle with the rename). The constructor's argument is already named `geometric` (ee6c96b). |
+| 2 | Finding C's device numbers | ACCEPTED. Follow-up of high priority: re-centred Float32 geometry with Float64 accumulation (each pixel's chief-ray hit once in Float64 as a local origin, the per-ray hits and texture / edge lookups as Float32 offsets from it), measured against the 0.4 % gate per tile on the Siemens case, to drop the Float64 estimator and record (Float64 is 1/64 rate on the RTX Pro 6000s, 1/2 on a B200) | follow-up, not started |
+| 3 | Core 3.3 a–g | DO ALL, pushed and released through the stack's release process (the owner posts the Registrator comment), then RC adopts | a: committed locally on the monorepo branch `perf/height-field-fused-jacobian` (ea3cc069), not pushed; b–g not started |
+| 4 | Texture solve | (a) Krylov.jl (LSMR or CGLS, Jacobi-preconditioned by diag(AᵀA)), the penalty stacked `[A; √λ D]`, cuSPARSE CSR for `A` and an explicit `Aᵀ` in the CUDA extension; benchmark against `cgls`, verify the textures within tolerance, delete the redundant custom solver / CSR code, re-run the texture records once. (b) the error scoring stays on the device | (b) done (36c9de9); (a) not started. The device construction of this branch (`page_footprints`, `fit_operator`) produces exactly the CSR arrays a `CuSparseMatrixCSR` holds, so it carries over. |
+| 5 | focus-ab | keep the parameterizations as a TYPE PARAMETER of `Focus` (no `kind` branch), moved out of `src/experiments/`; find the experiment's records and re-run it on the cluster | not started |
+| 6 | Grid route | one row-kernel launch and one batched product per view for all its tiles, on this branch, after 1, 3, 4 | not started; the measurements of section 5.2 (65 × 50) are its baseline |
+| 7 | Release | finish the round on the branch, merge, register 0.1.0 from that commit; no version bump | — |
+| 8 | Default vignetting | `NoVignetting()` (Core, 3 f): V ≡ 1 by dispatch, no parameters, no columns | needs 3 f; the branch's default is still the flat 4 × 4 surface |
+| 9 | CPU workgroup | keep 16, the measurement cited at the definition | done (`_pixel_workgroup`'s docstring) |
+
+When the round is complete: the `simplify` and `code-review` skills on the branch's diff (and the monorepo branch), their
+confirmed findings fixed, and the gates again (suite, goldens, GPU tier, experiments).
