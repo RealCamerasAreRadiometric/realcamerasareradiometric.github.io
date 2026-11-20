@@ -261,17 +261,23 @@ end
     _gauss_newton_blocks(J, r, T, lay, run) -> (Jᵀr, JᵀJ)
 
 The Gauss–Newton blocks of a block's rows in the problem's coordinates: `Tᵀ(J r)` and `Tᵀ(J Jᵀ)T` of the device Jacobian `J` (full
-columns × rows) and residual `r`, the products on their backend (BLAS on the CPU, the device's library on a GPU: one code path), only
-the `n` and `n × n` values to the host.
+columns × rows) and residual `r`. The products over the rows, `J r` and `J Jᵀ`, are formed on their backend (BLAS on the CPU, the
+device's library on a GPU: one code path) and only their `ncol` and `ncol × ncol` values reach the host; the column map `T`
+(`_column_map`: a column scale, a selection, a channel tie — a few entries per column) is applied there as a sparse matrix. (Applied
+on the device as a dense matrix, `T` was an upload and three small dense products per block: 0.84 ms of a tile's 1.43 ms on a B200,
+2026-11-20, and on the CPU two dense `ncol³` products per tile. A scale or a selection gives the same entries as the dense
+products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
-    Td = adapt(KA.get_backend(J), T)
-    g, H = Array(Td' * _rows_times(J, r)), Array(Td' * ((J * J') * Td))
-    (all(isfinite, g) && all(isfinite, H)) && return g, H
-    # a non-finite Jacobian entry makes its column's diagonal of JᵀJ non-finite: scrubbed (`_scrub_entries!`) and formed again — the
-    # blocks of the scrubbed Jacobian, as before; a finite Jacobian (every block but a defect's) skips the scrub's sweep over it
-    _scrub!(J, lay, run)
-    return Array(Td' * _rows_times(J, r)), Array(Td' * ((J * J') * Td))
+    g, H = Array(_rows_times(J, r)), Array(J * J')
+    if !(all(isfinite, g) && all(isfinite, H))
+        # a non-finite Jacobian entry makes its column's diagonal of J Jᵀ non-finite: scrubbed (`_scrub_entries!`) and formed again —
+        # the blocks of the scrubbed Jacobian; a finite Jacobian (every block but a defect's) skips the scrub's sweep over it
+        _scrub!(J, lay, run)
+        g, H = Array(_rows_times(J, r)), Array(J * J')
+    end
+    Ts = SparseArrays.sparse(T)
+    return Ts' * g, Matrix(Ts' * (H * Ts))
 end
 """
     _rows_times(J, r) -> J r
