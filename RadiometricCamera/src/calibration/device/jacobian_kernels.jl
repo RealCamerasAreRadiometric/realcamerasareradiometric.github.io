@@ -282,7 +282,7 @@ end
     _in_problem_coordinates(T, g, H) -> (Tᵀg, TᵀHT)
 
 The full-column products `g = J r` and `H = J Jᵀ` in the problem's coordinates under the sparse column map `T`
-(`ncol × n`): one pass over `T`'s stored entries per output entry, written straight into the `n` and `n × n` results (no
+(`ncol × n`): one sweep of `T`'s stored entries per output entry, written straight into the `n` and `n × n` results (no
 `ncol × n` intermediate: a tile's 289² values twice per block were 3.5 GB of host allocation per grid linearization of 864 tiles).
 """
 function _in_problem_coordinates(T::SparseArrays.SparseMatrixCSC{Float64}, g::Vector{Float64}, H::Matrix{Float64})
