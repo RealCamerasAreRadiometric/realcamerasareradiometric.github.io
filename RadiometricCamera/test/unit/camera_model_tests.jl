@@ -19,7 +19,7 @@
     # the vignetting (V ≡ 1 by default) added; the image size is the geometric camera's, stated once
     @test RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386) === c
     @test RadiometricCameraModel(lens; focus, aperture_radius = 0.0386, vignetting = vig) === c
-    @test Focus(lens, 1.5) == focus && RC.n_nodes(Focus(lens, 2.0; nodes = 4)) == 16 && RC.𝔱(Focus(lens, 2.0; nodes = 4), SVector(5.0, 7.0)) ≈ 2.0
+    @test Focus(lens, 1.5) == focus && RC.n_nodes(Focus(lens, 2.0; n = 4)) == 16 && RC.𝔱(Focus(lens, 2.0; n = 4), SVector(5.0, 7.0)) ≈ 2.0
     @test_throws UndefKeywordError RadiometricCameraModel(lens; focus = 1.5)          # no default aperture: r is a physical statement
     @test isbits(c) && isbits(v)                                                        # the camera and the kernels' view travel into a device kernel as they are
     # its parts read and replaced one at a time: the others are kept

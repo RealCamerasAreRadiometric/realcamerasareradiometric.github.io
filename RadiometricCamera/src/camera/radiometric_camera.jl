@@ -59,13 +59,13 @@ _image_rect(lens::VgtkCore.BoundedCamera) = ((W, H) = VgtkCore.extent(lens); Vgt
 _flat_vignetting(lens::VgtkCore.BoundedCamera) = VgtkCore.TensorProductVignetting((4, 4), _image_rect(lens); degree = 2)
 
 """
-    Focus(lens, focus_distance; nodes = 3, T = Float64)
+    Focus(lens, focus_distance; n = 3, T = Float64)
 
-The constant focus surface `𝔱 ≡ focus_distance` (metres) on the `nodes × nodes` grid of the image of the geometric camera `lens` (its
-`extent`): `Focus(nodes, focus_distance, W, H)`.
+The constant focus surface `𝔱 ≡ focus_distance` (metres) on the `n × n` grid of the image of the geometric camera `lens` (its
+`extent`): `Focus(n, focus_distance, W, H)`.
 """
-Focus(lens::VgtkCore.BoundedCamera, focus_distance::Real; nodes::Integer = 3, T = Float64) =
-    ((W, H) = VgtkCore.extent(lens); Focus(nodes, focus_distance, W, H; T))
+Focus(lens::VgtkCore.BoundedCamera, focus_distance::Real; n::Integer = 3, T = Float64) =
+    ((W, H) = VgtkCore.extent(lens); Focus(n, focus_distance, W, H; T))
 
 """The camera with its geometric camera (the lens, Θ_d) replaced."""
 with_lens(c::RadiometricCameraModel, lens) = RadiometricCameraModel(lens, c.focus, c.aperture_radius, c.vignetting)
