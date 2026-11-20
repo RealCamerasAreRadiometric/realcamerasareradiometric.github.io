@@ -52,6 +52,10 @@ VisualGeometryToolkitCore = {url = "https://github.com/VisualGeometryToolkit/Vis
 VisualGeometryToolkitIO = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitIO"}
 VisualGeometryToolkitEstimation = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitEstimation"}
 VisualGeometryToolkitFeatures = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitFeatures"}
+# TEMPORARY (the same migration): VisualGeometryToolkitEval from the same branch (0.9.3: its compat admits VisualGeometryToolkitCore
+# 0.12) and PanoramaStitching from its port branch, until they are registered. Removed before a release.
+VisualGeometryToolkitEval = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitEval"}
+PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "vrtk/port"}
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
