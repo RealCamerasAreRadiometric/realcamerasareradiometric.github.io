@@ -266,13 +266,22 @@ the `n` and `n × n` values to the host.
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
     Td = adapt(KA.get_backend(J), T)
-    g, H = Array(Td' * (J * r)), Array(Td' * ((J * J') * Td))
+    g, H = Array(Td' * _rows_times(J, r)), Array(Td' * ((J * J') * Td))
     (all(isfinite, g) && all(isfinite, H)) && return g, H
     # a non-finite Jacobian entry makes its column's diagonal of JᵀJ non-finite: scrubbed (`_scrub_entries!`) and formed again — the
     # blocks of the scrubbed Jacobian, as before; a finite Jacobian (every block but a defect's) skips the scrub's sweep over it
     _scrub!(J, lay, run)
-    return Array(Td' * (J * r)), Array(Td' * ((J * J') * Td))
+    return Array(Td' * _rows_times(J, r)), Array(Td' * ((J * J') * Td))
 end
+"""
+    _rows_times(J, r) -> J r
+
+The device Jacobian `J` (columns × rows) times the residual `r`: `J * r` (the host's BLAS on the CPU backend). RC's CUDA extension
+gives the device's method: the vendor library's matrix–vector product of a wide matrix is slow (73 × 230,400 Float64 on a B200:
+14.9 ms, its matrix–matrix product of the same sizes 0.33 ms; 2026-11-20), so the product is taken as a one-column matrix product
+there (0.10 ms; the same sums to rounding, 3.5e-14 relative).
+"""
+_rows_times(J, r) = J * r
 
 """The block's Jacobian in the problem's coordinates on the host (`J_fullᵀ T`, rows × n): `computeresjac`'s, outside the LM iteration
 (the tests, the stall postcondition, the grid smoothness's weight selection)."""

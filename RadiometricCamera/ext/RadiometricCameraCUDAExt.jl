@@ -30,4 +30,8 @@ function RadiometricCamera._shared_read_only!(::CUDA.CUDABackend, x)
     return x
 end
 
+# J r of a device Jacobian (`_rows_times`): CUBLAS's gemv of a wide matrix is ~100× slower than its gemm of the same sizes, so the
+# residual goes in as a one-column matrix.
+RadiometricCamera._rows_times(J::CUDA.AnyCuMatrix, r::CUDA.AnyCuVector) = vec(J * reshape(r, :, 1))
+
 end # module
