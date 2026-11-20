@@ -1,9 +1,15 @@
-// Links the names in the landing hero's author block. DocumenterLandingPage
+// Links the names, group, university and venue in the landing hero's author block. DocumenterLandingPage
 // renders the hero tagline as plain escaped text, so the links are added here,
 // on load; without JavaScript the block reads the same, unlinked.
-// AUTHORS: add each author's (and affiliation's) page here once index.md names them.
 (function () {
   var LINKS = {
+      "James Pritts": "https://prittjam.github.io/",
+      "Felix Seegräber": "https://www.uni-kiel.de/en/person/seegraeber-felix-68860",
+      "David Nakath": "https://www.geomar.de/en/dnakath",
+      "Kevin Köser": "https://www.uni-kiel.de/en/person/koeser-kevin-58375",
+      "Marine Data Science": "https://www.marine-ai.de/",
+      "Kiel University": "https://www.uni-kiel.de/en/",
+      "arXiv 2026": "https://arxiv.org/abs/2611.25265"
   };
   function linkify() {
     var el = document.querySelector(".landing-tagline");
