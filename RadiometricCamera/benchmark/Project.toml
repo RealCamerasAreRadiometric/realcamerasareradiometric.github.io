@@ -1,0 +1,28 @@
+# The benchmark environment of RadiometricCamera (benchmark/run.jl): a member of the package's workspace, so it resolves with
+# the package and shares its Manifest (never committed). Every dependency is one of the package's own.
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+NLLSsolver = "50b5cf9e-bf7a-4e29-8981-4280cbba70cb"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+RadiometricCamera = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
+Static = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+
+[sources]
+RadiometricCamera = {path = ".."}
+
+[compat]
+CUDA = "5"
+ForwardDiff = "1"
+JSON = "1.12"
+KernelAbstractions = "0.9"
+NLLSsolver = "5.3.4"
+Static = "1"
+StaticArrays = "1"
+VisualGeometryToolkitCore = "0.11.1"
+julia = "1.13"
