@@ -322,6 +322,19 @@ end
     A = R.blocks.all.A
     @test all(R.kept) && R.blocks.all.rows == eachindex(rows_px) && size(A) == (length(rows_px), TW * TH)
     I_true = A * vec(design)
+    # the operators built where the rows are computed (page_footprints, fit_operator: the rows selected, weighted and transposed on
+    # the device) are Core's operators of the host matrix, array for array; a selection keeps its order
+    P = page_footprints(ctx, rows_px, ctx.camera, rows_by_photograph(rows_px); device = VgtkCore.KA.CPU())
+    Fsel = findall(isodd, eachindex(rows_px)); wsel = [1.0 + 0.1 * (q % 7) for q in Fsel]; Dp = VgtkCore.difference_rows((TW, TH), 1)
+    same(a, b) = size(a) == size(b) && a.rowptr == b.rowptr && a.colval == b.colval && a.nzval == b.nzval
+    for (w, Ah) in ((wsel, RC._whiten(wsel, A[Fsel, :])), (RC.Unweighted(), A[Fsel, :]))
+        opd = fit_operator(P.A, Fsel, w, Dp; device = VgtkCore.KA.CPU()); oph = VgtkCore.PenalizedOperator(Ah, Dp; device = VgtkCore.KA.CPU())
+        @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
+    end
+    @test all(P.kept) && host_sparse(P.A) == A && host_sparse(csr_rows(P.A, reverse(Fsel); device = VgtkCore.KA.CPU())) == A[reverse(Fsel), :]
+    @test host_sparse(csr_transpose(P.A; device = VgtkCore.KA.CPU())) == sparse(transpose(A))
+    shuffled = reverse(rows_px)                                         # rows_px in any order: the rows follow it
+    @test host_sparse(page_footprints(ctx, shuffled, ctx.camera, rows_by_photograph(shuffled); device = VgtkCore.KA.CPU()).A) == A[end:-1:1, :]
     for k in 1:5
         img = zeros(H, W, 3)
         for (q, (kk, u, v)) in enumerate(rows_px); kk == k && (img[v, u, :] .= I_true[q]); end
@@ -438,6 +451,14 @@ end
     end
     sg2 = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], rtol = 1e-9, maxit = 3000)
     @test sg2.main.x == sg.main.x                                    # deterministic on the device
+    # the operators' construction on the device (the rows selected, weighted, transposed there: csr_rows, csr_transpose, fit_operator)
+    # gives the arrays Core uploads from the host matrix
+    dev = gpu.device; sel = findall(q -> q % 3 != 0, 1:size(A, 1)); w = [1.0 + 0.01 * (q % 11) for q in sel]
+    same(a, b) = size(a) == size(b) && Array(a.rowptr) == Array(b.rowptr) && Array(a.colval) == Array(b.colval) && Array(a.nzval) == Array(b.nzval)
+    @test same(csr_transpose(gpu.A; device = dev), gpu.At) && same(csr_rows(gpu.A, sel; device = dev), VgtkCore.CSRMatrix(A[sel, :]; device = dev))
+    opd = fit_operator(gpu.A, sel, w, D; device = dev); oph = VgtkCore.PenalizedOperator(RadiometricCamera._whiten(w, A[sel, :]), D; device = dev)
+    @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
+    @test host_sparse(csr_rows(gpu.A, reverse(sel); device = dev)) == A[reverse(sel), :]
     @test TextureGPU.gpu_name() isa String
 end
 

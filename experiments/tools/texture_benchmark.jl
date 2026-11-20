@@ -13,7 +13,7 @@
 #
 # The sheet is the tests' (60 × 84 mm, a design of smooth blobs and bars), photographed defocused from 0.30–0.42 m by a double-sphere
 # camera focused at 0.45 m with a 4 mm aperture; the photographs' values are the rows' own prediction of the design. Reported per
-# stage: seconds (the first call, compilation included, and a second, warm), and the numbers a change must keep: the rows, the
+# stage (the rows on the device, `page_footprints`; the fit operator, `fit_operator`; the solves; the refine stage): seconds (the first call, compilation included, and a second, warm), and the numbers a change must keep: the rows, the
 # nonzeros, the iterations and a checksum of the textures.
 # =============================================================================
 using DrWatson
@@ -81,16 +81,17 @@ function texture_benchmark()
     roles = split_roles(K, 5); role = [roles[r[1]] for r in rows_px]
     blocks = (; fit = role .== :fit, val = role .== :val, test = role .== :test)
     say("rows", length(rows_px))
+    D = VgtkCore.difference_rows((TW, TH), 1)
     for pass in ("first", "warm")
-        R, t = timed(() -> page_rows(ctx, rows_px, ctx.camera, blocks, groups; device = BENCH_DEVICE))
+        R, t = timed(() -> (R = page_footprints(ctx, rows_px, ctx.camera, groups; device = BENCH_DEVICE); VgtkCore.KA.synchronize(BENCH_DEVICE); R))
         say("page_rows_$(pass)_s", t)
-        A = R.blocks.fit.A
-        pass == "first" && (say("fit_rows", size(A, 1)); say("fit_nonzeros", nnz(A)); say("fit_nonzeros_sumsq", sum(abs2, nonzeros(A))))
-        y = A * vec(design)
-        D = VgtkCore.difference_rows((TW, TH), 1)
-        op, t = timed(() -> VgtkCore.PenalizedOperator(A, D; device = BENCH_DEVICE))
+        F = findall(blocks.fit .& R.kept)
+        op, t = timed(() -> (op = fit_operator(R.A, F, RC.Unweighted(), D; device = BENCH_DEVICE); VgtkCore.KA.synchronize(BENCH_DEVICE); op))
         say("operator_$(pass)_s", t)
-        scale = VgtkCore.penalty_scale(sum(abs2, nonzeros(A)), TW * TH, 1.0)
+        energy = sum(abs2, Array(op.At.nzval))
+        pass == "first" && (say("fit_rows", op.A.m); say("fit_nonzeros", length(op.A.nzval)); say("fit_nonzeros_sumsq", energy))
+        yd = Adapt.adapt(BENCH_DEVICE, zeros(op.A.m)); mul!(yd, op.A, Adapt.adapt(BENCH_DEVICE, vec(design))); y = Array(yd)
+        scale = VgtkCore.penalty_scale(energy, TW * TH, 1.0)
         sw, t = timed(() -> page_solves(op, y, fill(0.5, TW * TH); scale, weights = [1e-3, 1e-1], rtol = 1e-6, maxit = 300))
         say("page_solves_$(pass)_s", t)
         pass == "first" && (say("iterations", [sw.main.iterations; [r.iterations for r in sw.reg]]); say("texture_checksum", sum(sw.main.x) + sum(r -> sum(r.x), sw.reg)))

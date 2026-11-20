@@ -402,7 +402,7 @@ alone), everything else the same.
 function variant_camera(ctx, name::AbstractString; pinhole_r::Real)
     c = ctx.camera
     name == "learned" && return c
-    name == "pinhole" && return RC.RadiometricCameraModel(c.lens, c.focus, Float64(pinhole_r), c.vignetting)
+    name == "pinhole" && return RC.with_aperture_radius(c, Float64(pinhole_r))
     throw(ArgumentError("variant_camera: unknown blur model $(repr(name)) ($(join(TEXTURE_VARIANTS, " | ")))"))
 end
 
@@ -531,7 +531,7 @@ The blur row of a sampled pixel `(q, u, v)` (`q` its index in the launch) under 
 sample and every aperture-disc sample the ray `world_ray`, its intersection with the sheet and the bilinear texels there
 (`texel_weights`), weighted by the sensor and aperture weights and accumulated per texel in sample order, normalised to a sum of 1 and
 scaled by the chief ray's vignetting `V(𝐩)` (a pixel's model is I = V · Σ w x). Its `n` distinct texels go into the first `n` of the
-`_footprint_slots(st)` slots from `(q − 1) · slots + 1` of `cols` (the texel, in first-sample order) and `vals` (its weight); returns
+`_footprint_slots(st)` slots from `(q − 1) · slots + 1` of `cols` (the texel, ascending) and `vals` (its weight); returns
 `n`, or 0 when a sample misses the sheet or the grid (the pixel is dropped). A functor of Core's `pointwise!`: one KernelAbstractions
 kernel on every backend, the CPU's included.
 """
@@ -579,6 +579,13 @@ _footprint_slots(st) = 4 * length(st.sensor) * RC.n_disc(st.aperture)
     @inbounds for i in (base + 1):(base + n)
         f.vals[i] = V * (f.vals[i] / tot)
     end
+    @inbounds for i in (base + 2):(base + n)                              # the row's texels ascending: the order of a sparse operator's row
+        c = f.cols[i]; x = f.vals[i]; j = i - 1
+        while j > base && f.cols[j] > c
+            f.cols[j + 1] = f.cols[j]; f.vals[j + 1] = f.vals[j]; j -= 1
+        end
+        f.cols[j + 1] = c; f.vals[j + 1] = x
+    end
     return Int32(n)
 end
 
@@ -591,46 +598,168 @@ function rows_by_photograph(rows_px)
     return g
 end
 
+# The page's operators are built where the rows are computed (owner 2026-11-20: as the calibration's normal equations, nothing of
+# the system's construction on the host). The footprint kernel leaves each sampled pixel's texels in its slots, ascending; the rows
+# are compacted, selected, weighted and transposed by row-parallel kernels (Core's `_launch_rows!`: a work item per row, no atomics)
+# and one device sort of the entries' keys, into Core's `CSRMatrix`es — the arrays Core's `PenalizedOperator` holds. The entries and
+# their order are the host assembly's (`sparse(I, J, V)` of the same slots, then Core's upload), so the solves are the same numbers.
+
+# Row `i` of a gather: its `cnt[i]` entries from `src[i] + 1 …` of (`colsrc`, `valsrc`) to `dst[i] + 1 …` of (`colout`, `valout`).
+Base.@propagate_inbounds function _gather_row!(valout, i, colout, dst, src, cnt, colsrc, valsrc)
+    d = dst[i]; s = src[i]
+    for j in 1:cnt[i]
+        colout[d + j] = colsrc[s + j]; valout[d + j] = valsrc[s + j]
+    end
+    return nothing
+end
+# Row `i`'s entries times its weight `w[i]` (RC's one weighting, `_whiten`: the same product as its sparse row scaling).
+Base.@propagate_inbounds function _weight_row!(nzval, i, rowptr, w)
+    for e in rowptr[i]:(rowptr[i + 1] - 1)
+        nzval[e] = RC._whiten(w, i, nzval[e])
+    end
+    return nothing
+end
+# Row `i`'s entries' keys `(column − 1) · nz + entry`: ascending by column, then by entry (by row: the entries are stored row by row).
+Base.@propagate_inbounds function _transpose_keys!(keys, i, rowptr, colval, nz)
+    for e in rowptr[i]:(rowptr[i + 1] - 1)
+        keys[e] = (colval[e] - 1) * nz + e
+    end
+    return nothing
+end
+# Row `i`'s entries' row index (the transpose's column values, before the sort).
+Base.@propagate_inbounds function _entry_rows!(rows, i, rowptr)
+    for e in rowptr[i]:(rowptr[i + 1] - 1)
+        rows[e] = i
+    end
+    return nothing
+end
+# Entry `e` of the transpose: the entry `(keys[e] − 1) % nz + 1` of the operator (its row, its value).
+Base.@propagate_inbounds function _transposed_entry!(nzout, e, rowout, keys, nz, rows, nzval)
+    s = (keys[e] - 1) % nz + 1
+    rowout[e] = rows[s]; nzout[e] = nzval[s]
+    return nothing
+end
+# Column `j`'s first entry among the sorted `keys`: 1 + the keys below `(j − 1) · nz + 1` (a binary search).
+Base.@propagate_inbounds function _column_start!(ptr, j, keys, nz)
+    t = (j - 1) * nz + 1; lo = 1; hi = length(keys) + 1
+    while lo < hi
+        mid = (lo + hi) >>> 1
+        keys[mid] < t ? (lo = mid + 1) : (hi = mid)
+    end
+    ptr[j] = lo
+    return nothing
+end
+
+"The row pointers of rows with `cnt[i]` entries each (`cnt` on a device): `1`, then one past each row's last entry."
+_row_pointers(cnt::AbstractVector{Int}, device) = vcat(Adapt.adapt(device, [1]), cumsum(cnt) .+ 1)
+
+"""
+    csr_rows(C, sel; device) -> CSRMatrix
+
+The rows `sel` (indices, any order) of the device operator `C` (Core's `CSRMatrix`) as an operator of its own on `device`: row `r`
+is `C`'s row `sel[r]`, its entries in their stored order (one gather kernel, a work item per row).
+"""
+function csr_rows(C::VgtkCore.CSRMatrix, sel::AbstractVector{<:Integer}; device)
+    n = length(sel)
+    seld = Adapt.adapt(device, Vector{Int}(sel))
+    src = C.rowptr[seld] .- 1
+    cnt = C.rowptr[seld .+ 1] .- 1 .- src
+    ptr = _row_pointers(cnt, device); nz = n == 0 ? 0 : Int(sum(cnt))
+    colval = VgtkCore.KA.zeros(device, Int, nz); nzval = VgtkCore.KA.zeros(device, Float64, nz)
+    VgtkCore._launch_rows!(_gather_row!, nzval, n, colval, ptr .- 1, src, cnt, C.colval, C.nzval)
+    return VgtkCore.CSRMatrix(n, C.n, ptr, colval, nzval)
+end
+
+"""
+    csr_transpose(C; device) -> CSRMatrix
+
+The transpose of the device operator `C` (Core's `CSRMatrix`) as an operator on `device`: its rows `C`'s columns, each row's entries
+by `C`'s row, ascending — the compressed columns of the matrix, as Core's `PenalizedOperator` holds a transpose. One sort of the
+entries' keys on the device, the rest row-parallel kernels (no atomics, so the result is the same on every backend).
+"""
+function csr_transpose(C::VgtkCore.CSRMatrix; device)
+    nz = length(C.nzval)
+    keys = VgtkCore.KA.zeros(device, Int, nz); rows = VgtkCore.KA.zeros(device, Int, nz)
+    VgtkCore._launch_rows!(_transpose_keys!, keys, C.m, C.rowptr, C.colval, nz)
+    VgtkCore._launch_rows!(_entry_rows!, rows, C.m, C.rowptr)
+    sort!(keys)
+    colval = VgtkCore.KA.zeros(device, Int, nz); nzval = VgtkCore.KA.zeros(device, Float64, nz)
+    VgtkCore._launch_rows!(_transposed_entry!, nzval, nz, colval, keys, nz, rows, C.nzval)
+    ptr = VgtkCore.KA.zeros(device, Int, C.n + 1)
+    VgtkCore._launch_rows!(_column_start!, ptr, C.n + 1, keys, nz)
+    return VgtkCore.CSRMatrix(C.n, C.m, ptr, colval, nzval)
+end
+
+"The device operator `C` (Core's `CSRMatrix`) as a host sparse matrix (the tests and small pages read rows of it)."
+host_sparse(C::VgtkCore.CSRMatrix) =
+    sparse(transpose(SparseMatrixCSC(C.n, C.m, Vector{Int}(Array(C.rowptr)), Vector{Int}(Array(C.colval)), Vector{Float64}(Array(C.nzval)))))
+
+"""
+    page_footprints(ctx, rows_px, camera, groups; device) -> (; A, kept)
+
+The blur rows (`_FootprintAt`) of every sampled pixel `rows_px[q] = (k, u, v)` of `camera` (a `RadiometricCameraModel`: the blur model,
+`variant_camera`) at photograph `k`'s pose `ctx.poses[k]`, on `device` and kept there: one footprint kernel per photograph (`groups`,
+`rows_by_photograph`; Core's `pointwise!` on `OnBackend`), its slots compacted by a gather kernel. `A` is Core's `CSRMatrix` of
+`length(rows_px)` rows in `rows_px` order over the page's `TW · TH` texels, each row's texels ascending (a texel its samples share
+summed); a pixel with a sample off the sheet is dropped: an empty row, `kept[q]` false.
+"""
+function page_footprints(ctx, rows_px, camera::RC.RadiometricCameraModel, groups::AbstractDict{<:Integer, <:AbstractVector{<:Integer}}; device)
+    N = _footprint_slots(ctx.sett); nT = ctx.TW * ctx.TH; KA = VgtkCore.KA
+    order = Int[]; cnts = Any[]; cols = Any[]; vals = Any[]
+    for k in sort!(collect(keys(groups)))
+        qs = groups[k]; m = length(qs)
+        m == 0 && continue
+        slot_cols = KA.zeros(device, Int32, N * m); slot_vals = KA.zeros(device, Float64, N * m); n = KA.zeros(device, Int32, m)
+        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.scene, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), slot_cols, slot_vals)   # the kernel's view: the camera at pose k
+        VgtkCore.pointwise!(f, n, Adapt.adapt(device, Int32.(1:m)), Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]),
+                            Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); exec = VgtkCore.OnBackend(device))
+        KA.synchronize(device)
+        cnt = Int.(n); dst = cumsum(cnt) .- cnt; nz = Int(sum(cnt))
+        colk = KA.zeros(device, Int, nz); valk = KA.zeros(device, Float64, nz)
+        VgtkCore._launch_rows!(_gather_row!, valk, m, colk, dst, Adapt.adapt(device, collect(0:N:(N * (m - 1)))), cnt, slot_cols, slot_vals)
+        append!(order, qs); push!(cnts, cnt); push!(cols, colk); push!(vals, valk)
+    end
+    length(order) == length(rows_px) || throw(ArgumentError("page_footprints: the groups hold $(length(order)) of the $(length(rows_px)) sampled pixels"))
+    if isempty(cnts)
+        A = VgtkCore.CSRMatrix(0, nT, Adapt.adapt(device, [1]), KA.zeros(device, Int, 0), KA.zeros(device, Float64, 0))
+        return (; A, kept = falses(0))
+    end
+    cnt = reduce(vcat, cnts)
+    A = VgtkCore.CSRMatrix(length(order), nT, _row_pointers(cnt, device), reduce(vcat, cols), reduce(vcat, vals))
+    order == eachindex(rows_px) || (A = csr_rows(A, invperm(order); device))       # rows in rows_px order (already, when rows_px runs by photograph)
+    ptr = Array(A.rowptr)
+    return (; A, kept = BitVector(ptr[q + 1] > ptr[q] for q in eachindex(rows_px)))
+end
+
 """
     page_rows(ctx, rows_px, camera, blocks, groups; device) -> (; blocks, kept)
 
-The blur rows (`_FootprintAt`) of every sampled pixel `rows_px[q] = (k, u, v)` of `camera` (a `RadiometricCameraModel`: the blur model,
-`variant_camera`) at photograph `k`'s pose `ctx.poses[k]`: one kernel per photograph
-(`groups`, `rows_by_photograph`) on `device` (Core's `pointwise!` on `OnBackend`); a pixel with a sample off the sheet is dropped
-(`kept[q]` false). `blocks` names the row sets wanted, each a Bool per sampled pixel; per block `(; A, rows)`: its sparse matrix (`TW ·
-TH` columns, a texel its samples share summed; rows in `rows_px` order) built directly, no slice of a whole-page matrix, and `rows` the
-indices of `rows_px` it holds.
+The blur rows of every sampled pixel ([`page_footprints`](@ref), on `device`) as host sparse matrices: `blocks` names the row sets
+wanted, each a Bool per sampled pixel; per block `(; A, rows)`: its sparse matrix (`TW · TH` columns; rows in `rows_px` order) and
+`rows`, the indices of `rows_px` it holds (the block's kept pixels). The refine stage keeps the rows on the device (`run_page`); this
+form is the tests' and a small page's.
 """
 function page_rows(ctx, rows_px, camera::RC.RadiometricCameraModel, blocks::NamedTuple, groups::AbstractDict{<:Integer, <:AbstractVector{<:Integer}}; device)
-    N = _footprint_slots(ctx.sett); nT = ctx.TW * ctx.TH
-    coo = map(_ -> (; I = Int[], J = Int[], V = Float64[], rows = Int[]), blocks)
-    kept = falses(length(rows_px))
-    for k in sort!(collect(keys(groups)))
-        qs = groups[k]; m = length(qs)
-        cols = VgtkCore.KA.zeros(device, Int32, N * m); vals = VgtkCore.KA.zeros(device, Float64, N * m); cnt = VgtkCore.KA.zeros(device, Int32, m)
-        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.scene, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), cols, vals)   # the kernel's view: the camera at pose k
-        VgtkCore.pointwise!(f, cnt, Adapt.adapt(device, Int32.(1:m)), Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]),
-                            Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); exec = VgtkCore.OnBackend(device))
-        VgtkCore.KA.synchronize(device)
-        nh, colh, valh = Array(cnt), Array(cols), Array(vals)
-        for (i, q) in enumerate(qs)
-            nh[i] > 0 || continue
-            kept[q] = true; s = (i - 1) * N
-            for (b, c) in zip(blocks, coo)
-                b[q] || continue
-                push!(c.rows, q); r = length(c.rows)
-                for j in (s + 1):(s + nh[i])
-                    push!(c.I, r); push!(c.J, colh[j]); push!(c.V, valh[j])
-                end
-            end
-        end
+    P = page_footprints(ctx, rows_px, camera, groups; device)
+    out = map(blocks) do b
+        rows = findall(b .& P.kept)
+        (; A = host_sparse(csr_rows(P.A, rows; device)), rows)
     end
-    out = map(coo) do c                                                # rows in rows_px order (already, when rows_px runs by photograph)
-        issorted(c.rows) && return (; A = sparse(c.I, c.J, c.V, length(c.rows), nT), c.rows)
-        rk = invperm(sortperm(c.rows))
-        (; A = sparse(rk[c.I], c.J, c.V, length(c.rows), nT), rows = sort(c.rows))
-    end
-    return (; blocks = out, kept)
+    return (; blocks = out, kept = P.kept)
+end
+
+"""
+    fit_operator(A, rows, w, D; device) -> PenalizedOperator
+
+Core's `PenalizedOperator` of the fit rows `rows` of the page's device rows `A` (`page_footprints`) under their weights `w` (RC's one
+weighting: `Unweighted()`, or 1/σ per fit row) and the penalty operator `D` (a host sparse matrix, uploaded): the rows selected,
+weighted and transposed on `device` (`csr_rows`, `csr_transpose`) — the arrays Core's constructor makes from the host matrix.
+"""
+function fit_operator(A::VgtkCore.CSRMatrix, rows::AbstractVector{<:Integer}, w, D::SparseMatrixCSC; device)
+    Af = csr_rows(A, rows; device)
+    w isa RC.Unweighted || VgtkCore._launch_rows!(_weight_row!, Af.nzval, Af.m, Af.rowptr, Adapt.adapt(device, Vector{Float64}(w)))
+    pen = VgtkCore.PenalizedOperator(SparseMatrixCSC{Float64, Int}(undef, 0, size(D, 2)), D; device)       # the penalty's two operators, Core's upload
+    return VgtkCore.PenalizedOperator(Af, csr_transpose(Af; device), pen.D, pen.Dt, pen.device)
 end
 
 # ---- the solve: Core's CGLS on the page, on the host or the device -----------------------------------------------------------------
@@ -663,8 +792,8 @@ page_files(dir::AbstractString, v::AbstractString) = (; texture = joinpath(dir, 
 """
     run_page(ctx, samples, roles, cells, circle, out; settings, variants, device, values, log)
 
-The refine stage: every sampled pixel's row (`samples`, `page_rows`) under each blur model of `variants` (`variant_camera`), the fit rows'
-operator on `device` (Core's `PenalizedOperator`: the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
+The refine stage: every sampled pixel's row (`samples`, `page_footprints`: on `device`, where they stay) under each blur model of `variants`
+(`variant_camera`), the fit rows' operator built there (`fit_operator`: Core's `PenalizedOperator` on the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
 every weight of `settings["regularization_weights"]`); the squared errors of every solution on the fit, validation and test rows that
 fall in the scored `cells` (the test also at the centre ρ < `centre_rho` and the edge ρ > `edge_rho` of the image) with the photographs'
 sums of squares. The observed values are `values[k]`: `sample_pixels`' values of photograph `k` at its sampled pixels, read when its mask
@@ -711,29 +840,29 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
     m̄ = VgtkCore.mean_positive_eigenvalue(D)                          # the operator's normalization of the weight (Core's)
     for name in variants
         t1 = time()
-        R = page_rows(ctx, rows_px, variant_camera(ctx, name; pinhole_r = PINR), blocks, groups; device)
-        Af, F = R.blocks.fit.A, R.blocks.fit.rows                      # F, Fs, Vs, Ts: indices of rows_px
+        R = page_footprints(ctx, rows_px, variant_camera(ctx, name; pinhole_r = PINR), groups; device)   # every row, on the device
+        F, Fs, Vs, Ts = (findall(b .& R.kept) for b in blocks)         # indices of rows_px: the fit rows, the scored fit, validation and test rows
         nkept = count(R.kept); nval = count(R.kept .& isval); ntest = count(R.kept .& istest)
         wF = RC._select_rows(rw, F)                                    # the fit rows' weights (RC's one weighting: _whiten)
-        Aw = RC._whiten(wF, Af); bw = RC._whiten(wF, yv[F])           # whitened rows and values, or as measured
-        scale = VgtkCore.penalty_scale(sum(abs2, nonzeros(Aw)), TW * TH, m̄)   # λ = β · scale, the fit rows' energy in the cost's units
-        log(@sprintf("page %s: %d rows kept (fit %d, validation %d, test %d), %d fit nonzeros, m̄ %.4g, λ/β %.4g, rows %s  [%.0f s]", name, nkept, length(F), nval, ntest, nnz(Af), m̄, scale,
-                     weighting_record(rw), time() - t1))
-        t2 = time(); op = VgtkCore.PenalizedOperator(Aw, D; device)
+        bw = RC._whiten(wF, yv[F])                                     # the values whitened as the rows, or as measured
+        t2 = time(); op = fit_operator(R.A, F, wF, D; device)          # the fit rows selected, weighted and transposed on the device
+        scale = VgtkCore.penalty_scale(sum(abs2, Array(op.At.nzval)), TW * TH, m̄)   # λ = β · scale, the fit rows' energy in the cost's units
+        log(@sprintf("page %s: %d rows kept (fit %d, validation %d, test %d), %d fit nonzeros, m̄ %.4g, λ/β %.4g, rows %s  [%.0f s]", name, nkept, length(F), nval, ntest,
+                     length(op.A.nzval), m̄, scale, weighting_record(rw), time() - t1))
         sw = page_solves(op, bw, x0; scale, weights = W8, rtol, maxit)
-        op = nothing
+        colptr = Array(op.At.rowptr); op = nothing
         log(@sprintf("page %s: unregularised %d its%s; Tikhonov %s  [%.0f s]", name, sw.main.iterations, sw.main.converged ? "" : " (NOT converged)",
                      join([@sprintf("%g:%d", λ, r.iterations) for (λ, r) in zip(W8, sw.reg)], " "), time() - t2))
-        (Afs, Fs), (Avs, Vs), (Ats, Ts) = ((b.A, b.rows) for b in (R.blocks.fit_scored, R.blocks.val_scored, R.blocks.test_scored))
         mc = ρ[Ts] .< cr; me = ρ[Ts] .> ce
-        err(M, b, x) = M * x .- b
+        yd = Adapt.adapt(device, yv); pred = similar(yd)
         function record(x, iters, converged, weight)
-            ef = err(Afs, yv[Fs], x); ev = err(Avs, yv[Vs], x); et = err(Ats, yv[Ts], x)
+            mul!(pred, R.A, Adapt.adapt(device, x)); e = Array(pred .- yd)    # every row's error A x − y, the rows as measured (a dropped pixel's unread)
+            ef = e[Fs]; ev = e[Vs]; et = e[Ts]
             Dict{String, Any}("weight" => weight, "iters" => iters, "converged" => converged, "fit_sse" => sum(abs2, ef), "val_sse" => sum(abs2, ev),
                               "test_sse" => sum(abs2, et), "test_sse_centre" => sum(abs2, et[mc]), "test_sse_edge" => sum(abs2, et[me]))
         end
         recs = [record(sw.main.x, sw.main.iterations, sw.main.converged, 0.0); [record(r.x, r.iterations, r.converged, λ) for (λ, r) in zip(W8, sw.reg)]]
-        seen = [Af.colptr[j + 1] > Af.colptr[j] for j in 1:(TW * TH)]          # the texels the fit rows read
+        seen = [colptr[j + 1] > colptr[j] for j in 1:(TW * TH)]                # the texels the fit rows read
         files = page_files(out, name)
         write(files.texture, Float32.(sw.main.x)); write(files.reg, Float32.(reduce(hcat, [r.x for r in sw.reg]; init = zeros(TW * TH, 0)))); write(files.seen, UInt8.(seen))
         VgtkIO.write_record(files.record, Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.texture_page_variant, "variant" => name, "rows" => nkept, "fit_rows" => length(F), "val_rows" => nval, "test_rows" => ntest,
