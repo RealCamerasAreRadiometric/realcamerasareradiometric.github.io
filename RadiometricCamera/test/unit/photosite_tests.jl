@@ -55,16 +55,16 @@
         tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
         focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-        views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
         vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
+        camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-        renders = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-        return (; scene, st, lens_t, tps_t, poses, views_t, vig_t, mat_t, light_t, a_t, b, r_SH, masks, renders, W, H)
+        masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+        return (; scene, st, lens_t, tps_t, poses, camera_t, vig_t, mat_t, light_t, a_t, b, r_SH, masks, renders, W, H)
     end
 end
 
@@ -111,7 +111,7 @@ end
     targets = [p[1] for p in ph]
     masks = [f.masks[k] .& ph[k][2] for k in 1:2]                                       # the compute mask AND the valid green photosites
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)          # the encoding's scale is the lighting's
-    truth = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, targets; masks, channel = 2)
+    truth = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, targets; masks, channel = 2)
     @test all(k -> length(truth.ϕ[k]) == count(masks[k]), 1:2)                         # ONE residual per green photosite
     c_truth = cost(truth)[1]
     # R/B perturbed: the photograph differs at red and blue photosites only, the mask and every residual are the same
@@ -122,13 +122,13 @@ end
     end
     ph2 = [read_photosites(m) for m in pert]
     @test all(k -> ph2[k][2] == ph[k][2] && ph2[k][1] != ph[k][1], 1:2)
-    truth2 = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
+    truth2 = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
     @test cost(truth2)[1] == c_truth && truth2.ϕ == truth.ϕ
     # a perturbed camera (poses, lens) recovered from the green photosites alone: the truth to the 14-bit encoding
-    s = CalibrationState(f.scene, f.st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))),
-                                              cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 1.25 * f.W, (0.5 * f.W, 0.5 * f.H), f.W, f.H),
-                                              Focus(f.tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9]), 0.0386) for p in f.poses],
-                         f.vig_t, f.mat_t, light_κ, targets; masks, channel = 2)
+    camera_0 = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 1.25 * f.W, (0.5 * f.W, 0.5 * f.H), f.W, f.H),
+                                      Focus(f.tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9]), 0.0386, f.vig_t)
+    poses_0 = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in f.poses]
+    s = CalibrationState(f.scene, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
     c0 = cost(s)[1]
     run_lm!(s; maxiters = 100, reldcost = 1e-12, fixed = (:focus, :aperture, :vignetting, :lighting, :material))
     @test cost(s)[1] < 1e-3 * c0 && cost(s)[1] <= 1.01 * c_truth + 1e-12
@@ -147,8 +147,8 @@ end
         ph = [read_photosites(mosaic_of(r, κ)) for r in f.renders]
         masks = [f.masks[k] .& ph[k][2] for k in 1:2]
         light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-        s_cpu = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2)
-        s_gpu = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
+        s_cpu = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2)
+        s_gpu = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
         @test s_gpu.px == s_cpu.px                                                         # the same green photosites
         prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)

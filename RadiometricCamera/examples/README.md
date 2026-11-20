@@ -13,8 +13,9 @@
    a Schöps `central-generic` calibration (`schoeps_gridlens`), any VisualGeometryToolkitCore lens as Core's pixel camera
    (`BoundedCamera(CameraModel(K, VgtkCore.KannalaBrandt(…)), extent)`); each becomes the refinable generic grid model —
    VisualGeometryToolkitCore's SplineLens camera — with `grid_model(camera, G_x, G_y)`.
-2. **The radiometric model around it** — `Focus` (inverse depth `t̂`, TPS), `View` (with the image distance s′), `Vignetting` (`V`),
-   `Lighting` (`L_SH` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` — and what each symbol is in the paper.
+2. **The radiometric model around it** — `Focus` (inverse depth `t̂`, TPS), the vignetting (`V`), the camera that holds them with
+   the lens and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at a pose), `Lighting`
+   (`L_SH` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` — and what each symbol is in the paper.
 3. **State, masks, start prediction** — `CalibrationState`, `compute_mask`, `render_all`, `cost`.
 4. **Calibration** — the closed-form linear sweep (`solve_linear_blocks!`: Θ_l, Θ_v, μ), the joint LM over all blocks on the GPU
    (`run_lm_grid!`), the loss curve, `save_grid`.

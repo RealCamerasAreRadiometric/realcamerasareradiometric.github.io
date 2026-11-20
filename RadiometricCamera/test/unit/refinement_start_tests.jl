@@ -2,7 +2,7 @@
 # defaults, so a refine-only change never changes a start), the start record's round trip, the refusal of a start of other options,
 # and the retired one-step entry points.
 @testitem "refinement start: start options, the start record, refusals" setup = [RCFixtures] begin
-    using RadiometricCamera: lens, material, start_options, View
+    using RadiometricCamera: lens, material, start_options
     using StaticArrays, LinearAlgebra
 
     module RefinementStartTest
@@ -38,7 +38,7 @@
         W = H = 32
         kb = cam(RC.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
         sc = gold_scene(W, H; h = gold_h())
-        s = gold_state(sc..., [View(p, kb, gold_focus(), 0.0386) for p in gold_poses()])
+        s = gold_state(sc..., kb)
         names = ["V01.png", "V02.png"]
         meta = (; names, W₀ = W, H₀ = H, fpx = 41.216, lens_start = s.camera.lens, init_region = nothing, R0 = 0.0386,
                 d_c = 1.31, f_m = 0.0041, be0 = [0.1, 0.25], page_flip = 1.0, board_y_sign = -1.0, vig_c = SVector(16.0, 15.5),

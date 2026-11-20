@@ -10,9 +10,11 @@
     exported = Set(n for n in names(RC) if Base.isexported(RC, n) && n !== :RadiometricCamera)   # (names() lists the public names too)
     @test exported == documented
     @test length(exported) <= 20                                                   # a headline, not the package
-    for n in (:𝔣, :𝔭, :ρ_c, :Φ_pixel, :View, :build_problem, :run_lm!, :save_state, :load_distance_map, :selfcheck)
+    for n in (:𝔣, :𝔭, :ρ_c, :Φ_pixel, :render_view, :build_problem, :run_lm!, :save_state, :load_distance_map, :selfcheck)
         @test Base.ispublic(RC, n) && !Base.isexported(RC, n)
     end
+    # the camera-first API (owner 2026-11-20): the kernels' View record and view_of are internal
+    @test !Base.ispublic(RC, :View) && !Base.ispublic(RC, :view_of)
     # the retired names (RC 0.11.0) are refused by name with Core's replacement, never public
     @test_throws "use VisualGeometryToolkitCore's `backproject(camera, 𝐩)`" RC.π⁻¹(nothing, nothing)
     @test_throws "use VisualGeometryToolkitCore's `project(camera, X)`" RC.project_pixel(nothing, nothing, nothing)

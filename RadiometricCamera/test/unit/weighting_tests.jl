@@ -9,8 +9,8 @@
     import VisualGeometryToolkitCore as VgtkCore
     NL = RC.NLLSsolver
     S = NEScene.SCENE
-    state(; kw...) = RC.CalibrationState(S.sc, S.st, copy(S.views), VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NEScene.W, NEScene.W); degree = 2),
-                                         RC.with_μ(S.mat, 0.7), VgtkCore.EnvironmentLight(VgtkCore.SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, kw...)
+    state(; kw...) = RC.CalibrationState(S.sc, S.st, RC.with_vignetting(S.camera, VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NEScene.W, NEScene.W); degree = 2)),
+                                         copy(S.poses), RC.with_μ(S.mat, 0.7), VgtkCore.EnvironmentLight(VgtkCore.SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, kw...)
     su = state()
     wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
     sw = state(; weights = wts)
@@ -62,9 +62,9 @@ end
 @testitem "weighting: whitened rows in the per-tile route" setup = [RCFixtures, GridTilesScene] begin
     using RadiometricCamera: build_problem_grid
     NL = RC.NLLSsolver
-    su = RC.CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks)
+    su = RC.CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
-    sw = RC.CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks, weights = wts)
+    sw = RC.CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, weights = wts)
     pu, _ = build_problem_grid(su; patch = (5, 5)); pw, _ = build_problem_grid(sw; patch = (5, 5))
     for (tu, tw) in zip(RC.tile_costs(pu), RC.tile_costs(pw))
         w3 = [wts[tw.k][3 * (i - 1) + c] for i in tw.pix for c in 1:3]               # a colour state: three rows per pixel, the view's
@@ -90,7 +90,7 @@ end
     pxs = [RC.masked_pixels(o[2]) for o in obs]
     ϕw = [RC.masked_observations(obs[k][1], pxs[k]; channel = 2) for k in 1:2]
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-    truth = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
+    truth = CalibrationState(f.scene, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
                              masks = [o[2] for o in obs], ϕ = first.(ϕw), weights = getindex.(ϕw, 2), channel = 2)
     m = sum(length, truth.ϕ)
     χ2 = 2cost(truth)[1] / m
@@ -98,7 +98,7 @@ end
     @test m > 500 && abs(χ2 - 1) < 0.15
     # each row's code step: one RAW code in the row's units, 1 / (white − black) of its photosite's channel (Core's linearisation)
     @test all(k -> ϕw[k][3] ≈ [1 / (mosaics[k].white - PhotositeScene.BLACK[VgtkCore.photosite_colors(mosaics[k])[v, u] + 1]) for (u, v) in pxs[k]], 1:2)
-    tq = CalibrationState(f.scene, f.st, copy(f.views_t), f.vig_t, f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
+    tq = CalibrationState(f.scene, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
                           masks = [o[2] for o in obs], ϕ = first.(ϕw), weights = getindex.(ϕw, 2), quanta = last.(ϕw), channel = 2)
     # a fit at the noise level is no exact fit: its cost (χ²/2 ≈ m/2) is far above the resolution's square (the quantisation, Σ (q/σ)²/12),
     # so Core's stationarity postcondition decides it (Success only when stationary)
@@ -129,7 +129,7 @@ end
         su = ne_state()
         wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
         S = NEScene.SCENE
-        state(be) = RC.CalibrationState(S.sc, S.st, copy(S.views), su.camera.vignetting, su.mat, su.light, S.targets; S.masks, weights = wts, backend = be)
+        state(be) = RC.CalibrationState(S.sc, S.st, RC.with_vignetting(S.camera, su.camera.vignetting), copy(S.poses), su.mat, su.light, S.targets; S.masks, weights = wts, backend = be)
         sc = state(RC.KernelAbstractions.CPU()); sg = state(CUDA.CUDABackend())
         pc, _ = RC.build_problem(sc); pg, _ = RC.build_problem(sg)
         for k in 1:2

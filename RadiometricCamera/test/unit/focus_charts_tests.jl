@@ -1,6 +1,6 @@
 # EXPERIMENT (focus-ab): the direction-chart and spherical focus surfaces (src/camera/focus_charts.jl).
 @testitem "focus charts (focus-ab experiment)" setup = [RCFixtures] begin
-    using RadiometricCamera: Focus, FocusSpline, t̂, View
+    using RadiometricCamera: Focus, FocusSpline, t̂, RadiometricCameraModel
     using StaticArrays, LinearAlgebra, Statistics
     import RadiometricCamera: ForwardDiff
     import VisualGeometryToolkitCore as VgtkCore
@@ -41,7 +41,7 @@
         @test f.kind == 0 && tps.kind == 0
         lens = cam(VgtkCore.KannalaBrandt(-0.04, 0.003, -0.004, 0.002), 72.0, (200.0, 150.0), 400, 300; f_y = 81.0)
         @test RC.focus_weights(tps, lens, SVector(240.0, 210.0)) == RC.VgtkCore.nodal_weights(tps.sys, SVector(240.0, 210.0))
-        v = View(VgtkCore.EuclideanMap(SMatrix{3, 3}(SMatrix{3, 3}(1.0I)), SVector{3}(zero(SVector{3})); check = false), lens, f, 1e-3)
-        @test t̂(v, SVector(240.0, 210.0)) === t̂(f, SVector(240.0, 210.0))
+        c = RadiometricCameraModel(lens, f, 1e-3, VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 400, 300); degree = 2))
+        @test t̂(c, SVector(240.0, 210.0)) === t̂(f, SVector(240.0, 210.0))
     end
 end

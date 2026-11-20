@@ -35,7 +35,7 @@ Adapt.@adapt_structure _FluxAt
 _row_type(f::_FluxAt) = SVector{3, _float_of(f.st)}
 @inline function (f::_FluxAt)(id::UInt32)
     u, v = _decode_px(id, f.H)
-    return Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st)
+    return _Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st)
 end
 
 """Row sums of `A .* B` per channel (helper: closure-free for the GPU compiler)."""
@@ -60,7 +60,7 @@ Adapt.@adapt_structure _PartsAt
 _row_type(f::_PartsAt{J, NV}) where {J, NV} = (F = _float_of(f.st); Tuple{SMatrix{3, J, F, 3J}, SVector{3, F}, SMatrix{3, NV, F, 3NV}})
 @inline function (f::_PartsAt{J, NV})(id::UInt32) where {J, NV}
     u, v = _decode_px(id, f.H)
-    p = pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
+    p = _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
     return _linear_rows(p, f.vig, coefficients(f.light), f.mat.μ)
 end
 
@@ -83,7 +83,7 @@ _parts_type(::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, st::RenderSetti
 _row_float(::Type{<:PixelParts{J, L3, NS, F}}) where {J, L3, NS, F} = F
 @inline function (f::_PixelPartsAt)(id::UInt32)
     u, v = _decode_px(id, f.H)
-    return pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
+    return _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
 end
 
 """The parts of every pixel of the device list `px` (`_PartsAt`), on the device (queued on this task's queue): `_parts_stride(J, NV)`
@@ -141,7 +141,7 @@ _row_type(f::_JacAt{C}) where {C} = SVector{3 * (1 + C), _float_of(f.st)}
 @inline function (f::_JacAt{C})(i::UInt32) where {C}
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    Φ = Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, Int(f.fbase), Int(f.dbase),
+    Φ = _Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, Int(f.fbase), Int(f.dbase),
                 nothing, lr)
     F = _float_of(f.st)
     return SVector(ntuple(q -> (c = (q - 1) ÷ (1 + C) + 1; j = (q - 1) % (1 + C);
@@ -186,7 +186,7 @@ _row_type(f::_RecordAt) = SVector{3, _float_of(f.st)}
 @inline function (f::_RecordAt)(i::UInt32)
     nr = length(f.st.sensor) * n_disc(f.st.aperture)
     u, v = _decode_px(@inbounds(f.px[i]), f.H)
-    return SVector{3, _float_of(f.st)}(Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, nothing, nothing,
+    return SVector{3, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, nothing, nothing,
                                        nothing, RadianceRecord(f.out, (Int(i) - 1) * nr)))
 end
 """
@@ -260,7 +260,7 @@ _row_type(f::_HeightAt) = SMatrix{3, HEIGHT_NC, _float_of(f.st), 3 * HEIGHT_NC}
 @inline function (f::_HeightAt)(i::UInt32)
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    return SMatrix{3, HEIGHT_NC, _float_of(f.st)}(Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st,
+    return SMatrix{3, HEIGHT_NC, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st,
                                                   nothing, nothing, HeightRays(f.h), lr))
 end
 """The height partials of every pixel of the device list `px` at the plain view `v32` (the kernel's float type, device-capable),

@@ -306,19 +306,19 @@ end
     @test 0.2 * s1.masked < length(s2.px) < 0.4 * s1.masked
     # the footprint (one row of page_rows, the KernelAbstractions kernel on the CPU backend): the pinhole's is the chief ray's bilinear
     # texels times V (the pixel-centre quadrature); the learned one spreads, sums to V
-    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.vig(RC.𝐩_of_pixel(u, v))
-    row(view) = (R = page_rows(ctx, [(1, u, v)], _ -> view, (; all = [true]), Dict(1 => [1]); device = VgtkCore.KA.CPU()); (R.kept[1], R.blocks.all.A[1, :]))
-    okp, rp = row(variant_view(ctx, 1, "pinhole"; pinhole_r = 1e-9))
-    o, d = RC.world_ray(ctx.views[1], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
+    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.camera.vignetting(RC.𝐩_of_pixel(u, v))
+    row(camera) = (R = page_rows(ctx, [(1, u, v)], camera, (; all = [true]), Dict(1 => [1]); device = VgtkCore.KA.CPU()); (R.kept[1], R.blocks.all.A[1, :]))
+    okp, rp = row(variant_camera(ctx, "pinhole"; pinhole_r = 1e-9))
+    o, d = RC.world_ray(ctx.camera, ctx.poses[1], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
     tw = Dict(texel_weights(RC.chart(ctx.bd, 𝐱), TW, TH))
     @test okp && sum(rp) ≈ Vuv && all(isapprox(Vuv * get(tw, t, 0.0), rp[t]; atol = 1e-9) for t in findall(!iszero, rp))
-    okl, rl = row(variant_view(ctx, 1, "learned"; pinhole_r = 1e-9))
+    okl, rl = row(variant_camera(ctx, "learned"; pinhole_r = 1e-9))
     @test okl && sum(rl) ≈ Vuv && nnz(rl) > nnz(rp)
-    @test_throws ArgumentError variant_view(ctx, 1, "cone"; pinhole_r = 1e-9)
+    @test_throws ArgumentError variant_camera(ctx, "cone"; pinhole_r = 1e-9)
     # the photographs rendered by the rows themselves: I = V · A x — every sample of every photograph
     samples = [sample_pixels(ctx, k, ext; fraction = 1.0, seed = 11, backend = VgtkCore.KA.CPU()).px for k in 1:5]
     rows_px = [(k, Int(p[1]), Int(p[2])) for k in 1:5 for p in samples[k]]
-    R = page_rows(ctx, rows_px, k -> ctx.views[k], (; all = trues(length(rows_px))), rows_by_photograph(rows_px); device = VgtkCore.KA.CPU())
+    R = page_rows(ctx, rows_px, ctx.camera, (; all = trues(length(rows_px))), rows_by_photograph(rows_px); device = VgtkCore.KA.CPU())
     A = R.blocks.all.A
     @test all(R.kept) && R.blocks.all.rows == eachindex(rows_px) && size(A) == (length(rows_px), TW * TH)
     I_true = A * vec(design)

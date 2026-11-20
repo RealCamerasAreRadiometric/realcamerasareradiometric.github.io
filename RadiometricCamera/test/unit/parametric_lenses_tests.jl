@@ -96,19 +96,19 @@
     lens_t = _cv14(SVector(1.288, 1.288, 0.01, -0.02, -0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005), 24, 24)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))); focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
-    @test has_lens(views_t[1].lens, typeof(VgtkIO.opencv_lens(zeros(14))))
     # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
+    camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
+    @test has_lens(View(poses[1], camera_t).lens, typeof(VgtkIO.opencv_lens(zeros(14))))     # the kernels' view keeps the 14-coefficient lens
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
+    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     @test all(count(m) > 100 for m in masks)
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+    s = CalibrationState(scene, st, camera_t, poses, mat_t, light_t, targets; masks)
     prob, idx = build_problem(s)
     dv = prob.variables[idx.distortion]
     @test dv isa VgtkCore.SubsetManifold && Int(RC.NLLSsolver.nvars(dv)) == 18 && free_names(dv) == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(lens_t)))
@@ -151,8 +151,7 @@
     # (:tx, :ty) first, so the fifth coordinate is no longer k1 (a tilt start the restricted block (:f, :aspect, :k1) cannot undo)
     ik1 = 4 + findfirst(==(:k1), VgtkCore.parameter_names(VgtkCore.lens(lens_t)))
     lens_start = camera_of(VgtkIO.opencv_lens(zeros(14)), _θd(lens_t) + SVector{18}(ntuple(i -> i <= 2 ? 0.48 : i == ik1 ? 0.03 : 0.0, 18)), 24, 24)
-    s2 = CalibrationState(scene, st, [View(p, lens_start, focus_t, 0.0386) for p in poses],
-                          vig_t, mat_t, light_t, targets; masks)
+    s2 = CalibrationState(scene, st, RadiometricCameraModel(lens_start, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets; masks)
     c0 = cost(s2)[1]
     its = Int[]
     result = run_lm!(s2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,

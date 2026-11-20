@@ -5,7 +5,7 @@
     using StaticArrays, LinearAlgebra
     using Statistics: var
     using VisualGeometryToolkitCore: TensorProductVignetting
-    # the camera and its photographs: a view is the pose and the camera's parts; the views of one camera rebuild it
+    # the camera and its photographs: the kernels' (internal) view is the camera at a pose, its parts flattened
     W = H = 24
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     focus = Focus(3, 1.5, W, H)
@@ -18,8 +18,9 @@
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it
     @test fieldnames(RadiometricCameraModel) == (:lens, :focus, :aperture_radius, :vignetting) && fieldnames(View) == (:pose, :lens, :focus, :r)
     @test !any(n -> isdefined(RC, n), (:InFocusBlur, :NO_BLUR, :in_focus_blur, :blur_sigmas, :with_blur, :with_in_focus_blur, :set_camera!))
-    @test RC._shared_camera([v, View(inv(pose), c)], vig) == c
-    @test_throws ArgumentError RC._shared_camera([v, View(pose, lens, focus, 0.03)], vig)             # another aperture: not one camera
+    @test !isdefined(RC, :_shared_camera) && !Base.ispublic(RC, :View) && !Base.ispublic(RC, :view_of)   # one camera, never parts
+    @test RC.𝔣(c, SVector(5.0, 7.0)) == RC.𝔣(v, SVector(5.0, 7.0)) && RC.t̂(c, SVector(5.0, 7.0)) == RC.t̂(v, SVector(5.0, 7.0))
+    @test RC.world_ray(c, pose, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0)) == RC.world_ray(v, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0))
     @test VgtkCore.project(c, SVector(0.1, 0.0, 1.0)) == VgtkCore.project(lens, SVector(0.1, 0.0, 1.0))
     # the target's radiometry: the material and the print's edge, lengths as quantities, the state's mm values back bit for bit
     m = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)

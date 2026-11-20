@@ -5,7 +5,7 @@
 # The saddle and the two-view scene with its targets both items use.
 @testsetup module HeightScene
     using RadiometricCamera: BoardSurface, compute_mask, Focus, FocusSpline, grid_model, HEIGHT_NC, Material, PrintedTarget,
-                             render_all, RenderSettings, Scene, sphere_radius, View, with_surface, 𝔟
+                             render_all, RenderSettings, Scene, sphere_radius, with_surface, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -13,7 +13,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export page_board, sad, hh, tex_h, board_hs, Wh, Hh, scene_h, scene_hh, glens_h, focus_h, poses_h, views_h, vig_h, b_h, a_h, light_h, mat_h, st_h, masks_h, blank_h, height_true, targets_h
+    export page_board, sad, hh, tex_h, board_hs, Wh, Hh, scene_h, scene_hh, glens_h, focus_h, poses_h, camera_h, vig_h, b_h, a_h, light_h, mat_h, st_h, masks_h, blank_h, height_true, targets_h
 
     """A board of `aspect` = height / width (2 m wide), seen from z > 0."""
     page_board(aspect) = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
@@ -28,16 +28,16 @@
     glens_h = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wh, Hh), 10, 10)
     focus_h = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wh, Hh))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_h = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
-    views_h = [View(poses_h[k], glens_h, focus_h, 0.0386) for k in 1:2]
     vig_h = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wh, Hh); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     b_h = 𝔟(board_hs); a_h = zeros(3, 9); a_h[:, 1] .= (2.0, 1.9, 1.8); a_h[:, 3] .= (0.4, 0.3, 0.2)
     light_h = EnvironmentLight(SphericalHarmonicMap(a_h, 2), b_h, sphere_radius(b_h, [p.t for p in poses_h]))
     mat_h = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
     st_h = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks_h = [compute_mask(v, scene_h, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_h]              # the mask is the plane's (the surface stays inside the padding)
+    camera_h = RadiometricCameraModel(glens_h, focus_h, 0.0386, vig_h)
+    masks_h = [compute_mask(camera_h, p, scene_h, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]             # the mask is the plane's (the surface stays inside the padding)
     blank_h = [zeros(Hh, Wh, 3) for _ in 1:2]
     height_true = hh                                                                      # the saddle, as nodal heights
-    targets_h = render_all(CalibrationState(scene_hh(height_true), st_h, copy(views_h), vig_h, mat_h, light_h, blank_h; masks = masks_h))
+    targets_h = render_all(CalibrationState(scene_hh(height_true), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
 end
 
 @testitem "board height field" setup = [RCFixtures, HeightScene] begin
@@ -101,13 +101,13 @@ end
     @test BoardSurface(h = hh).h == hh && BoardSurface(h = hh).edge == zero(SVector{EDGE_NC, Float64})
     @test Scene(board_h1, 8, 8).surface == BoardSurface() && with_surface(Scene(board_h1, 8, 8), shh).surface.h == hh
 
-    r_nom_h = render_all(CalibrationState(scene_h, st_h, copy(views_h), vig_h, mat_h, light_h, blank_h; masks = masks_h))
+    r_nom_h = render_all(CalibrationState(scene_h, st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
     @test maximum(maximum(abs, targets_h[k] .- r_nom_h[k]) for k in 1:2) > 0.02 * maximum(maximum, r_nom_h)
 
     # ---------------------------------------------------------------------------------------------------------------
     # 3. Jacobian columns of the free height parameters (material block: HEIGHT_NFREE AD columns after the 9 BRDF parameters; h = h₀ + B y) vs differences of the tile
     #    residual through `update`; the pose columns still match (duals flow through the surface intersection)
-    s_h = CalibrationState(scene_hh(0.5 * height_true), st_h, copy(views_h), vig_h, mat_h, light_h, targets_h; masks = masks_h)
+    s_h = CalibrationState(scene_hh(0.5 * height_true), st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
     prob_h, idx_h = build_problem_grid(s_h; patch = (5, 5), height_degree = 2)
     tiles_h = RC.tile_costs(prob_h)
     r_h = tiles_h[argmax([length(t.pix) for t in tiles_h])]
@@ -141,7 +141,7 @@ end
 
     # ---------------------------------------------------------------------------------------------------------------
     # 4. LM recovery of the saddle from the flat start, everything else at the truth
-    s_hr = CalibrationState(scene_h, st_h, copy(views_h), vig_h, mat_h, light_h, targets_h; masks = masks_h)
+    s_hr = CalibrationState(scene_h, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
     c0h = cost(s_hr)[1]
     run_lm_grid!(s_hr; patch = (5, 5), maxiters = 25, height_degree = 2,
                  fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
@@ -162,11 +162,11 @@ end
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
         scene_hg = scene_hh(0.5 * height_true)
-        s_g = CalibrationState(scene_hg, st_h, copy(views_h), vig_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
+        s_g = CalibrationState(scene_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
-        s_c = CalibrationState(scene_hg, st_h, copy(views_h), vig_h, mat_h, light_h, targets_h; masks = masks_h)
+        s_c = CalibrationState(scene_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
@@ -226,10 +226,10 @@ end
         wd = Adapt.adapt(CUDA.CuArray, VgtkCore.convert_eltype(Float32, tall.warping))
         @test wd isa VgtkCore.MappedSurface                                     # the flat field's system on the device
         scene_t = with_surface(Scene(tall, Wh, Hh), BoardSurface(h = 0.5 * height_true))
-        masks_t = [compute_mask(v, Scene(tall, Wh, Hh), st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_h]
-        targets_t = render_all(CalibrationState(with_surface(Scene(tall, Wh, Hh), BoardSurface(h = height_true)), st_h, copy(views_h), vig_h, mat_h, light_h, blank_h; masks = masks_t))
-        s_g = CalibrationState(scene_t, st_h, copy(views_h), vig_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
-        s_c = CalibrationState(scene_t, st_h, copy(views_h), vig_h, mat_h, light_h, targets_t; masks = masks_t)
+        masks_t = [compute_mask(camera_h, p, Scene(tall, Wh, Hh), st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]
+        targets_t = render_all(CalibrationState(with_surface(Scene(tall, Wh, Hh), BoardSurface(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
+        s_g = CalibrationState(scene_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
+        s_c = CalibrationState(scene_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t)
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g), render_all(s_c))) < 2e-3 * maximum(maximum, render_all(s_c))
         prob_g, _ = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)

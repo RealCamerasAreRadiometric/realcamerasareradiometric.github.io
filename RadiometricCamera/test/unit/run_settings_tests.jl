@@ -3,7 +3,7 @@
 # (`material.mu_bounds`: the state's), the Jacobian chunk (`compute.jacobian_chunk`: the state's) and the LM log (`lm.log`: run_lm!'s
 # keyword). A run that sets them leaves the next problem of the same session untouched.
 @testitem "run settings: no leak into the next problem" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, load_state, material, run_lm!, View
+    using RadiometricCamera: build_problem, load_state, material, run_lm!
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
 
@@ -16,7 +16,7 @@
 
     W = H = 32
     kb = cam(RC.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
-    fresh() = (sc = gold_scene(W, H; h = gold_h()); gold_state(sc..., [View(p, kb, gold_focus(), 0.0386) for p in gold_poses()]))
+    fresh() = (sc = gold_scene(W, H; h = gold_h()); gold_state(sc..., kb))
     material_var(prob) = only(v for v in prob.variables if v isa RC.MaterialVar)
     # a step of every coordinate of the material block, μ's far below its chart's centre
     increment(mv) = (u = fill(0.01, Int(NL.nvars(mv))); u[9] = -50.0; u)

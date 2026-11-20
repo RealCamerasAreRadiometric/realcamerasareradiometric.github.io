@@ -3,7 +3,7 @@
 # converged by definition, with no stationarity postcondition; the caps are not converged (one uniform convergence record, Core's).
 @testitem "refinement termination: a step-size stop is Success (Core 0.11.0: a tolerance stop is converged)" setup = [RCFixtures] begin
     using RadiometricCamera: compute_mask, cost, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings,
-                             run_lm!, Scene, sphere_radius, View, 𝔟
+                             run_lm!, Scene, sphere_radius, 𝔟
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
@@ -17,19 +17,19 @@
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
     vig_t = RC.gauge_center_value(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
     # the poses alone free, from a start a few mrad and mm off the truth
     only_poses = (:distortion, :focus, :aperture, :material, :vignetting, :lighting)       # held: every block but the poses
-    perturbed() = CalibrationState(scene, st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.005), SVector(0.004, -0.004, 0.006))),
-                                                    lens_t, focus_t, 0.0386) for p in poses], vig_t, mat_t, light_t, targets; masks)
+    perturbed() = CalibrationState(scene, st, camera_t, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.005), SVector(0.004, -0.004, 0.006)))
+                                                         for p in poses], mat_t, light_t, targets; masks)
 
     # a step-size stop AWAY from a stationary point: the step tolerance (xtol) so large that the first iteration's step ends the run,
     # a few mrad from the optimum — Success with IncrementSize (Core 0.11.0: the tolerance is the run's; whether it is too loose is the
@@ -66,7 +66,7 @@ end
 # Core's exact-fit test. At the noise level the fit is no exact fit (its cost ≫ the quantisation's square); a step-size stop is Success
 # wherever it fires (Core 0.11.0: a tolerance stop is converged), at the minimum and away from it.
 @testitem "refinement termination: the RAW path's LM, its stops' residual resolution > 0" setup = [RCFixtures, PhotositeScene] begin
-    using RadiometricCamera: cost, run_lm!, View
+    using RadiometricCamera: cost, run_lm!
     using Random, StaticArrays
     import VisualGeometryToolkitCore as VgtkCore
     f = photosite_scene(; W = 32, H = 32)
@@ -78,8 +78,8 @@ end
     ϕw = [RC.masked_observations(o[1], RC.masked_pixels(o[2]); channel = 2) for o in obs]
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
     only_poses = (:distortion, :focus, :aperture, :material, :vignetting, :lighting)
-    start() = CalibrationState(f.scene, f.st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(v.pose), vcat(SVector(0.004, -0.003, 0.005), SVector(0.004, -0.004, 0.006))),
-                                                   v.lens, v.focus, v.r) for v in f.views_t], f.vig_t, f.mat_t, light_κ,
+    start() = CalibrationState(f.scene, f.st, f.camera_t, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.005), SVector(0.004, -0.004, 0.006)))
+                                                           for p in f.poses], f.mat_t, light_κ,
                                [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2]; masks = [o[2] for o in obs], ϕ = first.(ϕw),
                                weights = getindex.(ϕw, 2), quanta = last.(ϕw), channel = 2)
     s = start()

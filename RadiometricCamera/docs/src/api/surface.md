@@ -1,7 +1,7 @@
 # The API surface
 
 RadiometricCamera exports its headline API only (`src/api.jl`, the one file that states the surface). Everything else a user may
-reach is `public`: write it qualified (`RadiometricCamera.View`) or import it by name (`using RadiometricCamera: View`).
+reach is `public`: write it qualified (`RadiometricCamera.Focus`) or import it by name (`using RadiometricCamera: Focus`).
 
 ## Exported
 
@@ -18,7 +18,7 @@ reach is `public`: write it qualified (`RadiometricCamera.View`) or import it by
 
 ## Public
 
-The image formation (`Scene`, `RenderSettings`, `Φ_pixel`, `render_view`), the camera and target models (`View`, `Focus`,
-`PrintedTarget`, `Material`, …), the closed-form blocks, the LM's blocks for building a problem of one's own (`build_problem`,
+The image formation (`Scene`, `RenderSettings`, `Φ_pixel`, `render_view`: each of the camera at a pose), the camera's and the target's
+parts (`Focus`, `PrintedTarget`, `Material`, …), the closed-form blocks, the LM's blocks for building a problem of one's own (`build_problem`,
 `run_lm!`, …), the records (`save_state`, `load_state`, …), the observation model and THE entry point of photographs (`ObservationModel`, `calibrated_camera`, `photo_set`, `observe`), the diagnostics (`selfcheck`, `bearing_px`, …), the option tables and
 the paper's symbols (`𝔣`, `𝔭`, `ρ_c`, …: owner D14, public, not exported). The list is `src/api.jl`'s `public` statement.

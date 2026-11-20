@@ -40,7 +40,7 @@ _pixel_pitch(s::VgtkCore.Sensor) = VgtkCore.ustrip(VgtkCore.m, VgtkCore.px * s.p
                  image_distance = nothing, downsample = 8, texture_downsample = 8, sensor_width = 7mm, r₀ = 1.7e-3, linearize = true,
                  focus_grid = 5, load_targets = true, raw_dir = nothing, lens_identity = nothing)
 
-Scene and initial views of a calibration session stored as VisualGeometryToolkitIO records (`records`: CaliBlobs'
+Scene, camera parts and initial poses of a calibration session stored as VisualGeometryToolkitIO records (`records`: CaliBlobs'
 `save_calibration`, or its one-time migration of a BlobBoards session export, `scripts/migrate_rc_session.jl`):
 
 * the camera: `load(BoundedCamera, camera.json)` — K in COLMAP pixels, the image extent, e.g. BlobBoards' division camera — bounded
@@ -50,8 +50,8 @@ Scene and initial views of a calibration session stored as VisualGeometryToolkit
 * the board: the target of component `component`, `load(Rig, targets_<component>.json)` — Core's planar target with its Canvas and
   the CanvasTexture of the printed image, whose file (`textures/<id>.png`, beside the records) is read by Features' `load_linear_image`
   and box-averaged by `texture_downsample` — as the `PrintedTarget` of the scene, whose world frame is the target's (metres);
-* the views: the frames of `trajectory_<component>.json` (`load(Trajectory, …)`: target → camera per frame, the frames' image names),
-  each view's camera → world pose its inverse (lengths in metres through FlexUnits);
+* the poses: the frames of `trajectory_<component>.json` (`load(Trajectory, …)`: target → camera per frame, the frames' image names),
+  each photograph's camera → world pose (`poses`) its inverse (lengths in metres through FlexUnits);
 * the focus surface: `focus_init = :board_center` (the board centre is in focus: its mean axial distance `d_c`, the lens equation's image
   distance `d_s = f·d_c/(d_c − f)`, the start plane `t̂ᵢ = cos αᵢ/d_c`), `:thin_lens` (`thin_lens_focus_distance`; t̂ ≡ 0 when it is
   Inf), `:board` (the mean principal-ray distance to the board plane) or a number (metres); `image_distance` overrides `d_s`
@@ -81,7 +81,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     tex_rec === nothing && throw(ArgumentError("target $id of $records carries no canvas texture (the printed image)"))
     tex = VgtkFeatures.load_linear_image(joinpath(records, tex_rec.path); downsample = texture_downsample)
     target = VgtkCore.ustrip(VgtkCore.m, pt)                              # the posed target in plain metres (the world = the rig's frame)
-    # the views: target → camera per frame; the camera → world pose is its inverse
+    # the poses: target → camera per frame; the camera → world pose is its inverse
     traj = VgtkIO.load(VgtkCore.Trajectory, joinpath(records, "trajectory_$(component).json"))
     frames = sort!(collect(keys(traj.poses)))
     names = [traj.images[t] for t in frames]
@@ -118,11 +118,10 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
          focus_init === :thin_lens ? thin_lens_focus_distance(lens₀, sensor, r₀; d_s) :
          focus_init === :board ? g : Float64(focus_init)
     focus₀ = Focus(FocusSpline(nodes), isfinite(𝔱₀) ? focus_start(lens₀, nodes, 𝔱₀) : zeros(length(nodes)))
-    views = [View(p, lens₀, focus₀, Float64(r₀)) for p in cam_poses]     # (d_s only places the thin-lens focus start: no parameter of the model)
     settings = raw_dir === nothing ? nothing :
         VgtkFeatures.extract_capture_settings(Dict(t => VgtkFeatures.load_raw_metadata(raw_file(raw_dir, traj.images[t])) for t in frames);
                                               lens = lens_identity)
-    return (; scene, views, targets, names, frames, lens₀, focus₀, r₀ = Float64(r₀), sensor = VgtkCore.sensor(lc), cosα = cosα_i, nodes, 𝔱₀, d_s, board_distances,
+    return (; scene, poses = cam_poses, targets, names, frames, lens₀, focus₀, r₀ = Float64(r₀), sensor = VgtkCore.sensor(lc), cosα = cosα_i, nodes, 𝔱₀, d_s, board_distances,
             center_distances, target_id = id, extent = VgtkCore.extent(bc), downsample, settings)
 end
 

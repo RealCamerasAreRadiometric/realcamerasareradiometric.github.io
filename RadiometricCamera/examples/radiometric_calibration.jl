@@ -20,7 +20,7 @@
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
 using RadiometricCamera: aperture_radius, cost, focus, Focus, FocusSpline, grid_angular_error, grid_dims, grid_model, lens,
                          load_session, Material, render_all, RenderSettings, run_lm_grid!, save_grid, schoeps_gridlens,
-                         solve_linear_blocks!, sphere_radius, t̂, View, 𝔟
+                         solve_linear_blocks!, sphere_radius, t̂, 𝔟
 import CUDA
 const VgtkCore = RadiometricCamera.VgtkCore                                  # VisualGeometryToolkitCore through the package
 const RC = RadiometricCamera
@@ -34,7 +34,7 @@ backend = CUDA.functional() ? CUDA.CUDABackend(; always_inline = true) : RC.Kern
 #
 # **(a) A calibration session's records** (BlobBoards' own feature-based calibration, stored as VisualGeometryToolkitIO records by
 # CaliBlobs: the camera — here a division camera `x_u = x_d / (1 + k₁ρ² + k₂ρ⁴)` — the board's target with its printed texture, the
-# frames' poses). `load_session` builds the scene, the initial views and loads the photographs (16-bit linear PNGs here, so
+# frames' poses). `load_session` builds the scene, the initial poses and loads the photographs (16-bit linear PNGs here, so
 # `linearize = false`); `downsample = 8` keeps this walkthrough at 648 × 432.
 
 SESSION = joinpath(EXP, "detector_bias", "data", "blobs_fisheye", "session")                # camera.json, targets_1.json, trajectory_1.json
@@ -42,7 +42,7 @@ IMAGES = joinpath(EXP, "detector_bias", "data", "blobs_fisheye", "gt", "images_l
 ds = load_session(SESSION, IMAGES; lens = :camera, focus_init = :board_center, downsample = 8, texture_downsample = 1,
                   sensor_width = 22.3VgtkCore.mm, r₀ = 17e-3 / (2 * 8), linearize = false)   # EOS 100D: 22.3 mm sensor, 17 mm f/8
 W₀, H₀ = ds.extent; W, H = ds.scene.W, ds.scene.H                         # the record's image, the scene's (box-averaged by 8)
-@printf("%d views, image %d × %d (used at %d × %d); division camera f = %.1f px (at %d × %d), k = %s\n", length(ds.views), W₀, H₀, W, H,
+@printf("%d views, image %d × %d (used at %d × %d); division camera f = %.1f px (at %d × %d), k = %s\n", length(ds.poses), W₀, H₀, W, H,
         VgtkCore.model(ds.lens₀).intrinsics.K[1, 1], W, H, string(VgtkCore.parameter_vector(VgtkCore.lens(ds.lens₀))))
 
 # **(b) A Schöps `central-generic` calibration** (intrinsics0.yaml: a B-spline surface of directions over the image). `schoeps_gridlens`
@@ -69,10 +69,11 @@ lens0 = grid_model(ds.lens₀, 35, 25);
 #
 # * `Focus`: inverse focus depth `t̂` on a 5 × 5 TPS node grid over the sensor's pixels, here a plane at the taped focus distance 0.5 m —
 #   `t̂ᵢ = cos αᵢ / 0.5 m` with αᵢ the angle between the ray π⁻¹(𝐩ᵢ) and the optical axis;
-# * `View(pose, lens, focus, r)`: one photograph — its extrinsics `Θ_e` (the camera → world `EuclideanMap`) and the camera's lens, focus
-#   surface and aperture radius r (the views of a state share them: the state holds one `RadiometricCameraModel`); no image distance;
 # * `TensorProductVignetting((5, 5), Rect(0, 0, W, H); degree = 2)` (VisualGeometryToolkitCore's): B-spline `V` with 5 × 5 nodes
 #   over the sensor, V = 1 at its centre pinned, flat at the start;
+# * `RadiometricCameraModel(lens, focus, r, vignetting)`: the radiometric camera, one object — the lens, the focus surface, the
+#   aperture radius r and the vignetting V; no image distance. A photograph is the camera at a pose: its extrinsics `Θ_e`, the
+#   camera → world `EuclideanMap` (`ds.poses`);
 # * `EnvironmentLight(SphericalHarmonicMap(radiance, l_max), 𝔟, r_SH)` (VisualGeometryToolkitCore's): SH light of order l_max on the
 #   sphere of radius `r_SH` around the board centre `𝔟` (`sphere_radius` = the sphere through the farthest camera);
 # * `Material(; 𝛂_ink, 𝛂_noink, 𝛈_ink, 𝛈_noink, μ)`: Θ_m — GGX roughness and refractive index of ink and paper (blended by the texture
@@ -83,9 +84,9 @@ f_m = VgtkCore.model(ds.lens₀).intrinsics.K[1, 1] * (22.3e-3 / W); d_f = 0.5; 
 nodes = VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))
 focus0 = Focus(FocusSpline(nodes), [normalize(VgtkCore.backproject(lens0, 𝐩))[3] / d_f for 𝐩 in nodes])
 r0 = 17e-3 / (2 * 8)                                                          # f/8 → r = f / (2N) = 1.06 mm
-views0 = [View(v.pose, lens0, focus0, r0) for v in ds.views]
-b = 𝔟(ds.scene.board); r_SH = sphere_radius(b, [v.pose.t for v in views0])
 vig0 = VgtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degree = 2)
+camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: lens, focus, aperture, vignetting
+b = 𝔟(ds.scene.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
 light0 = VgtkCore.EnvironmentLight(VgtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
 mat0 = Material(; 𝛂_ink = 0.15, 𝛂_noink = 0.4, 𝛈_ink = 1.6, 𝛈_noink = 1.33, μ = 0.5)
 st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
@@ -98,8 +99,8 @@ st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 # the light (the photographs' units): the closed-form Θ_l solve below sets it. `render_all` renders Φ for every masked pixel; `cost`
 # returns `(½ Σ (Φ − ϕ)², rel-RMS = √(Σ(Φ − ϕ)² / Σ ϕ²))`.
 
-K = 4; sel = round.(Int, range(1, length(views0); length = K))
-s = CalibrationState(ds.scene, st, views0[sel], vig0, mat0, light0, ds.targets[sel]; δ = 0.01, backend)
+K = 4; sel = round.(Int, range(1, length(ds.poses); length = K))
+s = CalibrationState(ds.scene, st, camera0, ds.poses[sel], mat0, light0, ds.targets[sel]; δ = 0.01, backend)
 solve_linear_blocks!(s; light = true, vignetting = false, mu = false); c0, rms0 = cost(s)
 @printf("%d views, %d masked pixels; start (flat V, closed-form lighting): rel-RMS %.4f\n", K, sum(length, s.px), rms0)
 Φ0 = render_all(s);                                                          # H × W × 3 per view, zero outside the mask

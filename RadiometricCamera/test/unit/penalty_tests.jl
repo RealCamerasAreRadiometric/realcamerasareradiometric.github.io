@@ -5,7 +5,7 @@
 
 @testitem "penalties: the vignetting solve's Δ³ penalty, fixed and by GCV" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings,
-                             Scene, solve_linear_blocks!, solve_Θ_v!, sphere_radius, View, 𝔟
+                             Scene, solve_linear_blocks!, solve_Θ_v!, sphere_radius, with_vignetting, 𝔟
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, center
@@ -16,17 +16,18 @@
     lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     focus_t = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
     vig_t = let v = TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 6); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:6, j in 1:6]) end
+    camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
+    camera_0 = with_vignetting(camera_t, TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2))   # the flat start
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
+    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     rng = Xoshiro(11)
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) .* (1 .+ 0.02 .* randn(rng, H, W, 3)) for k in 1:2]   # noisy photographs
-    state() = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2), mat_t, light_t, targets; masks)
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) .* (1 .+ 0.02 .* randn(rng, H, W, 3)) for k in 1:2]   # noisy photographs
+    state() = CalibrationState(scene, st, camera_0, poses, mat_t, light_t, targets; masks)
     s0 = state(); parts = all_parts(s0)
     solve_Θ_v!(s0, parts)
     s1 = state(); solve_Θ_v!(s1, parts; smoothness_weight = 0.0)
@@ -54,10 +55,10 @@
     @test_throws ArgumentError solve_Θ_v!(state(), parts; smoothness_weight = :aic)
     # the boundary order: 2 is the natural rule (Δ²c = 0), 3 the curvature-preserving Δ³c = 0 — Core's BoundaryRule(m, region; order)
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
-    sr = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2), mat_t, light_t, targets; masks, region = reg, boundary_order = 2)
+    sr = CalibrationState(scene, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 2)
     @test sr.vig_rule.interior == VgtkCore.BoundaryRule(sr.camera.vignetting,reg).interior
     @test RC.smoothness_nodes(sr.camera.vignetting,sr.vig_rule) == sr.vig_rule.interior
-    s3r = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2), mat_t, light_t, targets; masks, region = reg, boundary_order = 3)
+    s3r = CalibrationState(scene, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 3)
     r3 = VgtkCore.BoundaryRule(s3r.camera.vignetting,reg; order = 3)
     @test s3r.vig_rule.order == 3 && s3r.vig_rule.interior == r3.interior == sr.vig_rule.interior
     @test s3r.vig_rule.dependent == r3.dependent && s3r.vig_rule.terms == r3.terms && s3r.vig_rule.terms != sr.vig_rule.terms
@@ -84,7 +85,7 @@ end
     prob_p, _ = build_problem_grid(s; patch = (5, 5), smoothness = pr)
     @test sum(c -> length(c.terms), [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]) == length(pr.rows)
     # the weight by GCV on the linearization at a perturbed start: the smoothness of that weight, the selection recorded
-    sp = CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks)
+    sp = CalibrationState(scene, st, camera_p, poses_p, mat_t, light_t, targets; masks)
     held_p = RC.interior_nodes(RC.grid_present(glens_p))
     smooth, sel = RC.select_grid_smoothness_weight(sp, RC.PSplineSmoothness(3, :gcv), held_p)
     @test smooth.type === :pspline && smooth.β == sel.β && sel.kind === :pspline && isfinite(sel.gcv) && sel.n_columns == 4 * 50

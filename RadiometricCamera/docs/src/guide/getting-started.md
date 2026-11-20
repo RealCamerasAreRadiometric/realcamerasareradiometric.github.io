@@ -10,22 +10,23 @@ block below runs when the documentation is built.
 
 ## The scene and the camera
 
-The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The camera is
-VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels, over a
-double-sphere fisheye lens; any Core lens plugs in the same way. The image is `W × H` = 320 × 240 pixels (the `BoundedCamera`'s
-`Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration runs at the
-sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
+The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The geometric camera
+`lens` is VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels,
+over a double-sphere fisheye lens; any Core lens plugs in the same way. The image is `W × H` = 320 × 240 pixels (the
+`BoundedCamera`'s `Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration
+runs at the sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
 
 ```@example tutorial
 using RadiometricCamera, VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
-using RadiometricCamera: Focus, Material, PrintedTarget, RenderSettings, Scene, View, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
+using RadiometricCamera: Focus, Material, PrintedTarget, RenderSettings, Scene, compute_mask, render_view, solve_linear_blocks!, sphere_radius,
+                         with_vignetting, 𝔟
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                                   # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)
-camera = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))   # the geometric camera
 scene = Scene(board, W, H)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide
@@ -35,16 +36,13 @@ nothing # hide
 Monte Carlo samples of the radiance (common random numbers: the same samples at every evaluation, so the flux is a smooth,
 deterministic function of the parameters).
 
-## Two views
+## Two poses
 
-Two poses (camera → world, metres) around the board, each a [`View`](@ref) of the same camera, focused at 1.5 m
-([`Focus`](@ref): a constant inverse focus distance on a 3 × 3 node grid of the sensor), with an aperture radius of 4 cm (no image
-distance: the defocus is the focus surface's).
+The camera takes two photographs, from two poses (camera → world, metres) around the board.
 
 ```@example tutorial
 # lookat_pose(camera centre, the point it looks at — the board's centre, the world's up direction, which fixes the roll)
 poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:2]
-views = [View(p, camera, Focus(3, 1.5, W, H), 0.04) for p in poses]
 b = 𝔟(board)
 r_SH = sphere_radius(b, [p.t for p in poses])
 nothing # hide
@@ -56,29 +54,35 @@ board misses the sphere).
 
 ## The truth, and its photographs
 
-The true vignetting falls off quadratically from the sensor's centre, the true lighting is a coloured spherical-harmonics field
-of degree 2, and the true material has the diffuse weight μ = 0.4.
+The true radiometric camera is one object, a [`RadiometricCameraModel`](@ref): the geometric camera `lens`, a focus surface at
+1.5 m ([`Focus`](@ref): a constant inverse focus distance on a 3 × 3 node grid of the sensor), an aperture radius of 4 cm (no image
+distance: the defocus is the focus surface's) and a vignetting that falls off quadratically from the sensor's centre. The true
+lighting is a coloured spherical-harmonics field of degree 2, and the true material has the diffuse weight μ = 0.4. Each
+photograph is the camera at one of the poses: [`compute_mask`](@ref) and [`render_view`](@ref) take the camera and the pose (and
+the photograph's index `k`, which keys its Monte Carlo samples).
 
 ```@example tutorial
 xs = range(-0.5, 0.5; length = 4)
 vignetting_true = VisualGeometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
+camera_true = RadiometricCameraModel(lens, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # lens, focus surface, aperture radius (m), vignetting
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; μ = 0.4)
-masks = [compute_mask(v, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for v in views]
-photos = [render_view(k, views[k], vignetting_true, material_true, light_true, scene, settings, masks[k]) for k in 1:2]
+masks = [compute_mask(camera_true, p, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
+photos = [render_view(k, camera_true, poses[k], material_true, light_true, scene, settings, masks[k]) for k in 1:2]
 size(photos[1])
 ```
 
 ## Calibrating the radiometry
 
-A [`CalibrationState`](@ref) holds the camera the views share (a [`RadiometricCameraModel`](@ref)), their poses, the radiometric
-blocks and the photographs ϕ. It starts here from a flat vignetting, a grey lighting and the wrong weight μ = 0.7; Core's `cost` is
-½ Σ‖Φ − ϕ‖² and the relative RMS residual.
+A [`CalibrationState`](@ref) holds one camera, the poses of its photographs, the lighting, the material and the photographs ϕ.
+Here the geometry is known: the state starts from the true camera with a flat vignetting ([`with_vignetting`](@ref)), a grey
+lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² and the relative RMS residual.
 
 ```@example tutorial
-s = CalibrationState(scene, settings, copy(views), TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), Material(; μ = 0.7),
-                     EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos; masks)
+camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2))   # V ≡ 1
+s = CalibrationState(scene, settings, camera_start, poses, Material(; μ = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
+                     masks)
 cost(s)
 ```
 

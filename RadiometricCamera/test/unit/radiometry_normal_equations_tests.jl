@@ -6,7 +6,7 @@
 
 @testsetup module NEScene
     using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
-                             sphere_radius, View, with_μ, 𝔟
+                             sphere_radius, with_μ, with_vignetting, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap, coefficients
@@ -22,22 +22,22 @@
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, W))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                        SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-        views = [View(p, lens, focus, 0.0386) for p in poses]
         vig = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2); gr = range(-0.5, 0.5, length = 4)
             with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
+        camera = RadiometricCameraModel(lens, focus, 0.0386, vig)
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
         mat = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         sc = Scene(board, W, W)
-        masks = [compute_mask(v, sc, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views]   # the scene's masks, made once on the CPU
-        targets = [render_view(k, views[k], vig, mat, EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH), sc, st, masks[k]) for k in 1:2]
-        (; sc, st, views, b, r_SH, mat, masks, targets)
+        masks = [compute_mask(camera, p, sc, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]   # the scene's masks, made once on the CPU
+        targets = [render_view(k, camera, poses[k], mat, EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH), sc, st, masks[k]) for k in 1:2]
+        (; sc, st, camera, poses, b, r_SH, mat, masks, targets)
     end
     "A start away from the truth (flat V, grey light, μ 0.7): every residual and every Jacobian column nonzero."
     ne_state(; backend = VgtkCore.KA.CPU(), channel = 0) = (S = SCENE;
-        CalibrationState(S.sc, S.st, copy(S.views), TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2), with_μ(S.mat, 0.7),
-                         EnvironmentLight(SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, backend, channel))
+        CalibrationState(S.sc, S.st, with_vignetting(S.camera, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2)), copy(S.poses),
+                         with_μ(S.mat, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, backend, channel))
     """The normal equations of the lighting and vignetting blocks (μ held) assembled on the host from the design-row kernel's rows:
     J = [A_v Z | the lighting columns per measured channel], r = Φ − ϕ with Φ the lighting rows times the coefficients."""
     function ne_host(s, parts)

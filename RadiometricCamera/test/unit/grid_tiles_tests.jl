@@ -2,10 +2,10 @@
 # per-view/per-tile residual consistency, finite-difference Jacobian columns of every block
 # kind (incl. the patch tangent columns), and an LM smoke recovery of perturbed directions.
 
-# The scene, the CPU problem and the perturbed views both items use (the GPU item compares its device tiles with `tiles`).
+# The scene, the CPU problem and the perturbed camera and poses both items use (the GPU item compares its device tiles with `tiles`).
 @testsetup module GridTilesScene
     using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, Material, PrintedTarget,
-                             render_view, RenderSettings, Scene, sphere_radius, View, 𝔟
+                             render_view, RenderSettings, Scene, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -13,7 +13,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export tex, board, W, H, scene, src_t, glens_t, tps_t, focus_t, r_t, poses, views_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, views_p
+    export tex, board, W, H, scene, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p
 
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
@@ -25,17 +25,17 @@
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     r_t = 0.0386
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, glens_t, focus_t, r_t) for k in 1:2 for p in (poses[k],)]
     # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
+    camera_t = RadiometricCameraModel(glens_t, focus_t, r_t, vig_t)
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
+    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+    s = CalibrationState(scene, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
     prob, idx = build_problem_grid(s; patch = (5, 5))
     tiles = RC.tile_costs(prob)
     # LM smoke: perturb the grid (small direction rotations) + a pose nudge; joint LM must recover sharply
@@ -45,7 +45,8 @@
         G_p[g2, g1] = G_p[g2, g1] + 2e-3 * sin(g1 + 2g2) * b1 + 2e-3 * cos(2g1 - g2) * b2
     end
     glens_p = RC.VgtkCore.with_directions(glens_t, G_p)
-    views_p = [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(poses[k]), vcat(SVector(0.003, -0.002, 0.002), SVector(0.002, -0.003, 0.004))), glens_p, focus_t, r_t) for k in 1:2]
+    camera_p = RadiometricCameraModel(glens_p, focus_t, r_t, vig_t)
+    poses_p = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(poses[k]), vcat(SVector(0.003, -0.002, 0.002), SVector(0.002, -0.003, 0.004))) for k in 1:2]
 end
 
 @testitem "grid lens / per-tile blocks" setup = [RCFixtures, GridTilesScene] begin
@@ -96,8 +97,8 @@ end
         col = J[:, 6 + 200 + 9 + 1]
         @test norm(col - fd) / norm(fd) < 5e-3
     end
-    s2 = CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks)   # a copy: the LM writes its views back into
-                                                         # the state's vector, and the GPU recovery below must start from the perturbed views_p
+    s2 = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)   # a copy: the LM writes its poses back into
+                                                         # the state's vector, and the GPU recovery below must start from the perturbed poses_p
     c0 = cost(s2)[1]
     res = run_lm_grid!(s2; patch = (5, 5), maxiters = 25)
     @test cost(s2)[1] < 3e-3 * c0
@@ -115,7 +116,7 @@ end
 end
 
 @testitem "grid lens / present nodes, absent nodes and smoothness" setup = [RCFixtures, GridTilesScene] begin
-    using RadiometricCamera: build_problem_grid, render_view, View
+    using RadiometricCamera: build_problem_grid, render_view
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     # the nodes under the model's imaged region: Core's footprint rule (the double sphere source: the whole plane, every node present)
@@ -147,14 +148,14 @@ end
     lens_m = RC.VgtkCore.with_present(glens_t, held)
     D(l) = VgtkCore.directions(VgtkCore.model(l))
     @test VgtkCore.present_nodes(VgtkCore.model(lens_m)) == held && all(v -> all(isnan, v), D(lens_m)[.!held])
-    views_m = [View(v.pose, lens_m, v.focus, v.r) for v in views_t]
-    s_all = CalibrationState(scene, st, copy(views_m), vig_t, mat_t, light_t, targets; masks)
+    camera_m = RadiometricCameraModel(lens_m, focus_t, r_t, vig_t)
+    s_all = CalibrationState(scene, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
     @test_throws ArgumentError build_problem_grid(s_all; patch = (5, 5))
     reads_held(u, v) = all(p -> all(isfinite, VgtkCore.backproject(lens_m, first(p))), RC.sensor_samples(st.sensor, u, v))
     masks_m = [BitMatrix([mk[v, u] && reads_held(u, v) for v in axes(mk, 1), u in axes(mk, 2)]) for mk in masks]
     @test all(k -> 0 < count(masks_m[k]) < count(masks[k]), 1:2)
-    targets_m = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks_m[k]) for k in 1:2]
-    s = CalibrationState(scene, st, copy(views_m), vig_t, mat_t, light_t, targets_m; masks = masks_m)
+    targets_m = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks_m[k]) for k in 1:2]
+    s = CalibrationState(scene, st, camera_m, copy(poses), mat_t, light_t, targets_m; masks = masks_m)
     # in a problem: zero cost at the start, the rows' Jacobian against central differences through the patch blocks' retraction,
     # no column for an absent node; a patch block with no present node is not a variable of the solve
     for pr in (pr2, prp)
@@ -213,7 +214,7 @@ end
     # --- device (GPU) per-tile path: bitwise residual, column parity, LM smoke ---
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_g = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        s_g = CalibrationState(scene, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
@@ -271,7 +272,7 @@ end
         RC.NLLSsolver.computeresidual(r2, vars2n...)
         @test s_g.run.device_calls[:flux] > calls0
         RC._unregister_grid_problem!(s_g)
-        s2g = CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        s2g = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
         c0g = cost(s2g)[1]
         run_lm_grid!(s2g; patch = (5, 5), maxiters = 15)
         @test cost(s2g)[1] < 0.05 * c0g

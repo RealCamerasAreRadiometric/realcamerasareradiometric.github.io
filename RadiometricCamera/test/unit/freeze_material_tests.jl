@@ -3,7 +3,7 @@
 # `_hold_material`), its 9 columns (8 nonlinear by AD + the analytic μ column) are zero, every other column and the residual are
 # unchanged, and `update` leaves Θ_m while moving the warping.
 @testitem "frozen material (staged refinement)" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, build_problem_grid, grid_model, lens, PerViewResidual, View
+    using RadiometricCamera: build_problem, build_problem_grid, grid_model, lens, PerViewResidual
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -28,7 +28,7 @@
     W = H = 32
     @testset "per-tile block (grid lens, warping free)" begin
         glens = grid_model(cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H), 10, 10)
-        s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., [View(p, glens, gold_focus(), 0.0386) for p in gold_poses()])
+        s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., glens)
         prob, _ = build_problem_grid(s; patch = (5, 5), height_degree = 1)
         held, idx = build_problem_grid(s; patch = (5, 5), height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]                                                         # the block stays variable
@@ -48,7 +48,7 @@
     @testset "per-view block (Kannala–Brandt)" begin
         kb = cam(RCg.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
         scene, m = gold_scene(W, H; h = gold_h())
-        s = gold_state(scene, m, [View(p, kb, gold_focus(), 0.0386) for p in gold_poses()])
+        s = gold_state(scene, m, kb)
         prob, _ = build_problem(s; height_degree = 1)
         held, idx = build_problem(s; height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]

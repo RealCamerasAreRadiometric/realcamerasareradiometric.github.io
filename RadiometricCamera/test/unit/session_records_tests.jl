@@ -17,7 +17,7 @@
         end
         ds = RC.load_session(rec, imgs; focus_init = :board_center, downsample = 8, texture_downsample = 8)
         @test ds.names == ["train_01.png", "train_02.png", "train_03.png"] && ds.frames == [1, 2, 3] && Tuple(ds.extent) == (1024, 1024)
-        @test size(ds.targets[1]) == (128, 128, 3) && length(ds.views) == 3
+        @test size(ds.targets[1]) == (128, 128, 3) && length(ds.poses) == 3 && !haskey(ds, :views)
         # the camera: the record's pixel camera (COLMAP K) on the scene's pixels (the photographs box-averaged by 8: K scaled by 1/8)
         rcam = VgtkIO.load(VgtkCore.CameraModel, joinpath(rec, "camera.json"))
         K = rcam.intrinsics.K
@@ -30,15 +30,15 @@
         @test RC.texture_size(b) == (6143 ÷ 8, 6143 ÷ 8)
         @test world_point(b, SVector(0.0, 0.0)) ≈ SVector(tr.origin[1], tr.origin[2] + tr.widths[2], 0.0) atol = 1e-15   # the image's top-left
         @test world_point(b, SVector(1.0, 1.0)) ≈ SVector(tr.origin[1] + tr.widths[1], tr.origin[2], 0.0) atol = 1e-15   # its bottom-right
-        # the views: the trajectory's target → camera maps, in metres; the camera centre is in front of the printed side
+        # the poses: the trajectory's target → camera maps, in metres; the camera centre is in front of the printed side
         traj = VgtkIO.load(VgtkCore.Trajectory, joinpath(rec, "trajectory_1.json"))
         for (k, t) in enumerate(ds.frames)
             T = VgtkCore.ustrip(VgtkCore.m, traj.poses[t])                  # board (target frame, m) → camera
             for X in (SVector(0.0, 0.0, 0.0), SVector(0.03, -0.02, 0.0), SVector(-0.05, 0.04, 0.0))
-                @test inv(ds.views[k].pose)(X) ≈ T(X) atol = 1e-12
+                @test inv(ds.poses[k])(X) ≈ T(X) atol = 1e-12
             end
-            @test dot(ds.views[k].pose.t - 𝔟(b), board_normal(b)) > 0
-            q = VgtkCore.project(ds.lens₀, inv(ds.views[k].pose)(𝔟(b)))             # the board centre images inside the picture
+            @test dot(ds.poses[k].t - 𝔟(b), board_normal(b)) > 0
+            q = VgtkCore.project(ds.lens₀, inv(ds.poses[k])(𝔟(b)))             # the board centre images inside the picture
             @test all(0 .< q .< 128)
         end
         @test ds.d_s > 0 && all(d -> 0.05 < d < 0.2, ds.center_distances)       # the 130 mm board at ≈ 9 cm (130/2000 of the 2 m render)

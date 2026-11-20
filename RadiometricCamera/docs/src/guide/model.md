@@ -51,8 +51,8 @@ RadiometricCamera
 
 Pixel coordinates are COLMAP convention (pixel i spans [i, i+1), centre i + 0.5): every sensor position 𝐩 of the package —
 the cameras' K, the focus and vignetting splines, the masks, the detections — is in them ([`𝐩_of_pixel`](@ref)`(u, v)` of
-Julia's 1-based pixel `(u, v)`). Camera frame x right, y down, z forward; a [`View`](@ref)'s pose is VisualGeometryToolkitCore's
-camera → world `EuclideanMap` (`R = R_cw`, `t` = the camera centre 𝐜; world = the board / session frame, metres). Photographs are
+Julia's 1-based pixel `(u, v)`). Camera frame x right, y down, z forward; a photograph is the [`RadiometricCameraModel`](@ref) at a
+pose, VisualGeometryToolkitCore's camera → world `EuclideanMap` (`R = R_cw`, `t` = the camera centre 𝐜; world = the board / session frame, metres). Photographs are
 RAW files (VisualGeometryToolkitFeatures' `load_raw_mosaic`, linearised under each photograph's sensor model:
 [`load_photo`](@ref RadiometricCamera.load_photo), [`photo_set`](@ref RadiometricCamera.photo_set)) or 16-bit linear PNGs, read by VisualGeometryToolkitFeatures'
 `load_linear_image` (the option `io.linearize = "on"` decodes sRGB);
@@ -68,7 +68,8 @@ src/camera/                         the geometric camera and its radiometric ext
                                       CameraModel: Lens(DoubleSphere), KannalaBrandt, Division — BlobBoards' model —, the 14-coefficient
                                       chain, …) and its LM box and scale; grid_camera.jl: Core's spline cameras (a SplineLens camera
                                       and its per-tile windows) as chief-ray models, grid_model (any camera → the grid)
-  radiometric_camera.jl               View (Θ_e, Θ_d, Θ_f, r, the sensor geometry s′), 𝔣, π̂⁻¹, the world rays
+  radiometric_camera.jl               RadiometricCameraModel (Θ_d, Θ_f, r, V: the camera, one object), the kernels' View of it at a
+                                      pose (Θ_e), 𝔣, π̂⁻¹, the world rays
   vignetting.jl, focus.jl, pose.jl
 src/sensor/                         notation.jl (the sensor domain ℐ, pixel conventions), quadrature.jl (pixel footprint and aperture rules)
 (Core's EnvironmentLight)           y_l^m (sh_basis), the light on the sphere (𝔟, r_SH) with a_{c,l}^m (SphericalHarmonicMap), L^SVSH (radiance)

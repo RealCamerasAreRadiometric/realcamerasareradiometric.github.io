@@ -16,9 +16,13 @@
 """
     RadiometricCameraModel(lens, focus, aperture_radius, vignetting)
 
-The radiometric camera, what every photograph of a calibration shares: the geometric camera π⁻¹ (`lens`: Core's pixel camera or a
-grid model; Θ_d), the focus surface (`focus`, Θ_f), the aperture radius r (`aperture_radius`, metres) and the
-vignetting V (`vignetting`, Core's `AbstractVignetting`, Θ_v). A photograph adds its pose: [`View`](@ref)`(pose, camera)`.
+The radiometric camera, what every photograph of a calibration shares, as ONE object: the geometric camera π⁻¹ (`lens`: Core's
+pixel camera or a grid model; Θ_d), the focus surface (`focus`, Θ_f), the aperture radius r (`aperture_radius`, metres) and the
+vignetting V (`vignetting`, Core's `AbstractVignetting`, Θ_v). Every function of the camera takes it whole: a photograph is the
+camera at a pose (camera → world, Core's `EuclideanMap`) — [`render_view`](@ref)`(k, camera, pose, …)`,
+[`compute_mask`](@ref)`(camera, pose, …)`, [`Φ_pixel`](@ref)`(u, v, k, camera, pose, …)`,
+[`world_ray`](@ref)`(camera, pose, 𝐩, 𝐚)` — and a calibration holds one camera and its poses
+([`CalibrationState`](@ref)`(scene, settings, camera, poses, …)`).
 
 The image distance is not a parameter: the defocus is the focus surface t̂(𝐩) along each chief ray, and the cos⁴/s′² obliquity is in V.
 """
@@ -37,9 +41,10 @@ VgtkCore.backproject(c::RadiometricCameraModel, 𝐩) = VgtkCore.backproject(c.l
 """
     View{T, N}
 
-One photograph of a [`RadiometricCameraModel`](@ref) as the renderer evaluates it, in one element type `T` (Float64, Float32 on the
-device, a dual in the Jacobian evaluations): the pose (camera → world, Θ_e), the lens Θ_d, the focus surface Θ_f and the aperture
-radius r. The vignetting is not in it: the renderer takes V apart, as it differentiates it analytically.
+Internal: one photograph of a [`RadiometricCameraModel`](@ref) as the renderer's kernels evaluate it — the camera at a pose
+(`View(pose, camera)`), flattened into one element type `T` (Float64, Float32 on the device, a dual in the Jacobian evaluations): the
+pose (camera → world, Θ_e), the lens Θ_d, the focus surface Θ_f and the aperture radius r. The vignetting is not in it: the kernels
+take V apart, as they differentiate it analytically. Callers give the camera and the pose; the public functions form the view.
 """
 struct View{T, N, L, P}
     pose::P                                   # camera → world: Core's EuclideanMap in T (`_pose_eltype`; t = the camera centre)
@@ -83,37 +88,51 @@ partials (per-view lens AD, seeded grid-node directions) the normalisation proje
 """
 @inline chief_dir(lens, 𝐩::StaticVector{2}) = normalize(_chief_ray(lens, 𝐩))
 @inline chief_dir(v::View, 𝐩::StaticVector{2}) = chief_dir(v.lens, 𝐩)
+@inline chief_dir(c::RadiometricCameraModel, 𝐩::StaticVector{2}) = chief_dir(c.lens, 𝐩)
 
-"""Focus point 𝔣(𝐩) = 𝔱(𝐩) d̂(𝐩) on the Petzval surface, d̂ the UNIT chief direction (camera frame, the centre of projection
-𝔭 = 0): ‖𝔣(𝐩)‖ = 𝔱(𝐩) = 1/t̂(𝐩) exactly, for every lens class."""
-@inline 𝔣(v::View, 𝐩::StaticVector{2}) = inv(t̂(v, 𝐩)) * chief_dir(v.lens, 𝐩)
-
-"""EXPERIMENT (focus-ab): `t̂` of a view at the sensor position 𝐩 — the sensor TPS at 𝐩 (kind 0, as before), or a direction
-chart's surface at the chief direction of 𝐩 through the view's lens (kinds 1, 2; focus_charts.jl)."""
-@inline t̂(v::View, 𝐩::StaticVector{2}) = v.focus.kind == 0 ? t̂(v.focus, 𝐩) : t̂_dir(v.focus, chief_dir(v.lens, 𝐩))
+"""The camera's own functions (camera frame, no pose) take the camera or the kernels' view of it: the same fields, one code path."""
+const _CameraOrView = Union{RadiometricCameraModel, View}
 
 """
-    π̂⁻¹(v, 𝐩, 𝐚) -> SVector{3}
+    𝔣(camera, 𝐩) -> SVector{3}
 
-Radiometric extension: unit direction from the aperture point 𝐚 towards 𝔣(𝐩),
+Focus point 𝔣(𝐩) = 𝔱(𝐩) d̂(𝐩) on the Petzval surface, d̂ the UNIT chief direction (camera frame, the centre of projection
+𝔭 = 0): ‖𝔣(𝐩)‖ = 𝔱(𝐩) = 1/t̂(𝐩) exactly, for every lens class.
+"""
+@inline 𝔣(v::_CameraOrView, 𝐩::StaticVector{2}) = inv(t̂(v, 𝐩)) * chief_dir(v.lens, 𝐩)
+
+"""
+    t̂(camera, 𝐩)
+
+The camera's inverse focus distance at the sensor position 𝐩. EXPERIMENT (focus-ab): the sensor TPS at 𝐩 (kind 0, as before), or a
+direction chart's surface at the chief direction of 𝐩 through the camera's lens (kinds 1, 2; focus_charts.jl).
+"""
+@inline t̂(v::_CameraOrView, 𝐩::StaticVector{2}) = v.focus.kind == 0 ? t̂(v.focus, 𝐩) : t̂_dir(v.focus, chief_dir(v.lens, 𝐩))
+
+"""
+    π̂⁻¹(camera, 𝐩, 𝐚) -> SVector{3}
+
+Radiometric extension: unit direction from the aperture point 𝐚 towards 𝔣(𝐩) (camera frame),
 computed as `normalize(d̂(𝐩) − t̂(𝐩) 𝐚)` with the unit chief direction d̂ = `chief_dir(𝐩)` (regular for focus at infinity).
 `π̂⁻¹(𝐩, 𝔭) = π⁻¹(𝐩)`.
 """
-@inline function π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3})
+@inline function π̂⁻¹(v::_CameraOrView, 𝐩::StaticVector{2}, 𝐚::StaticVector{3})
     d = chief_dir(v.lens, 𝐩) - t̂(v, 𝐩) * 𝐚
     return d / sqrt(d[1]^2 + d[2]^2 + d[3]^2)
 end
 """As above with a hoisted `t̂(𝐩)` (evaluated once per sensor sample by `Φ_pixel`)."""
-@inline function π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val)
+@inline function π̂⁻¹(v::_CameraOrView, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val)
     d = chief_dir(v.lens, 𝐩) - t̂val * 𝐚
     return d / sqrt(d[1]^2 + d[2]^2 + d[3]^2)
 end
 
 """
-    world_ray(v, 𝐩, 𝐚) -> (origin, direction)
+    world_ray(camera, pose, 𝐩, 𝐚) -> (origin, direction)
 
-Ray of the sensor position 𝐩 through the aperture point 𝐚 in world coordinates.
+Ray of the sensor position 𝐩 through the aperture point 𝐚 of `camera` at `pose` (camera → world), in world coordinates.
 """
+@inline world_ray(c::RadiometricCameraModel, pose::EuclideanMap, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) =
+    world_ray(View(pose, c), 𝐩, 𝐚)
 @inline function world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3})
     return v.pose(𝐚), v.pose.R * π̂⁻¹(v, 𝐩, 𝐚)
 end

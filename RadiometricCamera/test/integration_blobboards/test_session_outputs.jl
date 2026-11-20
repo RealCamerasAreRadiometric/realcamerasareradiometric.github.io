@@ -242,7 +242,7 @@ try
     @testset "5 load_session (the photo pipeline's loader of the records)" begin
         for lens in (:camera, :grid)
             d = RC.load_session(SES, IMG; lens, focus_init = :board_center, downsample = 8, texture_downsample = 8)
-            @test length(d.views) == length(VIEWS) && d.names == ["train_0$(k).png" for k in eachindex(VIEWS)]
+            @test length(d.poses) == length(VIEWS) && d.names == ["train_0$(k).png" for k in eachindex(VIEWS)]
             @test size(d.targets[1]) == (RH ÷ 8, RW ÷ 8, 3)
             # the records' world is board 291's frame in metres (the 130 mm board standing in for the render's 2 m one): the loader's
             # consistency is what is tested, not the scale

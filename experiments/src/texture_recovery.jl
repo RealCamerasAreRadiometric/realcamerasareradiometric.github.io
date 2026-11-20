@@ -19,7 +19,7 @@
 # =============================================================================
 using RadiometricCamera
 using RadiometricCamera: chart, compute_mask, draws, focus, inside, lens, photo_file, residuals,
-                         View, view_of, world_ray
+                         world_ray
 const RC = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
 import VisualGeometryToolkitEstimation as VgtkEstimation
@@ -366,7 +366,7 @@ their green photosites on the raw grid under that record — its black (the dark
 `characterisation` the record's location (its sha256 checked against the camera's); a camera of decoded images their pixels, the
 green channel. Another record, another kind of photograph, a frame the record does not describe: refused. No flag chooses.
 
-What the page solve shares: the photographs' views (the `camera` — a `RadiometricCameraModel`, central — at the poses, camera → world)
+What the page solve shares: the photographs (the `camera` — a `RadiometricCameraModel`, central — at the `poses`, camera → world)
 and their decoded files (`images_dir/<name>`), the sheet as the scene's board (`page_frame`, a flat surface with the `target`'s
 printed-edge parameters: the calibration board's warping is never evaluated on the sheet), its ray intersector, the vignetting, the
 render settings (the calibration's own, `camera.settings`: the quadrature), the design (`design_png`, the green channel, as a `TW × TH` matrix [x, y]) and its texel size.
@@ -380,8 +380,8 @@ function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::Abstrac
     𝐨, 𝐮, 𝐯, _ = page_frame(sheet.page_w, sheet.page_h)
     names = [String(p[1]) for p in poses]
     photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterisation)   # THE entry point, the camera's own model
-    views = [RC.View(EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false), camera) for (_, R, t) in poses]   # camera → world
-    bd = RC.PrintedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = views[1].pose.t)
+    cam_poses = [EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false) for (_, R, t) in poses]   # camera → world
+    bd = RC.PrintedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
     surf = RC.BoardSurface(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
     scene = RC.Scene(bd, Int(W), Int(H), surf); rays = RC.BoardRays(scene)
     img = VgtkFeatures.load_linear_image(design_png); TH, TW = size(img, 1), size(img, 2)
@@ -389,21 +389,21 @@ function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::Abstrac
     page_mm = (1e3 * sheet.page_w, 1e3 * sheet.page_h); tex_mm = page_mm[1] / TW
     abs(page_mm[2] / TH - tex_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texels are not square ($(page_mm[1] / TW) × $(page_mm[2] / TH) mm)"))
     abs(tex_mm - sheet.texel_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texel $(tex_mm) mm is not the sheet target's $(sheet.texel_mm) mm"))
-    return (; names, images_dir = String(images_dir), photos, views, lens = camera.lens, bd, surf, scene, rays, vig = camera.vignetting, sett = settings, design, TW, TH,
+    return (; names, images_dir = String(images_dir), photos, camera, poses = cam_poses, bd, surf, scene, rays, sett = settings, design, TW, TH,
             tex_mm, page_mm, W = Int(W), H = Int(H), learned_r = camera.aperture_radius)
 end
 
 """
-    variant_view(ctx, k, name; pinhole_r) -> View
+    variant_camera(ctx, name; pinhole_r) -> RadiometricCameraModel
 
-Photograph `k`'s View under the blur model `name`: `learned` the calibration's as it is; `pinhole` the aperture radius `pinhole_r`
-(the chief ray alone), everything else the same.
+The camera under the blur model `name`: `learned` the calibration's as it is; `pinhole` the aperture radius `pinhole_r` (the chief ray
+alone), everything else the same.
 """
-function variant_view(ctx, k::Integer, name::AbstractString; pinhole_r::Real)
-    v = ctx.views[k]
-    name == "learned" && return v
-    name == "pinhole" && return RC.View(v.pose, v.lens, v.focus, Float64(pinhole_r))
-    throw(ArgumentError("variant_view: unknown blur model $(repr(name)) ($(join(TEXTURE_VARIANTS, " | ")))"))
+function variant_camera(ctx, name::AbstractString; pinhole_r::Real)
+    c = ctx.camera
+    name == "learned" && return c
+    name == "pinhole" && return RC.RadiometricCameraModel(c.lens, c.focus, Float64(pinhole_r), c.vignetting)
+    throw(ArgumentError("variant_camera: unknown blur model $(repr(name)) ($(join(TEXTURE_VARIANTS, " | ")))"))
 end
 
 # ---- the pixels: the mask, the sample, the roles, the cells ------------------------------------------------------------------------
@@ -435,13 +435,13 @@ weighting: an uncertain plane (a RAW photograph under a sensor model with a vari
 value; a plain plane `RC.Unweighted()` (rows as measured).
 """
 function sample_pixels(ctx, k::Integer, external; fraction::Real, seed::Integer, backend)
-    mask = RC.compute_mask(ctx.views[k], ctx.scene, ctx.sett; δ = 0.0, external, backend)
+    mask = RC.compute_mask(ctx.camera, ctx.poses[k], ctx.scene, ctx.sett; δ = 0.0, external, backend)
     plane, mask = RC.observe(ctx.photos, k, mask; name = ctx.names[k])   # the camera's observation model: its record's photosites, or the image's pixels
     size(plane, 1) == ctx.H && size(plane, 2) == ctx.W || error("sample_pixels: $(ctx.names[k]) is $(size(plane, 2)) × $(size(plane, 1)), the scene $(ctx.W) × $(ctx.H)")
     rng = StableRNG(seed + k); px = NTuple{4, Float64}[]
     for (u, v) in RC.masked_pixels(mask)
         rand(rng) < fraction || continue
-        o, d = RC.world_ray(ctx.views[k], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
+        o, d = RC.world_ray(ctx.camera, ctx.poses[k], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
         (isfinite(sr) && sr > 0) || continue
         𝐛 = RC.chart(ctx.bd, 𝐱); push!(px, (u, v, 𝐛[1] * ctx.page_mm[1], 𝐛[2] * ctx.page_mm[2]))
     end
@@ -592,22 +592,23 @@ function rows_by_photograph(rows_px)
 end
 
 """
-    page_rows(ctx, rows_px, view_of, blocks, groups; device) -> (; blocks, kept)
+    page_rows(ctx, rows_px, camera, blocks, groups; device) -> (; blocks, kept)
 
-The blur rows (`_FootprintAt`) of every sampled pixel `rows_px[q] = (k, u, v)` under the Views `view_of(k)`: one kernel per photograph
+The blur rows (`_FootprintAt`) of every sampled pixel `rows_px[q] = (k, u, v)` of `camera` (a `RadiometricCameraModel`: the blur model,
+`variant_camera`) at photograph `k`'s pose `ctx.poses[k]`: one kernel per photograph
 (`groups`, `rows_by_photograph`) on `device` (Core's `pointwise!` on `OnBackend`); a pixel with a sample off the sheet is dropped
 (`kept[q]` false). `blocks` names the row sets wanted, each a Bool per sampled pixel; per block `(; A, rows)`: its sparse matrix (`TW ·
 TH` columns, a texel its samples share summed; rows in `rows_px` order) built directly, no slice of a whole-page matrix, and `rows` the
 indices of `rows_px` it holds.
 """
-function page_rows(ctx, rows_px, view_of, blocks::NamedTuple, groups::AbstractDict{<:Integer, <:AbstractVector{<:Integer}}; device)
+function page_rows(ctx, rows_px, camera::RC.RadiometricCameraModel, blocks::NamedTuple, groups::AbstractDict{<:Integer, <:AbstractVector{<:Integer}}; device)
     N = _footprint_slots(ctx.sett); nT = ctx.TW * ctx.TH
     coo = map(_ -> (; I = Int[], J = Int[], V = Float64[], rows = Int[]), blocks)
     kept = falses(length(rows_px))
     for k in sort!(collect(keys(groups)))
         qs = groups[k]; m = length(qs)
         cols = VgtkCore.KA.zeros(device, Int32, N * m); vals = VgtkCore.KA.zeros(device, Float64, N * m); cnt = VgtkCore.KA.zeros(device, Int32, m)
-        f = _FootprintAt(view_of(k), ctx.scene, ctx.sett, ctx.vig, Int32(ctx.TW), Int32(ctx.TH), cols, vals)
+        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.scene, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), cols, vals)   # the kernel's view: the camera at pose k
         VgtkCore.pointwise!(f, cnt, Adapt.adapt(device, Int32.(1:m)), Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]),
                             Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); exec = VgtkCore.OnBackend(device))
         VgtkCore.KA.synchronize(device)
@@ -662,7 +663,7 @@ page_files(dir::AbstractString, v::AbstractString) = (; texture = joinpath(dir, 
 """
     run_page(ctx, samples, roles, cells, circle, out; settings, variants, device, values, log)
 
-The refine stage: every sampled pixel's row (`samples`, `page_rows`) under each blur model of `variants` (`variant_view`), the fit rows'
+The refine stage: every sampled pixel's row (`samples`, `page_rows`) under each blur model of `variants` (`variant_camera`), the fit rows'
 operator on `device` (Core's `PenalizedOperator`: the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
 every weight of `settings["regularization_weights"]`); the squared errors of every solution on the fit, validation and test rows that
 fall in the scored `cells` (the test also at the centre ρ < `centre_rho` and the edge ρ > `edge_rho` of the image) with the photographs'
@@ -710,7 +711,7 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
     m̄ = VgtkCore.mean_positive_eigenvalue(D)                          # the operator's normalization of the weight (Core's)
     for name in variants
         t1 = time()
-        R = page_rows(ctx, rows_px, k -> variant_view(ctx, k, name; pinhole_r = PINR), blocks, groups; device)
+        R = page_rows(ctx, rows_px, variant_camera(ctx, name; pinhole_r = PINR), blocks, groups; device)
         Af, F = R.blocks.fit.A, R.blocks.fit.rows                      # F, Fs, Vs, Ts: indices of rows_px
         nkept = count(R.kept); nval = count(R.kept .& isval); ntest = count(R.kept .& istest)
         wF = RC._select_rows(rw, F)                                    # the fit rows' weights (RC's one weighting: _whiten)

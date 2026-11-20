@@ -39,10 +39,10 @@
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         # a state of the scene seen through `lens`, its targets rendered at the truth
         function state(lens, scene_ = scene, st_ = st; kw...)
-            views = [View(p, lens, focus_t, 0.0386) for p in poses]
-            masks = [compute_mask(v, scene_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for v in views]   # the workload's CPU states
-            targets = [render_view(k, views[k], vignetting(), mat, light, scene_, st_, masks[k]) for k in 1:2]
-            return CalibrationState(scene_, st_, views, vignetting(), with_μ(mat, 0.5), light, targets; masks, kw...)
+            camera = RadiometricCameraModel(lens, focus_t, 0.0386, vignetting())
+            masks = [compute_mask(camera, p, scene_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for p in poses]   # the workload's CPU states
+            targets = [render_view(k, camera, poses[k], mat, light, scene_, st_, masks[k]) for k in 1:2]
+            return CalibrationState(scene_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, kw...)
         end
         per_view(s; kw...) = ((prob, _) = build_problem(s; kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
         per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))

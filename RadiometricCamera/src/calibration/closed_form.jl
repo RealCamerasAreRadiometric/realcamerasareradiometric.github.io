@@ -61,14 +61,19 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
 end
 
 """
-    pixel_parts(u, v, k, view::View, mat::Material, light::EnvironmentLight, scene::Scene, settings::RenderSettings) -> PixelParts
+    pixel_parts(u, v, k, camera, pose, mat::Material, light::EnvironmentLight, scene::Scene, settings::RenderSettings) -> PixelParts
 
-THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of view `k`, in the settings' float type: the sensor and aperture
-quadratures evaluated once, so the closed-form solves of `Θ_l`, `Θ_v` and μ ([`solve_linear_blocks!`](@ref)) need no re-rendering.
-The sample keys are `k`'s, so the Monte Carlo radiance matches [`Φ_pixel`](@ref)'s. Device-safe: the parts kernels run it per pixel
-(`_PixelPartsAt` for the closed-form solves, `_PartsAt` for the LM's analytic columns).
+THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of photograph `k`, `camera` (a [`RadiometricCameraModel`](@ref)) at
+`pose` (camera → world), in the settings' float type: the sensor and aperture quadratures evaluated once, so the closed-form solves
+of `Θ_l`, `Θ_v` and μ ([`solve_linear_blocks!`](@ref)) need no re-rendering. The sample keys are `k`'s, so the Monte Carlo radiance
+matches [`Φ_pixel`](@ref)'s. The vignetting is not applied: it is one of the parts' linear factors.
 """
-@inline function pixel_parts(u::Integer, v::Integer, k::Integer, view::View, mat::Material,
+pixel_parts(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
+            scene::Scene, st::RenderSettings) = _pixel_parts(u, v, k, View(pose, camera), mat, light, scene, st)
+
+"""The kernels' form of [`pixel_parts`](@ref) on a `View`. Device-safe: the parts kernels run it per pixel (`_PixelPartsAt` for the
+closed-form solves, `_PartsAt` for the LM's analytic columns)."""
+@inline function _pixel_parts(u::Integer, v::Integer, k::Integer, view::View, mat::Material,
                              light::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, scene::Scene, st::RenderSettings{TS, NS}) where {L, C, J, TS, NS}
     F = _float_of(st)
     bd = scene.board

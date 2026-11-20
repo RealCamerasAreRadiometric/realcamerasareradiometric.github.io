@@ -84,20 +84,20 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         @test RC.grid_angular_error(gl, rl) < 5e-3                          # 25×25 quasi-interpolation of the rational lens: 1.1 mrad
         vk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
         for lens in (cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), 24, 24), rl, gl, vk)
-            views = [View(p, lens, focus, 0.0386) for p in poses]
             vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+            camera = RadiometricCameraModel(lens, focus, 0.0386, vig)
             # the contract's values are the paper's integral ∝ r²: the render divides by πr², so the lighting carries it
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.0386^2, 2), b, r_SH); mat = Material()
             st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-            masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views]
+            masks = [compute_mask(camera, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
             @test all(count(m) > 50 for m in masks)
-            targets = [render_view(k, views[k], vig, mat, light, scene, st, masks[k]) for k in 1:2]
+            targets = [render_view(k, camera, poses[k], mat, light, scene, st, masks[k]) for k in 1:2]
             @test all(t -> all(isfinite, t) && maximum(t) > 0, targets)
-            s = CalibrationState(scene, st, copy(views), vig, mat, light, targets; masks)
+            s = CalibrationState(scene, st, camera, poses, mat, light, targets; masks)
             c, rms = cost(s)
             @test isfinite(c) && rms < 1e-6                                   # re-rendering the generating state: zero residual
-            moved = [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), SVector(0.01, 0.0, 0.0, 0.0, 0.0, 0.0)), lens, focus, 0.0386) for p in poses]
-            s2 = CalibrationState(scene, st, moved, vig, mat, light, targets; masks)
+            moved = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), SVector(0.01, 0.0, 0.0, 0.0, 0.0, 0.0)) for p in poses]
+            s2 = CalibrationState(scene, st, camera, moved, mat, light, targets; masks)
             c2, rms2 = cost(s2)
             @info "pipeline smoke" lens = nameof(typeof(lens)) rel_rms_at_truth = rms rel_rms_moved_10mrad = rms2
             @test rms2 > 1e-3                                                # the render responds to geometry
@@ -168,7 +168,8 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         NPX = 48
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), Float64(NPX), (NPX / 2, NPX / 2), NPX, NPX)
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)       # R_cw = diag(1, −1, −1): looking down at the board
-        view = View(pose, pin, Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, NPX, NPX))), fill(1 / 1.5, 9)), 0.02)
+        camera = RadiometricCameraModel(pin, Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, NPX, NPX))), fill(1 / 1.5, 9)), 0.02,
+                                        TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NPX, NPX); degree = 2))
         X = world_point(board, C)                                                  # (0.2, −0.3, 0)
         @test X ≈ SVector(0.2, -0.3, 0.0) atol = 1e-12
         Y = pose.R' * (X - pose.t)                                              # (0.2, 0.3, 1.5)
@@ -179,8 +180,8 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         function render_board(bd)
             scene = Scene(bd, NPX, NPX); b = 𝔟(bd)
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.02^2, 2), b, sphere_radius(b, [pose.t]))
-            mask = compute_mask(view, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
-            return render_view(1, view, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NPX, NPX); degree = 2), Material(), light, scene, st, mask)[:, :, 1], mask
+            mask = compute_mask(camera, pose, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
+            return render_view(1, camera, pose, Material(), light, scene, st, mask)[:, :, 1], mask
         end
         lum, mask = render_board(board); lum_w, _ = render_board(white)
         ratio = lum ./ max.(lum_w, 1e-9)                                             # shading and vignetting cancel: the ink map as seen

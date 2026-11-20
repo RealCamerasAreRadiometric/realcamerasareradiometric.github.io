@@ -89,7 +89,6 @@ _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
                      channel = 0, focus_fixed = Int[], mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
                      sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
                      sensor = NoSensorRecord(), photo_kind = Decoded(false))
-    CalibrationState(scene, settings, views, vig, mat, light, targets; kwargs...)
 
 `channel` (0: the three channels; 1–3: that channel alone, ONE residual per measured pixel, `fit_channels`): a
 single-channel state ties the other channels' lighting coefficients and refractive indices η to channel `channel`'s
@@ -108,9 +107,8 @@ each of its `ϕ`'s length (whitened rows: the residuals and the Jacobians divide
 each row's RAW code step in its units (`masked_observations`), or `nothing` (a decoded image): what the data resolve
 (`lm_abstol`).
 
-The state of the [`RadiometricCameraModel`](@ref) `camera` seen from `poses` (camera → world, one per photograph), or of `views`
-that share one geometric camera, focus surface and aperture radius, with the vignetting `vig` (an `ArgumentError`
-when the views do not share them). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
+The state of the [`RadiometricCameraModel`](@ref) `camera` (one camera: lens, focus surface, aperture radius and vignetting)
+seen from `poses` (camera → world, one per photograph). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
 (`vignetting_rule`, extrapolated with a zero `boundary_order`-th difference), its parameters the interior ones; a radial profile's nodes with less than `support_min` of the mean data
 weight are dependent the same way, continuing the supported ones with that order (`RadialSupportRule`). Builds the masks from the initial views (∩ `external_masks`) unless `masks` is given. Float64 targets are
 kept by reference (no copy). When the masked observation vectors `ϕ` are given (built one photo at a time
@@ -132,7 +130,7 @@ function CalibrationState(scene::Scene, settings::RenderSettings, camera::Radiom
     length(targets) == K || throw(DimensionMismatch("$(K) views but $(length(targets)) targets"))
     poses = [_pose_eltype(Float64, p) for p in poses]
     if masks === nothing
-        masks = [compute_mask(View(poses[k], camera), scene, settings; δ, backend,   # the state's device
+        masks = [compute_mask(camera, poses[k], scene, settings; δ, backend,   # the state's device
                               external = external_masks === nothing ? nothing : external_masks[k]) for k in 1:K]
     end
     px = [masked_pixels(m) for m in masks]
@@ -155,27 +153,6 @@ function CalibrationState(scene::Scene, settings::RenderSettings, camera::Radiom
         Float64.(Tuple(mu_bounds)), Union{Nothing, Vector{Float64}}[q === nothing ? nothing : Vector{Float64}(q) for q in quanta],
         collect(VgtkCore.SensorModel, sensor_models), sensor, photo_kind, _LmRun(), nothing)
 end
-function CalibrationState(scene::Scene, settings::RenderSettings, views::AbstractVector{<:View{Float64}}, vig::AbstractVignetting,
-                          mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}}; kwargs...)
-    return CalibrationState(scene, settings, _shared_camera(views, vig), [v.pose for v in views], mat, light, targets; kwargs...)
-end
-
-"""
-    _shared_camera(views, vig) -> RadiometricCameraModel
-
-The camera that `views` share, with the vignetting `vig`: their geometric camera, focus surface and aperture radius,
-which must be the same in every view (an `ArgumentError` naming the first view that differs).
-"""
-function _shared_camera(views::AbstractVector{<:View}, vig::AbstractVignetting)
-    isempty(views) && throw(ArgumentError("_shared_camera: no views (a state's camera is the one its views share)"))
-    v1 = views[1]
-    for (k, v) in enumerate(views)
-        v.lens == v1.lens && v.focus == v1.focus && v.r == v1.r ||
-            throw(ArgumentError("view $k does not share view 1's camera (lens, focus, aperture radius): the views of a state are one camera"))
-    end
-    return RadiometricCameraModel(v1.lens, v1.focus, v1.r, vig)
-end
-
 """
     n_views(s::CalibrationState) -> Int
 
@@ -185,7 +162,7 @@ n_views(s::CalibrationState) = length(s.poses)
 """
     view_of(s::CalibrationState, k) -> View
 
-The renderer's view `k`: its pose and the state's camera.
+Internal: the kernels' view `k`, the state's camera at its pose `k` (`View(s.poses[k], s.camera)`).
 """
 view_of(s::CalibrationState, k::Integer) = View(s.poses[k], s.camera)
 """
@@ -247,7 +224,7 @@ set_vignetting!(s::CalibrationState, v::AbstractVignetting) = (s.camera = with_v
 """
     set_pose!(s::CalibrationState, k, pose::EuclideanMap) -> s
 
-Replace the pose Θ_e of view `k` (Core's `EuclideanMap`, camera → world as [`View`](@ref)'s, metres); the camera is kept.
+Replace the pose Θ_e of photograph `k` (Core's `EuclideanMap`, camera → world, metres); the camera is kept.
 """
 function set_pose!(s::CalibrationState, k::Integer, pose::EuclideanMap)
     s.poses[k] = _pose_eltype(Float64, pose)

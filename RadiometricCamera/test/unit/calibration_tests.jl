@@ -1,7 +1,7 @@
 @testitem "calibration" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, aperture_radius, build_problem, compute_mask, cost, focus, Focus, FocusSpline, Material,
                              PerViewResidual, PrintedTarget, render_view, RenderSettings, run_lm!, Scene, solve_radiometry_gn!,
-                             solve_Θ_l!, solve_Θ_v!, solve_μ!, sphere_radius, View, with_nonlinear, with_μ, 𝔟
+                             solve_Θ_l!, solve_Θ_v!, solve_μ!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points, center
@@ -17,35 +17,35 @@
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     r_t = 0.0386
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, lens_t, focus_t, r_t) for p in poses]
     # the truth field at V(𝐜) = 1, the pin every state holds (2026-11-11: no `pin_center = false`): a solve recovers it exactly
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
+    camera_t = RadiometricCameraModel(lens_t, focus_t, r_t, vig_t)          # the true camera; a start's camera is it with another vignetting
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
     # single linear-block steps at the truth of everything else are exact
-    s = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
+    s = CalibrationState(scene, st, camera_t, poses, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
     solve_Θ_l!(s); @test maximum(abs, Matrix(coefficients(s.light)) - a_t) < 1e-8
-    s = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2), mat_t, light_t, targets; masks)
+    s = CalibrationState(scene, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, mat_t, light_t, targets; masks)
     solve_Θ_v!(s); @test maximum(abs, Matrix(s.camera.vignetting.P) - Matrix(vig_t.P)) < 1e-6
     # under an imaged region (a circle of radius 7 px about the sensor centre) the tensor surface's nodes outside it are
     # dependent (Core's BoundaryRule through the surface's support trait): the solve's unknowns are the interior nodes, one column each
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
-    s = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2), mat_t, light_t, targets; masks, region = reg)
+    s = CalibrationState(scene, st, with_vignetting(camera_t, TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, mat_t, light_t, targets; masks, region = reg)
     rule = s.vig_rule
     @test rule.interior == VgtkCore.node_mask(s.camera.vignetting, reg) && !rule.interior[1, 1] && rule.interior[3, 3] && !isempty(rule.dependent)
     @test size(RC.vignetting_basis(s)) == (36, count(rule.interior) - 1) && Int(RC.NLLSsolver.nvars(VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), RC.vignetting_basis(s)))) == count(rule.interior) - 1   # the pin V(𝐜) = 1 takes one direction, always
     P0 = Matrix(s.camera.vignetting.P); solve_Θ_v!(s); P1 = Matrix(s.camera.vignetting.P)
     @test P1 ≈ VgtkCore.extend_controls(rule, P1, P0) && P1[rule.interior] != P0[rule.interior]
-    s = CalibrationState(scene, st, copy(views_t), vig_t, with_μ(mat_t, 0.8), light_t, targets; masks)
+    s = CalibrationState(scene, st, camera_t, poses, with_μ(mat_t, 0.8), light_t, targets; masks)
     solve_μ!(s); @test s.mat.μ ≈ 0.4 atol = 1e-8
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
-    s = CalibrationState(scene, st, copy(views_t), TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2), with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
+    s = CalibrationState(scene, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
     parts_j = all_parts(s); solve_radiometry_gn!(s, parts_j; max_iter = 80); cj = RC.parts_cost(s, parts_j)
     @test cj < 1e-16 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_j = [s.camera.vignetting(SVector(x, y)) / vig_t(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
@@ -53,7 +53,7 @@
     @test s.mat.μ ≈ 0.4 atol = 1e-6
     # Jacobian of the per-view residual vs finite differences (the pin V(𝐜) = 1 held exactly: the centre's direction is no column)
     # (the state's V is the truth's normalized to V(𝐜) = 1, the gauge: the truth's lighting carries the V(𝐜), so the residual vanishes)
-    s = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, with_coefficients(light_t, coefficients(light_t) .* vig_t(center(vig_t))), targets; masks)
+    s = CalibrationState(scene, st, camera_t, poses, mat_t, with_coefficients(light_t, coefficients(light_t) .* vig_t(center(vig_t))), targets; masks)
     prob, idx = build_problem(s)
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
@@ -76,7 +76,7 @@
     end
     # the HARD pin (2026-10-30, the default): the centre's free direction is eliminated (`gauge_basis`) — one V column fewer, no pin
     # residual, the field normalised to V(𝐜) = 1 at construction and kept there by every step
-    sh = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
+    sh = CalibrationState(scene, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !hasfield(typeof(sh), :pin_center)                                   # always held: no switch
     @test sh.camera.vignetting(center(sh.camera.vignetting)) ≈ 1 atol = 1e-12
     prob_h, idx_h = build_problem(sh); vv_h = prob_h.variables[idx_h.vignetting]
@@ -90,9 +90,9 @@
     # joint LM recovery from a perturbed start of EVERY block (vignetting, lighting and μ included)
     vig_p = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.2 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     a_p = 0.8 .* a_t; a_p[:, 4] .= 0.0
-    s2 = CalibrationState(scene, st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))), cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 30.0, (12.0, 12.0), W, H),
-                                            Focus(tps_t, fill(1 / 1.7, 9)), 0.03) for p in poses],
-                          vig_p, with_μ(with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), 0.55), EnvironmentLight(SphericalHarmonicMap(a_p, 2), b, r_SH), targets; masks)
+    s2 = CalibrationState(scene, st, RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 30.0, (12.0, 12.0), W, H), Focus(tps_t, fill(1 / 1.7, 9)), 0.03, vig_p),
+                          [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in poses],
+                          with_μ(with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), 0.55), EnvironmentLight(SphericalHarmonicMap(a_p, 2), b, r_SH), targets; masks)
     c0 = cost(s2)[1]
     # The joint LM recovers EVERY block of this two-view fixture to machine precision (≈ 90 iterations with the relative stopping test at
     # 1e-12: cost/c0 2e-26, r and 𝛂 to 1e-14, μ and the lighting to 1e-12). The (aperture radius, μ, lighting, focus) direction is flat but not
@@ -115,9 +115,10 @@
     @test maximum(abs, Matrix(coefficients(s2.light)) .* g_2 .- a_t .* g_t) / maximum(abs, a_t) < 1e-9
     # rounds of the joint LM (`run_lm!`, the per-view route) from wrong everything: must decrease the cost monotonically (the retired
     # `calibrate!` loop's test, ported: its rounds of n_inner iterations until a relative cost change below 1e-4)
-    s3 = CalibrationState(scene, st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.005, -0.004, 0.006), zeros(SVector{3}))), cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 30.24, (12.0, 12.0), W, H),
-                                            Focus(tps_t, fill(1 / 1.6, 9)), 0.035) for p in poses],
-                          TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2), Material(), EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), targets; masks)
+    s3 = CalibrationState(scene, st, RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 30.24, (12.0, 12.0), W, H), Focus(tps_t, fill(1 / 1.6, 9)), 0.035,
+                                                            TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)),
+                          [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.005, -0.004, 0.006), zeros(SVector{3}))) for p in poses],
+                          Material(), EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), targets; masks)
     hist = [cost(s3)[1]]
     for _ in 1:3
         run_lm!(s3; maxiters = 4)
@@ -144,7 +145,7 @@
     @test size(Jm, 2) == 6 + 3 + 9 + 1 + 9 && !any(iszero, [norm(Jm[:, 6 + j]) for j in 1:3])    # three lens columns, all moving the flux
     @test norm(Jm[:, 7]) > 0 && norm(Jm[:, 11]) > 0
     # trace recording
-    s5 = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
+    s5 = CalibrationState(scene, st, camera_t, poses, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
     trc = NamedTuple[]
     run_lm!(s5; maxiters = 2, trace = trc, trace_meta = (; stage = 1, factor = 1, ϕ² = sum(sum(abs2, p) for p in s5.ϕ)))
     @test !isempty(trc) && all(t.phase == :lm for t in trc)
@@ -159,10 +160,10 @@
         # fit the coefficients by least squares on a dense ρ grid instead (exact for a quadratic, see vignetting_tests.jl)
         ρs = range(0, 1, length = 80); A = reduce(vcat, [collect(VgtkCore.bspline_basis(kn, Val(3), ρ))' for ρ in ρs]); A \ [1 - 0.4ρ^2 for ρ in ρs] end))
     @test vig_r.P[1] ≈ vig_r.P[2] atol = 1e-10
-    targets_r = [render_view(k, views_t[k], vig_r, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, copy(views_t), RadialVignetting(5, 𝐜r, rmax_r), mat_t, light_t, targets_r; masks)
+    targets_r = [render_view(k, with_vignetting(camera_t, vig_r), poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+    s = CalibrationState(scene, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
     solve_Θ_v!(s); @test maximum(abs, Matrix(VgtkCore.control_points(s.camera.vignetting)) - Matrix(VgtkCore.control_points(vig_r))) < 1e-6
-    s = CalibrationState(scene, st, copy(views_t), RadialVignetting(5, 𝐜r, rmax_r), with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
+    s = CalibrationState(scene, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
     parts_r = all_parts(s); solve_radiometry_gn!(s, parts_r; max_iter = 80); cj_r = RC.parts_cost(s, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_r = [s.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
@@ -178,7 +179,7 @@ end
 @testitem "calibration parametric warping" setup = [RCFixtures] begin
     using RadiometricCamera: board_surface, BoardSurface, build_problem, compute_mask, cost, Focus, FocusSpline, HEIGHT_NC,
                              HEIGHT_NFREE, height_on, Material, PerViewResidual, PrintedTarget, render_view, RenderSettings,
-                             Scene, sphere_radius, View, with_surface, 𝔟
+                             Scene, sphere_radius, with_surface, 𝔟
     # 2026-10-30: the parametric (per-view) route with a FREE board warping — `build_problem(; height_degree = 1)` / `run_lm!(; height_degree)`:
     # the nodal heights ride in the material block as in the grid route (MaterialVar{Float64, HEIGHT_NC}: 9 + HEIGHT_NFREE columns,
     # h = h₀ + B y, B the board's height_basis), seeded as duals from a FLAT start h₀ = 0 (ForwardDiff's `iszero` of a seeded dual is false, so the
@@ -199,17 +200,17 @@ end
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     r_t = 0.0386
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_t = [View(p, lens_t, focus_t, r_t) for p in poses]
     vig_t = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
+    camera_t = RadiometricCameraModel(lens_t, focus_t, r_t, vig_t)
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene_t, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-    targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene_t, st, masks[k]) for k in 1:2]
+    masks = [compute_mask(camera_t, p, scene_t, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene_t, st, masks[k]) for k in 1:2]
 
-    s = CalibrationState(scene_0, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
+    s = CalibrationState(scene_0, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !height_on(board_surface(s))
     prob, idx = build_problem(s; height_degree = 1)
     mv0 = prob.variables[idx.material]
@@ -249,7 +250,7 @@ end
     res0 = get(prob0.problem.costs, PerViewResidual{9})[1]
     @test size(RC.NLLSsolver.computeresjac(RC.static(127), res0, RC.NLLSsolver.getvars(res0, prob0.variables)...)[2], 2) == c0 + 15 + 27
     # a few LM iterations from the flat start (poses + material block free, the rest held) lower the cost and bend the board towards the truth
-    s2 = CalibrationState(scene_0, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
+    s2 = CalibrationState(scene_0, st, camera_t, poses, mat_t, light_t, targets; masks)
     c_before = cost(s2)[1]
     RC.run_lm!(s2; maxiters = 8, height_degree = 1, fixed = (:distortion, :focus, :aperture, :vignetting, :lighting))
     @test cost(s2)[1] < c_before

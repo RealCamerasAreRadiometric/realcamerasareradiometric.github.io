@@ -4,7 +4,7 @@
 # The distance-map board, the two-view scene and its targets both items use.
 @testsetup module EdgeScene
     using RadiometricCamera: BoardSurface, compute_mask, Focus, FocusSpline, grid_model, Material, PrintedTarget, render_all,
-                             RenderSettings, Scene, sphere_radius, View, with_sdf, with_surface, 𝔟
+                             RenderSettings, Scene, sphere_radius, with_sdf, with_surface, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -12,7 +12,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export page_e, rects_e, sdf_rects, sdf_e, board_e0, board_e, We, He, scene_e, glens_e, focus_e, poses_e, views_e, vig_e, b_e, a_e, light_e, st_e, masks_e, edge_true, mat_e, scene_edge, edge_state, blank_e, targets_e, edge_s
+    export page_e, rects_e, sdf_rects, sdf_e, board_e0, board_e, We, He, scene_e, glens_e, focus_e, poses_e, camera_e, vig_e, b_e, a_e, light_e, st_e, masks_e, edge_true, mat_e, scene_edge, edge_state, blank_e, targets_e, edge_s
 
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a page of 200 mm with 16 ink squares (25 mm, pitch 50 mm) and its exact distance map
@@ -44,17 +44,17 @@
     glens_e = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), We, He), 10, 10)
     focus_e = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, We, He))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_e = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
-    views_e = [View(poses_e[k], glens_e, focus_e, 0.0386) for k in 1:2]
     vig_e = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, We, He); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
+    camera_e = RadiometricCameraModel(glens_e, focus_e, 0.0386, vig_e)
     b_e = 𝔟(board_e); a_e = zeros(3, 9); a_e[:, 1] .= (2.0, 1.9, 1.8); a_e[:, 3] .= (0.4, 0.3, 0.2)
     light_e = EnvironmentLight(SphericalHarmonicMap(a_e, 2), b_e, sphere_radius(b_e, [p.t for p in poses_e]))
     st_e = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks_e = [compute_mask(v, scene_e, st_e; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_e]
+    masks_e = [compute_mask(camera_e, p, scene_e, st_e; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_e]
     edge_true = SVector(0.6, 3.0)                                         # δ 0.6 mm, σ_print 3 mm: about one pixel on the board, so the renders resolve the edge
     mat_e = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
     # the print's edge parameters (δ, σ_print) are the scene's surface parameters
     scene_edge(e) = with_surface(scene_e, BoardSurface(edge = e))
-    edge_state(e, targets; kw...) = CalibrationState(scene_edge(e), st_e, copy(views_e), vig_e, mat_e, light_e, targets; masks = masks_e, kw...)
+    edge_state(e, targets; kw...) = CalibrationState(scene_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
     blank_e = [zeros(He, We, 3) for _ in 1:2]
     targets_e = render_all(edge_state(edge_true, blank_e))
     edge_s = SVector(0.3, 3.0)

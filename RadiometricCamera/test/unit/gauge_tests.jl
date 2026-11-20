@@ -9,7 +9,7 @@
     # the near-gauge: one infinitesimal rotation ω of every node direction (its tangent coordinates t_k · (ω × d)) and of every
     # pose (left: the camera frame turns, ξ = (ω, 0)) leaves the tile residuals all but unchanged (only the aperture disc and the
     # focus, fixed in the camera frame, do not turn with it)
-    sp = CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks)
+    sp = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     prob0, idx0 = build_problem_grid(sp; patch = (5, 5), rotation_gauge = false)
     pin = RC.rotation_gauge_coordinates(glens_p, nothing)
     @test length(pin) == 3 && pin[1][1:2] == pin[2][1:2] && pin[1][3] == 1 && pin[2][3] == 2 && pin[3][1:2] != pin[1][1:2]
@@ -49,7 +49,7 @@
     # and the joint LM moves none of them (a zero column's step is zero), the poses and the grid both free: every accepted step leaves
     # the chief node where it is and moves the roll node along its free tangent only, in that step's chart (the chart turns with the
     # node, so the held coordinate is zero per step, not in the start's chart once the node has turned)
-    sl = CalibrationState(scene, st, copy(views_p), vig_t, mat_t, light_t, targets; masks)
+    sl = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     (gx1, gy1, _) = pin[1]; (gx3, gy3, c3) = pin[3]
     node(lens, gx, gy) = normalize(SVector{3, Float64}(VgtkCore.directions(VgtkCore.model(lens))[gy, gx]))
     roll = [node(sl.camera.lens, gx3, gy3)]; chief = [node(sl.camera.lens, gx1, gy1)]

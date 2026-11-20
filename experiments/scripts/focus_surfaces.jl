@@ -24,8 +24,7 @@ include(srcdir("radiometric_refinement.jl"))                                  # 
 include(srcdir("figures.jl"))
 using .Figures: focus_surface_figure
 import VisualGeometryToolkitEval.Reproduce as Reproduce
-using StaticArrays: SVector, SMatrix
-using LinearAlgebra: I
+using StaticArrays: SVector
 import VisualGeometryToolkitCore as VgtkCore
 
 const DRIVER = "scripts/focus_surfaces.jl"
@@ -70,20 +69,19 @@ figures_product() = driver_product("figures", Dict{String,Any}("experiment" => C
     focus_surface_points(camera, W, H; spacing) -> (X, Y, Z, D)
 
 The in-focus points of a `RadiometricCameraModel` on the `spacing`-px lattice of its `W × H` sensor (COLMAP pixels): for a pixel 𝐩 the lens
-images, RadiometricCamera's focus point 𝔣(𝐩) = 𝔱(𝐩) d̂(𝐩) of the camera's view in its own frame (`𝔣(View(pose, camera), 𝐩)`:
-the chief ray's unit direction from the centre of projection and the focus distance 𝔱 = 1 / t̂ of the view's focus, whatever its
+images, RadiometricCamera's focus point 𝔣(𝐩) = 𝔱(𝐩) d̂(𝐩) of the camera in its own frame (`𝔣(camera, 𝐩)`:
+the chief ray's unit direction from the centre of projection and the focus distance 𝔱 = 1 / t̂ of the camera's focus, whatever its
 kind — the sensor TPS or a direction chart), metres; NaN where the lens images nothing (`in_domain`) or t̂ ≤ 0. `D` = 𝔱.
 """
 function focus_surface_points(camera, W::Integer, H::Integer; spacing::Integer)
     xs = (spacing / 2):spacing:W; ys = (spacing / 2):spacing:H
     X = fill(NaN, length(xs), length(ys)); Y = copy(X); Z = copy(X); D = copy(X)
-    v = RadiometricCamera.View(VgtkCore.EuclideanMap(SMatrix{3, 3, Float64}(I), zero(SVector{3, Float64}); check = false), camera)   # the camera frame
     for (j, y) in enumerate(ys), (i, x) in enumerate(xs)
         p = SVector(Float64(x), Float64(y))
         RadiometricCamera.in_domain(camera.lens, p) || continue
         all(isfinite, VgtkCore.backproject(camera.lens, p)) || continue
-        t̂ = RadiometricCamera.t̂(v, p); (isfinite(t̂) && t̂ > 0) || continue        # the view's t̂: the focus kind's (sensor TPS or a direction chart)
-        X[i, j], Y[i, j], Z[i, j] = RadiometricCamera.𝔣(v, p); D[i, j] = 1 / t̂       # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩)
+        t̂ = RadiometricCamera.t̂(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
+        X[i, j], Y[i, j], Z[i, j] = RadiometricCamera.𝔣(camera, p); D[i, j] = 1 / t̂  # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩), camera frame
     end
     return X, Y, Z, D
 end

@@ -1,5 +1,5 @@
 @testitem "pose / board / back-projection" setup = [RCFixtures] begin
-    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, PrintedTarget, View, world_point, world_ray,
+    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, PrintedTarget, world_point, world_ray,
                              π̂⁻¹, _chief_ray, ρ_c, 𝔟, 𝔣, 𝔭
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -46,11 +46,11 @@
     @test SVector(X...) ≈ 𝐱
     # back-projection
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.0, 12.0), 24, 24)
-    view = View(p, lens, Focus(5, 1.5, 24, 24), 0.03)
+    camera = RadiometricCameraModel(lens, Focus(5, 1.5, 24, 24), 0.03, VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2))
     𝐩 = SVector(16.8, 9.6); 𝐚 = SVector(0.02, -0.01, 0.0)
-    @test π̂⁻¹(view, 𝐩, 𝔭) ≈ _chief_ray(lens, 𝐩)                            # π̂⁻¹(𝐩, 𝔭) = _chief_ray(𝐩)
-    @test π̂⁻¹(view, 𝐩, 𝐚) ≈ normalize(𝔣(view, 𝐩) - 𝐚)              # (𝔣 − 𝐚)/‖𝔣 − 𝐚‖ form
-    @test norm(𝔣(view, 𝐩)) ≈ 1.5
-    o, d = world_ray(view, 𝐩, 𝐚)
+    @test π̂⁻¹(camera, 𝐩, 𝔭) ≈ _chief_ray(lens, 𝐩)                            # π̂⁻¹(𝐩, 𝔭) = _chief_ray(𝐩)
+    @test π̂⁻¹(camera, 𝐩, 𝐚) ≈ normalize(𝔣(camera, 𝐩) - 𝐚)              # (𝔣 − 𝐚)/‖𝔣 − 𝐚‖ form
+    @test norm(𝔣(camera, 𝐩)) ≈ 1.5
+    o, d = world_ray(camera, p, 𝐩, 𝐚)
     @test o ≈ p.t + p.R * 𝐚 && norm(d) ≈ 1
 end

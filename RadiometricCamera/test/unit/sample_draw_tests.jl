@@ -225,10 +225,12 @@ end
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
     scene = Scene(board, W, H)
     pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector{3}(SVector(0.05, -0.05, 1.5)); check = false)
-    view = View(pose, cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 140.0, (80.0, 80.0), W, H), Focus(3, 1.5, W, H), 0.0386)
+    camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 140.0, (80.0, 80.0), W, H), Focus(3, 1.5, W, H), 0.0386,
+                                    VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    view = View(pose, camera)        # the mask test's internal record (BoardValidity, board_valid take the kernels' view)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     region = [(u - 80)^2 + (v - 80)^2 < 75^2 for v in 1:H, u in 1:W]
-    mask = compute_mask(view, scene, st; δ = 0.01, external = region, backend = cpu)
+    mask = compute_mask(camera, pose, scene, st; δ = 0.01, external = region, backend = cpu)
     @test 0 < count(mask) < count(region)                                                # the board does not fill the region
     ids = findall(vec(region)); t = BoardValidity(view, scene, st; δ = 0.01, backend = cpu)
     @test t(ids) == mask[ids] && board_valid(view, scene, st, ids[1:2:end]; δ = 0.01, backend = cpu) == mask[ids[1:2:end]]

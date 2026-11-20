@@ -110,14 +110,14 @@ end
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
     focus = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
-    views = [RC.View(poses[k], glens, focus, 0.0386) for k in 1:2]
     vig = RC.gauge_center_value(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    camera = RC.RadiometricCameraModel(glens, focus, 0.0386, vig)
     b = RC.𝔟(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))
     mat = RC.Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
     rs = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [RC.compute_mask(v, scene, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for v in views]
-    imgs = [RC.render_view(k, views[k], vig, mat, light, scene, rs, masks[k]) for k in 1:2]
+    masks = [RC.compute_mask(camera, p, scene, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
+    imgs = [RC.render_view(k, camera, poses[k], mat, light, scene, rs, masks[k]) for k in 1:2]
     # the detections: board points seen through the start camera, each image point moved by a fixed sub-pixel offset (a detector's
     # bias), so the start's bearing error is not zero
     detections(k) = [(p .+ SVector(0.3 * cospi(i / 7), 0.3 * sinpi(i / 5)), X) for (i, X) in enumerate(SVector(x, y, 0.0) for x in -0.5:0.1:0.5 for y in -0.5:0.1:0.5)

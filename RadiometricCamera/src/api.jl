@@ -19,7 +19,7 @@ public 𝐩_of_pixel, pixel_of_𝐩, ℐ_𝐮, luma, luma_image, SensorQuadratur
        n_nodes, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model, exact_start, start_grid, region_start, coverage_region,
        check_coverage, calibrated_folds, grid_angular_error, schoeps_gridlens,
        schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera, save_lens,
-       load_parametric_lens, load_lens, lens_type_name, View, 𝔭, 𝔣, π̂⁻¹, chief_dir, world_ray, TargetRadiometry, material,
+       load_parametric_lens, load_lens, lens_type_name, 𝔭, 𝔣, π̂⁻¹, chief_dir, world_ray, TargetRadiometry, material,
        edge_parameters, target_radiometry, board_surface, radiometric_target, set_radiometric_target!, with_vignetting,
        PrintedTarget, posed_target, board_normal, 𝔟, texture_size, corners, intersect_board, board_plane_hit, world_point,
        inside, ρ_c, with_sdf, has_sdf, BoardSurface, with_h, with_edge, height_on, HEIGHT_NC, HEIGHT_NFREE, EDGE_NC,
@@ -28,7 +28,7 @@ public 𝐩_of_pixel, pixel_of_𝐩, ℐ_𝐮, luma, luma_image, SensorQuadratur
        sphere_radius, Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈, D_ggx, Λ_ggx, G1_ggx, G2_ggx,
        F_dielectric, sample_vndf_caps, D_v, PDF_reflect, reflect, f_CT_parts, f_CT, RadianceSampler, SampleKey, draws,
        key_hash, L_c, RadianceParts, radiance_parts, L_from_parts, RenderSettings, Scene, with_surface, pixel_id, Φ_pixel,
-       compute_mask, masked_pixels, render_view, masked_vector, n_views, view_of, focus, aperture_radius, set_surface!,
+       compute_mask, masked_pixels, render_view, masked_vector, n_views, focus, aperture_radius, set_surface!,
        set_vignetting!, set_pose!, render_all, photometric_residuals, PixelParts, pixel_parts, RadiometryParts, all_parts,
        solve_Θ_l!, solve_Θ_v!, solve_μ!, solve_radiometry_gn!, solve_linear_blocks!, lens_free, lens_manifold, focus_block,
        ApertureVar, MaterialVar, LightingVar, PerViewResidual, build_problem, read_back!, run_lm!, extract_variables,
@@ -69,3 +69,22 @@ photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_mode
 """Retired (RC 0.11.1): a characterisation is stated by `sensor_statement(spec)` and read by `photo_set`."""
 sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_characterisation is retired (RC 0.11.1): `sensor_statement(spec)` states the record " *
                                                                   "(its sha256), `photo_set` reads it at the location given"))
+
+# ---- retired call forms (owner 2026-11-20: the camera-first API). A radiometric camera is ONE object, a `RadiometricCameraModel`
+# (lens, focus surface, aperture radius, vignetting); a photograph is the camera at a pose. The forms that took a `View` assembled
+# from the camera's parts, with the vignetting as a separate argument, are refused by name with their replacement (no alias, no
+# forwarding). `View` itself is the kernels' internal record (`View(pose, camera)`).
+_retired_view_form(name, replacement) =
+    throw(ArgumentError("$name of a View (the camera's parts, the vignetting apart) is retired: a radiometric camera is one object. " *
+                        "Give the camera and the pose: $replacement"))
+CalibrationState(::Scene, ::RenderSettings, ::AbstractVector{<:View}, ::AbstractVignetting, args...; kwargs...) =
+    _retired_view_form("CalibrationState", "`CalibrationState(scene, settings, camera, poses, mat, light, targets; …)`, " *
+                       "`camera = RadiometricCameraModel(lens, focus, aperture_radius, vignetting)`")
+render_view(::Integer, ::View, ::AbstractVignetting, args...) =
+    _retired_view_form("render_view", "`render_view(k, camera, pose, mat, light, scene, settings, mask)`")
+compute_mask(::View, ::Scene, ::RenderSettings; kwargs...) =
+    _retired_view_form("compute_mask", "`compute_mask(camera, pose, scene, settings; δ, external, backend)`")
+Φ_pixel(::Integer, ::Integer, ::Integer, ::View, ::AbstractVignetting, args...) =
+    _retired_view_form("Φ_pixel", "`Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings)`")
+pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
+    _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, scene, settings)`")

@@ -18,7 +18,7 @@
 # item compares the device Jacobian with `J_g`).
 @testsetup module RichardsonScene
     using RadiometricCamera: BoardSurface, build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, HEIGHT_NC, Material,
-                             PrintedTarget, render_all, RenderSettings, Scene, sphere_radius, View, with_surface, with_μ, 𝔟
+                             PrintedTarget, render_all, RenderSettings, Scene, sphere_radius, with_surface, with_μ, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, n_control_points, EnvironmentLight, SphericalHarmonicMap,
@@ -27,7 +27,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export tex_r, board_r, Wr, Hr, h_r, scene_r, focus_r, poses_r, vig_r, b_r, a_r, light_r, mat_r, st_r, kb_r, glens_r, blank_r, views_g, masks_g, targets_g, s_g, prob_g, idx_g, tiles_g, res_g, vars_g, r0_g, J_g, lay_g, patch_cols_g,
+    export tex_r, board_r, Wr, Hr, h_r, scene_r, focus_r, poses_r, vig_r, b_r, a_r, light_r, mat_r, st_r, kb_r, glens_r, blank_r, camera_g, masks_g, targets_g, s_g, prob_g, idx_g, tiles_g, res_g, vars_g, r0_g, J_g, lay_g, patch_cols_g,
            richardson_differences
     """Central differences of `f` at the steps h, h/2, h/4 and their Richardson extrapolation: `(D_R, D(h), D(h/2), D(h/4))`."""
     function richardson_differences(f, h)
@@ -56,10 +56,10 @@
     blank_r = [zeros(Hr, Wr, 3) for _ in 1:2]
     # ---------------------------------------------------------------------------------------------------------------
     # 2. the per-tile route (the grid model: the node tangents through the bicubic chain rule, the nodal heights h as duals, Θ_e, Θ_f, r, Θ_m)
-    views_g = [View(p, glens_r, focus_r, 0.0386) for p in poses_r]
-    masks_g = [compute_mask(v, scene_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_g]
-    targets_g = render_all(CalibrationState(scene_r, st_r, copy(views_g), vig_r, mat_r, light_r, blank_r; masks = masks_g))
-    s_g = CalibrationState(with_surface(scene_r, BoardSurface(h = 0.5 .* h_r)), st_r, copy(views_g), vig_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
+    camera_g = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
+    masks_g = [compute_mask(camera_g, p, scene_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
+    targets_g = render_all(CalibrationState(scene_r, st_r, camera_g, poses_r, mat_r, light_r, blank_r; masks = masks_g))
+    s_g = CalibrationState(with_surface(scene_r, BoardSurface(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
     prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 1)
     tiles_g = RC.tile_costs(prob_g)
     res_g = tiles_g[argmax([length(t.pix) for t in tiles_g])]
@@ -80,7 +80,7 @@ end
 
 @testitem "pathwise Jacobian vs Richardson finite differences" setup = [RCFixtures, RichardsonScene] begin
     using RadiometricCamera: BoardSurface, build_problem, build_problem_grid, compute_mask, focus, lens, material,
-                             PerViewResidual, PrintedTarget, render_all, Scene, t̂, View, with_sdf, with_surface, with_μ, 𝛂, 𝛈
+                             PerViewResidual, PrintedTarget, render_all, Scene, t̂, with_sdf, with_surface, with_μ, with_vignetting, 𝛂, 𝛈
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: with_control_points, control_points, n_control_points
@@ -107,10 +107,10 @@ end
     end
     # ---------------------------------------------------------------------------------------------------------------
     # 1. the per-view route (a parametric model: Θ_e, Θ_d of the Kannala–Brandt model, Θ_f, r, Θ_m; analytic Θ_v, Θ_l, μ)
-    views_r = [View(p, kb_r, focus_r, 0.0386) for p in poses_r]
-    masks_r = [compute_mask(v, scene_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_r]
-    targets_r = render_all(CalibrationState(scene_r, st_r, copy(views_r), vig_r, mat_r, light_r, blank_r; masks = masks_r))
-    s_v = CalibrationState(scene_r, st_r, copy(views_r), with_control_points(vig_r, 1.05 .* Matrix(control_points(vig_r))), with_μ(mat_r, 0.55),
+    camera_r = RadiometricCameraModel(kb_r, focus_r, 0.0386, vig_r)
+    masks_r = [compute_mask(camera_r, p, scene_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
+    targets_r = render_all(CalibrationState(scene_r, st_r, camera_r, poses_r, mat_r, light_r, blank_r; masks = masks_r))
+    s_v = CalibrationState(scene_r, st_r, with_vignetting(camera_r, with_control_points(vig_r, 1.05 .* Matrix(control_points(vig_r)))), poses_r, with_μ(mat_r, 0.55),
                            with_coefficients(light_r, 0.9 .* a_r), targets_r; masks = masks_r)          # away from the truth: residuals ≠ 0
     prob_v, idx_v = build_problem(s_v)
     res_v = get(prob_v.problem.costs, PerViewResidual{9})[1]
@@ -186,11 +186,11 @@ end
     board_e_r = with_sdf(PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5]), sdf_r, page_r)
     # the print's (δ, σ_print) on the surface: σ_print 3 mm, about one pixel on the board, so the render resolves the edge
     scene_e_r = Scene(board_e_r, Wr, Hr, BoardSurface(edge = SVector(0.3, 3.0)))
-    views_e_r = [View(p, glens_r, focus_r, 0.0386) for p in poses_r]
-    masks_e_r = [compute_mask(v, scene_e_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_e_r]
+    camera_e_r = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
+    masks_e_r = [compute_mask(camera_e_r, p, scene_e_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
     targets_e_r = render_all(CalibrationState(with_surface(scene_e_r, BoardSurface(edge = SVector(0.6, 3.0))), st_r,
-                                              copy(views_e_r), vig_r, mat_r, light_r, blank_r; masks = masks_e_r))
-    s_e = CalibrationState(scene_e_r, st_r, copy(views_e_r), vig_r, mat_r, light_r, targets_e_r; masks = masks_e_r)
+                                              camera_e_r, poses_r, mat_r, light_r, blank_r; masks = masks_e_r))
+    s_e = CalibrationState(scene_e_r, st_r, camera_e_r, poses_r, mat_r, light_r, targets_e_r; masks = masks_e_r)
     prob_e, _ = build_problem_grid(s_e; patch = (5, 5))
     tiles_e = RC.tile_costs(prob_e)
     res_e = tiles_e[argmax([length(t.pix) for t in tiles_e])]
@@ -216,7 +216,7 @@ end
     # 4. the Float32 device path (under the GPU gate): CPU / GPU column parity per family and the residual bitwise from the flux kernel
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_gd = CalibrationState(with_surface(scene_r, BoardSurface(h = 0.5 .* h_r)), st_r, copy(views_g), vig_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
+        s_gd = CalibrationState(with_surface(scene_r, BoardSurface(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
                                 backend = CUDA.CUDABackend())
         prob_gd, idx_gd = build_problem_grid(s_gd; patch = (5, 5), height_degree = 1)
         tiles_gd = RC.tile_costs(prob_gd)

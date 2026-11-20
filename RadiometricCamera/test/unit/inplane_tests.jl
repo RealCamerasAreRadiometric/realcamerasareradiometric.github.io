@@ -7,7 +7,7 @@
 # of the 2 m board, ≈ 0.5 px at the 32-px camera (the height tests' scene, with the in-plane error in place of the saddle).
 @testsetup module InplaneScene
     using RadiometricCamera: BoardSurface, compute_mask, Focus, FocusSpline, grid_model, Material, PrintedTarget, render_all,
-                             RenderSettings, Scene, sphere_radius, View, with_surface, 𝔟
+                             RenderSettings, Scene, sphere_radius, with_surface, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -15,7 +15,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export θ_true, tex_i, board_i, Wi, Hi, scene_i, scene_iθ, glens_i, lens_param_i, focus_i, poses_i, views_i, views_param_i, vig_i, light_i, mat_i, st_i, masks_i, blank_i, targets_i, targets_param_i
+    export θ_true, tex_i, board_i, Wi, Hi, scene_i, scene_iθ, glens_i, lens_param_i, focus_i, poses_i, camera_i, camera_param_i, vig_i, light_i, mat_i, st_i, masks_i, blank_i, targets_i, targets_param_i
 
     θ_true = SVector(0.03, 0.02)                                                           # (a, u): x by e^0.03 against y, shear 2 %
     tex_i = fixture_board()
@@ -27,17 +27,17 @@
     glens_i = grid_model(lens_param_i, 10, 10)
     focus_i = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wi, Hi))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_i = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
-    views_i = [View(poses_i[k], glens_i, focus_i, 0.0386) for k in 1:2]
-    views_param_i = [View(poses_i[k], lens_param_i, focus_i, 0.0386) for k in 1:2]
     vig_i = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wi, Hi); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
+    camera_i = RadiometricCameraModel(glens_i, focus_i, 0.0386, vig_i)                    # the grid camera
+    camera_param_i = RadiometricCameraModel(lens_param_i, focus_i, 0.0386, vig_i)         # the parametric camera it is sampled from
     b_i = 𝔟(board_i); a_i = zeros(3, 9); a_i[:, 1] .= (2.0, 1.9, 1.8); a_i[:, 3] .= (0.4, 0.3, 0.2)
     light_i = EnvironmentLight(SphericalHarmonicMap(a_i, 2), b_i, sphere_radius(b_i, [p.t for p in poses_i]))
     mat_i = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
     st_i = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks_i = [compute_mask(v, scene_i, st_i; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_i]                  # the mask is the plane's, padded past the 3 % stretch
+    masks_i = [compute_mask(camera_i, p, scene_i, st_i; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_i]                 # the mask is the plane's, padded past the 3 % stretch
     blank_i = [zeros(Hi, Wi, 3) for _ in 1:2]
-    targets_i = render_all(CalibrationState(scene_iθ(θ_true), st_i, copy(views_i), vig_i, mat_i, light_i, blank_i; masks = masks_i))
-    targets_param_i = render_all(CalibrationState(scene_iθ(θ_true), st_i, copy(views_param_i), vig_i, mat_i, light_i, blank_i; masks = masks_i))
+    targets_i = render_all(CalibrationState(scene_iθ(θ_true), st_i, camera_i, poses_i, mat_i, light_i, blank_i; masks = masks_i))
+    targets_param_i = render_all(CalibrationState(scene_iθ(θ_true), st_i, camera_param_i, poses_i, mat_i, light_i, blank_i; masks = masks_i))
 end
 
 @testitem "in-plane print error: the map, Core's posed target, the render" setup = [RCFixtures, InplaneScene] begin
@@ -129,8 +129,8 @@ end
     # ---------------------------------------------------------------------------------------------------------------
     # 4. the render: the texture is sampled at the DESIGN point the physical point shows, so the error moves the rendered pattern; the
     #    as-designed render is the flat board's bit for bit
-    r_flat = render_all(CalibrationState(scene_i, st_i, copy(views_i), vig_i, mat_i, light_i, blank_i; masks = masks_i))
-    r_zero = render_all(CalibrationState(scene_iθ(zero(θ_true)), st_i, copy(views_i), vig_i, mat_i, light_i, blank_i; masks = masks_i))
+    r_flat = render_all(CalibrationState(scene_i, st_i, camera_i, poses_i, mat_i, light_i, blank_i; masks = masks_i))
+    r_zero = render_all(CalibrationState(scene_iθ(zero(θ_true)), st_i, camera_i, poses_i, mat_i, light_i, blank_i; masks = masks_i))
     @test all(r_zero[k] == r_flat[k] for k in 1:2)
     @test maximum(maximum(abs, targets_i[k] .- r_flat[k]) for k in 1:2) > 0.02 * maximum(maximum, r_flat)
     # a pixel's radiance through Φ_pixel: with the error, the same as the flat board's at the design point's physical place — checked
@@ -155,7 +155,7 @@ end
     # 1. the grid-tile route: the material block carries (a, u) as two AD columns after the 9 BRDF parameters (and after the free height
     #    parameters when the warping is free); the columns match central differences of the tile residual through `update`; the pose
     #    columns still match (the duals flow through the surface and the texture lookup)
-    s_i = CalibrationState(scene_iθ(0.5 * θ_true), st_i, copy(views_i), vig_i, mat_i, light_i, targets_i; masks = masks_i)
+    s_i = CalibrationState(scene_iθ(0.5 * θ_true), st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i)
     prob_i, idx_i = build_problem_grid(s_i; patch = (5, 5), inplane = true)
     tiles_i = RC.tile_costs(prob_i)
     r_i = tiles_i[argmax([length(t.pix) for t in tiles_i])]
@@ -213,7 +213,7 @@ end
 
     # ---------------------------------------------------------------------------------------------------------------
     # 2. the per-view route (a parametric lens): `build_problem(; inplane)` — the same two columns after the material block
-    s_p = CalibrationState(scene_iθ(0.5 * θ_true), st_i, copy(views_param_i), vig_i, mat_i, light_i, targets_param_i; masks = masks_i)
+    s_p = CalibrationState(scene_iθ(0.5 * θ_true), st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i)
     prob_p, idx_p = build_problem(s_p; inplane = true)
     mvp = prob_p.variables[idx_p.material]
     @test Int(RC.NLLSsolver.nvars(mvp)) == 9 + INPLANE_NC && RC.n_inplane(mvp) == INPLANE_NC && RC.n_height(mvp) == 0
@@ -284,14 +284,14 @@ end
 
     # ---------------------------------------------------------------------------------------------------------------
     # 3. LM recovery of (a, u) from the as-designed start, everything else at the truth: the grid route, then the per-view route
-    s_r = CalibrationState(scene_i, st_i, copy(views_i), vig_i, mat_i, light_i, targets_i; masks = masks_i)
+    s_r = CalibrationState(scene_i, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i)
     c0r = cost(s_r)[1]
     run_lm_grid!(s_r; patch = (5, 5), maxiters = 25, inplane = true,
                  fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
     @test cost(s_r)[1] < 1e-3 * c0r
     @test norm(board_surface(s_r).inplane - θ_true) < 0.05 * norm(θ_true)                      # a 3 % stretch and a 2 % shear, recovered to 5 % of themselves
     @test iszero(board_surface(s_r).h)
-    s_rp = CalibrationState(scene_i, st_i, copy(views_param_i), vig_i, mat_i, light_i, targets_param_i; masks = masks_i)
+    s_rp = CalibrationState(scene_i, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i)
     c0p = cost(s_rp)[1]
     run_lm!(s_rp; maxiters = 25, inplane = true,
             fixed = (:poses, :distortion, :focus, :aperture, :vignetting, :lighting))
@@ -312,11 +312,11 @@ end
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
         scene_g = scene_iθ(0.5 * θ_true)
-        s_g = CalibrationState(scene_g, st_i, copy(views_i), vig_i, mat_i, light_i, targets_i; masks = masks_i, backend = CUDA.CUDABackend())
+        s_g = CalibrationState(scene_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i, backend = CUDA.CUDABackend())
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), inplane = true)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
-        s_c = CalibrationState(scene_g, st_i, copy(views_i), vig_i, mat_i, light_i, targets_i; masks = masks_i)
+        s_c = CalibrationState(scene_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), inplane = true)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
@@ -336,8 +336,8 @@ end
         @test device_parity(rjg_b, rjg) && device_parity(Jg_b, Jg)
         RC._unregister_grid_problem!(s_g)
         # the per-view route on the device (a parametric lens)
-        s_pg = CalibrationState(scene_g, st_i, copy(views_param_i), vig_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = CUDA.CUDABackend())
-        s_pc = CalibrationState(scene_g, st_i, copy(views_param_i), vig_i, mat_i, light_i, targets_param_i; masks = masks_i)
+        s_pg = CalibrationState(scene_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = CUDA.CUDABackend())
+        s_pc = CalibrationState(scene_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i)
         prob_pg, _ = build_problem(s_pg; inplane = true); prob_pc, idx_pc = build_problem(s_pc; inplane = true)
         res_pg = get(prob_pg.problem.costs, PerViewResidual{9})[1]; res_pc = get(prob_pc.problem.costs, PerViewResidual{9})[1]
         rpg, Jpg = RC.NLLSsolver.computeresjac(RC.static(127), res_pg, RC.NLLSsolver.getvars(res_pg, prob_pg.variables)...)

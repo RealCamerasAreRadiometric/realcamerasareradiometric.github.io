@@ -203,14 +203,26 @@ end
 end
 
 """
-    Φ_pixel(u, v, k, view, vig, mat, light, scene, settings) -> SVector{3}
+    Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings) -> SVector{3}
 
-Radiant flux of pixel `(u, v)` of view `k`. `@inline`: in the device kernels a Julia-level inline lets the compiler optimize the
-dual arithmetic across the call (the backend's `always_inline` only inlines at the LLVM level) — the GPU Jacobian is 12% faster.
-`hrays`: a `HeightRays` for the `3 × HEIGHT_NC` nodal-height partials instead of the flux. `lrays`: a radiance-Jacobian
-mode (`RadianceRecord`, `RadianceRays`) for the rays' radiance.
+Radiant flux of pixel `(u, v)` (column `u`, row `v` of the `H × W` image) of photograph `k`: `camera` (a
+[`RadiometricCameraModel`](@ref)) at `pose` (camera → world). `k` is the photograph's index: it keys the common random numbers of
+the radiance (`SampleKey`), so the flux of a state's view `k` is `Φ_pixel(u, v, k, camera, poses[k], …)`.
 """
-@inline function Φ_pixel(u::Integer, v::Integer, k::Integer, view::View{T}, vig::AbstractVignetting, mat::Material,
+Φ_pixel(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
+        scene::Scene, st::RenderSettings) =
+    _Φ_pixel(u, v, k, View(pose, camera), camera.vignetting, mat, light, scene, st)
+
+"""
+    _Φ_pixel(u, v, k, view, vig, mat, light, scene, settings[, fseed, dirseed, hrays, lrays]) -> SVector{3}
+
+The kernels' flux of pixel `(u, v)` of view `k` ([`Φ_pixel`](@ref) of the camera at its pose, the vignetting apart). `@inline`: in
+the device kernels a Julia-level inline lets the compiler optimize the dual arithmetic across the call (the backend's
+`always_inline` only inlines at the LLVM level) — the GPU Jacobian is 12% faster. `hrays`: a `HeightRays` for the `3 × HEIGHT_NC`
+nodal-height partials instead of the flux. `lrays`: a radiance-Jacobian mode (`RadianceRecord`, `RadianceRays`) for the rays'
+radiance.
+"""
+@inline function _Φ_pixel(u::Integer, v::Integer, k::Integer, view::View{T}, vig::AbstractVignetting, mat::Material,
                  light::EnvironmentLight, scene::Scene, st::RenderSettings, fseed = nothing, dirseed = nothing,
                  hrays = nothing, lrays = nothing) where {T}
     bd = scene.board
@@ -240,14 +252,17 @@ mode (`RadianceRecord`, `RadianceRays`) for the rays' radiance.
 end
 
 """
-    compute_mask(view, scene, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
+    compute_mask(camera, pose, scene, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
 
-Pixel mask: `true` where the chief ray and every (footprint corner × aperture border sample)
-ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with `external`. `board_valid` over every pixel
-of `external` (all of them without one): one kernel on `backend`, required. A caller that needs only some of the pixels (the start's
-draw, `draw_samples`) tests those alone through `BoardValidity`.
+Pixel mask of `camera` (a [`RadiometricCameraModel`](@ref)) at `pose` (camera → world): `true` where the chief ray and every
+(footprint corner × aperture border sample) ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with
+`external`. `board_valid` over every pixel of `external` (all of them without one): one kernel on `backend`, required. A caller
+that needs only some of the pixels (the start's draw, `draw_samples`) tests those alone through `BoardValidity`.
 """
-function compute_mask(view::View, scene::Scene, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
+compute_mask(camera::RadiometricCameraModel, pose::EuclideanMap, scene::Scene, st::RenderSettings; kwargs...) =
+    _compute_mask(View(pose, camera), scene, st; kwargs...)
+"""The kernels' form of [`compute_mask`](@ref): the camera at its pose as a `View`."""
+function _compute_mask(view::View, scene::Scene, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
     H, W = scene.H, scene.W
     ids = external === nothing ? collect(1:(H * W)) : findall(vec(external))   # column-major: (u − 1) H + v
     mask = falses(H, W)
@@ -322,13 +337,18 @@ end
 masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)]
 
 """
-    render_view(k, view, vig, mat, light, scene, settings, mask) -> Array{Float64, 3}
+    render_view(k, camera, pose, mat, light, scene, settings, mask) -> Array{Float64, 3}
 
-`H × W × 3` image of view `k` (zeros outside the mask): the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on the CPU backend, in the arguments'
-float type.
+`H × W × 3` image of photograph `k`, `camera` (a [`RadiometricCameraModel`](@ref)) at `pose` (camera → world), zeros outside the
+mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on the CPU backend, in the arguments' float type. `k` is the
+photograph's index: it keys the common random numbers of the radiance, so photograph `k` of a state renders with its index.
 """
-function render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                     scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool})
+render_view(k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight, scene::Scene,
+            st::RenderSettings, mask::AbstractMatrix{Bool}) =
+    _render_view(k, View(pose, camera), camera.vignetting, mat, light, scene, st, mask)
+"""The kernels' form of [`render_view`](@ref): the camera at its pose as a `View`, the vignetting apart."""
+function _render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
+                      scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool})
     px = masked_pixels(mask)
     img = zeros(Float64, scene.H, scene.W, 3)
     isempty(px) && return img

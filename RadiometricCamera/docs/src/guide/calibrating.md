@@ -10,7 +10,7 @@ The radiometric camera needs one thing from a geometric model: Core's `backproje
 point 𝐩 in the COLMAP pixels of the image (𝓘 = [0, W] × [0, H], Core's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be
 refined, VisualGeometryToolkitCore's parameter protocol.
 
-Any VisualGeometryToolkitCore lens plugs into [`View`](@ref) as Core's pixel camera — a `BoundedCamera` of
+Any VisualGeometryToolkitCore lens plugs into the [`RadiometricCameraModel`](@ref) as Core's pixel camera — a `BoundedCamera` of
 `CameraModel(LogicalIntrinsics(K), lens)`, K in the image's pixels (isbits: it travels into the GPU kernels as it is) — whose
 back-projection is Core's `backproject` and whose parameters are Core's parameter protocol; [`run_lm!`](@ref) refines it in its own
 parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and the image-size coordinate scale
@@ -20,7 +20,8 @@ parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and 
 ## Calibrate a session
 
 A calibration session stored as VisualGeometryToolkitIO records (a camera, the board's target and the trajectory of its
-frames) and its photographs give the scene and the starting views ([`load_session`](@ref)). The block below needs the reader's
+frames) and its photographs give the scene, the camera's starting lens and focus surface and the photographs' poses
+([`load_session`](@ref)). The block below needs the reader's
 own session, so it is not run here:
 
 ```julia
@@ -29,10 +30,10 @@ using RadiometricCamera, VisualGeometryToolkitCore
 using RadiometricCamera: Material, RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.scene.board)
-r_SH = sphere_radius(b, [v.pose.t for v in ds.views])
+r_SH = sphere_radius(b, [p.t for p in ds.poses])
 W, H = ds.scene.W, ds.scene.H
-s = CalibrationState(ds.scene, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), ds.views,
-                     RadialVignetting(16, Point2(W / 2, H / 2), hypot(W, H) / 2), Material(),
+camera = RadiometricCameraModel(ds.lens₀, ds.focus₀, ds.r₀, RadialVignetting(16, Point2(W / 2, H / 2), hypot(W, H) / 2))
+s = CalibrationState(ds.scene, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # Core's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
 run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)

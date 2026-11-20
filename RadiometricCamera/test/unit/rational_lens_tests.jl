@@ -39,14 +39,14 @@
     scene = Scene(board, W, H)
     tps_r = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))); focus_r = Focus(tps_r, fill(1 / 1.5, 9))
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    views_r = [View(p, lens, focus_r, 0.0386) for p in poses]
-    @test has_lens(views_r[1].lens, VgtkCore.Division{2, Float64})
     vig_r = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    camera_r = RadiometricCameraModel(lens, focus_r, 0.0386, vig_r)
+    @test has_lens(View(poses[1], camera_r).lens, VgtkCore.Division{2, Float64})     # the kernels' view keeps the rational lens
     light_r = EnvironmentLight(SphericalHarmonicMap(2.0, 2), b, r_SH); mat_r = Material()
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_r]
-    targets = [render_view(k, views_r[k], vig_r, mat_r, light_r, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, copy(views_r), vig_r, mat_r, light_r, targets; masks)
+    masks = [compute_mask(camera_r, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_r, poses[k], mat_r, light_r, scene, st, masks[k]) for k in 1:2]
+    s = CalibrationState(scene, st, camera_r, poses, mat_r, light_r, targets; masks)
     prob, idx = build_problem(s; fixed = (:aspect,))
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)

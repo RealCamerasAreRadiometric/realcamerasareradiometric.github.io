@@ -44,13 +44,13 @@ end
         bd = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex32; facing = [0.0, 0.0, 1.5])
         sc = Scene(bd, 32, 32)
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)
-        vw = View(pose, cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.0, 16.0), 32, 32), Focus(3, 1.5, 32, 32), 0.0386)
         vg = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 32, 32); degree = 2); mt = Material(); lt = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(bd), 2.0)
+        camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.0, 16.0), 32, 32), Focus(3, 1.5, 32, 32), 0.0386, vg)
         stt = RenderSettings(; N = 4)
-        args32 = VgtkCore.convert_eltype.(Float32, (vw, vg, mt, lt, sc, stt))
-        Φ32 = Φ_pixel(16, 16, 1, args32...)
+        args32 = VgtkCore.convert_eltype.(Float32, (View(pose, camera), vg, mt, lt, sc, stt))   # the kernels' Float32 record (the device's element type)
+        Φ32 = RC._Φ_pixel(16, 16, 1, args32...)
         @test Φ32 isa SVector{3, Float32}
-        Φ64 = Φ_pixel(16, 16, 1, vw, vg, mt, lt, sc, stt)
+        Φ64 = Φ_pixel(16, 16, 1, camera, pose, mt, lt, sc, stt)
         @test maximum(abs, (Φ32 .- Φ64) ./ Φ64) < 1e-4
     end
 
@@ -60,14 +60,15 @@ end
     # the run: every Φ finite; Φ exactly zero at a pixel whose samples all lie outside the domain; the moved lens's cost finite and higher.
     let a = dom_args
         @test in_domain(kb_in, SVector(24.0, 24.0)) && !in_domain(kb_out, SVector(24.0, 24.0)) && in_domain(kb_out, SVector(12.0, 12.0))
-        vw_out = View(a.pose, kb_out, Focus(3, 1.5, 24, 24), 0.0386)
-        Φs = [Φ_pixel(u, v, 1, vw_out, a.vig, a.mat, a.light, dom_scene, a.st) for u in 1:24, v in 1:24]
+        cam_in = RadiometricCameraModel(kb_in, Focus(3, 1.5, 24, 24), 0.0386, a.vig)
+        cam_out = RadiometricCameraModel(kb_out, Focus(3, 1.5, 24, 24), 0.0386, a.vig)
+        Φs = [Φ_pixel(u, v, 1, cam_out, a.pose, a.mat, a.light, dom_scene, a.st) for u in 1:24, v in 1:24]
         @test all(all(isfinite, Φ) for Φ in Φs)
         @test iszero(Φs[1, 1]) && iszero(Φs[24, 24])                               # the corner pixels: every sample outside the domain
         full = [trues(24, 24)]
-        tgt = [render_view(1, View(a.pose, kb_in, Focus(3, 1.5, 24, 24), 0.0386), a.vig, a.mat, a.light, dom_scene, a.st, full[1])]
-        s_in = CalibrationState(dom_scene, a.st, [View(a.pose, kb_in, Focus(3, 1.5, 24, 24), 0.0386)], a.vig, a.mat, a.light, tgt; masks = full)
-        s_out = CalibrationState(dom_scene, a.st, [vw_out], a.vig, a.mat, a.light, tgt; masks = full)
+        tgt = [render_view(1, cam_in, a.pose, a.mat, a.light, dom_scene, a.st, full[1])]
+        s_in = CalibrationState(dom_scene, a.st, cam_in, [a.pose], a.mat, a.light, tgt; masks = full)
+        s_out = CalibrationState(dom_scene, a.st, cam_out, [a.pose], a.mat, a.light, tgt; masks = full)
         c_in = cost(s_in)[1]; c_out = cost(s_out)[1]
         @test isfinite(c_out) && c_out > c_in
     end
@@ -95,18 +96,18 @@ end
         tps_g = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
         focus_t = Focus(tps_g, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15cos(k), 0.12sin(k), 0.1k))), SVector{3}(SVector(0.3cos(k), 0.3sin(k), 1.4 + 0.1k)); check = false) for k in 1:2]
-        views_t = [View(p, lens_t, focus_t, 0.0386) for p in poses]
         # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
         vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
+        camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_t]
-        targets = [render_view(k, views_t[k], vig_t, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-        s_cpu = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks)
-        s_gpu = CalibrationState(scene, st, copy(views_t), vig_t, mat_t, light_t, targets; masks, backend = CUDABackend())
+        masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+        targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+        s_cpu = CalibrationState(scene, st, camera_t, poses, mat_t, light_t, targets; masks)
+        s_gpu = CalibrationState(scene, st, camera_t, poses, mat_t, light_t, targets; masks, backend = CUDABackend())
         # render parity (Float64 CPU vs Float32 GPU; different draw precision → tolerance)
         img_cpu = render_all(s_cpu)[1]; img_gpu = render_all(s_gpu)[1]
         @test maximum(abs, img_gpu .- img_cpu) / maximum(img_cpu) < 2e-3
@@ -141,20 +142,21 @@ end
             @test norm(Jc[:, col] .- Jg[:, col]) / nc < 2e-2
         end
         # LM smoke on the GPU backend
-        s2 = CalibrationState(scene, st, [View(VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.008, -0.006, 0.01), SVector(0.008, -0.008, 0.012))),
-                                               cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 40.0, (16.0, 16.0), W, H), Focus(tps_g, fill(1 / 1.7, 9)), 0.03) for p in poses],
-                              vig_t, with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), light_t, targets; masks, backend = CUDABackend())
+        camera_2 = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 40.0, (16.0, 16.0), W, H), Focus(tps_g, fill(1 / 1.7, 9)), 0.03, vig_t)
+        poses_2 = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.008, -0.006, 0.01), SVector(0.008, -0.008, 0.012))) for p in poses]
+        s2 = CalibrationState(scene, st, camera_2, poses_2, with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), light_t, targets;
+                              masks, backend = CUDABackend())
         c0 = cost(s2)[1]
         result = run_lm!(s2; maxiters = 20)
         @test result.cost / 2 < 1e-2 * c0                     # Float32 J (80 dual slots, all blocks free) stalls above the Float64 floor
         # the same parity for the 18-coordinate lens block of the 14-coefficient lens (3 dual chunks of 15 on the device path)
         cv_o = [-0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005]            # cv2's coefficient order
         lens_o = cam(VgtkIO.opencv_lens(cv_o), 41.216, (16.32, 15.36), W, H)
-        views_o = [View(p, lens_o, focus_t, 0.0386) for p in poses]
-        masks_o = [compute_mask(v, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for v in views_o]
-        targets_o = [render_view(k, views_o[k], vig_t, mat_t, light_t, scene, st, masks_o[k]) for k in 1:2]
-        so_cpu = CalibrationState(scene, st, copy(views_o), vig_t, mat_t, light_t, targets_o; masks = masks_o)
-        so_gpu = CalibrationState(scene, st, copy(views_o), vig_t, mat_t, light_t, targets_o; masks = masks_o, backend = CUDABackend())
+        camera_o = RadiometricCameraModel(lens_o, focus_t, 0.0386, vig_t)
+        masks_o = [compute_mask(camera_o, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+        targets_o = [render_view(k, camera_o, poses[k], mat_t, light_t, scene, st, masks_o[k]) for k in 1:2]
+        so_cpu = CalibrationState(scene, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o)
+        so_gpu = CalibrationState(scene, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o, backend = CUDABackend())
         po_c, _ = build_problem(so_cpu); po_g, _ = build_problem(so_gpu)
         ro_c = get(po_c.problem.costs, PerViewResidual{9})[1]; ro_g = get(po_g.problem.costs, PerViewResidual{9})[1]
         vo_c = RC.NLLSsolver.getvars(ro_c, po_c.variables); vo_g = RC.NLLSsolver.getvars(ro_g, po_g.variables)
@@ -172,8 +174,8 @@ end
         # lists the tilt (:tx, :ty) first, so the fifth coordinate is no longer k1 (a tilt start the block (:f, :aspect, :k1) cannot undo)
         ik1_o = 4 + findfirst(==(:k1), VgtkCore.parameter_names(VgtkCore.lens(lens_o)))
         lens_o2 = camera_of(VgtkIO.opencv_lens(zeros(14)), vcat(pinhole_θ(lens_o), VgtkCore.parameter_vector(VgtkCore.lens(lens_o))) + SVector{18}(ntuple(i -> i <= 2 ? 0.64 : i == ik1_o ? 0.03 : 0.0, 18)), W, H)
-        so2 = CalibrationState(scene, st, [View(p, lens_o2, focus_t, 0.0386) for p in poses],
-                               vig_t, mat_t, light_t, targets_o; masks = masks_o, backend = CUDABackend())
+        so2 = CalibrationState(scene, st, RadiometricCameraModel(lens_o2, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets_o;
+                               masks = masks_o, backend = CUDABackend())
         co0 = cost(so2)[1]
         ro = run_lm!(so2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
@@ -181,12 +183,14 @@ end
         # radial vignetting profile on the device (2026-10-21): render parity, and the closed-form V solve from the DEVICE parts
         # (the parts kernel evaluates coefficient_jacobian / V of the radial type) recovers the profile
         vig_r = with_control_points(RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W), [1.0, 1.0, 0.9, 0.75, 0.6])   # P_0 = P_1: the pole tie
-        targets_r = [render_view(k, views_t[k], vig_r, mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-        sr_cpu = CalibrationState(scene, st, copy(views_t), vig_r, mat_t, light_t, targets_r; masks)
-        sr_gpu = CalibrationState(scene, st, copy(views_t), vig_r, mat_t, light_t, targets_r; masks, backend = CUDABackend())
+        camera_r = RC.with_vignetting(camera_t, vig_r)
+        targets_r = [render_view(k, camera_r, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+        sr_cpu = CalibrationState(scene, st, camera_r, poses, mat_t, light_t, targets_r; masks)
+        sr_gpu = CalibrationState(scene, st, camera_r, poses, mat_t, light_t, targets_r; masks, backend = CUDABackend())
         imr_cpu = render_all(sr_cpu)[1]; imr_gpu = render_all(sr_gpu)[1]
         @test maximum(abs, imr_gpu .- imr_cpu) / maximum(imr_cpu) < 2e-3
-        sr_fit = CalibrationState(scene, st, copy(views_t), RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W), mat_t, light_t, targets_r; masks, backend = CUDABackend())
+        sr_fit = CalibrationState(scene, st, RC.with_vignetting(camera_t, RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W)), poses, mat_t, light_t, targets_r;
+                                  masks, backend = CUDABackend())
         solve_Θ_v!(sr_fit)
         pts_r = [𝐩_of_pixel(u, v) for (u, v) in sr_fit.px[1]]
         @test maximum(abs(sr_fit.camera.vignetting(𝐩) - vig_r(𝐩)) for 𝐩 in pts_r) < 5e-3
@@ -218,10 +222,10 @@ end
         end
         # the out-of-domain samples on the device: finite residuals that match the CPU's, and the same higher cost
         let a = dom_args, full = [trues(24, 24)]
-            tgt = [render_view(1, View(a.pose, kb_in, Focus(3, 1.5, 24, 24), 0.0386), a.vig, a.mat, a.light, dom_scene, a.st, full[1])]
-            vo = View(a.pose, kb_out, Focus(3, 1.5, 24, 24), 0.0386)
-            sc_o = CalibrationState(dom_scene, a.st, [vo], a.vig, a.mat, a.light, tgt; masks = full)
-            sg_o = CalibrationState(dom_scene, a.st, [vo], a.vig, a.mat, a.light, tgt; masks = full, backend = CUDABackend())
+            tgt = [render_view(1, RadiometricCameraModel(kb_in, Focus(3, 1.5, 24, 24), 0.0386, a.vig), a.pose, a.mat, a.light, dom_scene, a.st, full[1])]
+            co = RadiometricCameraModel(kb_out, Focus(3, 1.5, 24, 24), 0.0386, a.vig)
+            sc_o = CalibrationState(dom_scene, a.st, co, [a.pose], a.mat, a.light, tgt; masks = full)
+            sg_o = CalibrationState(dom_scene, a.st, co, [a.pose], a.mat, a.light, tgt; masks = full, backend = CUDABackend())
             im_c = render_all(sc_o)[1]; im_g = render_all(sg_o)[1]
             @test all(isfinite, im_g) && maximum(abs, im_g .- im_c) / maximum(im_c) < 2e-3
             @test isfinite(cost(sg_o)[1]) && abs(cost(sg_o)[1] - cost(sc_o)[1]) < 2e-3 * cost(sc_o)[1]

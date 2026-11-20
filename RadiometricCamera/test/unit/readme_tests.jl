@@ -18,6 +18,9 @@
     landing = filter(!illustrative, julia_blocks(index))
     @test length(example) == 1                       # pin the counts
     @test landing == example                         # one example, shown twice
+    # the project page (site/src/index.md of the repository, beside the package; absent from an installed package) shows it too
+    site = joinpath(dirname(root), "site", "src", "index.md")
+    isfile(site) && @test filter(!illustrative, julia_blocks(site)) == example
 
     install = [m[1] for m in eachmatch(r"^pkg> add (.+)$"m, readme)]
     @test length(install) == 1
