@@ -5,28 +5,28 @@ hero:
   name: Real Cameras are Radiometric
   text: Lifting geometric camera models to radiometric ones
   tagline: |-
-    Ties Harder, Felix Seegräber, David Nakath, Hendrik Sauer, Kevin Köser, James Pritts
-    Preprint, 2026
+    Ties Harder, Felix Seegräber, David Nakath
+    Hendrik Sauer, Kevin Köser, James Pritts
+    Marine Data Science
+    Kiel University
+    arXiv 2026
   image:
     src: /assets/landing/logo.svg
     dark: /assets/landing/logo_dark.svg
     alt: The radiometric camera of a fisheye lens in a cross-section. The rays from a sensor point through the aperture meet in a point on a curved focus surface and spread onto the scene.
   actions:
     - theme: brand
-      text: Paper (PDF)
-      link: /paper.pdf
+      text: Getting started
+      link: /docs/guide/getting-started.html
     - theme: alt
-      text: arXiv (coming soon)
-      link: "#Paper"
+      text: Paper
+      link: https://arxiv.org/pdf/2611.25265
+    - theme: alt
+      text: API Reference
+      link: /docs/api/camera.html
     - theme: alt
       text: Code
       link: https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io
-    - theme: alt
-      text: Docs
-      link: /docs/
-    - theme: alt
-      text: BibTeX
-      link: "#Citation"
 features:
   - icon: 📷
     title: Any central camera, lifted
@@ -38,10 +38,6 @@ features:
     title: More accurate, and physically meaningful
     details: The calibrated cameras have lower reprojection errors on a held-out high-precision target, their vignetting reproduces a measured flat field, and their focus surfaces recover sharp texture from defocused images.
 ---
-```
-
-```@raw html
-<!-- ARXIV: the arXiv URL goes in the "arXiv" action above and in the Paper and Citation sections below -->
 ```
 
 ```@raw html
@@ -107,11 +103,10 @@ The radiometric camera keeps that mapping and replaces the pinhole by an apertur
 
 ## Paper
 
-```@raw html
-<p><a href="paper.pdf">The paper and its supplement (PDF)</a>, built from the
-<a href="https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io/tree/main/paper">manuscript
-in the repository</a>. arXiv: coming soon.</p>
-```
+The paper and its supplementary material are on arXiv:
+[arXiv:2611.25265](https://arxiv.org/abs/2611.25265) ([PDF](https://arxiv.org/pdf/2611.25265)).
+The manuscript's source is in the
+[repository](https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io/tree/main/paper).
 
 ## Code and documentation
 
@@ -135,10 +130,25 @@ Coming soon: the RAW images and the configurations of every experiment.
 
 ## Citation
 
+The radiometric camera is described in *Real Cameras are Radiometric*, arXiv 2026
+([PDF](https://arxiv.org/pdf/2611.25265), with supplementary material). If you use this
+project for your research, please cite:
+
 ```bibtex
-@misc{realcameras2026,
-  author = {Harder, Ties and Seegr{\"a}ber, Felix and Nakath, David and Sauer, Hendrik and K{\"o}ser, Kevin and Pritts, James},
-  title  = {Real Cameras are Radiometric},
-  year   = {2026},
+@article{harder2026radiometric,
+  author        = {Harder, Ties and Seegr{\"a}ber, Felix and Nakath, David and
+                   Sauer, Hendrik and K{\"o}ser, Kevin and Pritts, James},
+  title         = {Real Cameras are Radiometric},
+  journal       = {arXiv preprint arXiv:2611.25265},
+  year          = {2026},
+  eprint        = {2611.25265},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
 }
 ```
+
+## Acknowledgments
+
+James Pritts is funded by Kiel Training for Excellence, an EU Horizon Europe programme
+under the Marie Skłodowska-Curie Actions (MSCA), grant agreement No. 101081480, and by KMS
+Kiel Marine Science – Centre for Interdisciplinary Marine Science at Kiel University.

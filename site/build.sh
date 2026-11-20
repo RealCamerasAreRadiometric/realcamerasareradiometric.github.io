@@ -23,7 +23,7 @@ cp "$teaser" "$out/assets/landing/teaser.png"
 touch "$out/.nojekyll"   # GitHub Pages serves the files as they are (no Jekyll pass)
 
 # The landing page and the docs link to each other and to the paper by relative paths, and the targets exist.
-for target in docs/ paper.pdf; do
+for target in docs/; do
     grep -q "href=\"$target\"" "$out/index.html" || { echo "site/build.sh: index.html has no link to $target" >&2; exit 1; }
 done
 for target in ../ ../paper.pdf; do

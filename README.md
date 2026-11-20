@@ -5,7 +5,7 @@ The code, the experiments and the manuscript of the paper *Real Cameras are Radi
 
 - **Code**: this repository, <https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io>.
 - **Docs**: the package documentation, <https://realcamerasareradiometric.github.io/docs/>.
-- **Paper**: the paper and its supplement, <https://realcamerasareradiometric.github.io/paper.pdf>; arXiv: identifier to follow.
+- **Paper**: the paper and its supplement, <https://realcamerasareradiometric.github.io/paper.pdf>; arXiv: [2611.25265](https://arxiv.org/abs/2611.25265).
 
 ## Repository layout
 
