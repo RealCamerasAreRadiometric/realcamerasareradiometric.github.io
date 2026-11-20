@@ -3,8 +3,8 @@
 # LM with an 18-coordinate lens block (Jacobian vs finite differences, the GPU path in gpu_tests.jl).
 @testitem "Kannala–Brandt / 14-coefficient lenses (cv2, parametric LM)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens_type_name, load_lens,
-                             load_model, load_parametric_lens, Material, PerViewResidual, PrintedTarget, render_view,
-                             RenderSettings, run_lm!, save_lens, Scene, sphere_radius, View, chief_ray, 𝔟
+                             load_model, load_parametric_lens, Material, PerViewResidual, TexturedTarget, render_view,
+                             RenderSettings, run_lm!, save_lens, sphere_radius, View, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
@@ -91,8 +91,7 @@
     # the per-view parametric route with an 18-coordinate lens block (Core's ParameterManifold of the pixel camera, the skew fixed): layout,
     # Jacobian vs finite differences of the block's own update, a few LM steps
     tex = fixture_board()
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    scene = Scene(board, 24, 24)
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     lens_t = _cv14(SVector(1.288, 1.288, 0.01, -0.02, -0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005), 24, 24)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))); focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -105,10 +104,10 @@
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     @test all(count(m) > 100 for m in masks)
-    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, camera_t, poses, mat_t, light_t, targets; masks)
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
+    s = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks)
     prob, idx = build_problem(s)
     dv = prob.variables[idx.distortion]
     @test dv isa VgtkCore.SubsetManifold && Int(RC.NLLSsolver.nvars(dv)) == 18 && free_names(dv) == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(lens_t)))
@@ -151,7 +150,7 @@
     # (:tx, :ty) first, so the fifth coordinate is no longer k1 (a tilt start the restricted block (:f, :aspect, :k1) cannot undo)
     ik1 = 4 + findfirst(==(:k1), VgtkCore.parameter_names(VgtkCore.lens(lens_t)))
     lens_start = camera_of(VgtkIO.opencv_lens(zeros(14)), _θd(lens_t) + SVector{18}(ntuple(i -> i <= 2 ? 0.48 : i == ik1 ? 0.03 : 0.0, 18)), 24, 24)
-    s2 = CalibrationState(scene, st, RadiometricCameraModel(lens_start, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets; masks)
+    s2 = CalibrationState(board, st, RadiometricCameraModel(lens_start, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets; masks)
     c0 = cost(s2)[1]
     its = Int[]
     result = run_lm!(s2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,

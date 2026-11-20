@@ -16,6 +16,26 @@ number of a calibration changes: the moved code is the same arithmetic, and the 
   them from there (`using VisualRadiometryToolkitCore: Focus, Material`). `RadiometricCameraModel` stays exported here (a re-export: the
   headline's camera type). The moved names this package does not use itself (`with_geometric`, `with_focus`, `with_aperture_radius`,
   `pixel_of_𝐩`, `ℐ_𝐮`, `aperture_samples`, `aperture_border`, `Λ_ggx`, `G1_ggx`, `ae_chart`) are refused by name with the replacement.
+- **Moved to VisualRadiometryToolkitCore (breaking): the board is its textured target.** `PrintedTarget` is `TexturedTarget` there
+  (the same constructors), with its chart and geometry (`chart`, `world_point`, `corners`, `intersect_board`, `board_plane_hit`,
+  `board_normal`, `inside`, `texture_size`, `with_sdf`, `has_sdf`, `posed_target`), its albedo (`ρ_c` is `albedo`, `𝔟` is
+  `target_center`; the paper's symbols stay as aliases there), the printed-edge model (`edge_albedo`) and the warped page and in-plane
+  print error (`HEIGHT_NC`, `HEIGHT_NODES`, `EDGE_NC`, `INPLANE_NC`, `warping_nodes`, `warping_aspect`, `warping_field`, `board_height`,
+  `board_relief`, `BoardRays`, `inplane_calibration`, `design_chart`, `physical_chart`, `page_points`). They are no longer public
+  names of this package; `PrintedTarget` is refused by name. The calibration's share stays here: `sphere_radius`, `HEIGHT_NFREE`,
+  `height_nparams`, `height_manifold`, `height_basis`, `load_distance_map`, `TargetRadiometry`, `RadiometricTarget`.
+- **Changed (breaking): the board holds its own state, and there is no scene.** `BoardSurface` (the warping h, the printed edge
+  (δ, σ_print), the in-plane print error) is the textured target's own state, VisualRadiometryToolkitCore's `TargetState`, a field of
+  the target replaced by value (`with_state(board, state)`, `with_h`, `with_edge`, `with_inplane` on the board). `Scene` is gone: its
+  `board` and `surface` are the board, and its `W`, `H` were the camera's image size (`extent(geometric(camera))`), which is now
+  stated once, by the camera. Every entry point takes the board where it took the scene — `CalibrationState(board, settings, camera,
+  poses, …)`, `render_view(k, camera, pose, mat, light, board, settings, mask)`, `compute_mask(camera, pose, board, settings; …)`,
+  `Φ_pixel(u, v, k, camera, pose, mat, light, board, settings)`, `pixel_parts(…)` — and `L_c(board, mat, light, sampler, key, 𝐛, 𝐱, ω)`,
+  `radiance_parts(board, mat, light, …)` take the board with its state (no separate surface argument). `load_session` returns
+  `board` (was `scene`). `BoardSurface`, `Scene` and `with_surface` are refused by name with the replacement. A mask or a photograph
+  that is not of the camera's image, and a start camera whose image is not the run's photographs', are refused by name. The records
+  are unchanged (`rc/radiometric_target`, `rc/calibration_state`, the start record: the same schemas and keys, read and written from
+  the same values); no number of a calibration changes.
 - **Changed (breaking): VisualRadiometryToolkitCore's public names are descriptive ASCII.** The paper's symbols are its public
   aliases of the same functions (`𝔭`, `𝔣`, `π̂⁻¹`, `t̂`, `𝔱`, `𝐩_of_pixel`, `pixel_of_𝐩`, `ℐ_𝐮`, `𝐩_sample`, `𝐚_sample`, `𝐚_weight`,
   `𝐚_border`, `Θ_m_nonlinear`, `with_μ`, `𝛂`, `𝛈`, `Λ_ggx`): this package's source keeps them. The plain spellings changed and have

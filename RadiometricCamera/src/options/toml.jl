@@ -47,7 +47,7 @@ _sensor_width(opts::PipelineOptions) = opts.camera.sensor_mm * VgtkCore.mm
 _focal_length(opts::PipelineOptions) = opts.camera.f_mm * VgtkCore.mm
 """The printed page `(width, height)` as length quantities (`frontend.page_mm` mm)."""
 _page_size(opts::PipelineOptions) = (opts.frontend.page_mm[1] * VgtkCore.mm, opts.frontend.page_mm[2] * VgtkCore.mm)
-"""The printed edge `(δ, σ_print)` of the options (the print's: `BoardSurface.edge`)."""
+"""The printed edge `(δ, σ_print)` of the options (the print's: `TargetState.edge`)."""
 _edge_start(opts::PipelineOptions) = (e = opts.edge; (e.ink_spread_mm, e.print_sigma_mm))
 """The front-end's tag (the labels of the output files)."""
 _frontend_tag(opts::PipelineOptions) = tag_of(FRONTEND_TAGS, opts.frontend.type)

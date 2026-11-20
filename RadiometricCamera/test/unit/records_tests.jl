@@ -3,15 +3,15 @@
 # except a length (metres in memory, the file's mm on disk: ≤ 2 ulp at full precision) and a pose (IO's minimal form, a quaternion).
 
 @testitem "records: a calibration state, its radiometric camera and target read back as written" setup = [RCFixtures] begin
-    using RadiometricCamera: board_surface, BoardSurface, edge_parameters, Focus, FocusSpline, HEIGHT_NC,
-                             load_radiometric_camera, load_radiometric_target, load_state, Material, posed_target, PrintedTarget,
-                             RECORD_SCHEMAS, RenderSettings, save_radiometric_camera, save_radiometric_target, save_state,
-                             TargetRadiometry, warping_aspect, 𝔟
+    using RadiometricCamera: board_surface, TargetState, edge_parameters, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera,
+                             load_radiometric_target, load_state, Material, TexturedTarget, RECORD_SCHEMAS, RenderSettings,
+                             save_radiometric_camera, save_radiometric_target, save_state, TargetRadiometry, warping_aspect, 𝔟
+    using VisualRadiometryToolkitCore: posed_target
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     tex = fixture_board()
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
@@ -23,7 +23,7 @@
                                    SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
     a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)
-    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     target = RadiometricTarget(VgtkCore.model(posed_target(board)), SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC)), warping_aspect(board), rad)
     settings = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 7)
     ulps(a, b) = maximum(abs.(a .- b) ./ eps.(abs.(b)))
@@ -74,17 +74,17 @@
 end
 
 @testitem "records: a target's warping knows its page's aspect; another page's board refuses it" setup = [RCFixtures] begin
-    using RadiometricCamera: board_surface, BoardSurface, Focus, FocusSpline, HEIGHT_NC, load_radiometric_target, load_state,
-                             Material, PrintedTarget, radiometric_target, RenderSettings, save_radiometric_target, save_state,
-                             Scene, TargetRadiometry, warping_aspect, 𝔟
+    using RadiometricCamera: board_surface, TargetState, Focus, FocusSpline, HEIGHT_NC, load_radiometric_target, load_state,
+                             Material, TexturedTarget, radiometric_target, RenderSettings, save_radiometric_target, save_state,
+                             TargetRadiometry, warping_aspect, 𝔟
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
     tex = fixture_board()
-    square = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
+    square = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
     @test warping_aspect(square) == 1.0 && warping_aspect(tall) ≈ 0.7
-    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
     warped = RadiometricTarget(nothing, h, 1.0, rad)                    # learned on a square page
     flat = RadiometricTarget(nothing, zero(h), nothing, rad)              # a flat warping: aspect-free
@@ -126,7 +126,7 @@ end
         save_state(joinpath(dir, "state.json"), (; camera, target = warped, poses, names, light, settings, observation = dec, page_flip = nothing))
         sst = load_state(joinpath(dir, "state.json"))
         mat0 = Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
-        state_on(board) = CalibrationState(Scene(board, W, H), settings, camera, poses, mat0, light, [zeros(H, W, 3) for _ in 1:2])
+        state_on(board) = CalibrationState(board, settings, camera, poses, mat0, light, [zeros(H, W, 3) for _ in 1:2])
         s = state_on(tall)
         @test_throws "learned on a page of aspect" RC.load_state_into!(s, sst, names)
         @test s.mat == mat0 && iszero(board_surface(s).h)
@@ -137,13 +137,13 @@ end
 end
 
 @testitem "records: a target's in-plane print error is IO's calibration record of Aspect ∘ Skew" setup = [RCFixtures] begin
-    using RadiometricCamera: board_surface, BoardSurface, HEIGHT_NC, load_radiometric_target, Material, PrintedTarget,
+    using RadiometricCamera: board_surface, TargetState, HEIGHT_NC, load_radiometric_target, Material, TexturedTarget,
                              save_radiometric_target, TargetRadiometry
     using StaticArrays, LinearAlgebra
     tex = fixture_board()
-    square = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
-    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    square = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
     θ = SVector(0.0123456789, -0.00098765)
     # the record holds (a, u); a flat, as-designed target has none; the error needs the page's aspect as the warping does; it is finite
@@ -207,8 +207,9 @@ end
 end
 
 @testitem "records: the camera's lens coverage and sensor pitch survive (IO's bounded camera body), a parametric and a grid lens" setup = [RCFixtures] begin
-    using RadiometricCamera: BoardSurface, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera, load_state, Material,
-                             posed_target, PrintedTarget, RenderSettings, save_radiometric_camera, save_state, TargetRadiometry, 𝔟
+    using RadiometricCamera: TargetState, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera, load_state, Material,
+                             TexturedTarget, RenderSettings, save_radiometric_camera, save_state, TargetRadiometry, 𝔟
+    using VisualRadiometryToolkitCore: posed_target
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: Ellipse, Point2, Sensor, Size2, μm, lens_coverage, sensor, exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
@@ -240,8 +241,8 @@ end
         end
         # …and through the calibration state that holds the camera
         tex = fixture_board()
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
         target = RadiometricTarget(VgtkCore.model(posed_target(board)), zero(SVector{HEIGHT_NC, Float64}), nothing, rad)
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)

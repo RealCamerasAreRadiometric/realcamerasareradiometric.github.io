@@ -1,7 +1,7 @@
 # The radiometric camera as one value (RadiometricCameraModel: geometric camera, focus, aperture, vignetting), its photographs (View) and the
 # target's radiometry record (TargetRadiometry).
 @testitem "radiometric camera model and target radiometry" setup = [RCFixtures] begin
-    using RadiometricCamera: BoardSurface, edge_parameters, flat_vignetting, Focus, Material, material, TargetRadiometry, View, with_vignetting
+    using RadiometricCamera: TargetState, edge_parameters, flat_vignetting, Focus, Material, material, TargetRadiometry, View, with_vignetting
     using StaticArrays, LinearAlgebra
     using Statistics: var
     using VisualRadiometryToolkitCore: TensorProductVignetting, NoVignetting
@@ -54,7 +54,7 @@
     end
     # the target's radiometry: the material and the print's edge, lengths as quantities, the state's mm values back bit for bit
     m = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
-    surf = BoardSurface(edge = SVector(0.6, 0.028))
+    surf = TargetState(edge = SVector(0.6, 0.028))
     r = TargetRadiometry(m, surf)
     @test material(r) == m && edge_parameters(r) == surf.edge
     @test VgtkCore.ustrip(VgtkCore.m, r.ink_spread) ≈ 6e-4 && var(r.print_blur)[1] ≈ (2.8e-5 * VgtkCore.m)^2

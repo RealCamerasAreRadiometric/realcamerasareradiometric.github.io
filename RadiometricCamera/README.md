@@ -30,13 +30,13 @@ board covers, through the camera's aperture and focus surface.
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using RadiometricCamera: PrintedTarget, RenderSettings, Scene, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
+using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
 using VisualRadiometryToolkitCore: Material
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
 # camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                               # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)   # focal length 412 px, principal point at the centre
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
@@ -46,13 +46,12 @@ geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), 
 camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)
 # The photograph's pose, camera → world, metres: lookat_pose(camera centre, the point it looks at, the world's up direction, which fixes the roll)
 pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
-scene = Scene(board, W, H)
 light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # VisualRadiometryToolkitCore's light, L ≡ 1
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
-mask = compute_mask(camera, pose, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
-img = render_view(1, camera, pose, Material(), light, scene, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)
+mask = compute_mask(camera, pose, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
+img = render_view(1, camera, pose, Material(), light, board, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)
 count(mask)                     # 76800 = W × H: the board covers every pixel
-Φ = Φ_pixel(160, 120, 1, camera, pose, Material(), light, scene, settings)   # the pixel 𝐮 = (u, v) = (160, 120)
+Φ = Φ_pixel(160, 120, 1, camera, pose, Material(), light, board, settings)   # the pixel 𝐮 = (u, v) = (160, 120)
 Φ ≈ img[120, 160, :]            # true: the render is Φ_c(𝐮) of each pixel (img is H × W × 3: row v, column u)
 ```
 

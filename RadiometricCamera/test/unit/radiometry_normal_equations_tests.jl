@@ -5,7 +5,7 @@
 # report); the joint solve's recovery of the truth is the "calibration" item's.
 
 @testsetup module NEScene
-    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
+    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
                              sphere_radius, with_μ, with_vignetting, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
@@ -18,7 +18,7 @@
     export RC, ne_state, ne_host, relerr, coefficients, control_points
     const W = 24
     const SCENE = let tex = fixture_board()
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
         lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, W)
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, W))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
@@ -30,7 +30,7 @@
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
         mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        sc = Scene(board, W, W)
+        sc = board
         masks = [compute_mask(camera, p, sc, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]   # the scene's masks, made once on the CPU
         targets = [render_view(k, camera, poses[k], mat, EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH), sc, st, masks[k]) for k in 1:2]
         (; sc, st, camera, poses, b, r_SH, mat, masks, targets)

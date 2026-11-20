@@ -65,15 +65,15 @@ const BE = RC.rc_backend(BACKEND; fallback = false)          # top level: the ve
 
 # ---- the scene ---------------------------------------------------------------------------------------------------------------------
 
-function benchmark_scene()
+function benchmark_board()
     texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-    board = RC.PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+    board = RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
     f = 30.9 * W / 24
     K = CameraCalibrationMat(f, 0.0, 0.0, 0.0, f, 0.0, W / 2, H / 2, 1.0)
     lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
     saddle(𝐛) = (q = 𝐛 .- 0.5; 0.08 * q[1]^2 - 0.04 * q[1] * q[2] + 0.06 * q[2]^2)       # the tests' saddle (metres on the 2 m board)
-    surface = WARP ? RC.BoardSurface(; h = SVector{RC.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])) : RC.BoardSurface{Float64}()
-    scene = RC.Scene(board, W, H, surface)
+    surface = WARP ? RC.TargetState(; h = SVector{RC.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])) : RC.TargetState{Float64}()
+    board = RC.with_state(board, surface)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:VIEWS]
     b = RC.𝔟(board); r_SH = RC.sphere_radius(b, [p.t for p in poses])
@@ -85,14 +85,14 @@ function benchmark_scene()
     mat = RC.Material(; diffuse_weight = 0.4)
     camera = RC.RadiometricCameraModel(lens, RC.Focus(3, 1.5, W, H), 0.04, vig)
     cpu = KA.CPU()
-    masks = [RC.compute_mask(camera, p, scene, settings; δ = 0.02, backend = cpu) for p in poses]
+    masks = [RC.compute_mask(camera, p, board, settings; δ = 0.02, backend = cpu) for p in poses]
     PIXELS > 0 && (masks = map(thinned, masks))
-    photos = [RC.render_view(k, camera, poses[k], mat, light, scene, settings, masks[k]) for k in 1:VIEWS]
+    photos = [RC.render_view(k, camera, poses[k], mat, light, board, settings, masks[k]) for k in 1:VIEWS]
     start_light = EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH)
     # the timed states: a perturbed start on the benchmark's device
-    state(lens_ = lens) = RC.CalibrationState(scene, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
+    state(lens_ = lens) = RC.CalibrationState(board, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
                                               RC.Material(; diffuse_weight = 0.7), start_light, photos; masks, backend = BE)
-    return (; board, scene, settings, poses, light, mat, camera, masks, photos, state, lens)
+    return (; board, board, settings, poses, light, mat, camera, masks, photos, state, lens)
 end
 
 "The mask with every `n`-th of its pixels kept, about `PIXELS` of them."
@@ -150,12 +150,12 @@ function stages(c)
     list = Pair{String, Any}[]
     add(name, make) = occursin(STAGES, name) && push!(list, name => make)
     # forward
-    add("mask", () -> () -> count(RC.compute_mask(c.camera, c.poses[k], c.scene, c.settings; δ = 0.02, backend = BE)))
-    render(; kw...) = RC.render_view(k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]; kw...)
-    on_backend = hasmethod(RC.render_view, Tuple{map(typeof, (k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]))...}, (:backend,))
+    add("mask", () -> () -> count(RC.compute_mask(c.camera, c.poses[k], c.board, c.settings; δ = 0.02, backend = BE)))
+    render(; kw...) = RC.render_view(k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]; kw...)
+    on_backend = hasmethod(RC.render_view, Tuple{map(typeof, (k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]))...}, (:backend,))
     add("render", () -> () -> on_backend ? render(; backend = BE) : render())      # (before render_view took a backend: the CPU's)
     add("pixel", () -> () -> (s = zero(SVector{3, Float64});
-                              for i in 1:1000; s += RC.Φ_pixel(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings); end; s))
+                              for i in 1:1000; s += RC.Φ_pixel(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings); end; s))
     add("flux", () -> (s = c.state(); () -> RC._flux_device(s, k, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light)))
     add("cost", () -> (s = c.state(); () -> cost(s)[1]))
     # closed form
@@ -206,13 +206,13 @@ function inferred_types(c)
     k = 1; s = c.state()
     view = RC.View(c.poses[k], c.camera)
     F = RC._kernel_float(BE)
-    flux = RC._FluxAt(Int32(k), Int32(H), view, c.camera.vignetting, c.mat, c.light, c.scene, c.settings)
+    flux = RC._FluxAt(Int32(k), Int32(H), view, c.camera.vignetting, c.mat, c.light, c.board, c.settings)
     return Dict{String, Any}(
         "View(pose, camera)" => inferred(RC.View, c.poses[k], c.camera),
-        "Φ_pixel" => inferred(RC.Φ_pixel, 1, 1, k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings),
-        "pixel_parts" => inferred(RC.pixel_parts, 1, 1, k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings),
+        "Φ_pixel" => inferred(RC.Φ_pixel, 1, 1, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings),
+        "pixel_parts" => inferred(RC.pixel_parts, 1, 1, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings),
         "_FluxAt(id)" => inferred(flux, UInt32(1)),
-        "render_view" => inferred(RC.render_view, k, c.camera, c.poses[k], c.mat, c.light, c.scene, c.settings, c.masks[k]),
+        "render_view" => inferred(RC.render_view, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]),
         "world_ray" => inferred(RC.world_ray, c.camera, c.poses[k], SVector(1.0, 1.0), SVector(0.0, 0.0, 0.0)),
         "CalibrationState" => (; type = string(typeof(s)), concrete = isconcretetype(typeof(s))),
         "cost(state)" => inferred(cost, s),
@@ -232,7 +232,7 @@ function device_name()
 end
 
 function main()
-    c = benchmark_scene()
+    c = benchmark_board()
     npx = sum(count, c.masks)
     @printf("RadiometricCamera benchmark: %d × %d, %d views, %d masked pixels, %s, Julia %s%s\n", W, H, VIEWS, npx, device_name(), VERSION,
             isempty(LABEL) ? "" : ", " * LABEL)

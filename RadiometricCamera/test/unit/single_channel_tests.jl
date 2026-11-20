@@ -5,7 +5,7 @@
 # parameters; the other channels' lighting and η are no parameters (they follow the measured channel).
 
 @testsetup module SingleChannelScene
-    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
+    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
                              sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays
     using VisualGeometryToolkitCore: exp_so3
@@ -14,14 +14,13 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export single_channel_scene
+    export single_channel_board
 
     "The calibration fixture's two views; the colour reference (`io.channel` copied into three) and the single-channel state of
     channel `c`, both from the start camera and poses (or the truth) with the lighting and η tied to channel `c`."
-    function single_channel_scene(; c = 2, W = 24, H = 24, perturbed = false, backend = nothing)
+    function single_channel_board(; c = 2, W = 24, H = 24, perturbed = false, backend = nothing)
         tex = fixture_board()
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        scene = Scene(board, W, H)
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
         lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 1.288 * W, (0.51 * W, 0.48 * H), W, H)
         tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
         focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
@@ -33,8 +32,8 @@
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(0.12, 0.35, SVector(1.6, 1.65, 1.7), SVector(1.3, 1.33, 1.36), 0.4)   # η differs by channel
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
+        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
         copied = [repeat(r[:, :, c:c], 1, 1, 3) for r in renders]                     # today's io.channel: channel c in all three
         camera0 = perturbed ? RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 1.27 * W, (0.5 * W, 0.49 * H), W, H), focus_t, 0.0386, vig_t) :
                               camera_t
@@ -42,8 +41,8 @@
                              poses
         light0, mat0 = RC.tie_channels(light_t, c), RC.tie_channels(mat_t, c)          # the reference starts tied, as the single-channel state
         kw = backend === nothing ? (;) : (; backend)
-        ref = CalibrationState(scene, st, camera0, copy(poses0), mat0, light0, copied; masks, kw...)
-        one = CalibrationState(scene, st, camera0, copy(poses0), mat_t, light_t, renders; masks, channel = c, kw...)
+        ref = CalibrationState(board, st, camera0, copy(poses0), mat0, light0, copied; masks, kw...)
+        one = CalibrationState(board, st, camera0, copy(poses0), mat_t, light_t, renders; masks, channel = c, kw...)
         return (; ref, one, renders, masks, c)
     end
 end
@@ -51,7 +50,7 @@ end
 @testitem "single channel: one residual per measured pixel, a third of today's cost, its rows and columns" setup = [RCFixtures, SingleChannelScene] begin
     using RadiometricCamera: build_problem, cost, PerViewResidual
     using LinearAlgebra
-    f = single_channel_scene()
+    f = single_channel_board()
     ref, one, c = f.ref, f.one, f.c
     @test RC.fit_channels(one) == (c,) && RC.n_channels(one) == 1 && RC.fit_channels(ref) == (1, 2, 3)
     @test all(k -> length(one.ϕ[k]) == length(one.px[k]) == length(ref.ϕ[k]) ÷ 3, 1:2)
@@ -85,7 +84,7 @@ end
 @testitem "single channel: a fit reaches today's parameters" setup = [RCFixtures, SingleChannelScene] begin
     using RadiometricCamera: cost, run_lm!
     using Rotations: rotation_angle, RotMatrix
-    f = single_channel_scene(; perturbed = true)
+    f = single_channel_board(; perturbed = true)
     ref, one, c = f.ref, f.one, f.c
     run_lm!(ref; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
     run_lm!(one; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
@@ -102,8 +101,8 @@ end
     using RadiometricCamera: build_problem_grid
     c = 2
     copied = [repeat(t[:, :, c:c], 1, 1, 3) for t in targets]
-    ref = CalibrationState(scene, st, camera_t, copy(poses), RC.tie_channels(mat_t, c), RC.tie_channels(light_t, c), copied; masks)
-    one = CalibrationState(scene, st, camera_t, copy(poses), mat_t, light_t, targets; masks, channel = c)
+    ref = CalibrationState(board, st, camera_t, copy(poses), RC.tie_channels(mat_t, c), RC.tie_channels(light_t, c), copied; masks)
+    one = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, channel = c)
     p0, _ = build_problem_grid(ref; patch = (5, 5)); p1, _ = build_problem_grid(one; patch = (5, 5))
     t0 = RC.tile_costs(p0); t1 = RC.tile_costs(p1)
     @test length(t0) == length(t1)
@@ -124,8 +123,8 @@ end
     using CUDA: CUDABackend
     require_gpu()
     if RC_GPU_TESTS
-        cpu = single_channel_scene().one
-        gpu = single_channel_scene(; backend = CUDABackend(; always_inline = true)).one
+        cpu = single_channel_board().one
+        gpu = single_channel_board(; backend = CUDABackend(; always_inline = true)).one
         pc, ic = build_problem(cpu); pg, ig = build_problem(gpu)
         rc = get(pc.problem.costs, PerViewResidual{9})[1]; rg = get(pg.problem.costs, PerViewResidual{9})[1]
         vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)

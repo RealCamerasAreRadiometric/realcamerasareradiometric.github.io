@@ -31,7 +31,7 @@ VRTK Core's RadialVignetting (P)          V(𝐩) = Σ_i N_{i,p}(‖𝐩 − �
 VRTK Core's EnvironmentLight (𝔟, r_SH, a)  L_c^SVSH on the sphere (𝔟, r_SH), a_{c,l}^m     (Lighting)
 Material, cook_torrance                    Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}, f_c^CT  (SVBSDF and Monte Carlo Estimation)
 VRTK Core's ggx_distribution, ggx_masking_shadowing, fresnel_dielectric, visible_normal_density   D, G₂, F_c, D^v   (SVBSDF and Monte Carlo Estimation)
-PrintedTarget, BoardSurface.h, board_height 𝓑 (Core's posed target + the print) and its warping h  (Board Warping)
+VRTK Core's TexturedTarget, its state's h   𝓑 (Core's posed target + the print) and its warping h  (Board Warping)
 Φ_pixel, L_c                               Φ_c(𝐮), L_c(𝐱, ω)                              (Image Formation)
 PerViewResidual                            ϕ − Φ(Θ̄); V(0) = 1 held by `gauge_basis`        (Calibration Pipeline)
 computeresjac, _PartsAt                    the pathwise Jacobian; the Θ_v, Θ_l, μ columns  (Second Order Optimization)
@@ -73,9 +73,10 @@ import VisualGeometryToolkitEstimation as VgtkEstimation
 import VisualGeometryToolkitFeatures as VgtkFeatures
 import LibRaw_jll                  # Features' RAW decoder (its LibRaw extension): a RAW photograph (`load_photo`, by its file) is read through it in bin/refine.jl's environment
 # RC's methods of the stack's generic functions where RC's function is the same concept (owner ruling 2026-11-11: no new binding):
-# a surface point's chart (the board's page fraction), a camera's lens (the state's), the cost and residuals of a problem's state,
+# a camera's lens (the state's), the cost and residuals of a problem's state,
 # an estimate refined in place (the calibration state), an options struct's TOML table, a lens's identity (the options' stated one)
-import VisualGeometryToolkitCore: chart, cost, residuals
+import VisualGeometryToolkitCore: cost, residuals
+using VisualGeometryToolkitCore: chart                          # a board point's page chart (VisualRadiometryToolkitCore's method on its textured target)
 import VisualGeometryToolkitEstimation: config_dict
 import VisualGeometryToolkitFeatures: lens_identity
 using VisualGeometryToolkitCore: LogicalIntrinsics, CameraCalibrationMat,
@@ -98,6 +99,12 @@ using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma_image, SensorQuadrature, 
                                    𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border              # the sensor domain and the quadrature rules
 using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈,
                                    sample_visible_normal, reflection_pdf, reflect, cook_torrance_terms, cook_torrance   # the material: the Cook–Torrance BSDF
+# the board: the textured target (VisualGeometryToolkitCore's posed planar target with its texture, printed edge and own state), its
+# chart and albedo, the printed-edge model, the warped page and the in-plane print error (the paper's 𝔟 and ρ_c are aliases there)
+using VisualRadiometryToolkitCore: TexturedTarget, TargetState, with_state, with_h, with_edge, with_inplane, height_on, inplane_on,
+                                   EDGE_NC, HEIGHT_NC, HEIGHT_NODES, INPLANE_NC, with_sdf, board_normal, world_point, 𝔟, corners,
+                                   intersect_board, board_plane_hit, inside, printed_albedo, warping_nodes, warping_aspect,
+                                   board_height, BoardRays, inplane_calibration, design_chart, physical_chart, page_points
 # its camera-frame maps and part accessors, which this package's records answer by forwarding (VisualRadiometryToolkitCore's
 # CONTRACT_GENERICS, and VisualGeometryToolkitCore's `backproject`, whose alias there is the paper's π̂⁻¹): the kernels' `View`
 # (camera/view.jl) and the calibration state (calibration/state.jl). The paper's symbols are VisualRadiometryToolkitCore's public
@@ -114,9 +121,7 @@ include("camera/models/pixel_camera.jl")             # the parametric chief-ray 
 include("camera/models/grid_camera.jl")             # Core's generic models as chief-ray models (needs the parametric lenses)
 include("io/camera_models.jl")                         # lens / grid JSON, Schöps import (all model types defined above)
 # target: the calibration target, its warping and its SVBSDF
-include("target/printed_target.jl")
-include("target/warping.jl")
-include("target/printed_edge.jl")
+include("target/board.jl")                             # the board: VisualRadiometryToolkitCore's TexturedTarget; the calibration's share (the light sphere, the warping's free parameters, the distance map's reader)
 include("target/target_radiometry.jl")               # the target's radiometry as one record (the material and the print's edge)
 include("image_formation/radiance.jl")
 # image formation, the calibration (the state, the closed form, the LM over all blocks on the device), the loaders

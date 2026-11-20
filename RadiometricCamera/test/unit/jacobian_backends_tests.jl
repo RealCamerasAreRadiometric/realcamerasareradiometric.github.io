@@ -9,7 +9,7 @@
 # the height columns sensitive) warped by a saddle of 2 % of the board's width, the paper cases' warping degree 1.
 
 @testitem "one Jacobian implementation: height and focus columns against independent checks" setup = [RCFixtures, EdgeScene] begin
-    using RadiometricCamera: build_problem_grid, Focus, HEIGHT_NC, with_h, with_surface
+    using RadiometricCamera: build_problem_grid, Focus, HEIGHT_NC, with_h, with_state
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, ForwardDiff
     h_w = SVector{HEIGHT_NC}([0.5 * saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
@@ -28,14 +28,14 @@
     # 1. ForwardDiff of the flux through Core's posed height field, pixel by pixel, folded by the block's basis
     D = ForwardDiff.Dual{Nothing, Float64, HEIGHT_NC}
     hd = SVector{HEIGHT_NC, D}(ntuple(i -> D(m.surface.h[i], ForwardDiff.Partials(ntuple(j -> Float64(i == j), Val(HEIGHT_NC)))), Val(HEIGHT_NC)))
-    surf_d = RC.BoardSurface{D}(hd, SVector{RC.EDGE_NC, D}(m.surface.edge), SVector{RC.INPLANE_NC, D}(m.surface.inplane))
-    scene_d = with_surface(s_c.scene, surf_d)
+    surf_d = RC.TargetState{D}(hd, SVector{RC.EDGE_NC, D}(m.surface.edge), SVector{RC.INPLANE_NC, D}(m.surface.inplane))
+    board_d = with_state(s_c.board, surf_d)
     # the kernels' own form (the tile's window lens, the dual heights in the scene): the internal View and _Φ_pixel
     view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.camera.geometric, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
     Hd = zeros(3 * length(r.pix), HEIGHT_NC)
     for (i, iv) in enumerate(r.pix)
         u, v = s_c.px[r.k][iv]
-        Φ = RC._Φ_pixel(u, v, r.k, view, VgtkCore.model(vars[9]), m.mat, vars[10].light, scene_d, s_c.settings)
+        Φ = RC._Φ_pixel(u, v, r.k, view, VgtkCore.model(vars[9]), m.mat, vars[10].light, board_d, s_c.settings)
         for c in 1:3, j in 1:HEIGHT_NC
             Hd[3 * (i - 1) + c, j] = ForwardDiff.partials(Φ[c], j)
         end
@@ -57,7 +57,7 @@
     # 3. a direction-chart focus (focus-ab's kind 1): its columns against central differences of the residual along each node
     ξ = vec([SVector(x, y) for x in (-0.5, 0.0, 0.5), y in (-0.5, 0.0, 0.5)])
     fk = Focus(RC.FocusSpline(ξ, RC.FOCUS_DIRECTION_CHART), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
-    s_k = warped(CalibrationState(scene_edge(edge_s), st_e, RadiometricCameraModel(glens_e, fk, 0.0386, vig_e), copy(poses_e),
+    s_k = warped(CalibrationState(board_edge(edge_s), st_e, RadiometricCameraModel(glens_e, fk, 0.0386, vig_e), copy(poses_e),
                                   mat_e, light_e, targets_e; masks = masks_e))
     pk, _ = build_problem_grid(s_k; patch = (5, 5), height_degree = 1)
     rk = RC.tile_costs(pk)[argmax([length(t.pix) for t in RC.tile_costs(pk)])]
@@ -137,7 +137,7 @@ end
         # along each node (the Float32 differences: 0.7–2.2 % on this scene, 2026-11-11)
         ξ = vec([SVector(x, y) for x in (-0.5, 0.0, 0.5), y in (-0.5, 0.0, 0.5)])
         fk = Focus(RC.FocusSpline(ξ, RC.FOCUS_DIRECTION_CHART), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
-        chart_state(be) = warped(CalibrationState(scene_edge(edge_s), st_e, RadiometricCameraModel(glens_e, fk, 0.0386, vig_e), copy(poses_e),
+        chart_state(be) = warped(CalibrationState(board_edge(edge_s), st_e, RadiometricCameraModel(glens_e, fk, 0.0386, vig_e), copy(poses_e),
                                                   mat_e, light_e, targets_e; masks = masks_e, backend = be))
         rck, vck, rgk, vgk = tile_pair(chart_state(RC.KernelAbstractions.CPU()), chart_state(CUDA.CUDABackend()))
         _, Jck = RC.NLLSsolver.computeresjac(RC.static(1023), rck, vck...)

@@ -39,14 +39,14 @@ struct _FluxAt{V, G, M, L, S, T}
     vig::G
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
 end
 Adapt.@adapt_structure _FluxAt
 _row_type(f::_FluxAt) = SVector{3, _float_of(f.st)}
 @inline function (f::_FluxAt)(id::UInt32)
     u, v = _decode_px(id, f.H)
-    return _Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st)
+    return _Φ_pixel(u, v, Int(f.k), Int(f.H), f.view, f.vig, f.mat, f.light, f.board, f.st)
 end
 
 """Row sums of `A .* B` per channel (helper: closure-free for the GPU compiler)."""
@@ -64,7 +64,7 @@ struct _PartsAt{J, NV, V, G, M, L, S, T, P, R}
     vig::G
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
     sizes::Tuple{Val{J}, Val{NV}}
     px::P
@@ -75,7 +75,7 @@ _row_type(f::_PartsAt{J, NV}) where {J, NV} = (F = _float_of(f.st); Tuple{SMatri
 @inline function (f::_PartsAt{J, NV})(i::UInt32) where {J, NV}
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    p = _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st, lr)
+    p = _pixel_parts(u, v, Int(f.k), Int(f.H), f.view, f.mat, f.light, f.board, f.st, lr)
     return _linear_rows(p, f.vig, coefficients(f.light), f.mat.diffuse_weight)
 end
 
@@ -87,7 +87,7 @@ struct _PixelPartsAt{V, M, L, S, T}
     view::V
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
 end
 Adapt.@adapt_structure _PixelPartsAt
@@ -98,13 +98,13 @@ _parts_type(::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, st::RenderSetti
 _row_float(::Type{<:PixelParts{J, L3, NS, F}}) where {J, L3, NS, F} = F
 @inline function (f::_PixelPartsAt)(id::UInt32)
     u, v = _decode_px(id, f.H)
-    return _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
+    return _pixel_parts(u, v, Int(f.k), Int(f.H), f.view, f.mat, f.light, f.board, f.st)
 end
 
 """The parts of every pixel of the device list `px` (`_PartsAt`; `idx` its index list, `rays` the record of the same parameters), on
 the device (queued on this task's queue): `_parts_stride(J, NV)` floats per pixel."""
-_parts_device(be, px, idx, k, H, view, vig, mat, light, scene, st, J::Integer, NV::Integer; rays) =
-    _launch_rows(_PartsAt(Int32(k), Int32(H), view, vig, mat, light, scene, st, (Val(J), Val(NV)), px, rays), be, idx)
+_parts_device(be, px, idx, k, H, view, vig, mat, light, board, st, J::Integer, NV::Integer; rays) =
+    _launch_rows(_PartsAt(Int32(k), Int32(H), view, vig, mat, light, board, st, (Val(J), Val(NV)), px, rays), be, idx)
 """Floats per pixel of the parts."""
 _parts_stride(J::Integer, NV::Integer) = 3 * (J + 1 + NV)
 
@@ -143,7 +143,7 @@ struct _JacAt{C, V, G, M, L, S, T, P, R}
     vig::G
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
     chunk::Val{C}
     fbase::Int32
@@ -156,7 +156,7 @@ _row_type(f::_JacAt{C}) where {C} = SVector{3 * (1 + C), _float_of(f.st)}
 @inline function (f::_JacAt{C})(i::UInt32) where {C}
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    Φ = _Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, Int(f.fbase), Int(f.dbase),
+    Φ = _Φ_pixel(u, v, Int(f.k), Int(f.H), f.view, f.vig, f.mat, f.light, f.board, f.st, Int(f.fbase), Int(f.dbase),
                 nothing, lr)
     F = _float_of(f.st)
     return SVector(ntuple(q -> (c = (q - 1) ÷ (1 + C) + 1; j = (q - 1) % (1 + C);
@@ -165,8 +165,8 @@ end
 """The chunk's dual flux of every pixel of the device list `px` (`_JacAt`; `idx` its index list, `_index_list`), on the device,
 complete (this task's queue waited for): `3(1 + C)` floats per pixel; `rays`: the record of the same parameters
 (`_radiance_record_device`), the rays' radiance. Workgroups of 128 (the kernel's register budget at C = 4)."""
-function _jac_device(be, px, idx, k, H, view, vig, mat, light, scene, st, ::Val{C}, fbase, dbase; rays) where {C}
-    out = _launch_rows(_JacAt(Int32(k), Int32(H), view, vig, mat, light, scene, st, Val(C), Int32(fbase), Int32(dbase),
+function _jac_device(be, px, idx, k, H, view, vig, mat, light, board, st, ::Val{C}, fbase, dbase; rays) where {C}
+    out = _launch_rows(_JacAt(Int32(k), Int32(H), view, vig, mat, light, board, st, Val(C), Int32(fbase), Int32(dbase),
                               px, rays), be, idx; workgroupsize = 128)
     KA.synchronize(be)
     return out
@@ -191,7 +191,7 @@ struct _RecordAt{V, G, M, L, S, T, P, O}
     vig::G
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
     px::P
     out::O
@@ -201,27 +201,27 @@ _row_type(f::_RecordAt) = SVector{3, _float_of(f.st)}
 @inline function (f::_RecordAt)(i::UInt32)
     nr = length(f.st.sensor) * n_disc(f.st.aperture)
     u, v = _decode_px(@inbounds(f.px[i]), f.H)
-    return SVector{3, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st, nothing, nothing,
+    return SVector{3, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), Int(f.H), f.view, f.vig, f.mat, f.light, f.board, f.st, nothing, nothing,
                                        nothing, RadianceRecord(f.out, (Int(i) - 1) * nr)))
 end
 """
-    _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32) -> device vector of `RadianceJac`
+    _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32) -> device vector of `RadianceJac`
 
 The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (the kernel's float type) (view `v32`, material, lighting, scene with
 its surface): per ray `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
 the height kernel of the same parameters read it (`rays`) instead of carrying their partials through the estimator.
 """
-function _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
-    out = _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
+function _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
+    out = _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
     KA.synchronize(be)
     return out
 end
 """`_radiance_record_device` without the wait (this task's device queue orders the kernels that read it after it)."""
-function _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
+function _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
     nr = length(st32.sensor) * n_disc(st32.aperture)
     F = _float_of(st32)
     out = reinterpret(RadianceJac{F}, KA.zeros(be, F, length(RadianceJac{F}) * nr * length(px)))
-    f = _RecordAt(Int32(k), Int32(H), v32, vig32, m32, l32, scene32, st32, px, out)
+    f = _RecordAt(Int32(k), Int32(H), v32, vig32, m32, l32, board32, st32, px, out)
     haskey(_CAPACITY, typeof(be)) || _note_capacity!(be, f, idx, 128)   # the LM's heaviest kernel: its occupancy sizes the window
     _launch_rows(f, be, idx; workgroupsize = 128)
     return out
@@ -275,7 +275,7 @@ struct _HeightAt{V, G, M, L, S, T, H, P, R}
     vig::G
     mat::M
     light::L
-    scene::S
+    board::S
     st::T
     h::H
     px::P
@@ -286,21 +286,21 @@ _row_type(f::_HeightAt) = SMatrix{3, HEIGHT_NC, _float_of(f.st), 3 * HEIGHT_NC}
 @inline function (f::_HeightAt)(i::UInt32)
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    return SMatrix{3, HEIGHT_NC, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), f.view, f.vig, f.mat, f.light, f.scene, f.st,
+    return SMatrix{3, HEIGHT_NC, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), Int(f.H), f.view, f.vig, f.mat, f.light, f.board, f.st,
                                                   nothing, nothing, HeightRays(f.h), lr))
 end
 """The height partials of every pixel of the device list `px` at the plain view `v32` (the kernel's float type, device-capable),
-material `m32`, vignetting and lighting, on the scene `scene32` (plain surface) at the nodal heights `h`, seeded here: `3 HEIGHT_NC`
+material `m32`, vignetting and lighting, on the scene `board32` (plain surface) at the nodal heights `h`, seeded here: `3 HEIGHT_NC`
 floats per pixel, pixel-major, on the device (queued on this task's queue: `KA.synchronize` before another task reads it). Workgroups of
 128 (the Jacobian kernel's register budget)."""
-_heights_device(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32, h::StaticVector{HEIGHT_NC}; rays) =
-    _launch_rows(_height_functor(k, H, v32, vig32, m32, l32, scene32, st32, h, px, rays), be, idx; workgroupsize = 128)
+_heights_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32, h::StaticVector{HEIGHT_NC}; rays) =
+    _launch_rows(_height_functor(k, H, v32, vig32, m32, l32, board32, st32, h, px, rays), be, idx; workgroupsize = 128)
 """The height functor (`_HeightAt`): the nodal heights `h` seeded as `HEIGHT_NC`-slot duals."""
-function _height_functor(k, H, v32, vig32, m32, l32, scene32, st32, h::StaticVector{HEIGHT_NC}, px, rays)
+function _height_functor(k, H, v32, vig32, m32, l32, board32, st32, h::StaticVector{HEIGHT_NC}, px, rays)
     F = _float_of(st32)
     D = ForwardDiff.Dual{JacTag, F, HEIGHT_NC}
     hd = SVector{HEIGHT_NC, D}(ntuple(i -> D(F(h[i]), ForwardDiff.Partials(ntuple(j -> i == j ? one(F) : zero(F), Val(HEIGHT_NC)))), Val(HEIGHT_NC)))
-    return _HeightAt(Int32(k), Int32(H), v32, vig32, m32, l32, scene32, st32, hd, px, rays)
+    return _HeightAt(Int32(k), Int32(H), v32, vig32, m32, l32, board32, st32, hd, px, rays)
 end
 """The free height columns of a pixel's rows (`rows[c, col]`, `_PixelRows`) from the height partials `hh` (`_heights_device`) of
 view pixel `iv`: its raw nodal-height partials projected by the material block's basis `B` (`HEIGHT_NC × HEIGHT_NFREE`, the block's

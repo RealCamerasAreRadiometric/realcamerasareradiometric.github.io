@@ -18,6 +18,17 @@ function _image_rect(geometric::VgtkCore.BoundedCamera)
     return VgtkCore.Rect(0, 0, W, H)
 end
 """
+    _image_size(camera) -> (W, H)
+
+The image size of a camera, in pixels: its geometric camera's `extent` (VisualGeometryToolkitCore's `BoundedCamera`). THE image
+size of a render, of its masks and of the pixel ids' stride (`(u − 1) H + v`): it is stated once, by the camera. A kernel that
+holds only a bare model of a tile is given the height by its caller, read here from the state's camera.
+"""
+_image_size(geometric::VgtkCore.BoundedCamera) = (e = Tuple(VgtkCore.extent(geometric)); (Int(e[1]), Int(e[2])))
+_image_size(c::RadiometricCameraModel) = _image_size(c.geometric)
+_image_width(c) = _image_size(c)[1]
+_image_height(c) = _image_size(c)[2]
+"""
     flat_vignetting(geometric) -> TensorProductVignetting
 
 The calibration's start of the vignetting on the image of the geometric camera `geometric`: V ≡ 1 as a flat 4 × 4 quadratic B-spline
@@ -58,6 +69,8 @@ View{T, N, L}(pose::P, geometric::L, focus::Focus{T, N}, r) where {T, N, L, P <:
 
 Adapt.adapt_structure(to, v::View{T, N}) where {T, N} =
     (l = adapt(to, v.geometric); View{T, N, typeof(l)}(v.pose, l, v.focus, v.r))   # a grid lens carries an array
+
+_image_size(v::View) = _image_size(v.geometric)
 
 # ---- the camera-frame maps of a view: VisualRadiometryToolkitCore's, on the view's parts (one-line forwards)
 @inline chief_direction(v::View, 𝐩::StaticVector{2}) = chief_direction(v.geometric, 𝐩)

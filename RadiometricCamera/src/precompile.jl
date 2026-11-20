@@ -29,8 +29,7 @@
         return nothing
     end
     @compile_workload begin
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        scene = Scene(board, W, H)
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
         focus_t = Focus(FocusSpline(grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
@@ -38,11 +37,11 @@
         mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         # a state of the scene seen through `lens`, its targets rendered at the truth
-        function state(lens, scene_ = scene, st_ = st; kw...)
+        function state(lens, board_ = board, st_ = st; kw...)
             camera = RadiometricCameraModel(lens, focus_t, 0.0386, vignetting())
-            masks = [compute_mask(camera, p, scene_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for p in poses]   # the workload's CPU states
-            targets = [render_view(k, camera, poses[k], mat, light, scene_, st_, masks[k]) for k in 1:2]
-            return CalibrationState(scene_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, kw...)
+            masks = [compute_mask(camera, p, board_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for p in poses]   # the workload's CPU states
+            targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]) for k in 1:2]
+            return CalibrationState(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, kw...)
         end
         per_view(s; kw...) = ((prob, _) = build_problem(s; kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
         per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))

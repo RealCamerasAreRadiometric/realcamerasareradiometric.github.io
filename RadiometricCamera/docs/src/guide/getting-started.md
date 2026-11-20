@@ -20,14 +20,13 @@ runs at the sensor's full resolution. The principal point is the image's centre 
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
 using VisualRadiometryToolkitCore: Focus, Material, with_vignetting   # the generic radiometric types: the focus surface, the material, a camera's parts
-using RadiometricCamera: PrintedTarget, RenderSettings, Scene, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
+using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                                   # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
-scene = Scene(board, W, H)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide
 ```
@@ -68,8 +67,8 @@ camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vigne
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; diffuse_weight = 0.4)
-masks = [compute_mask(camera_true, p, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
-photos = [render_view(k, camera_true, poses[k], material_true, light_true, scene, settings, masks[k]) for k in 1:2]
+masks = [compute_mask(camera_true, p, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
+photos = [render_view(k, camera_true, poses[k], material_true, light_true, board, settings, masks[k]) for k in 1:2]
 size(photos[1])
 ```
 
@@ -81,7 +80,7 @@ lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² 
 
 ```@example tutorial
 camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2))   # V ≡ 1
-s = CalibrationState(scene, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
+s = CalibrationState(board, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
                      masks)
 cost(s)
 ```

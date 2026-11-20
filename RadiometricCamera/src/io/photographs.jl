@@ -40,7 +40,7 @@ _pixel_pitch(s::VgtkCore.Sensor) = VgtkCore.ustrip(VgtkCore.m, VgtkCore.px * s.p
                  image_distance = nothing, downsample = 8, texture_downsample = 8, sensor_width = 7mm, r₀ = 1.7e-3, linearize = true,
                  focus_grid = 5, load_targets = true, raw_dir = nothing, lens_identity = nothing)
 
-Scene, camera parts and initial poses of a calibration session stored as VisualGeometryToolkitIO records (`records`: CaliBlobs'
+Board, camera parts and initial poses of a calibration session stored as VisualGeometryToolkitIO records (`records`: CaliBlobs'
 `save_calibration`, or its one-time migration of a BlobBoards session export, `scripts/migrate_rc_session.jl`):
 
 * the camera: `load(BoundedCamera, camera.json)` — K in COLMAP pixels, the image extent, e.g. BlobBoards' division camera — bounded
@@ -49,7 +49,7 @@ Scene, camera parts and initial poses of a calibration session stored as VisualG
   `grid_size` sampled from it (`grid_model`);
 * the board: the target of component `component`, `load(Rig, targets_<component>.json)` — Core's planar target with its Canvas and
   the CanvasTexture of the printed image, whose file (`textures/<id>.png`, beside the records) is read by Features' `load_linear_image`
-  and box-averaged by `texture_downsample` — as the `PrintedTarget` of the scene, whose world frame is the target's (metres);
+  and box-averaged by `texture_downsample` — as the `TexturedTarget` of the scene, whose world frame is the target's (metres);
 * the poses: the frames of `trajectory_<component>.json` (`load(Trajectory, …)`: target → camera per frame, the frames' image names),
   each photograph's camera → world pose (`poses`) its inverse (lengths in metres through FlexUnits);
 * the focus surface: `focus_init = :board_center` (the board centre is in focus: its mean axial distance `d_c`, the lens equation's image
@@ -57,7 +57,7 @@ Scene, camera parts and initial poses of a calibration session stored as VisualG
   Inf), `:board` (the mean principal-ray distance to the board plane) or a number (metres); `image_distance` overrides `d_s`
   (`nothing`: from `focus_init`, `:board` the conjugate of the board distance, or a number);
 * the targets: the photographs `image_dir/<image>` in frame order (sRGB-decoded when `linearize`, box-averaged by `downsample`); with
-  `load_targets = false` only the first is read, for the scene size;
+  `load_targets = false` only the first is read, for the image size;
 * the capture's camera settings (`settings`): with `raw_dir`, each frame's RAW file (`raw_file`: the image's stem, a RAW extension)
   read by Features' `load_raw_metadata` (the EXIF alone) into Features' `extract_capture_settings` — Core's `CaptureSettings`, frame
   index → exposure and lens settings, with the body and the lens (`lens_identity` where the caller states it: an adapted lens
@@ -74,7 +74,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     lens === :camera || lens === :grid || throw(ArgumentError("lens must be :camera or :grid"))
     # the board: the component's target, its canvas texture's image beside the records
     rig = VgtkIO.load(VgtkCore.Rig, joinpath(records, "targets_$(component).json"))
-    length(rig.members) == 1 || @warn "component $component holds $(length(rig.members)) targets; the scene holds one, the first by id" ids = sort!(collect(keys(rig.members)))
+    length(rig.members) == 1 || @warn "component $component holds $(length(rig.members)) targets; the board holds one, the first by id" ids = sort!(collect(keys(rig.members)))
     id = first(sort!(collect(keys(rig.members))))
     pt = rig.members[id]
     tex_rec = VgtkCore.canvas(VgtkCore.model(pt)).texture
@@ -86,12 +86,11 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     frames = sort!(collect(keys(traj.poses)))
     names = [traj.images[t] for t in frames]
     cam_poses = [_pose_eltype(Float64, inv(VgtkCore.ustrip(VgtkCore.m, traj.poses[t]))) for t in frames]
-    board = PrintedTarget(target, tex; facing = cam_poses[1].t)
+    board = TexturedTarget(target, tex; facing = cam_poses[1].t)
     photo(n) = VgtkFeatures.load_linear_image(joinpath(image_dir, n); srgb = linearize, downsample)
     targets = load_targets ? [photo(n) for n in names] : Array{Float64, 3}[]
     t1 = load_targets ? targets[1] : photo(names[1])
     H, W = size(t1, 1), size(t1, 2); t1 = nothing
-    scene = Scene(board, W, H)
     # the record's camera on the scene's pixels: Features' box downsample by f averages the f × f block of raw pixels j f + 1 … (j + 1) f
     # (the remainder rows / columns dropped), so a COLMAP coordinate (pixel corners on the integers) is x / f, corners to corners —
     # the similarity of scale 1/f, no translation — and K is re-expressed in that frame by Core's `reframed_calibration`
@@ -121,7 +120,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     settings = raw_dir === nothing ? nothing :
         VgtkFeatures.extract_capture_settings(Dict(t => VgtkFeatures.load_raw_metadata(raw_file(raw_dir, traj.images[t])) for t in frames);
                                               lens = lens_identity)
-    return (; scene, poses = cam_poses, targets, names, frames, lens₀, focus₀, r₀ = Float64(r₀), sensor = VgtkCore.sensor(lc), cosα = cosα_i, nodes, 𝔱₀, d_s, board_distances,
+    return (; board, poses = cam_poses, targets, names, frames, lens₀, focus₀, r₀ = Float64(r₀), sensor = VgtkCore.sensor(lc), cosα = cosα_i, nodes, 𝔱₀, d_s, board_distances,
             center_distances, target_id = id, extent = VgtkCore.extent(bc), downsample, settings)
 end
 

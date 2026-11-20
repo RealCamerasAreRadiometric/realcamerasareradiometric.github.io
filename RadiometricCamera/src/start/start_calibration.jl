@@ -11,7 +11,7 @@
 
 The geometric calibration a radiometric calibration starts from: the geometric `camera` (a `BoundedCamera`, the start camera), one
 `poses[k]` per photograph (camera → world, `EuclideanMap`), the `observations[k]` of the target in photograph `k` (`(𝐩, X)` pairs: the
-image point, COLMAP px, and the target point in the world, plain metres) and the printed `target` (a [`PrintedTarget`](@ref)). The
+image point, COLMAP px, and the target point in the world, plain metres) and the printed `target` (a `TexturedTarget`). The
 front end's facts ride along: the photographs' `names`, the image size, the start camera's initialization region (where it is
 defined; `nothing`: its own domain), the record of its exact resample (`resample`, [`exact_start`](@ref)'s; `nothing` for a camera
 that was not resampled), `features_for(surface)` (the observations under a warped or misprinted surface), the world's
@@ -77,7 +77,7 @@ with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camer
 start_calibration(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions,
                   device = VgtkCore.default_device()) = _start_state(geometry, photographs, options, nothing; backend = device)
 start_calibration(camera::VgtkCore.BoundedCamera, poses::AbstractVector, observations::AbstractVector, photographs::AbstractVector{<:AbstractString};
-                  target::PrintedTarget, options::PipelineOptions, device = VgtkCore.default_device(), names = basename.(photographs)) =
+                  target::TexturedTarget, options::PipelineOptions, device = VgtkCore.default_device(), names = basename.(photographs)) =
     start_calibration(StartGeometry(camera, poses, observations, target; names), photographs; options, device)
 
 """

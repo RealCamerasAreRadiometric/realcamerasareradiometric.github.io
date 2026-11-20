@@ -24,10 +24,10 @@
         @test has_lens(ds.lens₀, VgtkCore.Division{2}) && VgtkCore.lens(ds.lens₀) == rcam.lens && VgtkCore.extent(ds.lens₀) == VgtkCore.Size2(128, 128)
         @test pinhole_θ(ds.lens₀) ≈ SVector(K[1, 1], K[2, 2], K[1, 3], K[2, 3]) ./ 8
         # the board: the target's canvas texture — its rectangle (metres, the design chart) and its image box-averaged by 8
-        tr = VgtkCore.Rect(VgtkCore.canvas(VgtkCore.model(ds.scene.board.target)).texture)
-        b = ds.scene.board
+        tr = VgtkCore.Rect(VgtkCore.canvas(VgtkCore.model(ds.board.target)).texture)
+        b = ds.board
         @test b.size ≈ SVector(tr.widths...) && 0.13 < b.size[1] < 0.1301
-        @test RC.texture_size(b) == (6143 ÷ 8, 6143 ÷ 8)
+        @test VrtkCore.texture_size(b) == (6143 ÷ 8, 6143 ÷ 8)
         @test world_point(b, SVector(0.0, 0.0)) ≈ SVector(tr.origin[1], tr.origin[2] + tr.widths[2], 0.0) atol = 1e-15   # the image's top-left
         @test world_point(b, SVector(1.0, 1.0)) ≈ SVector(tr.origin[1] + tr.widths[1], tr.origin[2], 0.0) atol = 1e-15   # its bottom-right
         # the poses: the trajectory's target → camera maps, in metres; the camera centre is in front of the printed side

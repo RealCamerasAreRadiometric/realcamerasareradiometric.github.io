@@ -54,7 +54,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "board plane hit" begin
         tex = rand(64, 96, 3)
-        bd = PrintedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+        bd = TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
         s, 𝐱 = intersect_board(bd, SVector(0.0, 0.0, 0.0), SVector(0.25, 0.5, 1.0))
         @test 𝐱 ≈ SVector(0.5, 1.0, 2.0) atol = 1e-12
         @test s ≈ 2 atol = 1e-12
@@ -74,8 +74,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "ray-tracing pipeline smoke (CPU): mask → render → cost with every lens type" begin
         tex = fixture_board()
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        scene = Scene(board, 24, 24)
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
         sensor = 1.288 * 0.066
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))), fill(1 / 1.5, 9))
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -89,15 +88,15 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
             # the contract's values are the paper's integral ∝ r²: the render divides by πr², so the lighting carries it
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.0386^2, 2), b, r_SH); mat = Material()
             st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-            masks = [compute_mask(camera, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+            masks = [compute_mask(camera, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
             @test all(count(m) > 50 for m in masks)
-            targets = [render_view(k, camera, poses[k], mat, light, scene, st, masks[k]) for k in 1:2]
+            targets = [render_view(k, camera, poses[k], mat, light, board, st, masks[k]) for k in 1:2]
             @test all(t -> all(isfinite, t) && maximum(t) > 0, targets)
-            s = CalibrationState(scene, st, camera, poses, mat, light, targets; masks)
+            s = CalibrationState(board, st, camera, poses, mat, light, targets; masks)
             c, rms = cost(s)
             @test isfinite(c) && rms < 1e-6                                   # re-rendering the generating state: zero residual
             moved = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), SVector(0.01, 0.0, 0.0, 0.0, 0.0, 0.0)) for p in poses]
-            s2 = CalibrationState(scene, st, camera, moved, mat, light, targets; masks)
+            s2 = CalibrationState(board, st, camera, moved, mat, light, targets; masks)
             c2, rms2 = cost(s2)
             @info "pipeline smoke" lens = nameof(typeof(lens)) rel_rms_at_truth = rms rel_rms_moved_10mrad = rms2
             @test rms2 > 1e-3                                                # the render responds to geometry
@@ -128,7 +127,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "fixed values: pose, board hit, board chart, forward projection" begin
         tex = fill(0.5, 8, 8, 3)
-        bd = PrintedTarget([-1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+        bd = TexturedTarget([-1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), 100.0, (50.0, 50.0), 100, 100)
         # identity pose: the pixel (75, 37.5) (m = (0.25, −0.125)) hits z = 2 at (0.5, −0.25, 2) → board chart (0.75, 0.375)
         s, X = intersect_board(bd, SVector(0.0, 0.0, 0.0), chief_ray(pin, SVector(75.0, 37.5)))
@@ -163,8 +162,8 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         ι1 = [clamp(hypot((j - 0.5) / 256 - C[1], (i - 0.5) / 256 - C[2]) / Rb, 0.0, 1.0) for i in 1:256, j in 1:256]
         tex1 = cat(ι1, ι1, ι1; dims = 3)
         o = [-1.0, -1.0, 0.0]; u = [2.0, 0.0, 0.0]; v = [0.0, 2.0, 0.0]; facing = [0.0, 0.0, 1.5]
-        board = PrintedTarget(o, u, v, tex1; facing)
-        white = PrintedTarget(o, u, v, ones(256, 256, 3); facing)
+        board = TexturedTarget(o, u, v, tex1; facing)
+        white = TexturedTarget(o, u, v, ones(256, 256, 3); facing)
         NPX = 48
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), Float64(NPX), (NPX / 2, NPX / 2), NPX, NPX)
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)       # R_cw = diag(1, −1, −1): looking down at the board
@@ -178,10 +177,10 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         col, row = pixel_of_𝐩(SVector{2, Float64}(pc))                              # the 1-based pixel: (30.9, 34.1)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)   # the contract's values are the paper's integral ∝ r²: the lighting carries the πr²
         function render_board(bd)
-            scene = Scene(bd, NPX, NPX); b = 𝔟(bd)
+            board = bd; b = 𝔟(bd)
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.02^2, 2), b, sphere_radius(b, [pose.t]))
-            mask = compute_mask(camera, pose, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
-            return render_view(1, camera, pose, Material(), light, scene, st, mask)[:, :, 1], mask
+            mask = compute_mask(camera, pose, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
+            return render_view(1, camera, pose, Material(), light, board, st, mask)[:, :, 1], mask
         end
         lum, mask = render_board(board); lum_w, _ = render_board(white)
         ratio = lum ./ max.(lum_w, 1e-9)                                             # shading and vignetting cancel: the ink map as seen

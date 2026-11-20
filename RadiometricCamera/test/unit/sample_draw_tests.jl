@@ -35,7 +35,7 @@
     src = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "prepare.jl"), String)
     @test occursin("masks = [inreg for _ in 1:K]", src) && !occursin("compute_mask(", src)
     @test occursin("img, masks[k] = observe(pset::PhotoSet, k, masks[k]; name = names[k])", src)
-    @test occursin("draw_samples(rng, BoardValidity(mask_views[k], scene, st; δ = 0.01, backend), masks[k], img, N;", src)
+    @test occursin("draw_samples(rng, BoardValidity(mask_views[k], board, st; δ = 0.01, backend), masks[k], img, N;", src)
     @test !occursin("lm_fraction", src) && !occursin("max_pixels_per_view", src)
     for k in ("lm_fraction", "max_pixels_per_view")
         e = try RC.pipeline_options(Dict("masks" => Dict(k => 1))); nothing catch err; err end
@@ -215,25 +215,24 @@ end
 end
 
 @testitem "samples: BoardValidity is compute_mask's test, the draw tests a few n of the region's pixels" setup = [RCFixtures] begin
-    using RadiometricCamera: BoardValidity, board_valid, compute_mask, draw_samples, Focus, GaussianDerivativeEdges, PrintedTarget,
-                             RenderSettings, Scene, View
+    using RadiometricCamera: BoardValidity, board_valid, compute_mask, draw_samples, Focus, GaussianDerivativeEdges,
+                             TexturedTarget, RenderSettings, View
     using StableRNGs: StableRNG
     using StaticArrays: SMatrix, SVector
     using VisualGeometryToolkitCore: exp_so3
     cpu = RadiometricCamera.KernelAbstractions.CPU()
     W = H = 160
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
-    scene = Scene(board, W, H)
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
     pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector{3}(SVector(0.05, -0.05, 1.5)); check = false)
     camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 140.0, (80.0, 80.0), W, H), Focus(3, 1.5, W, H), 0.0386,
                                     VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     view = View(pose, camera)        # the mask test's internal record (BoardValidity, board_valid take the kernels' view)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     region = [(u - 80)^2 + (v - 80)^2 < 75^2 for v in 1:H, u in 1:W]
-    mask = compute_mask(camera, pose, scene, st; δ = 0.01, external = region, backend = cpu)
+    mask = compute_mask(camera, pose, board, st; δ = 0.01, external = region, backend = cpu)
     @test 0 < count(mask) < count(region)                                                # the board does not fill the region
-    ids = findall(vec(region)); t = BoardValidity(view, scene, st; δ = 0.01, backend = cpu)
-    @test t(ids) == mask[ids] && board_valid(view, scene, st, ids[1:2:end]; δ = 0.01, backend = cpu) == mask[ids[1:2:end]]
+    ids = findall(vec(region)); t = BoardValidity(view, board, st; δ = 0.01, backend = cpu)
+    @test t(ids) == mask[ids] && board_valid(view, board, st, ids[1:2:end]; δ = 0.01, backend = cpu) == mask[ids[1:2:end]]
     # the draw through the view's test: the n smallest keys among compute_mask's pixels; its work, the pixels tested, against the
     # full-region test's count(region) (the timing check of the 0.11.4 review's item 7a; seconds: test/regression/mask_draw_benchmark.jl)
     n = 400; tested = Ref(0)

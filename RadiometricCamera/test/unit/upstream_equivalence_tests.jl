@@ -2,7 +2,7 @@
 # as a frozen REFERENCE (nothing in src/ calls it) and checks the upstream function against it on the inputs where the two could
 # differ, so the replacement is pinned to "the same numbers" rather than to "a plausible formula".
 @testitem "RC numerics replaced by the upstream owner's (equivalence)" setup = [RCFixtures] begin
-    using RadiometricCamera: board_normal, board_plane_hit, HEIGHT_NC, intersect_board, PrintedTarget, world_point
+    using RadiometricCamera: board_normal, board_plane_hit, HEIGHT_NC, intersect_board, TexturedTarget, world_point
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -89,7 +89,7 @@
         for _ in 1:20_000
             o0 = randn(rng, SVector{3, Float64}); u = randn(rng, SVector{3, Float64}); v = randn(rng, SVector{3, Float64})
             v = v - dot(v, u) / dot(u, u) * u                                      # a page's edges are orthogonal
-            bd = PrintedTarget(o0, u, v, ones(4, 4, 3); facing = o0 + 3 * randn(rng, SVector{3, Float64}))
+            bd = TexturedTarget(o0, u, v, ones(4, 4, 3); facing = o0 + 3 * randn(rng, SVector{3, Float64}))
             o = 2 * randn(rng, SVector{3, Float64}); d = normalize(randn(rng, SVector{3, Float64}))
             s, 𝐱 = board_plane_hit(bd, o, d); s_ref, 𝐱_ref = ref_intersect_board(bd, o, d)
             k = abs(dot(d, board_normal(bd))) < 0.05 ? 2 : 1                                  # 2: grazing
@@ -99,7 +99,7 @@
         @test n[1] + n[2] == 20_000 && n[2] > 500 && behind > 5000
         @test worst[1] <= 1e-13 && worst[2] <= 1e-12
         # the golden scenes' board, a ray of a camera looking down at it, with dual ray partials: values and partials agree to roundoff
-        bd = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(4, 4, 3); facing = [0.0, 0.0, 1.5])
+        bd = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(4, 4, 3); facing = [0.0, 0.0, 1.5])
         o = SVector(0.05, -0.05, 1.5); d = normalize(SVector(0.2, -0.1, -1.0))
         f(t) = (r = board_plane_hit(bd, o + t[1:3], d + t[4:6]); SVector(r[1], r[2]...))
         f_ref(t) = (r = ref_intersect_board(bd, o + t[1:3], d + t[4:6]); SVector(r[1], r[2]...))

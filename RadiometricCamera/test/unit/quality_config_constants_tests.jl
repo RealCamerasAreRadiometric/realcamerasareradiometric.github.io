@@ -46,14 +46,10 @@
         "GPU" => "a parsed CLI flag (whether the GPU stages run here)",
         "FORCE" => "a parsed CLI flag (recompute a keyed product)",
         # ---- model structure: static array sizes, gauge slices ----
-        "EDGE_NC" => "the printed edge's parameter count (δ, σ_print): the model's structure, a static size",
-        "INPLANE_NC" => "the in-plane print error's parameter count (aspect, skew): the model's structure, a static size",
-        "HEIGHT_N" => "the warping height field's node grid per page axis: static sizes (HEIGHT_NC, HEIGHT_NFREE) of the board model (judged structure, 2026-11-16)",
         "RAD_NL" => "the radiance Jacobian's column count (the lighting parameters): a static size",
         "GRID_PATCH" => "the grid route's static patch block size: a larger block explodes codegen (judged structure, 2026-11-16)",
         "_NO_ROTATION_GAUGE" => "the empty gauge slice (no held coordinate), a sentinel",
         # ---- numerical machinery no experiment varies ----
-        "EDGE_EPS_MM" => "the floor of the edge blur σ_c that keeps a sharp edge's derivative finite (a guard, not a setting)",
         "WINDOW_MEMORY_FOOTPRINT" => "the device scheduler's memory estimate: how many blocks are in flight, never what they compute",
         "LM_DAMPING" => "Levenberg's λ·I: the owner's ruling 2026-11-14 'one value, no option' (the retired key lm.iterator names it)",
         "_SAME_POSE_RTOL" => "a numerical identity: whether two representations of one pose are the same map (~4500 ulps), not a run setting")

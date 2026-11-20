@@ -37,7 +37,7 @@
     @testset "the start record round-trips; a start of other options is refused" begin
         W = H = 32
         kb = cam(RC.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
-        sc = gold_scene(W, H; h = gold_h())
+        sc = gold_board(W, H; h = gold_h())
         s = gold_state(sc..., kb)
         names = ["V01.png", "V02.png"]
         meta = (; names, W₀ = W, H₀ = H, fpx = 41.216, lens_start = s.camera.geometric, init_region = nothing, R0 = 0.0386,

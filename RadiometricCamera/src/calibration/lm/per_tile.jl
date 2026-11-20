@@ -333,7 +333,7 @@ function build_problem_grid(s::CalibrationState{N}; patch::Tuple{Int, Int} = GRI
     NH = _surface_held(fixed, :height) ? 0 : height_nparams(height_degree)   # the surface's parameters: the model's, unless `fixed` holds them
     inplane = inplane && !_surface_held(fixed, :inplane)
     material_held, blocks_held = _hold_material(fixed, NH > 0 || inplane)   # Θ_m alone while a surface parameter rides
-    mv = MaterialVar(s.mat, s.scene.surface, s.scene.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
+    mv = MaterialVar(s.mat, s.board.state, s.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
     TileT = PerTileResidual{N, typeof(s), PatchT, AVT}
     variables = Any[]; blocks = Any[]
     held = VgtkCore.present_nodes(VgtkCore.model(lens0))
@@ -477,7 +477,7 @@ function _tile_dev!(r::PerTileResidual)
     ids = Vector{UInt32}(undef, length(r.pix))
     for (j, i) in enumerate(r.pix)
         u, v = s.px[r.k][i]
-        ids[j] = UInt32((u - 1) * s.scene.H + v)
+        ids[j] = UInt32((u - 1) * _image_height(s) + v)
     end
     sh(a) = _shared_read_only!(s.backend, a)                  # read on the window's queues too, written only here
     d = (; px = sh(adapt(s.backend, ids)), idx = sh(_index_list(s.backend, length(ids))), pix = sh(adapt(s.backend, Int32.(r.pix))),
@@ -669,13 +669,13 @@ function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, nee
     return _batch_launch(s, k, vars, lensf, vec[first(gb.patches)], s.device_cache.px[k], s.device_cache.idx[k], key, need_jac)
 end
 """One chunk of a view batch's Jacobian (`_batch_launch`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on the
-lens `lens` and the scene `scene` (its surface replaced by the seeded one), both in `F` (`_kernel_float`, or
-`HIGH_FLOAT` for the pose's chunks: `hi`). Returns the `_JacAt` inputs `(view, mat, scene, fbase, dbase, hi)`."""
-function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, scene, hi::Bool) where {F}
+lens `lens` and the board `board` (its state replaced by the seeded one), both in `F` (`_kernel_float`, or
+`HIGH_FLOAT` for the pose's chunks: `hi`). Returns the `_JacAt` inputs `(view, mat, board, fbase, dbase, hi)`."""
+function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, board, hi::Bool) where {F}
     N = length(VgtkCore.model(foc).t̂_i)
-    D, cd, pose_d, focus_d, mat_d, scene_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, scene, lay.NI)
+    D, cd, pose_d, focus_d, mat_d, board_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, board, lay.NI)
     view_d = View{D, N, typeof(lens)}(pose_d, lens, focus_d, cd(ap.r, lay.off_r + 1))
-    return (view_d, mat_d, scene_d, Int32(lay.off_f - c0), Int32(lay.off_dir - c0), hi)
+    return (view_d, mat_d, board_d, Int32(lay.off_f - c0), Int32(lay.off_dir - c0), hi)
 end
 
 """
@@ -695,7 +695,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
     lens32 = _lens32(be, lensf)
     v32 = View{F, N, typeof(lens32)}(_pose_eltype(F, VgtkCore.model(pose)), lens32, VgtkCore.convert_eltype(F, VgtkCore.model(foc)),
                                      F(ap.r))
-    H = s.scene.H
+    H = _image_height(s)
     fluxf = _flux_functor(s, k, v32, VgtkCore.model(vg), m.mat, lt.light, m.surface)
     recordf = nothing; hrecordf = nothing; jacf = Tuple{Int, Any}[]; heightf = nothing; partsf = nothing
     hk = nothing
@@ -715,19 +715,19 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         # zero partials — the same values and partials, fewer registers
         vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
         m32 = VgtkCore.convert_eltype(F, m.mat)
-        scene32 = with_surface(dc.scene, VgtkCore.convert_eltype(F, m.surface))
-        recordf = (be, px, idx, k, H, v32, vig32j, m32, l32j, scene32, st32)   # the estimator once per ray (`_launch_record`)
+        board32 = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
+        recordf = (be, px, idx, k, H, v32, vig32j, m32, l32j, board32, st32)   # the estimator once per ray (`_launch_record`)
         if _needs_high(F, lay.NH > 0)                      # the nodal heights' kernel and its own record, in Float64 (`HIGH_FLOAT`)
             hk = _height_inputs(s, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light, lensf)
-            HIGH_FLOAT === F || (hrecordf = (be, px, idx, k, H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st))   # (CPU: the chunks' record)
-            lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st, m.surface.h))
+            HIGH_FLOAT === F || (hrecordf = (be, px, idx, k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st))   # (CPU: the chunks' record)
+            lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st, m.surface.h))
         end
-        plan = _chunk_plan(_chunk_starts(P, C), F, (lens32, dc.scene),
-                           hk === nothing ? nothing : (hk.view.geometric, hk.scene))
+        plan = _chunk_plan(_chunk_starts(P, C), F, (lens32, dc.board),
+                           hk === nothing ? nothing : (hk.view.geometric, hk.board))
         for (c0, Fc, inputs, high) in plan
             push!(jacf, (c0, _tile_chunk(Val(Fc), c0, C, lay, pose, foc, ap, m, inputs..., high)))
         end
-        partsf = (Int32(k), Int32(H), v32, vig32j, m32, l32j, scene32, st32, (Val(J), Val(NV)))   # (`_PartsAt`, with the batch's record)
+        partsf = (Int32(k), Int32(H), v32, vig32j, m32, l32j, board32, st32, (Val(J), Val(NV)))   # (`_PartsAt`, with the batch's record)
     end
     _count_device_call!(s, :flux)
     st32 = VgtkCore.convert_eltype(F, s.settings)
@@ -786,7 +786,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
     Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), lens64, r.pix, td.pix) : (nothing, nothing)
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
-    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(s.scene.H), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
+    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
                            _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N),
                            s.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,

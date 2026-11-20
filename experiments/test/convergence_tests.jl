@@ -106,9 +106,8 @@ end
     include(joinpath(rct, "fixture_board.jl")); include(joinpath(rct, "fixture_camera.jl"))   # RadiometricCamera's test scene (its checkpoint item's)
 
     tex = fixture_board()
-    board = RC.PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
-    scene = RC.Scene(board, W, H)
     glens = RC.grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H), 10, 10)
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -119,8 +118,8 @@ end
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))
     mat = RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     rs = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [RC.compute_mask(camera, p, scene, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
-    imgs = [RC.render_view(k, camera, poses[k], mat, light, scene, rs, masks[k]) for k in 1:2]
+    masks = [RC.compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
+    imgs = [RC.render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
     # the detections: board points seen through the start camera, each image point moved by a fixed sub-pixel offset (a detector's
     # bias), so the start's bearing error is not zero
     detections(k) = [(p .+ SVector(0.3 * cospi(i / 7), 0.3 * sinpi(i / 5)), X) for (i, X) in enumerate(SVector(x, y, 0.0) for x in -0.5:0.1:0.5 for y in -0.5:0.1:0.5)

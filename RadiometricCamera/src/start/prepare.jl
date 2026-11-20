@@ -113,16 +113,18 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
                 opts.edge.sdf, size(sdf, 2), size(sdf, 1), page_mm..., _edge_start(opts)...)
         sdf = nothing
     end
-    surface0 = BoardSurface(; h = height0, edge = isempty(opts.edge.sdf) ? nothing : collect(_edge_start(opts)), inplane = inplane0)
-    scene = Scene(board, W₀, H₀, surface0)
+    surface0 = TargetState(; h = height0, edge = isempty(opts.edge.sdf) ? nothing : collect(_edge_start(opts)), inplane = inplane0)
+    board = with_state(board, surface0)
+    Tuple(VgtkCore.extent(lens0)) == (W₀, H₀) ||   # the image is the camera's: the run's size and the start camera's are one
+        throw(ArgumentError("the start's camera is of a $(join(Tuple(VgtkCore.extent(lens0)), " × ")) image, the run's photographs are $(W₀) × $(H₀)"))
     st = RenderSettings(; n_𝐩 = opts.rendering.n_p, n_ρ = opts.rendering.n_rho, n_φ = opts.rendering.n_phi, N = opts.rendering.N,
                         hammersley = opts.rendering.hammersley)
     opts.rendering.hammersley && @printf("radiance samples: the Hammersley set of %d, shifted per (view, pixel, sub-pixel, aperture) key\n", opts.rendering.N)
-    b = 𝔟(scene.board); r_SH = sphere_radius(scene.board, [v.pose.t for v in views0])          # ≥ the page's corners too (2026-11-04)
+    b = 𝔟(board); r_SH = sphere_radius(board, [v.pose.t for v in views0])          # ≥ the page's corners too (2026-11-04)
     @printf("light sphere: r_SH %.3f m about the board centre (farthest camera %.3f m, farthest page corner %.3f m)\n", r_SH,
-            sphere_radius(b, [v.pose.t for v in views0]), maximum(norm(c - b) for c in corners(scene.board)))
+            sphere_radius(b, [v.pose.t for v in views0]), maximum(norm(c - b) for c in corners(board)))
     rng = StableRNG(opts.masks.seed)                                            # version-stable stream (_subsample)
-    inreg = VgtkCore.pixel_mask(_sampling_region(lens0, opts.masks.lens_coverage_scale), scene.W, scene.H)   # the pixels sampled: the coverage scaled
+    inreg = VgtkCore.pixel_mask(_sampling_region(lens0, opts.masks.lens_coverage_scale), W₀, H₀)   # the pixels sampled: the coverage scaled
     circ === nothing || @printf("imaged region: %d of %d pixels inside\n", count(inreg), length(inreg))
     mo = opts.masks                                                             # the draw (`draw_samples`): ∝ u^α of the edge strength's rank (0 = uniform),
     α = mo.gradient_bias                                                        #   or the rule of 2026-10-31 (edge_fraction), with an optional add-on
@@ -138,7 +140,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
         masks = [inreg for _ in 1:K]                                            # the candidates, before the observation model
     else
         masks = copy(start.masks)
-        all(m -> size(m) == (scene.H, scene.W), masks) || throw(ArgumentError("the start record $(start.dir): its masks are not the $(scene.W) × $(scene.H) photographs'"))
+        all(m -> size(m) == (H₀, W₀), masks) || throw(ArgumentError("the start record $(start.dir): its masks are not the $(W₀) × $(H₀) photographs'"))
     end
     # the start perturbed (`grid.start_perturbation`; perturb_start, per_tile_smoothness.jl): after the masks, which are the unperturbed
     # start's, and before the views, the present nodes and the smoothness, whose reference d̂₀ is so the PERTURBED start
@@ -180,7 +182,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
         # on the raw grid (both greens, uncensored, defects masked), a decoded image its pixels — never a flag (owner ruling 2026-11-13)
         img, masks[k] = observe(pset::PhotoSet, k, masks[k]; name = names[k])   # the candidates the model keeps (a start record's: its samples)
         chs = ndims(img) == 2 ? (1,) : _fit_channels(ch)                   # the edge selection reads the measured channels
-        start === nothing && (masks[k] = draw_samples(rng, BoardValidity(mask_views[k], scene, st; δ = 0.01, backend), masks[k], img, N;
+        start === nothing && (masks[k] = draw_samples(rng, BoardValidity(mask_views[k], board, st; δ = 0.01, backend), masks[k], img, N;
                                                       gradient_bias = α, edge_detector = mo.edge_detector, mo.edge_fraction, mo.addon_samples,
                                                       mo.addon_gradient_bias, channels = chs, diagonal = photosites, device = backend))
         px[k] = masked_pixels(masks[k])
@@ -220,7 +222,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     light0 = EnvironmentLight(SphericalHarmonicMap(1.0, opts.lighting.sh_order), b, r_SH)   # L ≡ 1 in every channel
     make_vig, vig_desc = _vignetting_spec(opts, W₀, H₀, coverage, vig_c)
     println("vignetting field: ", vig_desc, "; gauge V(𝐜) = 1 held ", "exactly (the centre's free direction eliminated)"); flush(stdout)
-    s = CalibrationState(scene, st, RadiometricCameraModel(lens0, focusV, R0, make_vig()), [v.pose for v in views0], material0, light0, empty_targets;
+    s = CalibrationState(board, st, RadiometricCameraModel(lens0, focusV, R0, make_vig()), [v.pose for v in views0], material0, light0, empty_targets;
                          masks, ϕ, backend, region, channel = ch, focus_fixed = findall(!, collect(focus_info[:free])),   # (focus-ab B: the held nodes)
                          sensor_models = sensor, sensor = om.sensor, photo_kind = om.kind, weights = _run_weights(ω), quanta = qs,
                          support_min = opts.vignetting.support_min, boundary_order = opts.vignetting.boundary_order,

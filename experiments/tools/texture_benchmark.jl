@@ -50,7 +50,7 @@ function texture_benchmark_scene(dir)
     PNGFiles.save(joinpath(sheetdir, "texture.png"), [RGB{N0f16}(design[i, j], design[i, j], design[i, j]) for j in 1:TH, i in 1:TW])
     save_sheet_target(sheetdir; page_mm = (60.0, 84.0), blobs_mm = Dict(1 => SVector(5.0, 5.0)))
     sheet = read_sheet(sheetdir)
-    rad = RC.TargetRadiometry(RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), RC.BoardSurface(; edge = [0.021, 0.034]))
+    rad = RC.TargetRadiometry(RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), RC.TargetState(; edge = [0.021, 0.034]))
     target = RC.RadiometricTarget(nothing, zero(SVector{RC.HEIGHT_NC, Float64}), 1.0, rad)
     Rx(a) = SMatrix{3, 3}(1.0, 0, 0, 0, cos(a), sin(a), 0, -sin(a), cos(a)); Ry(a) = SMatrix{3, 3}(cos(a), 0, -sin(a), 0, 1.0, 0, sin(a), 0, cos(a))
     poses = map(1:BENCH_VIEWS) do k

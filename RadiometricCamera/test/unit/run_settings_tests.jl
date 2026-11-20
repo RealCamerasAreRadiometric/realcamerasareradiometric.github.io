@@ -16,7 +16,7 @@
 
     W = H = 32
     kb = cam(RC.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
-    fresh() = (sc = gold_scene(W, H; h = gold_h()); gold_state(sc..., kb))
+    fresh() = (sc = gold_board(W, H; h = gold_h()); gold_state(sc..., kb))
     material_var(prob) = only(v for v in prob.variables if v isa RC.MaterialVar)
     # a step of every coordinate of the material block, μ's far below its chart's centre
     increment(mv) = (u = fill(0.01, Int(NL.nvars(mv))); u[9] = -50.0; u)

@@ -9,7 +9,8 @@
 # Everything else is internal. The names of Core's functions RC adds methods to (`chart`, `cost`, `residuals`) are Core's:
 # reach them through VisualGeometryToolkitCore. The generic radiometric types and functions are VisualRadiometryToolkitCore's (the
 # vignetting fields and the light, which were VisualGeometryToolkitCore's, and what moved there from this package: the camera's
-# parts and maps, the focus surface, the sensor domain and quadrature, the material): reach them through
+# parts and maps, the focus surface, the sensor domain and quadrature, the material, the textured target with its state — the board):
+# reach them through
 # VisualRadiometryToolkitCore — they are not public names of this package. The one re-export is the headline's camera type,
 # `RadiometricCameraModel`, which every verb here takes.
 # ---------------------------------------------------------------------------
@@ -18,40 +19,37 @@ export calibrate, start_calibration, refine_calibration!, StartGeometry, start_g
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        CalibrationState, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
 
-public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model, exact_start,
-       start_grid, region_start, coverage_region, check_coverage, calibrated_folds, grid_angular_error, schoeps_gridlens,
-       schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera, save_lens,
-       load_parametric_lens, load_lens, lens_type_name, TargetRadiometry, material, edge_parameters, target_radiometry,
-       board_surface, radiometric_target, set_radiometric_target!, PrintedTarget, posed_target, board_normal, 𝔟,
-       texture_size, corners, intersect_board, board_plane_hit, world_point, inside, ρ_c, with_sdf, has_sdf, BoardSurface,
-       with_h, with_edge, height_on, HEIGHT_NC, HEIGHT_NFREE, EDGE_NC, warping_nodes, warping_aspect, warping_field,
-       page_points, height_manifold, height_basis, board_height, board_relief, height_nparams, edge_albedo, INPLANE_NC,
-       with_inplane, inplane_on, inplane_calibration, design_chart, physical_chart, sphere_radius, RadianceSampler,
-       SampleKey, draws, key_hash, L_c, RadianceParts, radiance_parts, L_from_parts, RenderSettings, Scene, with_surface,
-       pixel_id, Φ_pixel, compute_mask, masked_pixels, render_view, masked_vector, n_views, set_surface!, set_vignetting!,
-       set_pose!, render_all, photometric_residuals, PixelParts, pixel_parts, RadiometryParts, all_parts, solve_Θ_l!,
-       solve_Θ_v!, solve_μ!, solve_radiometry_gn!, solve_linear_blocks!, lens_free, lens_manifold, focus_block, ApertureVar,
-       MaterialVar, LightingVar, PerViewResidual, build_problem, read_back!, run_lm!, extract_variables, Θ̄_snapshot,
-       tile_costs, build_problem_grid, run_lm_grid!, extract_variables_grid, load_session, thin_lens_focus_distance,
+public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model,
+       exact_start, start_grid, region_start, coverage_region, check_coverage, calibrated_folds, grid_angular_error,
+       schoeps_gridlens, schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,
+       save_lens, load_parametric_lens, load_lens, lens_type_name, TargetRadiometry, material, edge_parameters,
+       target_radiometry, board_surface, radiometric_target, set_radiometric_target!, HEIGHT_NFREE, height_manifold,
+       height_basis, height_nparams, sphere_radius, RadianceSampler, SampleKey, draws, key_hash, L_c, RadianceParts,
+       radiance_parts, L_from_parts, RenderSettings, pixel_id, Φ_pixel, compute_mask, masked_pixels, render_view,
+       masked_vector, n_views, set_surface!, set_vignetting!, set_pose!, render_all, photometric_residuals, PixelParts,
+       pixel_parts, RadiometryParts, all_parts, solve_Θ_l!, solve_Θ_v!, solve_μ!, solve_radiometry_gn!,
+       solve_linear_blocks!, lens_free, lens_manifold, focus_block, ApertureVar, MaterialVar, LightingVar,
+       PerViewResidual, build_problem, read_back!, run_lm!, extract_variables, Θ̄_snapshot, tile_costs,
+       build_problem_grid, run_lm_grid!, extract_variables_grid, load_session, thin_lens_focus_distance,
        dataset_features, REFINE_ONLY_KEYS, split_refine_only, start_options, start_pipeline_table, check_start_options,
-       bearing_px, detection_bearings, state_bearings, fpx_of, residual_vectors, board_hits, render_dump!, load_state_into!,
-       save_poses, load_pipeline_metrics, RECORD_SCHEMAS, save_run_parameters, load_run_parameters,
+       bearing_px, detection_bearings, state_bearings, fpx_of, residual_vectors, board_hits, render_dump!,
+       load_state_into!, save_poses, load_pipeline_metrics, RECORD_SCHEMAS, save_run_parameters, load_run_parameters,
        save_initialization_region, measure_image_region, save_image_region, load_image_region, run_lens_coverage,
        SENSOR_LENS_COVERAGE, GEOMETRY_IMAGES, check_geometry_image, raw_green_image, stored_initialization_region,
        save_state, load_state, save_radiometric_camera, load_radiometric_camera, save_radiometric_target,
        load_radiometric_target, initialization_region, in_initialization, selfcheck, settings_line, RAW_EXTENSIONS,
        green_photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file, load_photo,
-       sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe, SensorStatement,
-       SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel, OffSensorModel,
-       sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet, observation_model,
-       sensor_statement, observation_line, names_input_path, PRINT_PLANE, load_distance_map, config_dict,
-       write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
+       sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe,
+       SensorStatement, SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel,
+       OffSensorModel, sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet,
+       observation_model, sensor_statement, observation_line, names_input_path, PRINT_PLANE, load_distance_map,
+       config_dict, write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
        StartPerturbationOptions, FocusOptions, MaskOptions, RenderingOptions, LightingOptions, MaterialOptions,
        VignettingOptions, WarpingOptions, EdgeOptions, LMOptions, SweepOptions, ResumeOptions, SelfcheckOptions,
-       ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, FIXABLE_BLOCKS, PIPELINE_PATH_KEYS,
-       AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend, CPUCompute, GPUCompute,
-       start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule, DerivedLattice,
-       NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
+       ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, FIXABLE_BLOCKS,
+       PIPELINE_PATH_KEYS, AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend,
+       CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule,
+       DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
 
 # ---- retired names (RC 0.11.0), each refused by name with its replacement (no alias, no forwarding)
 """Retired (RC 0.11.0, owner 2026-11-15): VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""
@@ -78,17 +76,17 @@ sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_charac
 _retired_view_form(name, replacement) =
     throw(ArgumentError("$name of a View (the camera's parts, the vignetting apart) is retired: a radiometric camera is one object. " *
                         "Give the camera and the pose: $replacement"))
-CalibrationState(::Scene, ::RenderSettings, ::AbstractVector{<:View}, ::AbstractVignetting, args...; kwargs...) =
-    _retired_view_form("CalibrationState", "`CalibrationState(scene, settings, camera, poses, mat, light, targets; …)`, " *
+CalibrationState(::TexturedTarget, ::RenderSettings, ::AbstractVector{<:View}, ::AbstractVignetting, args...; kwargs...) =
+    _retired_view_form("CalibrationState", "`CalibrationState(board, settings, camera, poses, mat, light, targets; …)`, " *
                        "`camera = RadiometricCameraModel(geometric, focus, aperture_radius, vignetting)`")
 render_view(::Integer, ::View, ::AbstractVignetting, args...) =
-    _retired_view_form("render_view", "`render_view(k, camera, pose, mat, light, scene, settings, mask)`")
-compute_mask(::View, ::Scene, ::RenderSettings; kwargs...) =
-    _retired_view_form("compute_mask", "`compute_mask(camera, pose, scene, settings; δ, external, backend)`")
+    _retired_view_form("render_view", "`render_view(k, camera, pose, mat, light, board, settings, mask)`")
+compute_mask(::View, ::TexturedTarget, ::RenderSettings; kwargs...) =
+    _retired_view_form("compute_mask", "`compute_mask(camera, pose, board, settings; δ, external, backend)`")
 Φ_pixel(::Integer, ::Integer, ::Integer, ::View, ::AbstractVignetting, args...) =
-    _retired_view_form("Φ_pixel", "`Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings)`")
+    _retired_view_form("Φ_pixel", "`Φ_pixel(u, v, k, camera, pose, mat, light, board, settings)`")
 pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
-    _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, scene, settings)`")
+    _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, board, settings)`")
 
 # ---- retired names (owner 2026-11-20: `lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
 # camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of a state, the replacer.
@@ -121,9 +119,34 @@ for (name, replacement) in (
         :f_CT_parts => "`cook_torrance_terms`", :f_CT => "`cook_torrance`",
         :t̂_dir => "`inverse_focus_distance(focus, direction)` (the paper's `t̂`, its alias, of a unit chief direction)",
         :ae_chart => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `project(Lens(Equidistant()), d)`",
-        :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`")
+        :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`",
+        # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
+        :posed_target => "`posed_target(target)` (under its state) or `posed_target(target, state)`", :texture_size => "`texture_size`",
+        :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`",
+        :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
+        :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
     @eval begin
         @doc $("Moved (owner 2026-11-20) to VisualRadiometryToolkitCore: $replacement.")
         $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)), $replacement)
     end
 end
+
+# ---- retired names (owner 2026-11-20: the board is VisualRadiometryToolkitCore's textured target, and there is no scene). The board's
+# surface parameters are the target's OWN state; the image size is the camera's; a render takes the camera, the pose and the board.
+# Each old name is refused by name with its replacement (no alias, no forwarding).
+"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `TexturedTarget`."""
+PrintedTarget(args...; kwargs...) = throw(ArgumentError(
+    "PrintedTarget is retired: the board is VisualRadiometryToolkitCore's `TexturedTarget` (the same constructors: " *
+    "`TexturedTarget(target, texture; facing, sdf, page_mm)`, `TexturedTarget(𝐨, 𝐮_B, 𝐯_B, texture; …)`), which holds its own state"))
+"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `TargetState`, the state of a `TexturedTarget`."""
+BoardSurface(args...; kwargs...) = throw(ArgumentError(
+    "BoardSurface is retired: the board's warping h, printed edge and in-plane print error are the textured target's own state, " *
+    "VisualRadiometryToolkitCore's `TargetState(; h, edge, inplane)` — `with_state(board, state)`, or `with_h`, `with_edge`, `with_inplane` on the board"))
+"""Retired (owner 2026-11-20): there is no scene; a render takes the camera, the pose and the board."""
+Scene(args...; kwargs...) = throw(ArgumentError(
+    "Scene is retired: there is no scene type. The image size is the camera's (`extent(geometric(camera))`) and the board holds its own " *
+    "state: give the board itself, a `TexturedTarget` (`with_state(board, state)` for a warped or printed-edge board) — " *
+    "`render_view(k, camera, pose, mat, light, board, settings, mask)`, `CalibrationState(board, settings, camera, poses, …)`"))
+"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `with_state`."""
+with_surface(args...; kwargs...) = throw(ArgumentError(
+    "with_surface is retired: the surface parameters are the board's own state — VisualRadiometryToolkitCore's `with_state(board, state)`"))

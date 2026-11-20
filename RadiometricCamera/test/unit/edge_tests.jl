@@ -1,10 +1,10 @@
-# The printed edge (`Board.sdf`, `BoardSurface.edge`, printed_edge.jl): the normal CDF, the edge profile (half level at the ink spread δ,
+# The printed edge (`Board.sdf`, `TargetState.edge`, printed_edge.jl): the normal CDF, the edge profile (half level at the ink spread δ,
 # width = the print blur), the tile Jacobian through the distance map, CPU/GPU parity. The edge is never a parameter.
 
 # The distance-map board, the two-view scene and its targets both items use.
 @testsetup module EdgeScene
-    using RadiometricCamera: BoardSurface, compute_mask, Focus, FocusSpline, grid_model, Material, PrintedTarget, render_all,
-                             RenderSettings, Scene, sphere_radius, with_sdf, with_surface, 𝔟
+    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, grid_model, Material, TexturedTarget, render_all,
+                             RenderSettings, sphere_radius, with_sdf, with_state, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -12,7 +12,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export page_e, rects_e, sdf_rects, sdf_e, board_e0, board_e, We, He, scene_e, glens_e, focus_e, poses_e, camera_e, vig_e, b_e, a_e, light_e, st_e, masks_e, edge_true, mat_e, scene_edge, edge_state, blank_e, targets_e, edge_s
+    export page_e, rects_e, sdf_rects, sdf_e, board_e0, board_e, We, He, board_e, glens_e, focus_e, poses_e, camera_e, vig_e, b_e, a_e, light_e, st_e, masks_e, edge_true, mat_e, board_edge, edge_state, blank_e, targets_e, edge_s
 
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a page of 200 mm with 16 ink squares (25 mm, pitch 50 mm) and its exact distance map
@@ -35,12 +35,12 @@
         return out
     end
     sdf_e = sdf_rects(rects_e, 160, 160, page_e)
-    board_e0 = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
+    board_e0 = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
     board_e = with_sdf(board_e0, sdf_e, page_e)
     # ---------------------------------------------------------------------------------------------------------------
     # 3. a two-view scene on the distance-map board and its render
     We = He = 32
-    scene_e = Scene(board_e, We, He)
+    board_e = board_e
     glens_e = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), We, He), 10, 10)
     focus_e = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, We, He))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_e = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
@@ -49,20 +49,21 @@
     b_e = 𝔟(board_e); a_e = zeros(3, 9); a_e[:, 1] .= (2.0, 1.9, 1.8); a_e[:, 3] .= (0.4, 0.3, 0.2)
     light_e = EnvironmentLight(SphericalHarmonicMap(a_e, 2), b_e, sphere_radius(b_e, [p.t for p in poses_e]))
     st_e = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks_e = [compute_mask(camera_e, p, scene_e, st_e; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_e]
+    masks_e = [compute_mask(camera_e, p, board_e, st_e; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_e]
     edge_true = SVector(0.6, 3.0)                                         # δ 0.6 mm, σ_print 3 mm: about one pixel on the board, so the renders resolve the edge
     mat_e = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     # the print's edge parameters (δ, σ_print) are the scene's surface parameters
-    scene_edge(e) = with_surface(scene_e, BoardSurface(edge = e))
-    edge_state(e, targets; kw...) = CalibrationState(scene_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
+    board_edge(e) = with_state(board_e, TargetState(edge = e))
+    edge_state(e, targets; kw...) = CalibrationState(board_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
     blank_e = [zeros(He, We, 3) for _ in 1:2]
     targets_e = render_all(edge_state(edge_true, blank_e))
     edge_s = SVector(0.3, 3.0)
 end
 
 @testitem "printed edge (distance map)" setup = [RCFixtures, EdgeScene] begin
-    using RadiometricCamera: board_surface, BoardSurface, build_problem_grid, cost, edge_albedo, EDGE_NC, has_sdf, height_on,
-                             PrintedTarget, render_all, run_lm_grid!, with_edge, with_h
+    using RadiometricCamera: board_surface, TargetState, build_problem_grid, cost, EDGE_NC, height_on, TexturedTarget, render_all,
+                             run_lm_grid!, with_edge, with_h
+    using VisualRadiometryToolkitCore: edge_albedo, has_sdf
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -71,25 +72,25 @@ end
     @test has_sdf(board_e) && !has_sdf(board_e0) && board_e.page_mm == SVector(200.0, 200.0)
     @test board_e.sdf == sdf_e                                                                      # the distance map as given
     @test VgtkCore.convert_eltype(Float32, board_e).sdf isa Matrix{Float32} && VgtkCore.convert_eltype(Float32, board_e).page_mm == SVector{2, Float32}(200, 200)
-    @test_throws ArgumentError PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(4, 4, 3); sdf = sdf_e)
-    @test RC._albedo(board_e0, BoardSurface(), SVector(0.3, 0.4)) == RC.ρ_c(board_e0, SVector(0.3, 0.4))
+    @test_throws ArgumentError TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(4, 4, 3); sdf = sdf_e)
+    @test VrtkCore.printed_albedo(VrtkCore.with_state(board_e0, TargetState()), SVector(0.3, 0.4)) == VrtkCore.ρ_c(board_e0, SVector(0.3, 0.4))
 
     # the profile across the left edge of the square (12.5…37.5 mm)²: paper at x < 12.5 (d = 12.5 − x), at mid-height y = 25 mm
-    m_e = BoardSurface(edge = SVector(0.4, 0.3))
+    m_e = TargetState(edge = SVector(0.4, 0.3))
     @test with_h(m_e, m_e.h).edge == m_e.edge && !height_on(m_e) && VgtkCore.convert_eltype(Float32, m_e).edge == SVector{EDGE_NC, Float32}(m_e.edge)
-    @test with_edge(BoardSurface(), m_e.edge) == m_e && BoardSurface{Float32}().edge == zero(SVector{EDGE_NC, Float32})
+    @test with_edge(TargetState(), m_e.edge) == m_e && TargetState{Float32}().edge == zero(SVector{EDGE_NC, Float32})
     σp = m_e.edge[2]                                                      # the edge's width: the print's blur
     bpt(x, y) = SVector(x / page_e[1], y / page_e[2])
-    ρ_half = edge_albedo(board_e, m_e, bpt(12.5 - 0.4, 25.0))              # d = δ → half ink
+    ρ_half = edge_albedo(VrtkCore.with_state(board_e, m_e), bpt(12.5 - 0.4, 25.0))              # d = δ → half ink
     @test all(abs.(ρ_half .- 0.5) .< 1e-6) && allequal(ρ_half)             # the same in every channel
-    ρ_left = edge_albedo(board_e, m_e, bpt(12.5 - 0.4 - σp, 25.0))[1]      # one σ further out: 1 − Φ(−1)
+    ρ_left = edge_albedo(VrtkCore.with_state(board_e, m_e), bpt(12.5 - 0.4 - σp, 25.0))[1]      # one σ further out: 1 − Φ(−1)
     @test abs(ρ_left - (1 - 0.15865525393145707)) < 1e-5
-    ρ_top = edge_albedo(board_e, m_e, bpt(25.0, 12.5 - 0.4 - σp))[2]       # the top edge the same
+    ρ_top = edge_albedo(VrtkCore.with_state(board_e, m_e), bpt(25.0, 12.5 - 0.4 - σp))[2]       # the top edge the same
     @test abs(ρ_top - (1 - 0.15865525393145707)) < 1e-5
-    @test all(edge_albedo(board_e, m_e, bpt(25.0, 25.0)) .< 1e-4) && all(edge_albedo(board_e, m_e, bpt(45.0, 45.0)) .> 1 - 1e-3)   # far inside / outside
+    @test all(edge_albedo(VrtkCore.with_state(board_e, m_e), bpt(25.0, 25.0)) .< 1e-4) && all(edge_albedo(VrtkCore.with_state(board_e, m_e), bpt(45.0, 45.0)) .> 1 - 1e-3)   # far inside / outside
     # the chart derivative (the pose / lens chain): ∂ρ/∂b₁ = −φ(z)/σ_print · 200 on the paper side of the left edge
     xg = 12.5 - 0.4 - 0.2
-    ρd = edge_albedo(board_e, m_e, SVector(ForwardDiff.Dual(xg / 200, 1.0), ForwardDiff.Dual(25.0 / 200, 0.0)))
+    ρd = edge_albedo(VrtkCore.with_state(board_e, m_e), SVector(ForwardDiff.Dual(xg / 200, 1.0), ForwardDiff.Dual(25.0 / 200, 0.0)))
     z = (0.4 - (12.5 - xg)) / σp
     @test ForwardDiff.partials(ρd[1], 1) ≈ -exp(-z^2 / 2) / sqrt(2π) / σp * 200 rtol = 1e-5   # (the approximation's derivative, ≈ φ to 1e-6)
 

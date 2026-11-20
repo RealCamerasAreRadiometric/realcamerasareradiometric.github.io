@@ -358,7 +358,7 @@ function image_circle_of(camera::RC.RadiometricCameraModel)
 end
 
 """
-    sheet_scene(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterisation = nothing) -> NamedTuple
+    sheet_board(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterisation = nothing) -> NamedTuple
 
 The photographs in `images_dir` (`photo_file` of each pose's name) are read through RadiometricCamera's ONE entry point under the
 camera's own observation model (`photo_set(camera, files; characterisation)`, `sample_pixels`; owner 2026-11-15: a camera predicts
@@ -372,25 +372,25 @@ and their decoded files (`images_dir/<name>`), the sheet as the scene's board (`
 printed-edge parameters: the calibration board's warping is never evaluated on the sheet), its ray intersector, the vignetting, the
 render settings (the calibration's own, `camera.settings`: the quadrature), the design (`design_png`, the green channel, as a `TW × TH` matrix [x, y]) and its texel size.
 """
-function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::AbstractString, images_dir::AbstractString, poses, W::Integer, H::Integer;
+function sheet_board(cc::RC.CalibratedCamera, target, sheet, design_png::AbstractString, images_dir::AbstractString, poses, W::Integer, H::Integer;
                      characterisation::Union{Nothing, AbstractString} = nothing)
-    isempty(poses) && throw(ArgumentError("sheet_scene: no poses"))
+    isempty(poses) && throw(ArgumentError("sheet_board: no poses"))
     cc.observation.channel in (:G, :RGB) ||
-        throw(ArgumentError("sheet_scene: the page solve observes the green channel; the camera was calibrated on $(cc.observation.channel) alone"))
+        throw(ArgumentError("sheet_board: the page solve observes the green channel; the camera was calibrated on $(cc.observation.channel) alone"))
     camera = cc.model; settings = cc.settings
     𝐨, 𝐮, 𝐯, _ = page_frame(sheet.page_w, sheet.page_h)
     names = [String(p[1]) for p in poses]
     photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterisation)   # THE entry point, the camera's own model
     cam_poses = [EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false) for (_, R, t) in poses]   # camera → world
-    bd = RC.PrintedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
-    surf = RC.BoardSurface(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
-    scene = RC.Scene(bd, Int(W), Int(H), surf); rays = RC.BoardRays(scene)
+    bd = RC.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
+    surf = RC.TargetState(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
+    board = RC.with_state(bd, surf); rays = RC.BoardRays(board)
     img = VgtkFeatures.load_linear_image(design_png); TH, TW = size(img, 1), size(img, 2)
     design = Matrix{Float64}(permutedims(Float64.(img[:, :, 2])))                           # [x, y]
     page_mm = (1e3 * sheet.page_w, 1e3 * sheet.page_h); tex_mm = page_mm[1] / TW
-    abs(page_mm[2] / TH - tex_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texels are not square ($(page_mm[1] / TW) × $(page_mm[2] / TH) mm)"))
-    abs(tex_mm - sheet.texel_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_scene: the design's texel $(tex_mm) mm is not the sheet target's $(sheet.texel_mm) mm"))
-    return (; names, images_dir = String(images_dir), photos, camera, poses = cam_poses, bd, surf, scene, rays, sett = settings, design, TW, TH,
+    abs(page_mm[2] / TH - tex_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_board: the design's texels are not square ($(page_mm[1] / TW) × $(page_mm[2] / TH) mm)"))
+    abs(tex_mm - sheet.texel_mm) < 1e-6 * tex_mm || throw(ArgumentError("sheet_board: the design's texel $(tex_mm) mm is not the sheet target's $(sheet.texel_mm) mm"))
+    return (; names, images_dir = String(images_dir), photos, camera, poses = cam_poses, bd, surf, board, rays, sett = settings, design, TW, TH,
             tex_mm, page_mm, W = Int(W), H = Int(H), learned_r = camera.aperture_radius)
 end
 
@@ -436,9 +436,9 @@ weighting: an uncertain plane (a RAW photograph under a sensor model with a vari
 value; a plain plane `RC.Unweighted()` (rows as measured).
 """
 function sample_pixels(ctx, k::Integer, external; fraction::Real, seed::Integer, backend)
-    mask = RC.compute_mask(ctx.camera, ctx.poses[k], ctx.scene, ctx.sett; δ = 0.0, external, backend)
+    mask = RC.compute_mask(ctx.camera, ctx.poses[k], ctx.board, ctx.sett; δ = 0.0, external, backend)
     plane, mask = RC.observe(ctx.photos, k, mask; name = ctx.names[k])   # the camera's observation model: its record's photosites, or the image's pixels
-    size(plane, 1) == ctx.H && size(plane, 2) == ctx.W || error("sample_pixels: $(ctx.names[k]) is $(size(plane, 2)) × $(size(plane, 1)), the scene $(ctx.W) × $(ctx.H)")
+    size(plane, 1) == ctx.H && size(plane, 2) == ctx.W || error("sample_pixels: $(ctx.names[k]) is $(size(plane, 2)) × $(size(plane, 1)), the board $(ctx.W) × $(ctx.H)")
     rng = StableRNG(seed + k); px = NTuple{4, Float64}[]
     for (u, v) in RC.masked_pixels(mask)
         rand(rng) < fraction || continue
@@ -526,7 +526,7 @@ texel centres' grid, `nothing` otherwise (Core's clamp would extend the edge; a 
 end
 
 """
-    _FootprintAt(view, scene, st, vig, TW, TH, cols, vals)
+    _FootprintAt(view, board, st, vig, TW, TH, cols, vals)
 
 The blur row of a sampled pixel `(q, u, v)` (`q` its index in the launch) under `view`, the renderer's quadrature: for every sensor
 sample and every aperture-disc sample the ray `world_ray`, its intersection with the sheet and the bilinear texels there
@@ -538,7 +538,7 @@ kernel on every backend, the CPU's included.
 """
 struct _FootprintAt{V, S, T, G, C, W}
     view::V
-    scene::S
+    board::S
     st::T
     vig::G
     TW::Int32
@@ -551,7 +551,7 @@ Adapt.@adapt_structure _FootprintAt
 _footprint_slots(st) = 4 * length(st.sensor) * RC.n_disc(st.aperture)
 @inline function (f::_FootprintAt)(q::Int32, u::Int32, v::Int32)
     st, view = f.st, f.view
-    bd = f.scene.board; rays = RC.BoardRays(f.scene)
+    bd = f.board; rays = RC.BoardRays(f.board)
     TW, TH = Int(f.TW), Int(f.TH)
     base = (Int(q) - 1) * _footprint_slots(st); n = 0; tot = 0.0
     @inbounds for ks in 1:length(st.sensor)
@@ -711,7 +711,7 @@ function page_footprints(ctx, rows_px, camera::RC.RadiometricCameraModel, groups
         qs = groups[k]; m = length(qs)
         m == 0 && continue
         slot_cols = KA.zeros(device, Int32, N * m); slot_vals = KA.zeros(device, Float64, N * m); n = KA.zeros(device, Int32, m)
-        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.scene, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), slot_cols, slot_vals)   # the kernel's view: the camera at pose k
+        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.board, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), slot_cols, slot_vals)   # the kernel's view: the camera at pose k
         VgtkCore.pointwise!(f, n, Adapt.adapt(device, Int32.(1:m)), Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]),
                             Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); exec = VgtkCore.OnBackend(device))
         KA.synchronize(device)

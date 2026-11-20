@@ -6,7 +6,7 @@
 # the red and blue photosites never enter the fit; the device evaluates the same residual.
 
 @testsetup module PhotositeScene
-    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
+    using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
                              sphere_radius, View, 𝔟
     using RadiometricCamera, StaticArrays
     using VisualGeometryToolkitCore: exp_so3
@@ -17,7 +17,7 @@
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))       # cam
 
-    export photosite_scene, mosaic_of, noisy_mosaic, read_photosites
+    export photosite_board, mosaic_of, noisy_mosaic, read_photosites
 
     const BLACK = (512.0, 509.0, 515.0, 507.0)                  # R, G, B, G2: the two greens' black levels differ, as a camera's do
     const WHITE = 16383.0
@@ -47,11 +47,10 @@
     "The mosaic `m` as the pipeline reads it (the entry point's photosite route, `RC._observe`): its linear photosite values on the raw grid and its valid green mask."
     read_photosites(m) = RC._observe(RC.Photosites(), m, trues(size(m)), "test", VgtkCore.SensorModel())
 
-    "The calibration fixture's two-view scene, the renders and their compute masks."
-    function photosite_scene(; W = 24, H = 24)
+    "The calibration fixture's two-view board, the renders and their compute masks."
+    function photosite_board(; W = 24, H = 24)
         tex = fixture_board()
-        board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        scene = Scene(board, W, H)
+        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
         lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 1.288 * W, (0.51 * W, 0.48 * H), W, H)
         tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
         focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
@@ -63,16 +62,16 @@
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-        return (; scene, st, lens_t, tps_t, poses, camera_t, vig_t, mat_t, light_t, a_t, b, r_SH, masks, renders, W, H)
+        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
+        return (; board, st, lens_t, tps_t, poses, camera_t, vig_t, mat_t, light_t, a_t, b, r_SH, masks, renders, W, H)
     end
 end
 
 @testitem "photosites: linear values on the raw grid, the valid green photosites the mask" setup = [RCFixtures, PhotositeScene] begin
     using Random
     import VisualGeometryToolkitFeatures as VgtkFeatures
-    f = photosite_scene()
+    f = photosite_board()
     κ = 0.8 / maximum(maximum, f.renders)
     m = mosaic_of(f.renders[1], κ)
     plane, valid = read_photosites(m)
@@ -105,14 +104,14 @@ end
     using Rotations: rotation_angle, RotMatrix
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitFeatures as VgtkFeatures
-    f = photosite_scene()
+    f = photosite_board()
     κ = 0.8 / maximum(maximum, f.renders)
     mosaics = [mosaic_of(r, κ) for r in f.renders]
     ph = [read_photosites(m) for m in mosaics]
     targets = [p[1] for p in ph]
     masks = [f.masks[k] .& ph[k][2] for k in 1:2]                                       # the compute mask AND the valid green photosites
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)          # the encoding's scale is the lighting's
-    truth = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, targets; masks, channel = 2)
+    truth = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, targets; masks, channel = 2)
     @test all(k -> length(truth.ϕ[k]) == count(masks[k]), 1:2)                         # ONE residual per green photosite
     c_truth = cost(truth)[1]
     # R/B perturbed: the photograph differs at red and blue photosites only, the mask and every residual are the same
@@ -123,13 +122,13 @@ end
     end
     ph2 = [read_photosites(m) for m in pert]
     @test all(k -> ph2[k][2] == ph[k][2] && ph2[k][1] != ph[k][1], 1:2)
-    truth2 = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
+    truth2 = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
     @test cost(truth2)[1] == c_truth && truth2.ϕ == truth.ϕ
     # a perturbed camera (poses, lens) recovered from the green photosites alone: the truth to the 14-bit encoding
     camera_0 = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 1.25 * f.W, (0.5 * f.W, 0.5 * f.H), f.W, f.H),
                                       Focus(f.tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9]), 0.0386, f.vig_t)
     poses_0 = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in f.poses]
-    s = CalibrationState(f.scene, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
+    s = CalibrationState(f.board, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
     c0 = cost(s)[1]
     run_lm!(s; maxiters = 100, reldcost = 1e-12, fixed = (:focus, :aperture, :vignetting, :lighting, :material))
     @test cost(s)[1] < 1e-3 * c0 && cost(s)[1] <= 1.01 * c_truth + 1e-12
@@ -143,13 +142,13 @@ end
     using CUDA: CUDABackend
     require_gpu()
     if RC_GPU_TESTS
-        f = photosite_scene(; W = 32, H = 32)
+        f = photosite_board(; W = 32, H = 32)
         κ = 0.8 / maximum(maximum, f.renders)
         ph = [read_photosites(mosaic_of(r, κ)) for r in f.renders]
         masks = [f.masks[k] .& ph[k][2] for k in 1:2]
         light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-        s_cpu = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2)
-        s_gpu = CalibrationState(f.scene, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
+        s_cpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2)
+        s_gpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
         @test s_gpu.px == s_cpu.px                                                         # the same green photosites
         prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)

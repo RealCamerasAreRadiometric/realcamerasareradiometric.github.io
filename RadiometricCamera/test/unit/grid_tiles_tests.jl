@@ -4,8 +4,8 @@
 
 # The scene, the CPU problem and the perturbed camera and poses both items use (the GPU item compares its device tiles with `tiles`).
 @testsetup module GridTilesScene
-    using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, Material, PrintedTarget,
-                             render_view, RenderSettings, Scene, sphere_radius, 𝔟
+    using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, Material, TexturedTarget,
+                             render_view, RenderSettings, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -14,12 +14,11 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export tex, board, W, H, scene, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p
+    export tex, board, W, H, board, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p
 
     tex = fixture_board()
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
-    scene = Scene(board, W, H)
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     glens_t = grid_model(src_t, 10, 10)               # 7 × 7 cells; patches 5 × 5 → 2 × 2 patch blocks
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
@@ -34,9 +33,9 @@
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
+    masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
+    s = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
     prob, idx = build_problem_grid(s; patch = (5, 5))
     tiles = RC.tile_costs(prob)
     # LM smoke: perturb the grid (small direction rotations) + a pose nudge; joint LM must recover sharply
@@ -99,7 +98,7 @@ end
         col = J[:, 6 + 200 + 9 + 1]
         @test norm(col - fd) / norm(fd) < 5e-3
     end
-    s2 = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)   # a copy: the LM writes its poses back into
+    s2 = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)   # a copy: the LM writes its poses back into
                                                          # the state's vector, and the GPU recovery below must start from the perturbed poses_p
     c0 = cost(s2)[1]
     res = run_lm_grid!(s2; patch = (5, 5), maxiters = 25)
@@ -152,13 +151,13 @@ end
     D(l) = VgtkCore.directions(VgtkCore.model(l))
     @test VgtkCore.present_nodes(VgtkCore.model(lens_m)) == held && all(v -> all(isnan, v), D(lens_m)[.!held])
     camera_m = RadiometricCameraModel(lens_m, focus_t, r_t, vig_t)
-    s_all = CalibrationState(scene, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
+    s_all = CalibrationState(board, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
     @test_throws ArgumentError build_problem_grid(s_all; patch = (5, 5))
     reads_held(u, v) = all(p -> all(isfinite, VgtkCore.backproject(lens_m, first(p))), RC.sensor_samples(st.sensor, u, v))
     masks_m = [BitMatrix([mk[v, u] && reads_held(u, v) for v in axes(mk, 1), u in axes(mk, 2)]) for mk in masks]
     @test all(k -> 0 < count(masks_m[k]) < count(masks[k]), 1:2)
-    targets_m = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks_m[k]) for k in 1:2]
-    s = CalibrationState(scene, st, camera_m, copy(poses), mat_t, light_t, targets_m; masks = masks_m)
+    targets_m = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks_m[k]) for k in 1:2]
+    s = CalibrationState(board, st, camera_m, copy(poses), mat_t, light_t, targets_m; masks = masks_m)
     # in a problem: zero cost at the start, the rows' Jacobian against central differences through the patch blocks' retraction,
     # no column for an absent node; a patch block with no present node is not a variable of the solve
     for pr in (pr2, prp)
@@ -218,7 +217,7 @@ end
     # --- device (GPU) per-tile path: bitwise residual, column parity, LM smoke ---
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_g = CalibrationState(scene, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        s_g = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
@@ -276,7 +275,7 @@ end
         RC.NLLSsolver.computeresidual(r2, vars2n...)
         @test s_g.run.device_calls[:flux] > calls0
         RC._unregister_grid_problem!(s_g)
-        s2g = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        s2g = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
         c0g = cost(s2g)[1]
         run_lm_grid!(s2g; patch = (5, 5), maxiters = 15)
         @test cost(s2g)[1] < 0.05 * c0g

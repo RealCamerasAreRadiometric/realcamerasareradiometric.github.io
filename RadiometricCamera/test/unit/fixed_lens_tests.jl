@@ -3,8 +3,8 @@
 # refinable), Float32 cleanliness, duals through Core's lens inverses, and the per-view problem with the lens block fixed.
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, grid_model, in_domain,
-                             Material, PerViewResidual, PrintedTarget, render_view, RenderSettings, run_lm!, Scene,
-                             sphere_radius, chief_ray, 𝔟
+                             Material, PerViewResidual, TexturedTarget, render_view, RenderSettings, run_lm!, sphere_radius,
+                             chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
@@ -54,8 +54,7 @@
     @test fixed_f && names_f == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(l))) && free_names(RC.lens_manifold(l; fixed = VgtkCore.parameter_names(VgtkCore.model(l)))) == names_f
     # per-view problem with a KB lens on the synthetic board: Jacobian layout, zero distortion columns, LM smoke
     tex = fixture_board()
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    scene = Scene(board, 24, 24)
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     lk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
     tps_k = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))); focus_k = Focus(tps_k, fill(1 / 1.5, 9))
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -63,9 +62,9 @@
     camera_k = RadiometricCameraModel(lk, focus_k, 0.0386, vig_k)
     light_k = EnvironmentLight(SphericalHarmonicMap(2.0, 2), b, r_SH); mat_k = Material()
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(camera_k, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-    targets = [render_view(k, camera_k, poses[k], mat_k, light_k, scene, st, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
+    masks = [compute_mask(camera_k, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera_k, poses[k], mat_k, light_k, board, st, masks[k]) for k in 1:2]
+    s = CalibrationState(board, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
     fixed = VgtkCore.parameter_names(VgtkCore.model(lk))   # every parameter held
     prob, idx = build_problem(s; fixed)
     res = get(prob.problem.costs, PerViewResidual{9})[1]
@@ -73,7 +72,7 @@
     r0, J = RC.NLLSsolver.computeresjac(RC.static(125), res, vars...)                 # the LM's flags: every block but the fixed lens
     @test maximum(abs, r0) < 1e-12 && size(J, 2) == 6 + 0 + 9 + 1 + 9 + 15 + 27        # the fixed lens has no columns; 15 vignetting columns (the hard pin)
     @test norm(J[:, 1]) > 0 && norm(J[:, 6 + 9 + 1]) > 0                               # pose and aperture columns are live
-    s2 = CalibrationState(scene, st, camera_k, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.004), SVector(0.003, -0.003, 0.004))) for p in poses],
+    s2 = CalibrationState(board, st, camera_k, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.004), SVector(0.003, -0.003, 0.004))) for p in poses],
                           mat_k, light_k, targets; masks)
     c0 = cost(s2)[1]
     run_lm!(s2; maxiters = 8, fixed)

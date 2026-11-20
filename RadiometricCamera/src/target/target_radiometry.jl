@@ -1,13 +1,13 @@
 # ---------------------------------------------------------------------------
 # The target's radiometry: what a refinement learns about the PRINT, as one record (the camera's share is the
 # `RadiometricCameraModel`). It is the value the IO phase persists for a calibration target (keyed by the target's content id);
-# the calibration's working containers are the state's `mat` (Θ_m) and the scene's `BoardSurface.edge` (δ, σ_print in mm), which
+# the calibration's working containers are the state's `mat` (Θ_m) and the scene's `TargetState.edge` (δ, σ_print in mm), which
 # `TargetRadiometry(mat, surface)` reads and `material` / `edge_parameters` give back.
 # ---------------------------------------------------------------------------
 
 """
     TargetRadiometry(material, ink_spread, print_blur)
-    TargetRadiometry(material, surface::BoardSurface)
+    TargetRadiometry(material, surface::TargetState)
 
 The radiometry of a printed calibration target: its SVBSDF (`material`, a `Material`: Θ_m = the roughnesses and refractive
 indices of ink and paper and the diffuse weight μ) and, for a design given as a distance map, its printed edge — the ink spread δ
@@ -31,7 +31,7 @@ struct TargetRadiometry{T, Q, B <: VgtkCore.GaussianBlur}
         return new{T, Q, B}(material, ink_spread, print_blur)
     end
 end
-TargetRadiometry(m::Material, surface::BoardSurface) =
+TargetRadiometry(m::Material, surface::TargetState) =
     TargetRadiometry(m, VgtkIO.read_length(Float64(surface.edge[1]), VgtkCore.mm), VgtkCore.GaussianBlur(VgtkIO.read_length(Float64(surface.edge[2]), VgtkCore.mm)))
 
 """The target's SVBSDF Θ_m (`Material`)."""
@@ -42,14 +42,14 @@ material(r::TargetRadiometry) = r.material
 A calibration target as a refinement knows it, parallel to the geometric camera ↔ the `RadiometricCameraModel`: the
 geometric target (`target`, Core's `AbstractTarget` as the session's target record holds it, so its content identity is the
 session's; `nothing` for a state converted from a RadiometricCamera 0.5 `.jls` file, which did not record it), the board's warping as
-the refinement learned it (`warping`, the [`HEIGHT_NC`](@ref) nodal heights of `BoardSurface.h`, plain metres along the board normal —
+the refinement learned it (`warping`, the `HEIGHT_NC` nodal heights of `TargetState.h`, plain metres along the board normal —
 a calibration of the target that its content identity does not cover, so not the target's own `HeightField`), the aspect (height /
-width) of the page the warping was learned on (`aspect`, [`warping_aspect`](@ref) of its board: the same nodal heights are another surface on
+width) of the page the warping was learned on (`aspect`, `warping_aspect` of its board: the same nodal heights are another surface on
 a page of another aspect), the in-plane print error as the refinement learned it (`inplane`, the `(a, u)` of Core's `Aspect ∘ Skew` in
 the warping's placed chart — `inplane_calibration`; zero = the design as printed) and the print's radiometry ([`TargetRadiometry`](@ref)).
 A flat warping (every nodal height zero) is the plane on any page: its aspect may be `nothing`; a warped one, or an in-plane error
 (whose chart depends on the aspect), without an aspect is an `ArgumentError`. [`board_surface`](@ref) is the scene's
-[`BoardSurface`](@ref) of it on a board.
+`TargetState` of it on a board.
 """
 struct RadiometricTarget{G, T, R <: TargetRadiometry}
     target::G
@@ -71,10 +71,10 @@ struct RadiometricTarget{G, T, R <: TargetRadiometry}
     end
 end
 """
-    board_surface(b::PrintedTarget, t::RadiometricTarget) -> BoardSurface
-    board_surface(aspect, t::RadiometricTarget) -> BoardSurface
+    board_surface(b::TexturedTarget, t::RadiometricTarget) -> TargetState
+    board_surface(aspect, t::RadiometricTarget) -> TargetState
 
-The scene's [`BoardSurface`](@ref) of a radiometric target on the board `b` (or a page of `aspect` = height / width): its warping, its in-plane
+The scene's `TargetState` of a radiometric target on the board `b` (or a page of `aspect` = height / width): its warping, its in-plane
 print error and its print's edge parameters. The target's warping and in-plane error must have been learned on a page of the board's
 aspect (`t.aspect == warping_aspect(b)` to 1e-6), or be flat and as designed: an `ArgumentError` otherwise, since the nodal heights (and the
 placed chart of the in-plane error) on a page of another aspect are another surface.
@@ -82,9 +82,9 @@ placed chart of the in-plane error) on a page of another aspect are another surf
 function board_surface(aspect::Real, t::RadiometricTarget)
     (iszero(t.warping) && iszero(t.inplane)) || isapprox(t.aspect, aspect; rtol = 1e-6) ||
         throw(ArgumentError("board_surface: the target's warping was learned on a page of aspect (height / width) $(t.aspect), the board's page has $aspect: its nodal heights are another surface there"))
-    return BoardSurface(; h = t.warping, edge = edge_parameters(t.radiometry), inplane = t.inplane)
+    return TargetState(; h = t.warping, edge = edge_parameters(t.radiometry), inplane = t.inplane)
 end
-board_surface(b::PrintedTarget, t::RadiometricTarget) = board_surface(warping_aspect(b), t)
-"""The print's edge parameters `(δ, σ_print)` in mm, the `BoardSurface.edge` of a state ([`TargetRadiometry`](@ref))."""
+board_surface(b::TexturedTarget, t::RadiometricTarget) = board_surface(warping_aspect(b), t)
+"""The print's edge parameters `(δ, σ_print)` in mm, the `TargetState.edge` of a state ([`TargetRadiometry`](@ref))."""
 edge_parameters(r::TargetRadiometry) =
     SVector(VgtkIO.write_length(r.ink_spread, VgtkCore.mm), VgtkIO.write_length(std(r.print_blur)[1], VgtkCore.mm))   # σ_print: Core's std of the round blur

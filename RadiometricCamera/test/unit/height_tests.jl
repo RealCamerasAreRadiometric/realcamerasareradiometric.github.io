@@ -1,11 +1,11 @@
-# The board warping h (`BoardSurface.h`, `board_height`, `intersect_board` with the field — the out-of-plane shape of the print,
+# The board warping h (`TargetState.h`, `board_height`, `intersect_board` with the field — the out-of-plane shape of the print,
 # paper §Board Warping): the model and the ray–surface intersection, its dual-number Jacobian columns in the grid-tile path, LM recovery
 # of a known saddle, CPU/GPU parity.
 
 # The saddle and the two-view scene with its targets both items use.
 @testsetup module HeightScene
-    using RadiometricCamera: BoardSurface, compute_mask, Focus, FocusSpline, grid_model, HEIGHT_NC, Material, PrintedTarget,
-                             render_all, RenderSettings, Scene, sphere_radius, with_surface, 𝔟
+    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, grid_model, HEIGHT_NC, Material, TexturedTarget,
+                             render_all, RenderSettings, sphere_radius, with_state, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -13,18 +13,18 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export page_board, sad, hh, tex_h, board_hs, Wh, Hh, scene_h, scene_hh, glens_h, focus_h, poses_h, camera_h, vig_h, b_h, a_h, light_h, mat_h, st_h, masks_h, blank_h, height_true, targets_h
+    export page_board, sad, hh, tex_h, board_hs, Wh, Hh, board_h, board_hh, glens_h, focus_h, poses_h, camera_h, vig_h, b_h, a_h, light_h, mat_h, st_h, masks_h, blank_h, height_true, targets_h
 
     """A board of `aspect` = height / width (2 m wide), seen from z > 0."""
-    page_board(aspect) = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
     hh = SVector{HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a two-view scene of the blob fixture; the truth = a saddle with a 2 % sag of the board width at the edge (≈ 0.6 px at 40°)
     tex_h = fixture_board()
-    board_hs = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+    board_hs = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
     Wh = Hh = 32
-    scene_h = Scene(board_hs, Wh, Hh)
-    scene_hh(h) = with_surface(scene_h, BoardSurface(h = h))               # the warping is the scene's surface parameter
+    board_h = board_hs
+    board_hh(h) = with_state(board_h, TargetState(h = h))               # the warping is the scene's surface parameter
     glens_h = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wh, Hh), 10, 10)
     focus_h = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wh, Hh))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_h = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
@@ -34,23 +34,24 @@
     mat_h = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     st_h = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     camera_h = RadiometricCameraModel(glens_h, focus_h, 0.0386, vig_h)
-    masks_h = [compute_mask(camera_h, p, scene_h, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]             # the mask is the plane's (the surface stays inside the padding)
+    masks_h = [compute_mask(camera_h, p, board_h, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]             # the mask is the plane's (the surface stays inside the padding)
     blank_h = [zeros(Hh, Wh, 3) for _ in 1:2]
     height_true = hh                                                                      # the saddle, as nodal heights
-    targets_h = render_all(CalibrationState(scene_hh(height_true), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
+    targets_h = render_all(CalibrationState(board_hh(height_true), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
 end
 
 @testitem "board height field" setup = [RCFixtures, HeightScene] begin
-    using RadiometricCamera: board_height, board_normal, board_surface, BoardSurface, build_problem_grid, chart, cost, EDGE_NC,
-                             HEIGHT_NC, height_nparams, height_on, intersect_board, posed_target, PrintedTarget, render_all,
-                             run_lm_grid!, Scene, with_edge, with_h, with_surface, world_point
+    using RadiometricCamera: board_height, board_normal, board_surface, TargetState, build_problem_grid, chart, cost, EDGE_NC,
+                             HEIGHT_NC, height_nparams, height_on, intersect_board, TexturedTarget, render_all, run_lm_grid!,
+                             with_edge, with_h, with_state, world_point
+    using VisualRadiometryToolkitCore: posed_target
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
     # ---------------------------------------------------------------------------------------------------------------
     # 1. the model: the plane when off, the thin plate spline, the surface intersection (on the ray, on the surface, the sign), duals, bookkeeping
-    sf0 = BoardSurface()
+    sf0 = TargetState()
     @test !height_on(sf0) && iszero(sf0.h) && length(sf0.h) == HEIGHT_NC
     @test height_nparams(0) == 0 && height_nparams(1) == HEIGHT_NC && height_nparams(2) == HEIGHT_NC && height_nparams(3) == HEIGHT_NC
     # nodal heights of a saddle (thin plate spline through them, affine part dropped): an affine set of nodal heights is the plane
@@ -66,7 +67,7 @@ end
             @test board_height(W1, hh, 𝐛) ≈ hh[i] - (a[1] + a[2] * 𝐛[1] + a[3] * 𝐛[2]) atol = 1e-10
         end
     end
-    board_h1 = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], rand(8, 8, 3); facing = [0.0, 0.0, 1.5])
+    board_h1 = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], rand(8, 8, 3); facing = [0.0, 0.0, 1.5])
     @test board_h1.warping isa VgtkCore.MappedSurface                                     # the flat warping's parts, Core's surface
     oh = SVector(0.3, -0.2, 1.4); dh = normalize(SVector(-0.4, 0.3, -1.0))
     sh0, 𝐱h0 = intersect_board(board_h1, oh, dh)
@@ -76,7 +77,7 @@ end
     @test 𝐱h1 ≈ oh + sh1 * dh
     @test abs(dot(𝐱h1 - world_point(board_h1, SVector(0.0, 0.0)), board_normal(board_h1)) - board_height(board_h1, hh, chart(board_h1, 𝐱h1))) < 1e-10     # the hit lies on the surface (Core's root)
     # the warped board as Core's posed target with a HeightField calibration: Core's surface of it is the board's surface
-    let pt = posed_target(board_h1, with_h(BoardSurface(), hh)), sf = RC.VgtkCore.surface(pt)
+    let pt = posed_target(board_h1, with_h(TargetState(), hh)), sf = RC.VgtkCore.surface(pt)
         @test sf isa RC.VgtkCore.MappedSurface
         sc, 𝐱c = RC.VgtkCore.intersection(sf, oh, dh)
         @test abs(sc - sh1) < 1e-12 && norm(𝐱c - 𝐱h1) < 1e-12
@@ -98,16 +99,16 @@ end
     shh = with_h(sf0, hh)
     @test height_on(shh) && shh.edge == sf0.edge
     @test with_edge(shh, shh.edge).h == hh && VgtkCore.convert_eltype(Float32, shh).h == SVector{HEIGHT_NC, Float32}(hh)
-    @test BoardSurface(h = hh).h == hh && BoardSurface(h = hh).edge == zero(SVector{EDGE_NC, Float64})
-    @test Scene(board_h1, 8, 8).surface == BoardSurface() && with_surface(Scene(board_h1, 8, 8), shh).surface.h == hh
+    @test TargetState(h = hh).h == hh && TargetState(h = hh).edge == zero(SVector{EDGE_NC, Float64})
+    @test board_h1.state == TargetState() && with_state(board_h1, shh).state.h == hh
 
-    r_nom_h = render_all(CalibrationState(scene_h, st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
+    r_nom_h = render_all(CalibrationState(board_h, st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
     @test maximum(maximum(abs, targets_h[k] .- r_nom_h[k]) for k in 1:2) > 0.02 * maximum(maximum, r_nom_h)
 
     # ---------------------------------------------------------------------------------------------------------------
     # 3. Jacobian columns of the free height parameters (material block: HEIGHT_NFREE AD columns after the 9 BRDF parameters; h = h₀ + B y) vs differences of the tile
     #    residual through `update`; the pose columns still match (duals flow through the surface intersection)
-    s_h = CalibrationState(scene_hh(0.5 * height_true), st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
+    s_h = CalibrationState(board_hh(0.5 * height_true), st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
     prob_h, idx_h = build_problem_grid(s_h; patch = (5, 5), height_degree = 2)
     tiles_h = RC.tile_costs(prob_h)
     r_h = tiles_h[argmax([length(t.pix) for t in tiles_h])]
@@ -141,7 +142,7 @@ end
 
     # ---------------------------------------------------------------------------------------------------------------
     # 4. LM recovery of the saddle from the flat start, everything else at the truth
-    s_hr = CalibrationState(scene_h, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
+    s_hr = CalibrationState(board_h, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
     c0h = cost(s_hr)[1]
     run_lm_grid!(s_hr; patch = (5, 5), maxiters = 25, height_degree = 2,
                  fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
@@ -161,12 +162,12 @@ end
     # 5. device path: CPU/GPU parity of the height columns, batched == unbatched
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        scene_hg = scene_hh(0.5 * height_true)
-        s_g = CalibrationState(scene_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
+        board_hg = board_hh(0.5 * height_true)
+        s_g = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
-        s_c = CalibrationState(scene_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
+        s_c = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
@@ -189,13 +190,13 @@ end
 end
 
 @testitem "board warping at a non-square aspect: Float32 and the device (CPU side)" setup = [RCFixtures, HeightScene] begin
-    using RadiometricCamera: HEIGHT_NC, intersect_board, PrintedTarget, warping_aspect
+    using RadiometricCamera: HEIGHT_NC, intersect_board, TexturedTarget, warping_aspect
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     const Adapt = RC.Adapt
     # a board of a non-square page carries its page's warping (Core's flat surface over its nodes), and its Float32 board the
     # converted one: the same hits to Float32 rounding; adapt (an Array adaptor) keeps it bit for bit
-    tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
     @test warping_aspect(tall) ≈ 0.7 && tall.warping isa VgtkCore.MappedSurface
     t32 = VgtkCore.convert_eltype(Float32, tall)
     ta = Adapt.adapt(Array, t32)
@@ -211,8 +212,7 @@ end
 end
 
 @testitem "board warping at a non-square aspect (GPU)" tags = [:gpu] setup = [RCFixtures, RCGPU, HeightScene] begin
-    using RadiometricCamera: BoardSurface, build_problem_grid, compute_mask, PrintedTarget, render_all, Scene, warping_aspect,
-                             with_surface
+    using RadiometricCamera: TargetState, build_problem_grid, compute_mask, TexturedTarget, render_all, warping_aspect, with_state
     using StaticArrays, LinearAlgebra
     import CUDA
     import VisualGeometryToolkitCore as VgtkCore
@@ -221,15 +221,15 @@ end
     # α = 0.7 give the CPU's residuals and height columns
     require_gpu()
     if RC_GPU_TESTS
-        tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+        tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
         @test warping_aspect(tall) ≈ 0.7
         wd = Adapt.adapt(CUDA.CuArray, VgtkCore.convert_eltype(Float32, tall.warping))
         @test wd isa VgtkCore.MappedSurface                                     # the flat field's system on the device
-        scene_t = with_surface(Scene(tall, Wh, Hh), BoardSurface(h = 0.5 * height_true))
-        masks_t = [compute_mask(camera_h, p, Scene(tall, Wh, Hh), st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]
-        targets_t = render_all(CalibrationState(with_surface(Scene(tall, Wh, Hh), BoardSurface(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
-        s_g = CalibrationState(scene_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
-        s_c = CalibrationState(scene_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t)
+        board_t = with_state(tall, TargetState(h = 0.5 * height_true))
+        masks_t = [compute_mask(camera_h, p, tall, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]
+        targets_t = render_all(CalibrationState(with_state(tall, TargetState(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
+        s_g = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
+        s_c = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t)
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g), render_all(s_c))) < 2e-3 * maximum(maximum, render_all(s_c))
         prob_g, _ = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
@@ -249,11 +249,11 @@ end
 end
 
 @testitem "board warping: Core's height manifold moves the pure-bending heights (no gauge)" begin
-    using RadiometricCamera: board_height, BoardSurface, HEIGHT_NC, HEIGHT_NFREE, Material, PrintedTarget, warping_nodes
+    using RadiometricCamera: board_height, TargetState, HEIGHT_NC, HEIGHT_NFREE, Material, TexturedTarget, warping_nodes
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
-    page_board(aspect) = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
     W1 = page_board(1.0)
     B = Matrix(RC.height_basis(W1))
     @test B == VgtkCore.retract_jacobian(RC.height_manifold(W1))
@@ -295,17 +295,18 @@ end
         Z = hcat([[board_height(wp, SVector{HEIGHT_NC}(Bα[:, k]), p) for p in probes] for k in 1:HEIGHT_NFREE]...)
         @test rank(Z; rtol = 1e-10) == HEIGHT_NFREE
         # the material block takes its board's basis: a step of the free height parameters is pure bending of that page's spline
-        mv = RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), BoardSurface(), wp; height = HEIGHT_NC)
+        mv = RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), TargetState(), wp; height = HEIGHT_NC)
         @test mv.basis == RC.height_basis(wp)
         u = zeros(9 + HEIGHT_NFREE); u[10:end] .= 1e-3 .* y
         @test maximum(abs, Affα * RC.NLLSsolver.update(mv, u).surface.h) < 1e-15
     end
-    @test_throws ArgumentError RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), BoardSurface(); height = HEIGHT_NC)
+    @test_throws ArgumentError RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), TargetState(); height = HEIGHT_NC)
 end
 
 @testitem "board warping: the spline is the page's physical bending, whatever its aspect" begin
-    using RadiometricCamera: board_height, board_normal, BoardSurface, chart, HEIGHT_NC, intersect_board, posed_target,
-                             PrintedTarget, warping_aspect, with_h, world_point
+    using RadiometricCamera: board_height, board_normal, TargetState, chart, HEIGHT_NC, intersect_board, TexturedTarget,
+                             warping_aspect, with_h, world_point
+    using VisualRadiometryToolkitCore: posed_target
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
@@ -315,7 +316,7 @@ end
     # on a page that is not square.
     h = SVector{HEIGHT_NC}([1e-3 * sin(2.1i) for i in 1:HEIGHT_NC])
     for (Wm, Hm) in ((2.0, 2.0), (0.8, 0.6), (0.297, 0.210), (1.0, 2.5))
-        b = PrintedTarget([0.0, 0.0, 0.0], [Wm, 0.0, 0.0], [0.0, Hm, 0.0], rand(4, 4, 3); facing = [0.4, 0.3, 1.5])
+        b = TexturedTarget([0.0, 0.0, 0.0], [Wm, 0.0, 0.0], [0.0, Hm, 0.0], rand(4, 4, 3); facing = [0.4, 0.3, 1.5])
         metric = VgtkCore.ThinPlateSplineSystem([SVector(n[1] * Wm, n[2] * Hm) for n in RC.HEIGHT_NODES])
         wm, am = VgtkCore.tps_coefficients(metric, collect(h))
         probes = [SVector(x, y) for x in 0.05:0.1:0.95 for y in 0.05:0.1:0.95]
@@ -329,12 +330,12 @@ end
         o = SVector(0.31 * Wm, 0.62 * Hm, 1.2); d = normalize(SVector(0.02, -0.03, -1.0))
         s1, x1 = intersect_board(b, o, d, h)
         @test abs(dot(x1 - world_point(b, SVector(0.0, 0.0)), board_normal(b)) - board_height(b, h, chart(b, x1))) < 1e-12
-        sc, xc = VgtkCore.intersection(VgtkCore.surface(posed_target(b, with_h(BoardSurface(), h))), o, d)
+        sc, xc = VgtkCore.intersection(VgtkCore.surface(posed_target(b, with_h(TargetState(), h))), o, d)
         @test abs(sc - s1) < 1e-12 && norm(xc - x1) < 1e-12
     end
     # the per-axis chart is NOT the same bending on a non-square page (the defect this replaces): a measurable difference
     chart_tps = VgtkCore.ThinPlateSplineSystem(RC.HEIGHT_NODES)
-    page_board(aspect) = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
     wc, _ = VgtkCore.tps_coefficients(chart_tps, collect(h))
     old(𝐛) = VgtkCore.tps_evaluate(chart_tps.nodes, wc, zero(SVector{3, Float64}), 𝐛)
     wp = page_board(0.5)
@@ -373,7 +374,7 @@ end
     D = ForwardDiff.Dual{Nothing, Float64, 3}
     z = zero(SVector{HEIGHT_NC, Float64}); zd = SVector{HEIGHT_NC, D}(z)
     seeded = SVector{HEIGHT_NC, D}(ntuple(i -> D(0.0, ForwardDiff.Partials(ntuple(j -> Float64(i == j), 3))), HEIGHT_NC))
-    @test !RC.is_warped(z) && !RC.is_warped(zd) && RC.is_warped(seeded) && RC.is_warped(hh) && RC.is_warped(SVector{HEIGHT_NC, D}(hh))
+    @test !VrtkCore.is_warped(z) && !VrtkCore.is_warped(zd) && VrtkCore.is_warped(seeded) && VrtkCore.is_warped(hh) && VrtkCore.is_warped(SVector{HEIGHT_NC, D}(hh))
     # the ray seeded (a chunk's pose slots), the flat heights constant: the plane hit in the height field's numbers, its value the
     # plain plane hit bit for bit, its partials the height field's implicit ones (Core's Newton and implicit step at h = 0) to rounding
     o = SVector(0.1, -0.2, 1.4); d = normalize(SVector(0.05, 0.1, -1.0))
@@ -383,7 +384,7 @@ end
     s0, x0 = intersect_board(board_hs, o, d)
     @test s isa D && eltype(x) === D && ForwardDiff.value(s) == s0 && ForwardDiff.value.(x) == x0
     @test intersect_board(board_hs, od, dd, zd) == (s, x)                       # the per-ray form: the same hit
-    sn, xn = RC.VgtkCore.intersection(RC.board_relief(board_hs, zd), od, dd)   # the height field's path at the same flat board
+    sn, xn = RC.VgtkCore.intersection(VrtkCore.board_relief(board_hs, zd), od, dd)   # the height field's path at the same flat board
     @test abs(ForwardDiff.value(sn) - s0) < 1e-14 && norm(ForwardDiff.value.(xn) - x0) < 1e-14
     @test all(j -> norm(map(q -> ForwardDiff.partials(q)[j], x) - map(q -> ForwardDiff.partials(q)[j], xn)) < 1e-12, 1:3)
     @test norm(collect(ForwardDiff.partials(s)) - collect(ForwardDiff.partials(sn))) < 1e-12

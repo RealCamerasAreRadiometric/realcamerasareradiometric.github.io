@@ -74,9 +74,10 @@ src/camera/                         the geometric camera's chief-ray models and 
   view.jl                             the kernels' View of the camera at a pose (Θ_e): one-line forwards to VisualRadiometryToolkitCore's
                                       maps; flat_vignetting, the calibration's start of V
   vignetting.jl, pose.jl              the vignetting's rules and gauge; the pose
-src/target/                         printed_target.jl (PrintedTarget, 𝓑: Core's posed planar target + the print: texture, ρ_c), warping.jl (h: thin
-                                    plate spline, Core's MappedSurface; BoardSurface), printed_edge.jl (ρ_c of a distance-map design)
-src/image_formation/                radiance.jl (L_c, the per-basis responses), flux.jl (RenderSettings, Scene, Φ_pixel, masks)
+src/target/                         board.jl (𝓑: VisualRadiometryToolkitCore's TexturedTarget — Core's posed planar target + the print:
+                                    texture, printed edge, and its own state, the warping h — and the calibration's share: the light
+                                    sphere, the warping's free parameters, the distance map's reader), target_radiometry.jl
+src/image_formation/                radiance.jl (L_c, the per-basis responses), flux.jl (RenderSettings, Φ_pixel, masks)
 src/calibration/                    state.jl (CalibrationState), weighting.jl (the rows' weights: whitened under the sensor
                                     noise, or as measured), precision.jl, closed_form.jl (closed-form Θ_l, Θ_v, μ), smoothness.jl,
                                     problem_spec.jl (the problem from the options), lm/ (per_view.jl: variable blocks, PerViewResidual,

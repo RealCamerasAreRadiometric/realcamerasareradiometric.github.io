@@ -40,28 +40,6 @@ function RenderSettings(; n_𝐩::Integer = 2, n_ρ::Integer = 3, n_φ::Integer 
     return RenderSettings(SensorQuadrature{T}(n_𝐩), ApertureQuadrature{T}(n_ρ, n_φ), RadianceSampler(N; seed, hammersley))
 end
 
-"""
-    Scene
-
-Fixed scene data — the board 𝓑 and the image size `W × H` — and the surface parameters `surface::BoardSurface` (the board warping
-h and the printed-edge parameters, warping.jl), which every render receives by value. `Scene(board, W, H)` is the plane.
-"""
-struct Scene{B <: PrintedTarget, T}
-    board::B
-    W::Int
-    H::Int
-    surface::BoardSurface{T}
-    function Scene(board::B, W::Integer, H::Integer, surface::BoardSurface{T}) where {B <: PrintedTarget, T}
-        return new{B, T}(board, Int(W), Int(H), surface)
-    end
-end
-Scene(board::PrintedTarget{T}, W::Integer, H::Integer) where {T} = Scene(board, Int(W), Int(H), BoardSurface{T}())
-"""The scene with its surface parameters replaced."""
-with_surface(sc::Scene, surf::BoardSurface) = Scene(sc.board, sc.W, sc.H, surf)
-"""The board's rays of a render of `scene` (`BoardRays`): its warping's relief."""
-@inline BoardRays(scene::Scene) = BoardRays(scene.board, scene.surface.h)
-Adapt.adapt_structure(to, s::Scene) = Scene(adapt(to, s.board), s.W, s.H, s.surface)
-
 """Linear pixel id used in the sample keys (column-major over the `H × W` image)."""
 @inline pixel_id(u::Integer, v::Integer, H::Integer) = UInt64((u - 1) * H + v)
 
@@ -137,8 +115,8 @@ struct HeightRays{V <: StaticVector{HEIGHT_NC}}
     h::V
 end
 struct HeightRayTag end
-@inline _pixel_rays(::Nothing, scene::Scene) = BoardRays(scene)
-@inline _pixel_rays(hr::HeightRays, scene::Scene) = BoardRays(scene.board, hr.h)   # Core: the height-field Newton's hit, its height partials by one IFT step
+@inline _pixel_rays(::Nothing, board::TexturedTarget) = BoardRays(board)
+@inline _pixel_rays(hr::HeightRays, board::TexturedTarget) = BoardRays(board, hr.h)   # Core: the height-field Newton's hit, its height partials by one IFT step
 @inline _ray_zero(::Nothing, ::Type{T}) where {T} = zero(SVector{3, T})
 @inline _ray_zero(::HeightRays, ::Type{T}) where {T} = zero(SMatrix{3, HEIGHT_NC, T, 3 * HEIGHT_NC})
 """The ray's board point as the radiance estimator sees it: as intersected, or (height mode) on the ray at a one-slot dual `s`."""
@@ -210,9 +188,9 @@ end
     return s, o + s * d, nothing
 end
 """The radiance of a ray (`Φ_pixel`'s ray `ri`): `L_c`, or one of its radiance-Jacobian modes (`RadianceRecord`, `RadianceRays`)."""
-@inline _ray_radiance(::Nothing, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧) = L_c(bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
-@inline function _ray_radiance(lr::RadianceRecord, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
-    ω_l, T, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
+@inline _ray_radiance(::Nothing, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧) = L_c(bd, m, lt, sm, key, 𝐛, 𝐱, ω)
+@inline function _ray_radiance(lr::RadianceRecord, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
+    ω_l, T, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
     front || return zero(SVector{3, T})
     D = ForwardDiff.Dual{RadianceTag, T, RAD_NL}
     ε(j) = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials(ntuple(i -> i == j ? one(T) : zero(T), Val(RAD_NL))))
@@ -226,8 +204,8 @@ end
 end
 @inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
 @inline _δ(x::Real) = zero(x)
-@inline function _ray_radiance(lr::RadianceRays, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
-    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
+@inline function _ray_radiance(lr::RadianceRays, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
+    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
     front || return zero(SVector{3, Tz})
     e1, e2 = _seed_tangents(ForwardDiff.value.(ω_l))
     q4 = _δ(dot(e1, ω_l)); q5 = _δ(dot(e2, ω_l)); qα = _δ(α)
@@ -238,15 +216,15 @@ end
 end
 
 """
-    Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings) -> SVector{3}
+    Φ_pixel(u, v, k, camera, pose, mat, light, board, settings) -> SVector{3}
 
 Radiant flux of pixel `(u, v)` (column `u`, row `v` of the `H × W` image) of photograph `k`: `camera` (a
 `RadiometricCameraModel`) at `pose` (camera → world). `k` is the photograph's index: it keys the common random numbers of
 the radiance (`SampleKey`), so the flux of a state's view `k` is `Φ_pixel(u, v, k, camera, poses[k], …)`.
 """
 Φ_pixel(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
-        scene::Scene, st::RenderSettings) =
-    _Φ_pixel(u, v, k, View(pose, camera), camera.vignetting, mat, light, scene, st)
+        board::TexturedTarget, st::RenderSettings) =
+    _Φ_pixel(u, v, k, _image_height(camera), View(pose, camera), camera.vignetting, mat, light, board, st)
 
 """The number type a vignetting brings into the flux: its nodes' element type; the absent vignetting (VisualRadiometryToolkitCore's
 `NoVignetting`: V ≡ 1, `vig(𝐩) === true`) brings none — `Bool`, the neutral element of the promotion — so a Float32 kernel stays
@@ -255,22 +233,23 @@ Float32, and its factor `w * true` is `w`: the kernel holds no multiplication by
 @inline _vignetting_number_type(::NoVignetting) = Bool
 
 """
-    _Φ_pixel(u, v, k, view, vig, mat, light, scene, settings[, fseed, dirseed, hrays, lrays]) -> SVector{3}
+    _Φ_pixel(u, v, k, H, view, vig, mat, light, board, settings[, fseed, dirseed, hrays, lrays]) -> SVector{3}
 
-The kernels' flux of pixel `(u, v)` of view `k` ([`Φ_pixel`](@ref) of the camera at its pose, the vignetting apart). `@inline`: in
+The kernels' flux of pixel `(u, v)` of view `k` ([`Φ_pixel`](@ref) of the camera at its pose, the vignetting apart; `H` the image's
+height, the camera's: the stride of the pixel ids, which a kernel holding a bare model of a tile cannot read from it). `@inline`: in
 the device kernels a Julia-level inline lets the compiler optimize the dual arithmetic across the call (the backend's
 `always_inline` only inlines at the LLVM level) — the GPU Jacobian is 12% faster. `hrays`: a `HeightRays` for the `3 × HEIGHT_NC`
 nodal-height partials instead of the flux. `lrays`: a radiance-Jacobian mode (`RadianceRecord`, `RadianceRays`) for the rays'
 radiance.
 """
-@inline function _Φ_pixel(u::Integer, v::Integer, k::Integer, view::View{T}, vig::AbstractVignetting, mat::Material,
-                 light::EnvironmentLight, scene::Scene, st::RenderSettings, fseed = nothing, dirseed = nothing,
+@inline function _Φ_pixel(u::Integer, v::Integer, k::Integer, H::Integer, view::View{T}, vig::AbstractVignetting, mat::Material,
+                 light::EnvironmentLight, board::TexturedTarget, st::RenderSettings, fseed = nothing, dirseed = nothing,
                  hrays = nothing, lrays = nothing) where {T}
-    bd = scene.board
+    bd = board
     Tz = promote_type(T, eltype(mat.refractive_index_ink), eltype(coefficients(light)), _vignetting_number_type(vig))
     acc = _ray_zero(hrays, Tz)
-    pid = pixel_id(u, v, scene.H)
-    rays = _pixel_rays(hrays, scene)                                    # the board warping h's relief, formed once for the pixel's rays
+    pid = pixel_id(u, v, H)
+    rays = _pixel_rays(hrays, board)                                    # the board warping h's relief, formed once for the pixel's rays
     @inbounds for ks in 1:length(st.sensor)
         𝐩 = 𝐩_sample(st.sensor, ks, u, v)
         V𝐩 = vig(𝐩)
@@ -284,7 +263,7 @@ radiance.
             (isfinite(ForwardDiff.value(s)) && ForwardDiff.value(s) > 0) || continue
             𝐱ᵣ = _ray_point(hrays, s, 𝐱, o, d)
             𝐛 = chart(bd, 𝐱ᵣ)
-            L = _ray_radiance(lrays, ri, bd, scene.surface, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d, 𝐧)
+            L = _ray_radiance(lrays, ri, bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d, 𝐧)
             inner = _ray_add(hrays, inner, 𝐚_weight(st.aperture, la, view.r) * L, s)
         end
         acc += (st.sensor.weights[ks] * V𝐩) * inner
@@ -293,56 +272,56 @@ radiance.
 end
 
 """
-    compute_mask(camera, pose, scene, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
+    compute_mask(camera, pose, board, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
 
 Pixel mask of `camera` (a `RadiometricCameraModel`) at `pose` (camera → world): `true` where the chief ray and every
 (footprint corner × aperture border sample) ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with
 `external`. `board_valid` over every pixel of `external` (all of them without one): one kernel on `backend`, required. A caller
 that needs only some of the pixels (the start's draw, `draw_samples`) tests those alone through `BoardValidity`.
 """
-compute_mask(camera::RadiometricCameraModel, pose::EuclideanMap, scene::Scene, st::RenderSettings; kwargs...) =
-    _compute_mask(View(pose, camera), scene, st; kwargs...)
+compute_mask(camera::RadiometricCameraModel, pose::EuclideanMap, board::TexturedTarget, st::RenderSettings; kwargs...) =
+    _compute_mask(View(pose, camera), board, st; kwargs...)
 """The kernels' form of [`compute_mask`](@ref): the camera at its pose as a `View`."""
-function _compute_mask(view::View, scene::Scene, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
-    H, W = scene.H, scene.W
+function _compute_mask(view::View, board::TexturedTarget, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
+    W, H = _image_size(view)                                                   # the image is the camera's
     ids = external === nothing ? collect(1:(H * W)) : findall(vec(external))   # column-major: (u − 1) H + v
     mask = falses(H, W)
-    mask[ids[board_valid(view, scene, st, ids; δ, backend)]] .= true
+    mask[ids[board_valid(view, board, st, ids; δ, backend)]] .= true
     return mask
 end
 
 """
-    board_valid(view, scene, settings, ids; δ, backend) -> BitVector
+    board_valid(view, board, settings, ids; δ, backend) -> BitVector
 
 The mask test (`compute_mask`'s) of the pixels `ids` (column-major linear indices `(u − 1) H + v`) alone, in `ids`' order: one
 kernel over them (`_MaskAt` on Core's `pointwise!`) on `backend` (the caller's device: a state's or a run's `rc_backend`;
 KernelAbstractions' CPU() threads it over the pixels). THE mask test: `compute_mask` over a region, `BoardValidity` over a draw's
 candidates.
 """
-function board_valid(view::View, scene::Scene, st::RenderSettings, ids::AbstractVector{<:Integer}; δ::Real, backend)
+function board_valid(view::View, board::TexturedTarget, st::RenderSettings, ids::AbstractVector{<:Integer}; δ::Real, backend)
     isempty(ids) && return falses(0)
     out = KernelAbstractions.zeros(backend, Bool, length(ids))
-    VgtkCore.pointwise!(_MaskAt(view, scene.board, st.aperture, Int32(scene.H), Float64(δ)), out, adapt(backend, UInt32.(ids));
+    VgtkCore.pointwise!(_MaskAt(view, board, st.aperture, Int32(_image_height(view)), Float64(δ)), out, adapt(backend, UInt32.(ids));
                         exec = VgtkCore.OnBackend(backend))
     KernelAbstractions.synchronize(backend)
     return BitVector(Array(out))
 end
 
 """
-    BoardValidity(view, scene, settings; δ, backend)
+    BoardValidity(view, board, settings; δ, backend)
 
-The mask test of one view as a function of pixel ids: `t(ids)` is `board_valid(view, scene, settings, ids; δ, backend)`.
+The mask test of one view as a function of pixel ids: `t(ids)` is `board_valid(view, board, settings, ids; δ, backend)`.
 The start's draw (`draw_samples`) calls it on the candidates it needs, in its keys' order, instead of the whole region.
 """
-struct BoardValidity{V <: View, S <: Scene, R <: RenderSettings, B}
+struct BoardValidity{V <: View, S <: TexturedTarget, R <: RenderSettings, B}
     view::V
-    scene::S
+    board::S
     settings::R
     δ::Float64
     backend::B
 end
-BoardValidity(view::View, scene::Scene, st::RenderSettings; δ::Real, backend) = BoardValidity(view, scene, st, Float64(δ), backend)
-(t::BoardValidity)(ids::AbstractVector{<:Integer}) = board_valid(t.view, t.scene, t.settings, ids; t.δ, t.backend)
+BoardValidity(view::View, board::TexturedTarget, st::RenderSettings; δ::Real, backend) = BoardValidity(view, board, st, Float64(δ), backend)
+(t::BoardValidity)(ids::AbstractVector{<:Integer}) = board_valid(t.view, t.board, t.settings, ids; t.δ, t.backend)
 
 """The mask test of a pixel id (`compute_mask`): its chief ray and every footprint corner × aperture border ray on the board inside
 `[δ, 1−δ]²`, in front of the camera."""
@@ -378,7 +357,7 @@ end
 masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)]
 
 """
-    render_view(k, camera, pose, mat, light, scene, settings, mask; backend = CPU()) -> Array{Float64, 3}
+    render_view(k, camera, pose, mat, light, board, settings, mask; backend = CPU()) -> Array{Float64, 3}
 
 `H × W × 3` image of photograph `k`, `camera` (a `RadiometricCameraModel`) at `pose` (camera → world), zeros outside the
 mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (KernelAbstractions' `CPU()` by default; a device:
@@ -386,19 +365,21 @@ mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (Kern
 device, where the image agrees with the CPU's to Float32 rounding). `k` is the photograph's index: it keys the common random numbers
 of the radiance, so photograph `k` of a state renders with its index.
 """
-render_view(k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight, scene::Scene,
+render_view(k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight, board::TexturedTarget,
             st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU()) =
-    _render_view(k, View(pose, camera), camera.vignetting, mat, light, scene, st, mask; backend)
+    _render_view(k, View(pose, camera), camera.vignetting, mat, light, board, st, mask; backend)
 """The kernels' form of [`render_view`](@ref): the camera at its pose as a `View`, the vignetting apart."""
 function _render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                      scene::Scene, st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU())
+                      board::TexturedTarget, st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU())
+    W, H = _image_size(view)                                                   # the image is the camera's; the mask is of it
+    size(mask) == (H, W) || throw(ArgumentError("render_view: the mask is $(size(mask, 1)) × $(size(mask, 2)) (rows × columns), the camera's image $H × $W"))
     px = masked_pixels(mask)
-    img = zeros(Float64, scene.H, scene.W, 3)
+    img = zeros(Float64, H, W, 3)
     isempty(px) && return img
     F = _kernel_float(backend)
-    ids = adapt(backend, [UInt32((u - 1) * scene.H + v) for (u, v) in px])
+    ids = adapt(backend, [UInt32((u - 1) * H + v) for (u, v) in px])
     as(x) = F === _float_of(st) ? x : VgtkCore.convert_eltype(F, x)          # (arguments already in the kernels' float: as they are, no copy)
-    flux = _FluxAt(Int32(k), Int32(scene.H), adapt(backend, as(view)), as(vig), as(mat), as(light), adapt(backend, as(scene)), as(st))
+    flux = _FluxAt(Int32(k), Int32(H), adapt(backend, as(view)), as(vig), as(mat), as(light), adapt(backend, as(board)), as(st))
     Φ = _device_rows(flux, backend, ids)
     for (i, (u, v)) in enumerate(px), c in 1:3
         img[v, u, c] = Φ[3 * (i - 1) + c]

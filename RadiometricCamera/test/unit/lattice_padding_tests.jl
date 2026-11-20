@@ -85,15 +85,14 @@ end
 
 @testitem "lattice padding: a start whose node counts are not patch multiples runs through build_problem_grid and the LM" setup = [RCFixtures, SchoepsSource] begin
     using RadiometricCamera: build_problem_grid, compute_mask, exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, grid_model,
-                             grid_present, Material, PrintedTarget, render_view, RenderSettings, run_lm_grid!, Scene, sphere_radius, 𝔟
+                             grid_present, Material, TexturedTarget, render_view, RenderSettings, run_lm_grid!, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
 
     tex = fixture_board()
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
-    scene = Scene(board, W, H)
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     spline = subdivided(grid_model(src_t, 10, 10), 2)                      # a SplineLens source of 7 × 7 cells split 2 × 2: 17 nodes per axis
     st = exact_start(spline)                                               # his lattice, m = 1: 17 nodes per axis, padded to 20
@@ -108,9 +107,9 @@ end
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, sphere_radius(b, [p.t for p in poses]))
     mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     rs = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [compute_mask(camera, p, scene, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
-    targets = [render_view(k, camera, poses[k], mat, light, scene, rs, masks[k]) for k in 1:2]
-    s = CalibrationState(scene, rs, camera, copy(poses), mat, light, targets; masks)
+    masks = [compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
+    targets = [render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
+    s = CalibrationState(board, rs, camera, copy(poses), mat, light, targets; masks)
     prob, idx = build_problem_grid(s)                                      # the patch default: GRID_PATCH, which divides the padded lattice
     @test GRID_PATCH == (5, 5) && size(idx.patches) == (4, 4)
     out = run_lm_grid!(s; maxiters = 1, fixed = (:focus, :aperture, :vignetting, :lighting))

@@ -1,6 +1,7 @@
 @testitem "pose / board / back-projection" setup = [RCFixtures] begin
-    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, PrintedTarget, world_point, world_ray,
-                             π̂⁻¹, chief_ray, ρ_c, 𝔟, 𝔣, 𝔭
+    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, TexturedTarget, world_point, world_ray, π̂⁻¹,
+                             chief_ray, 𝔟, 𝔣, 𝔭
+    using VisualRadiometryToolkitCore: ρ_c
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -30,7 +31,7 @@
     end
     # board
     tex = rand(64, 96, 3)
-    bd = PrintedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+    bd = TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
     @test board_normal(bd)[3] < 0
     s, 𝐱 = intersect_board(bd, SVector(0.0, 0.0, 0.0), SVector(0.25, 0.5, 1.0))
     @test 𝐱[3] ≈ 2 && chart(bd, 𝐱) ≈ SVector(0.5, 1.0)

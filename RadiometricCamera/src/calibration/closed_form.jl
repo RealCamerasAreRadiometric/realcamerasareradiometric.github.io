@@ -35,15 +35,15 @@ struct PixelParts{J, L3, NS, F}
 end
 
 """
-    _sample_parts(view, mat, light, scene, st, rays, k, pid, ks, 𝐩, scale, Z) -> (Bd, Bs)
+    _sample_parts(view, mat, light, board, st, rays, k, pid, ks, 𝐩, scale, Z) -> (Bd, Bs)
 
 THE aperture quadrature of the light responses at sensor sample `ks` (position `𝐩`) of pixel id `pid` of view `k`:
 `Σ_l w_l (Bd, Bs)` of `radiance_parts` over the disc rule (`Z` the zero `3 × J` matrix of the accumulators' type; `scale` the global
 aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels `_PixelPartsAt` and `_PartsAt`.
 """
-@inline function _sample_parts(view::View, mat::Material, light::EnvironmentLight, scene::Scene, st::RenderSettings, rays,
+@inline function _sample_parts(view::View, mat::Material, light::EnvironmentLight, board::TexturedTarget, st::RenderSettings, rays,
                                k::Integer, pid, ks::Integer, 𝐩, scale, Z, lrays = nothing)
-    bd = scene.board
+    bd = board
     Bd = Z; Bs = Z
     rs = view.r
     for la in 1:n_disc(st.aperture)
@@ -52,7 +52,7 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
         sray, 𝐱 = _parts_hit(lrays, (ks - 1) * n_disc(st.aperture) + la, rays, o, d)
         (isfinite(sray) && sray > 0) || continue
         𝐛 = chart(bd, 𝐱)
-        parts = radiance_parts(bd, scene.surface, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱, d)
+        parts = radiance_parts(bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱, d)
         w = 𝐚_weight(st.aperture, la, rs) * scale
         Bd += w * parts.Bd
         Bs += w * parts.Bs
@@ -72,7 +72,7 @@ reach (zeros: it misses the board, or meets it from behind, where its parts are 
 end
 
 """
-    pixel_parts(u, v, k, camera, pose, mat::Material, light::EnvironmentLight, scene::Scene, settings::RenderSettings) -> PixelParts
+    pixel_parts(u, v, k, camera, pose, mat::Material, light::EnvironmentLight, board::TexturedTarget, settings::RenderSettings) -> PixelParts
 
 THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of photograph `k`, `camera` (a `RadiometricCameraModel`) at
 `pose` (camera → world), in the settings' float type: the sensor and aperture quadratures evaluated once, so the closed-form solves
@@ -80,21 +80,21 @@ of `Θ_l`, `Θ_v` and μ ([`solve_linear_blocks!`](@ref)) need no re-rendering. 
 matches [`Φ_pixel`](@ref)'s. The vignetting is not applied: it is one of the parts' linear factors.
 """
 pixel_parts(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
-            scene::Scene, st::RenderSettings) = _pixel_parts(u, v, k, View(pose, camera), mat, light, scene, st)
+            board::TexturedTarget, st::RenderSettings) = _pixel_parts(u, v, k, _image_height(camera), View(pose, camera), mat, light, board, st)
 
 """The kernels' form of [`pixel_parts`](@ref) on a `View`. Device-safe: the parts kernels run it per pixel (`_PixelPartsAt` for the
 closed-form solves, `_PartsAt` for the LM's analytic columns, which gives the pixel's radiance record `lrays` for its rays' hits,
 `_parts_hit`)."""
-@inline function _pixel_parts(u::Integer, v::Integer, k::Integer, view::View, mat::Material,
-                             light::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, scene::Scene, st::RenderSettings{TS, NS},
+@inline function _pixel_parts(u::Integer, v::Integer, k::Integer, H::Integer, view::View, mat::Material,
+                             light::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, board::TexturedTarget, st::RenderSettings{TS, NS},
                              lrays = nothing) where {L, C, J, TS, NS}
     F = _float_of(st)
-    bd = scene.board
-    pid = pixel_id(u, v, scene.H)
+    bd = board
+    pid = pixel_id(u, v, H)
     scale = 1 / (π * view.r^2)
     𝐩s = ntuple(ks -> SVector{2, F}(𝐩_sample(st.sensor, ks, u, v)), Val(NS))
-    rays = BoardRays(scene)                                  # the warping's relief, once for the pixel's rays (bit for bit the per-ray form)
-    BdBs = ntuple(ks -> _sample_parts(view, mat, light, scene, st, rays, k, pid, ks, 𝐩s[ks], scale, zero(SMatrix{3, J, F, 3J}), lrays), Val(NS))
+    rays = BoardRays(board)                                  # the warping's relief, once for the pixel's rays (bit for bit the per-ray form)
+    BdBs = ntuple(ks -> _sample_parts(view, mat, light, board, st, rays, k, pid, ks, 𝐩s[ks], scale, zero(SMatrix{3, J, F, 3J}), lrays), Val(NS))
     return PixelParts{J, 3J, NS, F}(SVector{NS}(𝐩s), SVector{NS, F}(ntuple(ks -> F(st.sensor.weights[ks]), Val(NS))),
                                     SVector{NS}(ntuple(ks -> SMatrix{3, J, F, 3J}(BdBs[ks][1]), Val(NS))),
                                     SVector{NS}(ntuple(ks -> SMatrix{3, J, F, 3J}(BdBs[ks][2]), Val(NS))))
@@ -158,11 +158,11 @@ in Float64 on every backend, as the nodal heights' path (`_height_float`): the c
 function all_parts(s::CalibrationState)
     be = s.backend
     dc = _ensure_device!(s)
-    scene = _height_scene(s)                                                  # the Float64 scene on the backend
+    board = _height_board(s)                                                  # the Float64 scene on the backend
     G = Float64
     mat = VgtkCore.convert_eltype(G, s.mat); light = VgtkCore.convert_eltype(G, s.light); st = VgtkCore.convert_eltype(G, s.settings)
     R = _parts_type(light, st)
-    bufs = [_launch_rows(_PixelPartsAt(Int32(k), Int32(s.scene.H), adapt(be, VgtkCore.convert_eltype(G, view_of(s, k))), mat, light, scene, st), be, dc.px[k])
+    bufs = [_launch_rows(_PixelPartsAt(Int32(k), Int32(_image_height(s)), adapt(be, VgtkCore.convert_eltype(G, view_of(s, k))), mat, light, board, st), be, dc.px[k])
             for k in 1:n_views(s) if !isempty(s.px[k])]               # a view without masked pixels: no launch (ndrange 0 fails)
     KA.synchronize(be)
     flat = isempty(bufs) ? KA.allocate(be, G, 0) : reduce(vcat, bufs)

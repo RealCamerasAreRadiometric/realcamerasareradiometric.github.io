@@ -5,8 +5,8 @@
 #
 #   julia --project=. test/regression/mask_draw_benchmark.jl [cpu|gpu] [W H n reps]
 using RadiometricCamera
-using RadiometricCamera: BoardValidity, compute_mask, draw_samples, Focus, GaussianDerivativeEdges, PrintedTarget, RenderSettings, Scene,
-                         View, rc_backend
+using RadiometricCamera: BoardValidity, compute_mask, draw_samples, Focus, GaussianDerivativeEdges, TexturedTarget,
+                         RenderSettings, View, rc_backend
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
 using VisualGeometryToolkitCore: exp_so3
@@ -18,8 +18,7 @@ include(joinpath(@__DIR__, "..", "unit", "fixture_camera.jl"))
 
 dev = rc_backend(get(ARGS, 1, "cpu"))
 W, H, n, reps = length(ARGS) >= 5 ? parse.(Int, ARGS[2:5]) : (6000, 4000, 27500, 3)
-board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
-scene = Scene(board, W, H)
+board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
 pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector{3}(SVector(0.05, -0.05, 1.5)); check = false)
 f = 0.9 * W                                                              # the board fills about half the frame
 camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), f, (W / 2, H / 2), W, H), Focus(3, 1.5, W, H), 0.0386,
@@ -29,8 +28,8 @@ region = [(u - W / 2)^2 + (v - H / 2)^2 < (0.48W)^2 for v in 1:H, u in 1:W]   # 
 cand = region .& [isodd(u + v) for v in 1:H, u in 1:W]                 # a RAW photograph's green photosites in it
 img = ones(H, W); d = GaussianDerivativeEdges(1.5)
 
-full() = compute_mask(camera, pose, scene, st; δ = 0.01, external = region, backend = dev)
-t = BoardValidity(View(pose, camera), scene, st; δ = 0.01, backend = dev)   # the draw's test: the kernels' view of the camera at its pose
+full() = compute_mask(camera, pose, board, st; δ = 0.01, external = region, backend = dev)
+t = BoardValidity(View(pose, camera), board, st; δ = 0.01, backend = dev)   # the draw's test: the kernels' view of the camera at its pose
 tested = Ref(0)
 drawn() = (tested[] = 0; draw_samples(StableRNG(1), ids -> (tested[] += length(ids); t(ids)), cand, img, n; edge_detector = d, device = dev))
 mask = full(); s = drawn()                                               # warm-up (compilation)

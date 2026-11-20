@@ -8,7 +8,7 @@
 # Variable blocks (NLLSsolver duck-typed interface: `nvars`, `update`):
 #   the pose (6, per view: Core's LeftRigidManifold6)   the lens (`lens_manifold`: Core's ParameterManifold of the pixel camera, boxed, scaled, restricted)   focus_block (N, Core's restricted ParameterManifold)   ApertureVar (1)
 #   MaterialVar (9 = 8 nonlinear + μ; in the grid route also the board warping h and the printed-edge parameters of the scene's
-#   BoardSurface)   Θ_v: Core's restrict(ParameterManifold(vig), Z) (the V(0)=1 gauge held exactly: `gauge_basis`)   LightingVar (3J)
+#   TargetState)   Θ_v: Core's restrict(ParameterManifold(vig), Z) (the V(0)=1 gauge held exactly: `gauge_basis`)   LightingVar (3J)
 # Cost block: one `PerViewResidual` per view with the per-pixel residual
 #   𝔯 = Φ_c(𝐮; Θ̄) − ϕ_c(𝐮)  over the mask (`computeresidual`), and a custom
 # `computeresjac` building the Jacobian with ForwardDiff.jl dual numbers seeded on
@@ -157,10 +157,10 @@ NLLSsolver.update(v::ApertureVar, u, start = 1) = ApertureVar(v.r * exp(u[start]
     MaterialVar(mat, surface, board = nothing; height = 0, inplane = false, fixed = (), mu_bounds = (0.0, 1.0))
 
 Θ_m block: the 8 nonlinear parameters (`roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper`; boxed by `bounds`), μ ∈ [0, 1] and the scene's
-`BoardSurface` (its printed edge, δ and σ_print, is never a parameter): with `height > 0` (`NH = height_nparams(height)`) the board warping h through its
+`TargetState` (its printed edge, δ and σ_print, is never a parameter): with `height > 0` (`NH = height_nparams(height)`) the board warping h through its
 `HEIGHT_NFREE` free parameters (h += B y with `B = height_basis(board)`, the board's page: Core's TargetManifold of that
 warping's height field — the piston and the two tilts, the poses', are never parameters; dual-number columns), with `inplane = true`
-(`NI = INPLANE_NC`) the in-plane print error `(a, u)` of `BoardSurface.inplane` (Core's `Aspect ∘ Skew`, `inplane_calibration`:
+(`NI = INPLANE_NC`) the in-plane print error `(a, u)` of `TargetState.inplane` (Core's `Aspect ∘ Skew`, `inplane_calibration`:
 additive, unbounded, no gauge — a rigid member and a scale are the poses'; dual-number columns). The surface shares the
 material block because NLLSsolver caps a cost block at ten variable dependencies, which the per-tile blocks already use.
 
@@ -176,7 +176,7 @@ unchanged; the LM's λ·I damping gives the zero columns a zero step. `mu_bounds
 """
 struct MaterialVar{T, NH, NI, HB <: Union{Nothing, SMatrix{HEIGHT_NC, HEIGHT_NFREE, Float64}}, CH, HM}
     mat::Material{T}
-    surface::BoardSurface{T}
+    surface::TargetState{T}
     basis::HB                          # height_basis of the board's warping (NH > 0), else nothing
     dense_basis::Union{Nothing, Matrix{Float64}}   # `basis` as a dense matrix, built once (the device Jacobian's height columns, `_height_row!`)
     mu_bounds::NTuple{2, Float64}      # μ's chart interval (lo, hi)
@@ -187,7 +187,7 @@ the block could not represent, read by every residual of the block, CPU and devi
 @inline is_valid(m::MaterialVar) = m.valid
 """The block's held parameters (the layouts' `fixed`): `(:material,)` while Θ_m is held inside the variable block (`HM`), else none."""
 material_fixed(::MaterialVar{T, NH, NI, HB, CH, HM}) where {T, NH, NI, HB, CH, HM} = HM ? (:material,) : ()
-function MaterialVar(mat::Material{T}, surface::BoardSurface{T}, board::Union{Nothing, PrintedTarget} = nothing;
+function MaterialVar(mat::Material{T}, surface::TargetState{T}, board::Union{Nothing, TexturedTarget} = nothing;
                      height::Integer = 0, inplane::Bool = false, channel::Integer = 0, fixed = (),
                      mu_bounds = (0.0, 1.0)) where {T}
     all(k -> Symbol(k) === :material, fixed) || throw(ArgumentError("MaterialVar: fixed = $(repr(fixed)) (the block holds :material alone)"))
@@ -208,7 +208,7 @@ function _tied_material_coordinates(u, start::Integer, n::Integer, c::Integer)
     return vcat(material_tie_basis(c) * [u[s + i] for i in 1:nk], [u[s + i] for i in (nk + 1):n])
 end
 # The material and the surface finite.
-_finite_material(m::Material, s::BoardSurface) =
+_finite_material(m::Material, s::TargetState) =
     all(isfinite, Θ_m_nonlinear(m)) && isfinite(m.diffuse_weight) && all(isfinite, s.h) && all(isfinite, s.edge) && all(isfinite, s.inplane)
 """Number of free height parameters of the block: `HEIGHT_NFREE` when the warping is free (dual columns), else 0."""
 n_height_free(::MaterialVar{T, NH}) where {T, NH} = NH > 0 ? HEIGHT_NFREE : 0
@@ -428,12 +428,12 @@ end
 """The dual material and surface of a Jacobian evaluation: the 8 nonlinear parameters seeded at `off_m + 1:8`, μ and the printed-edge
 parameters constant, the nodal heights seeded at `off_h + 1:HEIGHT_NC` when `off_h > 0` (free warping), the in-plane print error's
 parameters at `off_i + 1:INPLANE_NC` when `off_i > 0`; `sd(x, slot)` = the caller's seeding function. Returns `(mat_d, surf_d)`."""
-function _material_dual(m::Material, surf::BoardSurface, sd, off_m::Integer, ::Type{D}; off_h::Integer = 0, off_i::Integer = 0) where {D}
+function _material_dual(m::Material, surf::TargetState, sd, off_m::Integer, ::Type{D}; off_h::Integer = 0, off_i::Integer = 0) where {D}
     θm = Θ_m_nonlinear(m)
     mat_d = Material(sd(θm[1], off_m + 1), sd(θm[2], off_m + 2),
                      SVector{3, D}(ntuple(i -> sd(θm[2 + i], off_m + 2 + i), Val(3))),
                      SVector{3, D}(ntuple(i -> sd(θm[5 + i], off_m + 5 + i), Val(3))), sd(m.diffuse_weight, 0))
-    surf_d = BoardSurface{D}(SVector{HEIGHT_NC, D}(ntuple(i -> sd(surf.h[i], off_h > 0 ? off_h + i : 0), Val(HEIGHT_NC))),
+    surf_d = TargetState{D}(SVector{HEIGHT_NC, D}(ntuple(i -> sd(surf.h[i], off_h > 0 ? off_h + i : 0), Val(HEIGHT_NC))),
                              SVector{EDGE_NC, D}(ntuple(i -> sd(surf.edge[i], 0), Val(EDGE_NC))),
                              SVector{INPLANE_NC, D}(ntuple(i -> sd(surf.inplane[i], off_i > 0 ? off_i + i : 0), Val(INPLANE_NC))))
     return mat_d, surf_d
@@ -516,7 +516,7 @@ _register_window!(s::CalibrationState, p::VgtkCore.LmProblem, select; width::Uni
     _register_window!(s, p.problem, select; width)                           # an LM problem: its NLLSsolver problem's blocks
 function _register_window!(s::CalibrationState, problem, select; width::Union{Nothing, Integer} = nothing)
     _unregister_window!(s)
-    _ensure_device!(s); _height_scene(s); _view_phi(s, 1)        # the device cache's lazy entries, built before workers read it
+    _ensure_device!(s); _height_board(s); _view_phi(s, 1)        # the device cache's lazy entries, built before workers read it
     list = [c for T in keys(problem.costs) if select(T) for c in get(problem.costs, T)]
     pos = IdDict{Any, Int}(c => i for (i, c) in enumerate(list))
     s.device_cache = merge(s.device_cache, (; window = (; problem, list, pos, width = Ref(width === nothing ? 0 : Int(width)),
@@ -708,7 +708,7 @@ held at their start, and its other entries hold the lens model's parameters by
 Core's names in the lens block (`lens_free`; `(:cx, :cy, :k3)`, `:aspect` the aspect f_y/f_x); an entry that is none of these is an
 `ArgumentError`. A lens with no free parameter is held. The model's structure (as the grid route's `build_problem_grid`): with
 `height_degree > 0` the material block carries the board warping's `HEIGHT_NC` nodal heights (`MaterialVar{Float64, HEIGHT_NC}`:
-HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(s.scene.board)`); with `inplane` the in-plane print error `(a, u)` of
+HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(s.board)`); with `inplane` the in-plane print error `(a, u)` of
 the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it.
 """
 function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Integer = 0,
@@ -721,7 +721,7 @@ function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Intege
     NH = _surface_held(fixed, :height) ? 0 : height_nparams(height_degree)   # a free board warping: the nodal heights ride in the material block (as in the grid route)
     inplane = inplane && !_surface_held(fixed, :inplane)
     material_held, blocks_held = _hold_material(blocks_held, NH > 0 || inplane)
-    mv = MaterialVar(s.mat, s.scene.surface, s.scene.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
+    mv = MaterialVar(s.mat, s.board.state, s.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
     variables = Any[VgtkCore.LeftRigidManifold6(s.poses[k]) for k in 1:K]
     push!(variables, lv_d, focus_block(focus(s); fixed = s.focus_fixed),
           ApertureVar(aperture_radius(s)), mv, vv, lv)
@@ -765,7 +765,7 @@ end
 
 Everything needed to re-render the state later (`camera, poses, mat, surface, light`).
 """
-Θ̄_snapshot(s::CalibrationState; camera = s.camera, poses = s.poses, mat = s.mat, surface = s.scene.surface, light = s.light) =
+Θ̄_snapshot(s::CalibrationState; camera = s.camera, poses = s.poses, mat = s.mat, surface = s.board.state, light = s.light) =
     (; camera, poses = copy(poses), mat, surface, light)
 
 

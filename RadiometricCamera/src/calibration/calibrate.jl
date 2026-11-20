@@ -143,7 +143,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
     end
     function monitor(it0, cst, camera, poses, mat, surf, light)
         it = it0 + opts.resume.iteration_offset
-        zs = opts.warping.degree > 0 && it > 0 ? board_height(s.scene.board, surf.h, HEIGHT_NODES) : nothing   # the surface at the nodes, one field
+        zs = opts.warping.degree > 0 && it > 0 ? board_height(s.board, surf.h, HEIGHT_NODES) : nothing   # the surface at the nodes, one field
         opts.warping.degree > 0 && it > 0 && @printf("      board warping: TPS nodal heights %s mm (rms change from the start %.3f mm; surface at the nodes %+.2f … %+.2f mm)\n",
                                                    join([@sprintf("%+.2f", _mm(c)) for c in surf.h], " "), _mm(sqrt(sum(abs2, surf.h .- meta.height0) / HEIGHT_NC)),
                                                    _mm(minimum(zs)), _mm(maximum(zs)))
@@ -167,7 +167,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
         if opts.io.checkpoint_each && it > 0                              # per-iteration poses + state: the learned-pose evaluations and renders between iterations
             save_poses(joinpath(opts.io.out, "poses_it$(it).json"), poses, names; world = meta.world)
             save_state(joinpath(opts.io.out, "state_it$(it).json"),
-                       (; camera, target = RadiometricTarget(_geometric_target(s.scene.board.target), surf.h, warping_aspect(s.scene.board), TargetRadiometry(mat, surf); inplane = surf.inplane),
+                       (; camera, target = RadiometricTarget(_geometric_target(s.board.target), surf.h, warping_aspect(s.board), TargetRadiometry(mat, surf); inplane = surf.inplane),
                           poses, names, light, settings = s.settings, observation = observation_model(s), page_flip = meta.page_flip);
                        provenance = (; iteration = it, cost = cst, rel_rms = sqrt(2cst / ϕ²)))   # the iteration's cost, as the monitor's line
         end

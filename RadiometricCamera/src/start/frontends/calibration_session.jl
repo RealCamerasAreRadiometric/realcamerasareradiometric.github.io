@@ -10,7 +10,7 @@ function _frontend(::Type{BlobFrontend}, opts::PipelineOptions, start::NamedTupl
                       load_targets = false,   # the photographs are streamed below; decoding all of them here cost ≈ 2 s per view
                       raw_dir = isempty(opts.io.raw) ? nothing : opts.io.raw, lens_identity = opts.io.lens_identity === nothing ? nothing : lens_identity(opts.io.lens_identity))
     ds.settings === nothing || println("camera settings: ", settings_line(ds.settings; lens_stated = opts.io.lens_identity !== nothing))
-    board = ds.scene.board; names = copy(ds.names); W₀, H₀ = ds.extent
+    board = ds.board; names = copy(ds.names); W₀, H₀ = ds.extent
     poses0 = copy(ds.poses)
     stored = start.stored                                         # a start record (`load_refinement_start`): its lens, region and poses, no fit
     st0 = stored !== nothing ? (; stored.lens, stored.init_region, resample = nothing) :

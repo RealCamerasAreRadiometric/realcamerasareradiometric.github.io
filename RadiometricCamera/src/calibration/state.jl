@@ -4,7 +4,7 @@
 #   Θ_e  extrinsics (per view)            Θ_d  lens (a pixel camera: Core's BoundedCamera of a CameraModel; grid lenses per tile)
 #   Θ_f  focus surface (t̂ nodal values)   r    aperture radius
 #   Θ_l  lighting (SH coefficients)       Θ_v  vignetting (nodes)
-#   Θ_m  material {α, η, μ}                h    board warping (+ the print's edge parameters) in `scene.surface`
+#   Θ_m  material {α, η, μ}                h    board warping (+ the print's edge parameters) in the board's state (`board.state`)
 #   Θ_i = Θ_d ∪ Θ_f ∪ {r},  Θ_c = Θ_e ∪ Θ_i,  Θ_r = Θ_l ∪ Θ_m,  Θ̄ = all
 #
 # The camera (Θ_d, Θ_f, r and Θ_v) is ONE value, `RadiometricCameraModel`, shared by every view; a view adds its
@@ -31,12 +31,13 @@ _LmRun() = _LmRun(false, Dict{Symbol, Int}(), Dict{Symbol, Int}(:flux => 0, :jac
 """
     CalibrationState
 
-Everything the calibration works on: fixed scene data (board, image size, quadrature, masks, observed images ϕ) and the current
+Everything the calibration works on: the fixed data (the board, a `TexturedTarget`; the quadrature, masks, observed images ϕ; the image
+size is the camera's) and the current
 parameters Θ̄ — the camera every view shares (`camera`, a `RadiometricCameraModel`), one pose per view (`poses`, camera → world),
 the material and the lighting.
 """
-mutable struct CalibrationState{N, SC <: Scene, ST <: RenderSettings, TC <: RadiometricCameraModel, TL <: EnvironmentLight, TP <: EuclideanMap}
-    scene::SC
+mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, TC <: RadiometricCameraModel, TL <: EnvironmentLight, TP <: EuclideanMap}
+    board::SC
     settings::ST
     camera::TC                                # Θ_d, Θ_f, r and Θ_v, shared by every view
     poses::Vector{TP}                         # Θ_e: camera → world per view
@@ -84,7 +85,7 @@ photograph, every third entry from `c` for channel `c` alone."""
 _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
 
 """
-    CalibrationState(scene, settings, camera, poses, mat, light, targets; masks = nothing, δ = 0.02,
+    CalibrationState(board, settings, camera, poses, mat, light, targets; masks = nothing, δ = 0.02,
                      external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = CPU(), ϕ = nothing,
                      channel = 0, focus_fixed = Int[], mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
                      sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
@@ -115,7 +116,7 @@ kept by reference (no copy). When the masked observation vectors `ϕ` are given 
 from `masked_vector`, e.g. for full-resolution photos that do not fit in memory together), `targets` may be
 empty placeholder arrays.
 """
-function CalibrationState(scene::Scene, settings::RenderSettings, camera::RadiometricCameraModel{<:Any, <:Focus{Float64, N}}, poses::AbstractVector{<:EuclideanMap},
+function CalibrationState(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel{<:Any, <:Focus{Float64, N}}, poses::AbstractVector{<:EuclideanMap},
                           mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}};
                           masks = nothing, δ::Real = 0.02, external_masks = nothing, support_min::Real = 0.0, region = nothing,
                           boundary_order::Integer = 2, backend = KernelAbstractions.CPU(), ϕ = nothing, channel::Integer = 0,
@@ -130,9 +131,16 @@ function CalibrationState(scene::Scene, settings::RenderSettings, camera::Radiom
     length(targets) == K || throw(DimensionMismatch("$(K) views but $(length(targets)) targets"))
     poses = [_pose_eltype(Float64, p) for p in poses]
     if masks === nothing
-        masks = [compute_mask(camera, poses[k], scene, settings; δ, backend,   # the state's device
+        masks = [compute_mask(camera, poses[k], board, settings; δ, backend,   # the state's device
                               external = external_masks === nothing ? nothing : external_masks[k]) for k in 1:K]
     end
+    W, H = _image_size(camera)                                              # the image is the camera's (its geometric camera's extent): stated once
+    all(m -> size(m) == (H, W), masks) ||
+        throw(ArgumentError("CalibrationState: a mask is not of the camera's image, $H × $W (rows × columns): the image size is the camera's " *
+                            "(`extent(geometric(camera))`), the masks and photographs are of it"))
+    ϕ === nothing && !all(t -> (size(t, 1), size(t, 2)) == (H, W), targets) &&
+        throw(ArgumentError("CalibrationState: a photograph is not of the camera's image, $H × $W (rows × columns): the image size is the " *
+                            "camera's (`extent(geometric(camera))`)"))
     px = [masked_pixels(m) for m in masks]
     ϕ === nothing && (ϕ = [masked_vector(targets[k], px[k]; channel) for k in 1:K])   # a plane target (H × W): one measured value per pixel
     tg = Array{Float64, 3}[t isa Array{Float64, 3} ? t : Array{Float64, 3}(ndims(t) == 2 ? reshape(t, size(t)..., 1) : t) for t in targets]
@@ -153,8 +161,8 @@ function CalibrationState(scene::Scene, settings::RenderSettings, camera::Radiom
         light = tie_channels(light, channel); mat = tie_channels(mat, channel)
     end
     rule = vignetting_rule(camera.vignetting, region, px; support_min, order = boundary_order)
-    return CalibrationState{N, typeof(scene), typeof(settings), typeof(camera), typeof(light), eltype(poses)}(
-        scene, settings, camera, poses, VgtkCore.convert_eltype(Float64, mat), light, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), collect(Int, focus_fixed), zeros(0, 0),
+    return CalibrationState{N, typeof(board), typeof(settings), typeof(camera), typeof(light), eltype(poses)}(
+        board, settings, camera, poses, VgtkCore.convert_eltype(Float64, mat), light, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), collect(Int, focus_fixed), zeros(0, 0),
         Float64.(Tuple(mu_bounds)), Union{Nothing, Vector{Float64}}[q === nothing ? nothing : Vector{Float64}(q) for q in quanta],
         collect(VgtkCore.SensorModel, sensor_models), sensor, photo_kind, _LmRun(), nothing)
 end
@@ -188,11 +196,13 @@ focus(s::CalibrationState) = focus(s.camera)
 The aperture radius r the views share, in metres.
 """
 aperture_radius(s::CalibrationState) = aperture_radius(s.camera)
-"""The scene's surface parameters: the board warping h and the print's edge parameters (`BoardSurface`)."""
-board_surface(s::CalibrationState) = s.scene.surface
-"""Replace the scene's surface parameters (host precision: the scene's element type)."""
-function set_surface!(s::CalibrationState, surf::BoardSurface)
-    s.scene = with_surface(s.scene, surf)
+_image_size(s::CalibrationState) = _image_size(s.camera)   # the image is the camera's
+"""The board's own state: its warping h, the print's edge parameters and the in-plane print error (VisualRadiometryToolkitCore's
+`TargetState`, the state of the state's `TexturedTarget`)."""
+board_surface(s::CalibrationState) = s.board.state
+"""Replace the board's state (host precision)."""
+function set_surface!(s::CalibrationState, surf::TargetState)
+    s.board = with_state(s.board, surf)
     return s
 end
 """
@@ -208,7 +218,7 @@ The state's calibration target: the board's geometric target (Core's target of i
 the warping h with the aspect of the board's page and the target's radiometry ([`RadiometricTarget`](@ref)).
 """
 radiometric_target(s::CalibrationState) =
-    RadiometricTarget(_geometric_target(s.scene.board.target), board_surface(s).h, warping_aspect(s.scene.board), target_radiometry(s);
+    RadiometricTarget(_geometric_target(s.board.target), board_surface(s).h, warping_aspect(s.board), target_radiometry(s);
                       inplane = board_surface(s).inplane)
 _geometric_target(::Nothing) = nothing
 _geometric_target(t::VgtkCore.PosedTarget) = VgtkCore.model(t)
@@ -219,7 +229,7 @@ The state's material, board warping and the print's edge parameters from `t` (it
 learned on a page of another aspect than the run's board is an `ArgumentError` ([`board_surface`](@ref)).
 """
 function set_radiometric_target!(s::CalibrationState, t::RadiometricTarget)
-    surf = board_surface(s.scene.board, t)
+    surf = board_surface(s.board, t)
     s.mat = VgtkCore.convert_eltype(Float64, material(t.radiometry))
     return set_surface!(s, surf)
 end

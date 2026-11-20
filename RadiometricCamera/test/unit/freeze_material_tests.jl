@@ -28,7 +28,7 @@
     W = H = 32
     @testset "per-tile block (grid lens, warping free)" begin
         glens = grid_model(cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H), 10, 10)
-        s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., glens)
+        s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
         prob, _ = build_problem_grid(s; patch = (5, 5), height_degree = 1)
         held, idx = build_problem_grid(s; patch = (5, 5), height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]                                                         # the block stays variable
@@ -47,8 +47,8 @@
     end
     @testset "per-view block (Kannala–Brandt)" begin
         kb = cam(RCg.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
-        scene, m = gold_scene(W, H; h = gold_h())
-        s = gold_state(scene, m, kb)
+        board, m = gold_board(W, H; h = gold_h())
+        s = gold_state(board, m, kb)
         prob, _ = build_problem(s; height_degree = 1)
         held, idx = build_problem(s; height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]

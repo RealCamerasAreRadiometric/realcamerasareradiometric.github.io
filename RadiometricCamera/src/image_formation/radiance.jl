@@ -74,7 +74,7 @@ end
 @inline local_to_world(t, b, n, x, y, z) = x * t + y * b + z * n
 
 """Local board frame `(t, b, n)` of a board."""
-@inline function board_frame(bd::PrintedTarget)
+@inline function board_frame(bd::TexturedTarget)
     n = board_normal(bd)
     t, b = VgtkCore.direction_tangents(n)            # the tangent basis of the normal: Core's, in n's element type
     return t, b, n
@@ -85,35 +85,36 @@ end
 element type `T` of its radiance, whether the ray reaches the board from the front (`front`; from behind its radiance is zero) and
 the material `(ρ, α, η)` at the chart point 𝐛 (`_radiance_material`). Type-stable in the kernels: the material is evaluated for
 every ray (a ray from behind discards it)."""
-@inline function _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
+@inline function _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)
     T = promote_type(eltype(ω_l), eltype(𝐱), eltype(m.refractive_index_ink), eltype(coefficients(lt)))
-    return ω_l, T, ω_l[3] > 0, _radiance_material(bd, surf, m, 𝐛)
+    return ω_l, T, ω_l[3] > 0, _radiance_material(bd, m, 𝐛)
 end
 """
-    L_c(board, surface, mat, light, sampler, key, 𝐛, 𝐱, ω) -> SVector{3}
+    L_c(board, mat, light, sampler, key, 𝐛, 𝐱, ω) -> SVector{3}
 
-Monte-Carlo estimate of the per-channel radiance of the board point 𝐱 (chart 𝐛) seen along ω, the
+Monte-Carlo estimate of the per-channel radiance of the point 𝐱 (chart 𝐛) of the board (a `TexturedTarget`, under its state:
+its printed edge and in-plane print error) seen along ω, the
 unit direction from the aperture point to the board point (world frame; the paper's `π̂⁻¹(𝐩, 𝐚) − 𝐚`).
 The radiance leaves the board towards −ω.
 """
-@inline function L_c(bd::PrintedTarget, surf::BoardSurface, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey,
+@inline function L_c(bd::TexturedTarget, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey,
                      𝐛::StaticVector{2}, 𝐱::StaticVector{3}, ω::StaticVector{3})
-    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)   # ω_l: the outgoing direction ω_o = −ω; 𝐱 may be a dual board point (HeightRays)
+    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)   # ω_l: the outgoing direction ω_o = −ω; 𝐱 may be a dual board point (HeightRays)
     front || return zero(SVector{3, Tz})
     return _radiance_mc(bd, m, lt, s, key, ρ, α, η, ω_l, 𝐱, Tz)
 end
 """The albedo ρ, roughness α and refractive indices η of the board point of chart `𝐛` (`L_c`'s material inputs): the texture (or
 the printed edge) at the DESIGN point the physical 𝐛 shows, blending ink ↔ no ink by its value."""
-@inline function _radiance_material(bd::PrintedTarget, surf::BoardSurface, m::Material, 𝐛::StaticVector{2})
-    ρ = _albedo(bd, surf, design_chart(bd, surf.inplane, 𝐛))
+@inline function _radiance_material(bd::TexturedTarget, m::Material, 𝐛::StaticVector{2})
+    ρ = printed_albedo(bd, design_chart(bd, 𝐛))
     wv = texture_weight(ρ)
     return ρ, 𝛂(m, wv), 𝛈(m, wv)
 end
 """`L_c`'s Monte-Carlo estimator at its local inputs: the albedo ρ, roughness α, refractive indices η, the outgoing direction ω_l
 (board frame, facing: ω_l[3] > 0) and the board point 𝐱; `Tz` its element type. μ and the lighting enter as they are."""
-@inline function _radiance_mc(bd::PrintedTarget, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey,
+@inline function _radiance_mc(bd::TexturedTarget, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey,
                               ρ, α, η, ω_l::StaticVector{3}, 𝐱::StaticVector{3}, ::Type{Tz}) where {Tz}
     t, b, n = board_frame(bd)
     acc = zero(SVector{3, Tz})
@@ -147,19 +148,19 @@ struct RadianceParts{J, T, J3}
 end
 
 """
-    radiance_parts(board, surface, mat, light, sampler, key, 𝐛, 𝐱, ω) -> RadianceParts
+    radiance_parts(board, mat, light, sampler, key, 𝐛, 𝐱, ω) -> RadianceParts
 
 Same samples and direction convention as [`L_c`](@ref) (ω from the aperture point to the board point);
 used to build the design matrices of the linear solves.
 """
-function radiance_parts(bd::PrintedTarget, surf::BoardSurface, m::Material, lt::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}},
+function radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}},
                         s::RadianceSampler, key::SampleKey, 𝐛::StaticVector{2}, 𝐱::StaticVector{3}, ω::StaticVector{3}) where {L, C, J}
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)                      # outgoing direction ω_o = −ω (ω: aperture point → board point)
     T = promote_type(eltype(ω_l), eltype(m.refractive_index_ink))
     Bd = zero(SMatrix{3, J, T, 3J}); Bs = zero(SMatrix{3, J, T, 3J})
     ω_l[3] <= 0 && return RadianceParts{J, T, 3J}(Bd, Bs)
-    ρ = _albedo(bd, surf, design_chart(bd, surf.inplane, 𝐛))   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
+    ρ = printed_albedo(bd, design_chart(bd, 𝐛))   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
     wv = texture_weight(ρ)                                                # the texture value blends ink ↔ no ink
     α = 𝛂(m, wv); η = 𝛈(m, wv)
     h = key_hash(s, key)

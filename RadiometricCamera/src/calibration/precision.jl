@@ -12,9 +12,4 @@ VgtkCore.convert_eltype(::Type{T}, v::View) where {T} =
 VgtkCore.convert_eltype(::Type{T}, st::RenderSettings) where {T} =
     RenderSettings(VgtkCore.convert_eltype(T, st.sensor), VgtkCore.convert_eltype(T, st.aperture), st.sampler)
 
-function VgtkCore.convert_eltype(::Type{T}, b::PrintedTarget) where {T}
-    sd = b.sdf === nothing ? nothing : T.(b.sdf)
-    return PrintedTarget(b.target, VgtkCore.Quad{T}(b.quad), SVector{2, T}(b.size), T(b.facing), T.(b.texture), sd, SVector{2, T}(b.page_mm),
-                         VgtkCore.convert_eltype(T, b.warping))
-end
-VgtkCore.convert_eltype(::Type{T}, s::Scene) where {T} = Scene(VgtkCore.convert_eltype(T, s.board), s.W, s.H, VgtkCore.convert_eltype(T, s.surface))
+# (a textured target's conversion, with its state's, is VisualRadiometryToolkitCore's, with the type)

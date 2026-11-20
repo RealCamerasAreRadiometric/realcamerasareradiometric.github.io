@@ -30,11 +30,11 @@ using RadiometricCamera, VisualGeometryToolkitCore
 using VisualRadiometryToolkitCore: Material, geometric
 using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
-b = 𝔟(ds.scene.board)
+b = 𝔟(ds.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])
-W, H = ds.scene.W, ds.scene.H
+W, H = Tuple(extent(ds.lens₀))                    # the image is the camera's
 camera = RadiometricCameraModel(ds.lens₀, ds.focus₀, ds.r₀, RadialVignetting(16, Point2(W / 2, H / 2), hypot(W, H) / 2))
-s = CalibrationState(ds.scene, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
+s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # Core's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
 run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)

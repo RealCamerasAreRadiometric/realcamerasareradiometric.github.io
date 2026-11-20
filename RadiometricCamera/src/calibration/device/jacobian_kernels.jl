@@ -348,30 +348,30 @@ function _ensure_device!(s::CalibrationState)
     be = s.backend
     F = _kernel_float(be)
     # the CPU backend's kernels read the host scene itself (Float64 already: no copy of the board's maps)
-    scene32 = be isa KA.CPU && F === _float_of(s.settings) ? s.scene : adapt(be, VgtkCore.convert_eltype(F, s.scene))
-    px = [adapt(be, UInt32.(UInt32.((getindex.(p, 1) .- 1) .* s.scene.H .+ getindex.(p, 2)))) for p in s.px]
+    board32 = be isa KA.CPU && F === _float_of(s.settings) ? s.board : adapt(be, VgtkCore.convert_eltype(F, s.board))
+    px = [adapt(be, UInt32.(UInt32.((getindex.(p, 1) .- 1) .* _image_height(s) .+ getindex.(p, 2)))) for p in s.px]
     idx = [_index_list(be, length(p)) for p in px]
     # read by every chunk of every view, written only here: out of the device's per-buffer queue tracking, the lists one by one (an
     # adaptor does not descend into a Vector of device arrays — the lists stayed tracked, and a tile's row kernel on the main queue
     # waited for the next view's whole batch on its worker's queue: 85 % of a grid linearization, 2026-11-13)
     foreach(a -> _shared_read_only!(be, a), px); foreach(a -> _shared_read_only!(be, a), idx)
-    s.device_cache = _shared_read_only!(be, (; scene = scene32, px, idx))
+    s.device_cache = _shared_read_only!(be, (; board = board32, px, idx))
     return s.device_cache
 end
 
 """The scene of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
 kernels' scene itself where the two float types agree)."""
-function _height_scene(s::CalibrationState)
+function _height_board(s::CalibrationState)
     dc = _ensure_device!(s)
-    hasproperty(dc, :scene_h) && return dc.scene_h
+    hasproperty(dc, :board_h) && return dc.board_h
     be = s.backend
     G = HIGH_FLOAT
-    sh = G === _kernel_float(be) ? dc.scene : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, s.scene)))
-    s.device_cache = merge(s.device_cache, (; scene_h = sh))
+    sh = G === _kernel_float(be) ? dc.board : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, s.board)))
+    s.device_cache = merge(s.device_cache, (; board_h = sh))
     return sh
 end
 """
-    _height_inputs(s, view, vig, m::MaterialVar, light[, lens]) -> (; view, vig, mat, light, scene, st)
+    _height_inputs(s, view, vig, m::MaterialVar, light[, lens]) -> (; view, vig, mat, light, board, st)
 
 The inputs of the nodal heights' radiance record and height kernel at the trial parameters, in `HIGH_FLOAT` (Float64). `view` is
 host-side; its lens is adapted here (`lens`: an already assembled grid, `_lens32` of it in the float type).
@@ -379,11 +379,11 @@ host-side; its lens is adapted here (`lens`: an already assembled grid, `_lens32
 function _height_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, lens = nothing)
     be = s.backend
     G = HIGH_FLOAT
-    scene = with_surface(_height_scene(s), VgtkCore.convert_eltype(G, m.surface))
+    board = with_state(_height_board(s), VgtkCore.convert_eltype(G, m.surface))
     vG = lens === nothing ? adapt(be, VgtkCore.convert_eltype(G, view)) :
          (l = _lens32(be, lens, G); View{G, length(view.focus.t̂_i), typeof(l)}(_pose_eltype(G, view.pose), l, VgtkCore.convert_eltype(G, view.focus), G(view.r)))
     return (; view = vG, vig = VgtkCore.convert_eltype(G, vig), mat = VgtkCore.convert_eltype(G, m.mat), light = VgtkCore.convert_eltype(G, light),
-            scene, st = VgtkCore.convert_eltype(G, s.settings))
+            board, st = VgtkCore.convert_eltype(G, s.settings))
 end
 """The parameter pack of a per-view state in the kernels' float type."""
 _pack32(s::CalibrationState, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight) =
@@ -393,14 +393,14 @@ _pack32(s::CalibrationState, view::View, vig::AbstractVignetting, mat::Material,
 """Masked flux vector (3·npx, Float64 host) of view `k` at (view, vig, mat, light, surface) on the device backend (`surf` defaults to the
 state's accepted surface; the LM gives the trial block's)."""
 function _flux_device(s::CalibrationState, k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                      surf::BoardSurface = s.scene.surface)
+                      surf::TargetState = s.board.state)
     v32, _, _, _, _ = _pack32(s, view, vig, mat, light)
     return _flux_device_px(s, k, _ensure_device!(s).px[k], adapt(s.backend, v32), vig, mat, light, surf)   # adapt: a grid lens carries arrays
 end
 
 """As above over an explicit device pixel-id list with a view already in the kernels' float type (device-capable)."""
 function _flux_device_px(s::CalibrationState, k::Integer, px_d, v32, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                         surf::BoardSurface = s.scene.surface)
+                         surf::TargetState = s.board.state)
     _count_device_call!(s, :flux)
     be = s.backend
     npx = length(px_d)
@@ -410,11 +410,11 @@ end
 """The flux functor (`_FluxAt`) of view `k` at the view `v32` in the kernels' float type (device-capable) and the host vignetting, material, lighting and
 surface (converted here)."""
 function _flux_functor(s::CalibrationState, k::Integer, v32, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                       surf::BoardSurface = s.scene.surface)
+                       surf::TargetState = s.board.state)
     F = _kernel_float(s.backend)
     vig32, m32, l32, st32 = VgtkCore.convert_eltype(F, vig), VgtkCore.convert_eltype(F, mat), VgtkCore.convert_eltype(F, light), VgtkCore.convert_eltype(F, s.settings)
-    scene32 = with_surface(_ensure_device!(s).scene, VgtkCore.convert_eltype(F, surf))
-    return _FluxAt(Int32(k), Int32(s.scene.H), v32, vig32, m32, l32, scene32, st32)
+    board32 = with_state(_ensure_device!(s).board, VgtkCore.convert_eltype(F, surf))
+    return _FluxAt(Int32(k), Int32(_image_height(s)), v32, vig32, m32, l32, board32, st32)
 end
 
 @inline _chunk_dual(::Type{Tag}, ::Type{T}, x, gslot::Integer, c0::Integer, ::Val{C}, w = 1.0) where {Tag, T, C} =
@@ -454,28 +454,28 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     # partials: the same values and partials, fewer registers)
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)
     vk = adapt(be, VgtkCore.convert_eltype(F, view0))                 # adapt: a grid lens carries arrays
-    mk = VgtkCore.convert_eltype(F, m.mat); scenek = with_surface(dc.scene, VgtkCore.convert_eltype(F, m.surface))
+    mk = VgtkCore.convert_eltype(F, m.mat); boardk = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
     G = HIGH_FLOAT                                             # the heights' and the pose chunks' float type and inputs
     hk = _needs_high(F, need_h) ? _height_inputs(s, view0, VgtkCore.model(vg), m, lt.light) : nothing
     # the estimator once per ray: in `HIGH_FLOAT` where a chunk needs it (a device: the pose's), and then that record's numbers
     # rounded to the kernels' float for the other chunks and the parts (`_record_as`), not a second record
     if G === F || hk === nothing                               # (the CPU backend: the chunks' record is already Float64)
-        rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk)
+        rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), vk, vigk, mk, lk, boardk, stk)
         hrays = rays
     else
-        hrays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st)
+        hrays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st)
         rays = _record_as(F, hrays)
     end
     _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
     hrays === rays || _shared_read_only!(be, hrays)
-    plan = _chunk_plan(c0s, F, (vigk, lk, dc.scene, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.scene, hk.st, hrays))
+    plan = _chunk_plan(c0s, F, (vigk, lk, dc.board, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.board, hk.st, hrays))
     hs = _each_chunk(be, plan) do (c0, Fc, inputs, _)                 # the chunks' launches overlap (one worker queue each)
         _view_chunk(Val(Fc), s, r, lay, c0, C, pose, dist, foc, ap, m, inputs...)
     end
     S = _slot_rows(be, [(c0, h, C) for (c0, h) in zip(c0s, hs)], P, npx)
-    hh = need_h ? _heights_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st, m.surface.h; rays = hrays) :
+    hh = need_h ? _heights_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st, m.surface.h; rays = hrays) :
          nothing                                           # the nodal heights: the height kernel's partials
-    ph = need_lin ? _parts_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk, J, NV; rays) : nothing
+    ph = need_lin ? _parts_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), vk, vigk, mk, lk, boardk, stk, J, NV; rays) : nothing
     # The residual must be BITWISE the one `computeresidual` returns for the same parameters: NLLSsolver
     # recomputes the cost through this function after every accepted step and stops ("internal discrepancy
     # in cost computations") if it differs from the trial cost beyond isapprox — and the value part of the
@@ -485,7 +485,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(s.scene.H), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
+    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
@@ -535,28 +535,28 @@ function _block_jacobian(varflags, r::PerViewResidual, vars...)
 end
 
 """One chunk of the per-view Jacobian (`_view_jacobian`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded,
-the plain vignetting, lighting and settings, the scene `scene` (its surface replaced by the seeded one) and the record `rays` all in
+the plain vignetting, lighting and settings, the board `board` (its state replaced by the seeded one) and the record `rays` all in
 `F` (`_kernel_float`, or `HIGH_FLOAT` for the pose's chunks)."""
-function _view_chunk(::Val{F}, s::CalibrationState, r::PerViewResidual{N}, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, scene, stk,
+function _view_chunk(::Val{F}, s::CalibrationState, r::PerViewResidual{N}, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, board, stk,
                      rays) where {F, N}
     be = s.backend
-    D, cd, pose_d, focus_d, mat_d, scene_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, scene, n_inplane(m))
+    D, cd, pose_d, focus_d, mat_d, board_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, board, n_inplane(m))
     lens_d = _seeded_lens(dist, s.camera.geometric, x -> cd(x, 0), j -> cd(0.0, lay.off_d + j))   # a pixel camera is isbits: to the kernel as-is
     view_d = View{D, N, typeof(lens_d)}(pose_d, lens_d, focus_d, cd(ap.r, lay.col_r > 0 ? lay.off_r + 1 : 0))   # r seeded: AD through r² w̃ and r â
     fbase = Int32(!isempty(lay.focus_cols) ? lay.off_f - c0 : -1000000)
-    return _jac_device(be, s.device_cache.px[r.k], s.device_cache.idx[r.k], r.k, s.scene.H, view_d, vigk, mat_d, lk, scene_d, stk, Val(C), fbase, -1000000;
+    return _jac_device(be, s.device_cache.px[r.k], s.device_cache.idx[r.k], r.k, _image_height(s), view_d, vigk, mat_d, lk, board_d, stk, Val(C), fbase, -1000000;
                        rays)   # waits on this chunk's stream only
 end
 
 """
-    _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, scene, NI) -> (D, cd, pose_d, focus_d, mat_d, scene_d)
+    _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, board, NI) -> (D, cd, pose_d, focus_d, mat_d, board_d)
 
 The dual seeding shared by a Jacobian chunk of a view (`_view_chunk`) and of a tile (`_tile_chunk`) in the float type `F`: the chunk's
 dual type `D` and seeder `cd(x, gslot)` (slots `c0 + 1 … c0 + C`), the seeded pose (`lay.off_e`), the focus (`t̂` seeded per sensor
-sample in-kernel, the chain rule), the material and the scene `scene` with the seeded surface (its nodal heights unseeded: the height
+sample in-kernel, the chain rule), the material and the board `board` with the seeded state (its nodal heights unseeded: the height
 kernel's); `NI` in-plane parameters.
 """
-function _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, scene, NI) where {F}
+function _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, board, NI) where {F}
     Tag = JacTag
     N = length(VgtkCore.model(foc).t̂_i)
     D = ForwardDiff.Dual{Tag, F, C}
@@ -570,13 +570,13 @@ function _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, scene, NI) where {F}
     wa = coeff * collect(t̂d)
     focus_d = Focus{D, N}(nodes, t̂d, SVector{N, D}(ntuple(i -> wa[i], Val(N))), SVector{3, D}(wa[N + 1], wa[N + 2], wa[N + 3]), VgtkCore.model(foc).kind)
     mat_d, surf_d = _material_dual(m.mat, m.surface, cd, lay.off_m, D; off_h = 0, off_i = NI > 0 ? lay.off_i : 0)
-    return D, cd, pose_d, focus_d, mat_d, with_surface(scene, surf_d)
+    return D, cd, pose_d, focus_d, mat_d, with_state(board, surf_d)
 end
 
 """GPU render of view `k` at the current state (returns the H×W×3 Float64 image)."""
 function _render_view_device(s::CalibrationState, k::Integer)
     Φ = _flux_device(s, k, view_of(s, k), s.camera.vignetting, s.mat, s.light)
-    img = zeros(Float64, s.scene.H, s.scene.W, 3)
+    img = zeros(Float64, _image_height(s), _image_width(s), 3)
     for (i, (u, v)) in enumerate(s.px[k]), c in 1:3
         img[v, u, c] = Φ[3 * (i - 1) + c]
     end

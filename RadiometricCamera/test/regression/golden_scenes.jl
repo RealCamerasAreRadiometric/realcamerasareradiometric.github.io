@@ -1,7 +1,7 @@
 # Golden scenes: the same small problems built with the package BEFORE the second migration (branch board-space, the "old
 # stack") and with the current package. `record_golden.jl` writes their outputs from the old stack to golden_board_space.json;
 # test/regression/golden_tests.jl recomputes them with the current package and compares. Only the API differs between the two (the board warping
-# and the printed edge were Material fields before, the scene's BoardSurface now; the blob layout / tone / warp / gains / board space are
+# and the printed edge were Material fields before, the scene's TargetState now; the blob layout / tone / warp / gains / board space are
 # gone) — `OLD_STACK` selects the construction, the quantities are the same.
 #
 # Recorded per scene: Φ_pixel on fixed pixels; the residual and the Jacobian (per column: Σ, Σ|·|, Σ², and the entries of 4 fixed rows) of
@@ -9,10 +9,10 @@
 # board with the printed-edge block); the closed-form joint radiometry; three LM iterations with explicit
 # stopping tests (so the defaults' change does not enter).
 using RadiometricCamera, StaticArrays, LinearAlgebra
-using RadiometricCamera: all_parts, aperture_radius, BoardSurface, build_problem, build_problem_grid, compute_mask, cost, focus,
+using RadiometricCamera: all_parts, aperture_radius, TargetState, build_problem, build_problem_grid, compute_mask, cost, focus,
                          Focus, FocusSpline, height_basis, HEIGHT_NFREE, geometric, material, Material, PerViewResidual,
-                         PrintedTarget, render_all, RenderSettings, residuals, run_lm!, Scene, solve_radiometry_gn!,
-                         sphere_radius, t̂, View, with_sdf, with_μ, Φ_pixel, 𝔟
+                         TexturedTarget, render_all, RenderSettings, residuals, run_lm!, solve_radiometry_gn!, sphere_radius, t̂,
+                         View, with_sdf, with_μ, Φ_pixel, 𝔟
 const RCg = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
 using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, control_points, EnvironmentLight, SphericalHarmonicMap,
@@ -30,16 +30,16 @@ gold_h() = SVector{RCg.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RCg.HEIGHT_NODES])
 gold_mat() = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
 
 """Board, scene (with the warping h and the edge parameters as the stack wants them) and the material."""
-function gold_scene(W, H; h = nothing, edge = nothing, sdf = nothing)
-    board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], sdf === nothing ? GOLD_TEX : ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
+function gold_board(W, H; h = nothing, edge = nothing, sdf = nothing)
+    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], sdf === nothing ? GOLD_TEX : ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
     sdf === nothing || (board = with_sdf(board, sdf...))
     m = gold_mat()
     if OLD_STACK
         h === nothing || (m = RCg.with_height(m, h))
         edge === nothing || (m = RCg.with_edge(m, edge))
-        return Scene(board, W, H), m
+        return board, m
     end
-    return Scene(board, W, H, BoardSurface(; h, edge)), m
+    return with_state(board, TargetState(; h, edge)), m
 end
 gold_poses() = [RCg.VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
 const GOLD_W = 32                                       # the scenes' image: GOLD_W × GOLD_W pixels
@@ -65,21 +65,22 @@ A state of the camera of `lens` at the golden poses whose radiometry is away fro
 rendered at the truth. The old stack (`OLD_STACK`, the recording of golden_board_space.json) has no camera-first API: its views
 and vignetting apart.
 """
-function gold_state(scene, m, lens)
-    light = gold_light(scene.board); poses = gold_poses(); dev = RadiometricCamera.KernelAbstractions.CPU()
+function gold_state(board, m, lens)
+    light = gold_light(board); poses = gold_poses(); dev = RadiometricCamera.KernelAbstractions.CPU()
     vig_start = with_control_points(gold_vig(), 1.05 .* Matrix(control_points(gold_vig())))
     light_start = with_coefficients(light, 0.9 .* Matrix(coefficients(light)))
-    zero_targets = [zeros(scene.H, scene.W, 3) for _ in poses]
+    Wg, Hg = RadiometricCamera._image_size(lens)                       # the image is the camera's
+    zero_targets = [zeros(Hg, Wg, 3) for _ in poses]
     if OLD_STACK
         views = [View(p, lens, gold_focus(), 0.0386) for p in poses]
-        masks = [compute_mask(v, scene, GOLD_ST; δ = 0.03, backend = dev) for v in views]
-        tg = render_all(CalibrationState(scene, GOLD_ST, copy(views), gold_vig(), m, light, zero_targets; masks))
-        return CalibrationState(scene, GOLD_ST, copy(views), vig_start, with_μ(m, 0.55), light_start, tg; masks)
+        masks = [compute_mask(v, board, GOLD_ST; δ = 0.03, backend = dev) for v in views]
+        tg = render_all(CalibrationState(board, GOLD_ST, copy(views), gold_vig(), m, light, zero_targets; masks))
+        return CalibrationState(board, GOLD_ST, copy(views), vig_start, with_μ(m, 0.55), light_start, tg; masks)
     end
     camera = gold_camera(lens)
-    masks = [compute_mask(camera, p, scene, GOLD_ST; δ = 0.03, backend = dev) for p in poses]
-    tg = render_all(CalibrationState(scene, GOLD_ST, camera, poses, m, light, zero_targets; masks))
-    return CalibrationState(scene, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_μ(m, 0.55), light_start, tg; masks)
+    masks = [compute_mask(camera, p, board, GOLD_ST; δ = 0.03, backend = dev) for p in poses]
+    tg = render_all(CalibrationState(board, GOLD_ST, camera, poses, m, light, zero_targets; masks))
+    return CalibrationState(board, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_μ(m, 0.55), light_start, tg; masks)
 end
 """
 The height columns of a tile Jacobian in a form that does not depend on the warping's basis. The columns are `J_h = HS · B`
@@ -120,16 +121,16 @@ function gold_outputs()
     glens = RCg.VgtkCore.BoundedCamera(RCg.VgtkCore.CameraModel(gcam, RCg.VgtkCore.model(ds).intrinsics.K), RCg.VgtkCore.Size2(W, H))
     # 1. flux values: plane / warped board, KB / grid lens
     for (lab, lens, h) in (("kb_plane", kb, nothing), ("kb_warped", kb, gold_h()), ("grid_warped", glens, gold_h()))
-        scene, m = gold_scene(W, H; h)
-        light = gold_light(scene.board)
+        board, m = gold_board(W, H; h)
+        light = gold_light(board)
         out["flux_" * lab] = OLD_STACK ?
             (view = View(gold_poses()[1], lens, gold_focus(), 0.0386);
-             [collect(Φ_pixel(u, v, 1, view, gold_vig(), m, light, scene, GOLD_ST)) for (u, v) in GOLD_PX]) :
-            [collect(Φ_pixel(u, v, 1, gold_camera(lens), gold_poses()[1], m, light, scene, GOLD_ST)) for (u, v) in GOLD_PX]
+             [collect(Φ_pixel(u, v, 1, view, gold_vig(), m, light, board, GOLD_ST)) for (u, v) in GOLD_PX]) :
+            [collect(Φ_pixel(u, v, 1, gold_camera(lens), gold_poses()[1], m, light, board, GOLD_ST)) for (u, v) in GOLD_PX]
     end
     # 2. per-view problem (KB on the warped board): residual + Jacobian, closed-form joint radiometry, 3 LM iterations
-    scene, m = gold_scene(W, H; h = gold_h())
-    s = gold_state(scene, m, kb)
+    board, m = gold_board(W, H; h = gold_h())
+    s = gold_state(board, m, kb)
     prob, _ = build_problem(s)
     r = get(prob.problem.costs, PerViewResidual{9})[1]
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
@@ -141,7 +142,7 @@ function gold_outputs()
     out["lm3"] = (; cost = cost(s3)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3)))), t̂ = collect(focus(s3).t̂_i), r = aperture_radius(s3),
                   poses = [vcat(vec(p.R), collect(p.t)) for p in s3.poses], mat = collect(RCg.Θ_m_nonlinear(s3.mat)), μ = s3.mat.diffuse_weight)
     # 3. per-tile problem (grid model, warping free): the largest tile
-    s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., glens)
+    s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
     prob, _ = build_problem_grid(s; patch = (5, 5), height_degree = 1)
     t = largest_tile(prob)
     vars = RCg.NLLSsolver.getvars(t, prob.variables)
@@ -163,7 +164,7 @@ function gold_outputs()
     end
     # the print's edge (δ, σ_print) on the surface (σ_print 3 mm, about one pixel on the board: before 2026-11-14 the edge's width was the
     # camera's in-focus blur, σ_cam 0.9 px, with σ_print 0.3 mm)
-    s = gold_state(gold_scene(W, H; edge = SVector(0.3, 3.0), sdf)..., glens)
+    s = gold_state(gold_board(W, H; edge = SVector(0.3, 3.0), sdf)..., glens)
     prob, _ = build_problem_grid(s; patch = (5, 5))
     t = largest_tile(prob)
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(1023), t, RCg.NLLSsolver.getvars(t, prob.variables)...)

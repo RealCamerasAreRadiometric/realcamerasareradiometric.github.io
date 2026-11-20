@@ -12,7 +12,7 @@ CurrentModule = RadiometricCamera
 
 ```@autodocs
 Modules = [RadiometricCamera]
-Pages = ["target/printed_target.jl", "target/warping.jl", "target/printed_edge.jl", "target/target_radiometry.jl"]
+Pages = ["target/board.jl", "target/target_radiometry.jl"]
 Private = false
 ```
 
