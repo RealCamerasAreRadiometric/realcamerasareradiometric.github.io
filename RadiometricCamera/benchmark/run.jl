@@ -12,6 +12,7 @@
 #     warp=0|1            the board warped (a saddle of nodal heights, held) instead of flat: every ray then meets the height
 #                         field by Core's Newton instead of the plane                                                    [0]
 #     heights=0|1         the board warping's nodal heights free in the LM stages and the Jacobians (`height_degree = 1`)  [0]
+#     grid=20x15          the grid stages' spline model: its lattice of controls (multiples of 5; a run's is 65x50)       [20x15]
 #     reps=3              timed runs per stage after the first (the minimum is reported)                                [3]
 #     stages=<regex>      only the stages whose name matches                                                            [all]
 #     out=<file.json>     the results as a record (benchmark/compare.jl reads two of them)                              [none]
@@ -23,7 +24,7 @@
 #
 # The scene is the README's: a W × H double-sphere fisheye over a 2 m checkerboard, `views` photographs rendered at a known
 # camera, material and lighting; the timed states start from a perturbed camera (a flat vignetting, another μ and lighting), as a
-# calibration does. The grid stages see the same scene through the fisheye's spline model (`grid_model`, 20 × 15 controls).
+# calibration does. The grid stages see the same scene through the fisheye's spline model (`grid_model`, `grid` controls).
 #
 # Per stage: `first` (the first call: compilation and caches), `best` (the minimum of `reps` warm calls), `bytes` (the host
 # allocation of that call) and `value` (a checksum of the stage's result: two records of the same arithmetic agree in it, so a
@@ -54,6 +55,7 @@ const VIEWS = parse(Int, option("views", "3"))
 const PIXELS = parse(Int, option("pixels", "0"))
 const WARP = option("warp", "0") == "1"
 const HEIGHT_DEGREE = option("heights", "0") == "1" ? 1 : 0
+const GRID = Tuple(parse.(Int, split(option("grid", "20x15"), "x")))
 const REPS = parse(Int, option("reps", "3"))
 const STAGES = Regex(option("stages", "."))
 const OUT = option("out", "")
@@ -175,7 +177,7 @@ function stages(c)
     add("lm3_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # per tile
     grid = Ref{Any}(nothing)
-    grid_state() = (grid[] === nothing && (grid[] = RC.grid_model(c.lens, 20, 15)); c.state(grid[]))
+    grid_state() = (grid[] === nothing && (grid[] = RC.grid_model(c.lens, GRID...)); c.state(grid[]))
     add("tile_normal_equations", () -> begin
         s = grid_state(); problem, idx = RC.build_problem_grid(s; height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
@@ -257,7 +259,7 @@ function main()
         commit = try readchomp(`git -C $(@__DIR__) rev-parse --short HEAD`) catch; "" end
         record = Dict{String, Any}("schema" => "rc/benchmark/v1.0", "label" => LABEL, "commit" => commit, "julia" => string(VERSION),
                                    "threads" => Threads.nthreads(), "backend" => BACKEND, "device" => device_name(), "size" => [W, H], "views" => VIEWS,
-                                   "masked_pixels" => npx, "pixels" => PIXELS, "warp" => WARP, "heights" => HEIGHT_DEGREE, "reps" => REPS, "stages" => results,
+                                   "masked_pixels" => npx, "pixels" => PIXELS, "grid" => collect(GRID), "warp" => WARP, "heights" => HEIGHT_DEGREE, "reps" => REPS, "stages" => results,
                                    "inferred" => Dict(n => Dict("type" => v.type, "concrete" => v.concrete) for (n, v) in inf))
         open(io -> JSON.print(io, record, 2), OUT, "w")
         println("\nwrote ", OUT)
