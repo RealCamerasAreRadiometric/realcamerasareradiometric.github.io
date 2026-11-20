@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+Performance and composition (branch `perf/optimize-and-compose`, 2026-11-20). No number of a calibration changes beyond rounding:
+the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10).
+
+- **Added:** the radiometric camera composed from its geometric camera: `RadiometricCameraModel(lens; focus, aperture_radius,
+  vignetting)` — the focus surface (a `Focus`, or a distance: focused there everywhere), the aperture radius and the vignetting
+  (V ≡ 1 by default: the flat 4 × 4 quadratic B-spline surface on the image); the image size is the geometric camera's.
+  `Focus(lens, distance; n = 3)`; `with_lens`, `with_focus`, `with_aperture_radius` beside `with_vignetting`; `lens`, `focus`,
+  `aperture_radius` of a camera. The positional constructor is unchanged.
+- **Changed:** a ray's hit with the board is found once per linearization. The radiance record keeps each ray's board point and the
+  surface's normal there (`RadianceJac`: `[L | ∂L/∂ℓ | 𝐱 | 𝐧]`); the Jacobian chunks meet the recorded hit's tangent plane with their
+  dual ray (the implicit-function theorem's partials, no Newton) and the parts kernel takes the recorded hit (`_ray_hit`,
+  `_parts_hit`). On a warped board every chunk and the parts ran Core's height-field Newton at every ray before.
+- **Changed:** a flat board whose heights are constants of a dual type takes the plane hit (`is_warped` reads the numbers, not the
+  type): a Jacobian chunk of a flat board ran the height field's Newton at every ray.
+- **Changed:** the nodal heights take no dual slot (`_jacobian_layout`, `_tile_layout`): the CPU backend's one chunk was 25 partials
+  wider than its used slots, and split in two, with a free board warping.
+- **Changed:** the per-pixel kernels and the Jacobian's row kernel run in workgroups of 16 pixels on the CPU backend
+  (`_pixel_workgroup`, `_launch_pixel_rows!`): every thread works on a view of a few thousand pixels (KernelAbstractions' default
+  group of 1024 items left a 1,728-pixel view to two threads).
+- **Added:** `benchmark/` (a member of the package's workspace): `run.jl` times every stage of a calibration on one scene (CPU or
+  GPU; a JSON record per run, `compare.jl` sets two side by side), `linearization.jl` one view's linearization kernel by kernel.
+
+### experiments
+
+- **Changed:** the texture page's operators are built on the device, where the rows are computed (`page_footprints`,
+  `fit_operator`, `csr_rows`, `csr_transpose`): the rows compacted, selected, weighted and transposed by row-parallel kernels and one
+  device sort, into the arrays Core's `PenalizedOperator` holds — array for array the host assembly's, so the textures are the
+  same numbers. `page_rows` remains as the host form. `tools/texture_benchmark.jl` times the page solve on a synthetic sheet.
+
 ## 0.1.0
 
 First public release, the first version registered in Julia's General registry. Its code is that of 0.11.6, the last version of the
