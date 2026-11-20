@@ -119,3 +119,32 @@ end
     # a region that does reach past the lattice is still refused
     @test_throws VgtkCore.RegionBeyondSupport check_coverage(src, VgtkCore.Rect(0.0, 0.0, 640.0, 480.0) ∩ housing; who = "test")
 end
+
+@testitem "exact start: a Schöps (central-generic) start computed on the device is the host's" tags = [:gpu] setup = [RCFixtures, RCGPU, SchoepsSource] begin
+    # The start of a Schöps run's central-generic model (`schoeps_start` → `exact_start`: Estimation's exact resample of his lattice over
+    # the sensor ∩ his coverage) computed on the device, against the host's: the same lattice, region and record of the resample, the
+    # resample's own bound (the items above: < 1e-6 px from his rays where he images) and the two starts' rays over the sensor.
+    using RadiometricCamera: coverage_region, grid_dims, schoeps_start
+    using StaticArrays, LinearAlgebra
+    using KernelAbstractions: CPU
+    using CUDA: CUDABackend
+    require_gpu()
+    W, H = 640, 480
+    path = tempname() * ".yaml"; schoeps_yaml(path)
+    host = schoeps_start(path, W, H; device = CPU())
+    dev = schoeps_start(path, W, H; device = CUDABackend())
+    @test grid_dims(dev.lens) == grid_dims(host.lens) && dev.init_region == host.init_region
+    @test coverage_region(dev.lens) == coverage_region(host.lens)
+    @test dev.resample.subdivision == host.resample.subdivision
+    @test host.resample.max_px < 1e-6
+    @test dev.resample.max_px < 1e-6                                           # the device's resample, by the host tests' bound
+    sensor = VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H))
+    px = VgtkCore.pixel_centres(sensor, 1:4:W, 1:4:H)
+    rh = VgtkCore.backproject(VgtkCore.model(host.lens), px; device = CPU())
+    rd = VgtkCore.backproject(VgtkCore.model(dev.lens), px; device = CPU())   # the device's start, its rays evaluated on the host
+    @test all(r -> all(isfinite, r), rd)
+    fpx = RC.fpx_of(host.lens, W, H)                                            # px per radian: the rays' difference as pixels
+    @test fpx * maximum(norm(normalize(a) - normalize(b)) for (a, b) in zip(rh, rd)) < 1e-6
+    rdev = Array(VgtkCore.backproject(VgtkCore.model(dev.lens), px; device = CUDABackend()))   # and evaluated on the device
+    @test fpx * maximum(norm(normalize(SVector{3, Float64}(a)) - normalize(b)) for (a, b) in zip(rdev, rh)) < 1e-3
+end
