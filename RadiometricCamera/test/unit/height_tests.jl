@@ -364,3 +364,30 @@ end
         @test norm(map(x -> ForwardDiff.partials(x)[j], r[2]) - fd) <= 1e-6 * max(norm(fd), 1e-9)
     end
 end
+
+@testitem "board warping: a flat board whose heights are constants of a dual type takes the plane hit" setup = [RCFixtures, HeightScene] begin
+    using RadiometricCamera: HEIGHT_NC, intersect_board
+    using StaticArrays, LinearAlgebra, ForwardDiff
+    # is_warped: a nonzero height, or a seeded one (a nonzero partial); zero heights with zero partials are the plane in any element
+    # type (a Jacobian chunk's constant heights)
+    D = ForwardDiff.Dual{Nothing, Float64, 3}
+    z = zero(SVector{HEIGHT_NC, Float64}); zd = SVector{HEIGHT_NC, D}(z)
+    seeded = SVector{HEIGHT_NC, D}(ntuple(i -> D(0.0, ForwardDiff.Partials(ntuple(j -> Float64(i == j), 3))), HEIGHT_NC))
+    @test !RC.is_warped(z) && !RC.is_warped(zd) && RC.is_warped(seeded) && RC.is_warped(hh) && RC.is_warped(SVector{HEIGHT_NC, D}(hh))
+    # the ray seeded (a chunk's pose slots), the flat heights constant: the plane hit in the height field's numbers, its value the
+    # plain plane hit bit for bit, its partials the height field's implicit ones (Core's Newton and implicit step at h = 0) to rounding
+    o = SVector(0.1, -0.2, 1.4); d = normalize(SVector(0.05, 0.1, -1.0))
+    od = SVector{3, D}(ntuple(i -> D(o[i], ForwardDiff.Partials(ntuple(j -> Float64(i == j), 3))), 3))
+    dd = SVector{3, D}(ntuple(i -> D(d[i], ForwardDiff.Partials(ntuple(j -> 0.3 * Float64(i == j), 3))), 3))
+    s, x = intersect_board(RC.BoardRays(board_hs, zd), od, dd)
+    s0, x0 = intersect_board(board_hs, o, d)
+    @test s isa D && eltype(x) === D && ForwardDiff.value(s) == s0 && ForwardDiff.value.(x) == x0
+    @test intersect_board(board_hs, od, dd, zd) == (s, x)                       # the per-ray form: the same hit
+    sn, xn = RC.VgtkCore.intersection(RC.board_relief(board_hs, zd), od, dd)   # the height field's path at the same flat board
+    @test abs(ForwardDiff.value(sn) - s0) < 1e-14 && norm(ForwardDiff.value.(xn) - x0) < 1e-14
+    @test all(j -> norm(map(q -> ForwardDiff.partials(q)[j], x) - map(q -> ForwardDiff.partials(q)[j], xn)) < 1e-12, 1:3)
+    @test norm(collect(ForwardDiff.partials(s)) - collect(ForwardDiff.partials(sn))) < 1e-12
+    # plain rays on constant-dual flat heights: the same types as the height field's hit (one type on both branches)
+    sp, xp = intersect_board(RC.BoardRays(board_hs, zd), o, d)
+    @test sp isa D && eltype(xp) === D && ForwardDiff.value(sp) == s0
+end

@@ -170,11 +170,29 @@ same hit and its partials by ONE implicit-function step at it (Core's, hoists-09
 ignored by the chart). All nodal heights zero = the plane hit.
 """
 @inline function intersect_board(b::PrintedTarget, o::StaticVector{3}, d::StaticVector{3}, h::StaticVector{HEIGHT_NC, T}) where {T}
-    is_warped(h) || return intersect_board(b, o, d)
+    is_warped(h) || return _plane_hit_as(T, b, o, d)
     return VgtkCore.intersection(board_relief(b, h), o, d)
 end
-"""Whether the nodal heights `h` warp the board: nonzero, or seeded (a seeded flat board still needs its partials)."""
-@inline is_warped(h::StaticVector{HEIGHT_NC, T}) where {T} = T <: ForwardDiff.Dual || !iszero(h)
+"""
+    is_warped(h) -> Bool
+
+Whether the nodal heights `h` warp the board: a height is nonzero, or seeded (a nonzero partial: a seeded flat board still needs its
+height partials, the nodal-height mode's). Heights that are zero with zero partials are the plane, whatever their element type: a
+Jacobian chunk carries the board's heights as constants of its dual type (the chunks never seed them: the height kernel's), and a
+flat board's rays then take the plane hit, whose partials in the ray are the same derivative — not the height field's Newton and
+implicit step at every ray (25 thin-plate terms per evaluation: 96 % of a chunk kernel's time on a flat board, 2026-11-20).
+"""
+@inline is_warped(h::StaticVector{HEIGHT_NC}) = !all(_is_zero_number, h)
+"""Whether a number is zero in its value and in every partial it carries (any nesting of duals)."""
+@inline _is_zero_number(x::Real) = iszero(x)
+@inline _is_zero_number(x::ForwardDiff.Dual) = _is_zero_number(ForwardDiff.value(x)) & all(_is_zero_number, ForwardDiff.partials(x).values)
+"""The plane hit of the ray `(o, d)` in the numbers a hit of the height field of element type `T` has (a flat board whose heights are
+constants of a dual type: the same types on both branches of `intersect_board`, as a device kernel needs)."""
+@inline function _plane_hit_as(::Type{T}, b::PrintedTarget, o::StaticVector{3}, d::StaticVector{3}) where {T}
+    s, 𝐱 = intersect_board(b, o, d)
+    R = promote_type(T, typeof(s))
+    return convert(R, s), SVector{3, R}(𝐱)
+end
 
 """
     BoardRays(b, h)
@@ -184,14 +202,15 @@ The board of a render prepared for its rays: the `board_relief` of the heights `
 a pixel's quadrature — `intersect_board(rays, 𝐨, 𝐝)` is `intersect_board(b, 𝐨, 𝐝, h)` bit for bit, without rebuilding the relief per
 ray.
 """
-struct BoardRays{B, R}
+struct BoardRays{B, R, T}
     board::B
     relief::R
     warped::Bool
+    BoardRays{T}(board::B, relief::R, warped::Bool) where {B, R, T} = new{B, R, T}(board, relief, warped)
 end
-@inline BoardRays(b::PrintedTarget, h::StaticVector{HEIGHT_NC}) = BoardRays(b, board_relief(b, h), is_warped(h))
-@inline intersect_board(r::BoardRays, o::StaticVector{3}, d::StaticVector{3}) =
-    r.warped ? VgtkCore.intersection(r.relief, o, d) : intersect_board(r.board, o, d)
+@inline BoardRays(b::PrintedTarget, h::StaticVector{HEIGHT_NC, T}) where {T} = BoardRays{T}(b, board_relief(b, h), is_warped(h))   # `T`: the heights' numbers
+@inline intersect_board(r::BoardRays{B, R, T}, o::StaticVector{3}, d::StaticVector{3}) where {B, R, T} =
+    r.warped ? VgtkCore.intersection(r.relief, o, d) : _plane_hit_as(T, r.board, o, d)
 
 
 # --- the in-plane print error: Core's Aspect ∘ Skew in the warping's placed chart ---
