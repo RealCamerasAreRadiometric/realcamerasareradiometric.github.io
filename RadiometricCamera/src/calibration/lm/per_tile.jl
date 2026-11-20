@@ -727,7 +727,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         for (c0, Fc, inputs, high) in plan
             push!(jacf, (c0, _tile_chunk(Val(Fc), c0, C, lay, pose, foc, ap, m, inputs..., high)))
         end
-        partsf = _PartsAt(Int32(k), Int32(H), v32, vig32j, m32, l32j, scene32, st32, (Val(J), Val(NV)))
+        partsf = (Int32(k), Int32(H), v32, vig32j, m32, l32j, scene32, st32, (Val(J), Val(NV)))   # (`_PartsAt`, with the batch's record)
     end
     _count_device_call!(s, :flux)
     st32 = VgtkCore.convert_eltype(F, s.settings)
@@ -740,7 +740,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         co = [(c0, hi ? _launch_rows(_JacAt(Int32(k), Int32(H), vd, hk.vig, md, hk.light, sd, hk.st, Val(C), fb, db, px, hrays), be, idx; workgroupsize = 128) :
                         _launch_rows(_JacAt(Int32(k), Int32(H), vd, vig32j, md, l32j, sd, st32, Val(C), fb, db, px, rays), be, idx; workgroupsize = 128))
               for (c0, (vd, md, sd, fb, db, hi)) in jacf]
-        po = partsf === nothing ? nothing : _launch_rows(partsf, be, px)
+        po = partsf === nothing ? nothing : _launch_rows(_PartsAt(partsf..., px, rays), be, idx)
         KA.synchronize(be)
         flux = Float64.(Array(fo))                         # the residual's values (a channel triple per pixel); the Jacobian's stay on the device
         S = need_jac ? _slot_rows(be, [(c0, o, C) for (c0, o) in co], P, length(px)) : nothing

@@ -42,14 +42,14 @@ THE aperture quadrature of the light responses at sensor sample `ks` (position `
 aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels `_PixelPartsAt` and `_PartsAt`.
 """
 @inline function _sample_parts(view::View, mat::Material, light::EnvironmentLight, scene::Scene, st::RenderSettings, rays,
-                               k::Integer, pid, ks::Integer, 𝐩, scale, Z)
+                               k::Integer, pid, ks::Integer, 𝐩, scale, Z, lrays = nothing)
     bd = scene.board
     Bd = Z; Bs = Z
     rs = view.r
     for la in 1:n_disc(st.aperture)
         𝐚 = 𝐚_sample(st.aperture, la, rs)
         o, d = world_ray(view, 𝐩, 𝐚)
-        sray, 𝐱 = intersect_board(rays, o, d)
+        sray, 𝐱 = _parts_hit(lrays, (ks - 1) * n_disc(st.aperture) + la, rays, o, d)
         (isfinite(sray) && sray > 0) || continue
         𝐛 = chart(bd, 𝐱)
         parts = radiance_parts(bd, scene.surface, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱, d)
@@ -58,6 +58,17 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
         Bs += w * parts.Bs
     end
     return Bd, Bs
+end
+
+"""The hit of a parts ray (`_sample_parts`): `intersect_board`, or — beside a radiance record of the same parameters (`lrays`, the LM's
+parts kernel) — the record's hit of that ray (`_ray_hit`), so the height field's root is not found again; a ray the record did not
+reach (zeros: it misses the board, or meets it from behind, where its parts are zero) is skipped."""
+@inline _parts_hit(::Nothing, ri, rays, o, d) = intersect_board(rays, o, d)
+@inline function _parts_hit(lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
+    G = @inbounds lr.J[lr.base + ri]
+    𝐱 = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2])
+    reached = (G[1, RAD_NL + 3] != 0) | (G[2, RAD_NL + 3] != 0) | (G[3, RAD_NL + 3] != 0)       # 𝐧 ≠ 0
+    return ifelse(reached, dot(𝐱 - o, d), oftype(d[1], NaN)), 𝐱
 end
 
 """
@@ -72,16 +83,18 @@ pixel_parts(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, 
             scene::Scene, st::RenderSettings) = _pixel_parts(u, v, k, View(pose, camera), mat, light, scene, st)
 
 """The kernels' form of [`pixel_parts`](@ref) on a `View`. Device-safe: the parts kernels run it per pixel (`_PixelPartsAt` for the
-closed-form solves, `_PartsAt` for the LM's analytic columns)."""
+closed-form solves, `_PartsAt` for the LM's analytic columns, which gives the pixel's radiance record `lrays` for its rays' hits,
+`_parts_hit`)."""
 @inline function _pixel_parts(u::Integer, v::Integer, k::Integer, view::View, mat::Material,
-                             light::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, scene::Scene, st::RenderSettings{TS, NS}) where {L, C, J, TS, NS}
+                             light::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}}, scene::Scene, st::RenderSettings{TS, NS},
+                             lrays = nothing) where {L, C, J, TS, NS}
     F = _float_of(st)
     bd = scene.board
     pid = pixel_id(u, v, scene.H)
     scale = 1 / (π * view.r^2)
     𝐩s = ntuple(ks -> SVector{2, F}(𝐩_sample(st.sensor, ks, u, v)), Val(NS))
     rays = BoardRays(scene)                                  # the warping's relief, once for the pixel's rays (bit for bit the per-ray form)
-    BdBs = ntuple(ks -> _sample_parts(view, mat, light, scene, st, rays, k, pid, ks, 𝐩s[ks], scale, zero(SMatrix{3, J, F, 3J})), Val(NS))
+    BdBs = ntuple(ks -> _sample_parts(view, mat, light, scene, st, rays, k, pid, ks, 𝐩s[ks], scale, zero(SMatrix{3, J, F, 3J}), lrays), Val(NS))
     return PixelParts{J, 3J, NS, F}(SVector{NS}(𝐩s), SVector{NS, F}(ntuple(ks -> F(st.sensor.weights[ks]), Val(NS))),
                                     SVector{NS}(ntuple(ks -> SMatrix{3, J, F, 3J}(BdBs[ks][1]), Val(NS))),
                                     SVector{NS}(ntuple(ks -> SMatrix{3, J, F, 3J}(BdBs[ks][2]), Val(NS))))

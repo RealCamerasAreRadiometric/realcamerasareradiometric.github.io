@@ -53,10 +53,11 @@ end
 @inline _rowdot(A::SMatrix{3, J}, B::SMatrix{3, J}) where {J} =
     SVector(ntuple(c -> sum(ntuple(j -> A[c, j] * B[c, j], Val(J))), Val(3)))
 
-"""The analytic parts of the linear blocks at a masked pixel id of view `k`: `(light, μ, vig)` — the SH lighting columns (`3 × J`),
-the μ column (3) and the raw vignetting rows (`3 × NV`), in the kernel's float type: `_linear_rows` of the pixel's `pixel_parts`, the
-closed-form solves' one path."""
-struct _PartsAt{J, NV, V, G, M, L, S, T}
+"""The analytic parts of the linear blocks at the `i`-th pixel of view `k`'s list `px`: `(light, μ, vig)` — the SH lighting columns
+(`3 × J`), the μ column (3) and the raw vignetting rows (`3 × NV`), in the kernel's float type: `_linear_rows` of the pixel's
+`pixel_parts`, the closed-form solves' one path. `rays`: the radiance record of the same parameters (`_radiance_record_device`), whose
+hits the parts' rays take (`_parts_hit`: the height field's root once per ray, the record's)."""
+struct _PartsAt{J, NV, V, G, M, L, S, T, P, R}
     k::Int32
     H::Int32
     view::V
@@ -66,12 +67,15 @@ struct _PartsAt{J, NV, V, G, M, L, S, T}
     scene::S
     st::T
     sizes::Tuple{Val{J}, Val{NV}}
+    px::P
+    rays::R
 end
 Adapt.@adapt_structure _PartsAt
 _row_type(f::_PartsAt{J, NV}) where {J, NV} = (F = _float_of(f.st); Tuple{SMatrix{3, J, F, 3J}, SVector{3, F}, SMatrix{3, NV, F, 3NV}})
-@inline function (f::_PartsAt{J, NV})(id::UInt32) where {J, NV}
+@inline function (f::_PartsAt{J, NV})(i::UInt32) where {J, NV}
+    id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
-    p = _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
+    p = _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st, lr)
     return _linear_rows(p, f.vig, coefficients(f.light), f.mat.μ)
 end
 
@@ -97,10 +101,10 @@ _row_float(::Type{<:PixelParts{J, L3, NS, F}}) where {J, L3, NS, F} = F
     return _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st)
 end
 
-"""The parts of every pixel of the device list `px` (`_PartsAt`), on the device (queued on this task's queue): `_parts_stride(J, NV)`
-floats per pixel."""
-_parts_device(be, px, k, H, view, vig, mat, light, scene, st, J::Integer, NV::Integer) =
-    _launch_rows(_PartsAt(Int32(k), Int32(H), view, vig, mat, light, scene, st, (Val(J), Val(NV))), be, px)
+"""The parts of every pixel of the device list `px` (`_PartsAt`; `idx` its index list, `rays` the record of the same parameters), on
+the device (queued on this task's queue): `_parts_stride(J, NV)` floats per pixel."""
+_parts_device(be, px, idx, k, H, view, vig, mat, light, scene, st, J::Integer, NV::Integer; rays) =
+    _launch_rows(_PartsAt(Int32(k), Int32(H), view, vig, mat, light, scene, st, (Val(J), Val(NV)), px, rays), be, idx)
 """Floats per pixel of the parts."""
 _parts_stride(J::Integer, NV::Integer) = 3 * (J + 1 + NV)
 
@@ -204,7 +208,7 @@ end
     _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32) -> device vector of `RadianceJac`
 
 The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (the kernel's float type) (view `v32`, material, lighting, scene with
-its surface): per ray `[L | ∂L/∂ℓ]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
+its surface): per ray `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
 the height kernel of the same parameters read it (`rays`) instead of carrying their partials through the estimator.
 """
 function _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
@@ -216,7 +220,7 @@ end
 function _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, scene32, st32)
     nr = length(st32.sensor) * n_disc(st32.aperture)
     F = _float_of(st32)
-    out = reinterpret(RadianceJac{F}, KA.zeros(be, F, 3 * (1 + RAD_NL) * nr * length(px)))
+    out = reinterpret(RadianceJac{F}, KA.zeros(be, F, length(RadianceJac{F}) * nr * length(px)))
     f = _RecordAt(Int32(k), Int32(H), v32, vig32, m32, l32, scene32, st32, px, out)
     haskey(_CAPACITY, typeof(be)) || _note_capacity!(be, f, idx, 128)   # the LM's heaviest kernel: its occupancy sizes the window
     _launch_rows(f, be, idx; workgroupsize = 128)

@@ -157,7 +157,7 @@ The radiance-Jacobian modes of [`Φ_pixel`](@ref) (the device Jacobian): `L_c` d
 inputs ℓ — the albedo ρ, the roughness α, the refractive indices η, the outgoing direction ω_l and the board point 𝐱 — and channel c
 reads ρ and η only through ρ_c and η_c, so `RAD_NL` = 8 local slots carry its whole derivative: one shared by ρ_c, α, one shared by
 η_c, ω_l's two tangent components (ω_l is a unit vector: its partials are tangent, `_seed_tangents`) and 𝐱's three.
-`RadianceRecord`: at the plain parameters, each ray's `[L | ∂L/∂ℓ]` (`RadianceJac`) is written to `out[base + ray]` (ray
+`RadianceRecord`: at the plain parameters, each ray's `[L | ∂L/∂ℓ]` and its hit (`RadianceJac`, `_ray_hit`) are written to `out[base + ray]` (ray
 `(ks − 1) NA + la` of the pixel) and its value used. `RadianceRays`: the ray's ℓ, dual in the chunk's (or the height mode's) slots,
 replaces the estimator by its linearisation at the record, `L⁰ + J (ℓ − value(ℓ))` — the chain rule (∂L/∂θ = ∂L/∂ℓ · ∂ℓ/∂θ), so a
 chunk's partials skip the estimator. A ray the record did not reach reads as zero radiance with zero partials (the buffer is zeroed),
@@ -173,11 +173,45 @@ struct RadianceRays{A}
 end
 struct RadianceTag end
 const RAD_NL = 8
-"""A ray's `[L | ∂L/∂ℓ]` in the kernels' float type `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend)."""
-const RadianceJac{T} = SMatrix{3, 1 + RAD_NL, T, 3 * (1 + RAD_NL)}
+"""A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` in the kernels' float type `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend): the
+radiance and its `RAD_NL` local partials, then the ray's hit: its board point 𝐱 and the board surface's normal 𝐧 there (`_ray_hit`;
+any length, 𝐧 ⋅ 𝐝 = 1)."""
+const RadianceJac{T} = SMatrix{3, RAD_NL + 3, T, 3 * (RAD_NL + 3)}
+struct HitTag end
+"""
+    _ray_hit(hrays, lrays, ri, rays, o, d) -> (s, 𝐱, 𝐧)
+
+The hit of the ray `(o, d)` (`d` unit) of a pixel (`Φ_pixel`'s ray `ri`) with the board `rays` (`BoardRays`: the plane, or the
+warped page): the ray's parameter `s`, the board point 𝐱, and — where a mode records it — the surface's normal 𝐧 there.
+
+- The flux and the nodal-height mode: `intersect_board` (Core's `intersection`: the plane hit, or the height field's Newton), no normal.
+- `RadianceRecord` (the plain parameters): the same hit with the ray's origin seeded (three partials), so Core's implicit-function
+  step gives `∂𝐱/∂𝐨 = I − 𝐝 𝐧ᵀ / (𝐧 ⋅ 𝐝)` beside the hit, and with it the normal: `𝐧ᵀ = 𝐝ᵀ (I − ∂𝐱/∂𝐨)` (so 𝐧 ⋅ 𝐝 = 1). The
+  record keeps 𝐱 and 𝐧 with the ray's radiance.
+- `RadianceRays` (a Jacobian chunk: the ray dual in the chunk's slots, the surface constant): the hit of the dual ray with the
+  surface's TANGENT PLANE at the recorded hit, `s = 𝐧 ⋅ (𝐱₀ − 𝐨) / (𝐧 ⋅ 𝐝)`, `𝐱 = 𝐨 + s 𝐝` — the value the recorded hit, the partials
+  the implicit-function theorem's (a surface and its tangent plane have the same first-order hit). No Newton: the height field's
+  root is found once per ray, by the record, not again by every chunk (a warped board's chunk kernel 303 → 60 µs per pixel on the
+  CPU, 2026-11-20). A ray the record did not reach (zeros) has 𝐧 = 0: `s` is not finite and the ray is skipped, as before.
+"""
+@inline _ray_hit(hrays, lrays, ri, rays, o, d) = (intersect_board(rays, o, d)..., nothing)
+@inline function _ray_hit(::Nothing, ::RadianceRecord, ri, rays, o::StaticVector{3, T}, d::StaticVector{3, T}) where {T}
+    D = ForwardDiff.Dual{HitTag, T, 3}
+    od = SVector{3, D}(ntuple(c -> D(o[c], ForwardDiff.Partials(ntuple(i -> i == c ? one(T) : zero(T), Val(3)))), Val(3)))
+    sd, 𝐱d = intersect_board(rays, od, SVector{3, D}(d))
+    # 𝐧ⱼ = Σ_c 𝐝_c (δ_cj − ∂𝐱_c/∂𝐨_j)
+    𝐧 = SVector{3, T}(ntuple(j -> (d[j] - (d[1] * ForwardDiff.partials(𝐱d[1], j) + d[2] * ForwardDiff.partials(𝐱d[2], j) + d[3] * ForwardDiff.partials(𝐱d[3], j))), Val(3)))
+    return ForwardDiff.value(sd), SVector{3, T}(ntuple(c -> ForwardDiff.value(𝐱d[c]), Val(3))), 𝐧
+end
+@inline function _ray_hit(::Nothing, lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
+    G = @inbounds lr.J[lr.base + ri]
+    𝐱₀ = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]); 𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
+    s = dot(𝐧, 𝐱₀ - o) / dot(𝐧, d)
+    return s, o + s * d, nothing
+end
 """The radiance of a ray (`Φ_pixel`'s ray `ri`): `L_c`, or one of its radiance-Jacobian modes (`RadianceRecord`, `RadianceRays`)."""
-@inline _ray_radiance(::Nothing, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω) = L_c(bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
-@inline function _ray_radiance(lr::RadianceRecord, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+@inline _ray_radiance(::Nothing, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧) = L_c(bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+@inline function _ray_radiance(lr::RadianceRecord, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
     ω_l, T, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
     front || return zero(SVector{3, T})
     D = ForwardDiff.Dual{RadianceTag, T, RAD_NL}
@@ -186,12 +220,13 @@ const RadianceJac{T} = SMatrix{3, 1 + RAD_NL, T, 3 * (1 + RAD_NL)}
     L = _radiance_mc(bd, m, lt, sm, key, ρ .+ ε(1), α + ε(2), η .+ ε(3), ω_l + ε(4) * e1 + ε(5) * e2,
                      SVector(𝐱[1] + ε(6), 𝐱[2] + ε(7), 𝐱[3] + ε(8)), D)
     @inbounds lr.out[lr.base + ri] = eltype(lr.out)(ntuple(q -> (c = (q - 1) % 3 + 1; j = (q - 1) ÷ 3;
-                                                              j == 0 ? ForwardDiff.value(L[c]) : ForwardDiff.partials(L[c], j)), Val(3 * (1 + RAD_NL))))
+                                                              j == 0 ? ForwardDiff.value(L[c]) : j <= RAD_NL ? ForwardDiff.partials(L[c], j) :
+                                                              j == RAD_NL + 1 ? 𝐱[c] : 𝐧[c]), Val(3 * (RAD_NL + 3))))   # [L | ∂L/∂ℓ | 𝐱 | 𝐧]
     return SVector(ntuple(c -> ForwardDiff.value(L[c]), Val(3)))
 end
 @inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
 @inline _δ(x::Real) = zero(x)
-@inline function _ray_radiance(lr::RadianceRays, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω)
+@inline function _ray_radiance(lr::RadianceRays, ri, bd, surf, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
     ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
     front || return zero(SVector{3, Tz})
     e1, e2 = _seed_tangents(ForwardDiff.value.(ω_l))
@@ -238,12 +273,12 @@ radiance.
         for la in 1:n_disc(st.aperture)
             𝐚 = 𝐚_sample(st.aperture, la, view.r)
             o, d = world_ray_dir(view, 𝐚, dch, t̂s)
-            s, 𝐱 = intersect_board(rays, o, d)                               # the board warping h (the plane when zero)
+            ri = (ks - 1) * n_disc(st.aperture) + la
+            s, 𝐱, 𝐧 = _ray_hit(hrays, lrays, ri, rays, o, d)                # the board warping h (the plane when zero); a chunk: the recorded hit's tangent plane
             (isfinite(ForwardDiff.value(s)) && ForwardDiff.value(s) > 0) || continue
             𝐱ᵣ = _ray_point(hrays, s, 𝐱, o, d)
             𝐛 = chart(bd, 𝐱ᵣ)
-            L = _ray_radiance(lrays, (ks - 1) * n_disc(st.aperture) + la, bd, scene.surface, mat, light, st.sampler,
-                              SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d)
+            L = _ray_radiance(lrays, ri, bd, scene.surface, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d, 𝐧)
             inner = _ray_add(hrays, inner, 𝐚_weight(st.aperture, la, view.r) * L, s)
         end
         acc += (st.sensor.weights[ks] * V𝐩) * inner

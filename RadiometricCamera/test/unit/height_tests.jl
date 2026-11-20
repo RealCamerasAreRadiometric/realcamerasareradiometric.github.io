@@ -391,3 +391,35 @@ end
     sp, xp = intersect_board(RC.BoardRays(board_hs, zd), o, d)
     @test sp isa D && eltype(xp) === D && ForwardDiff.value(sp) == s0
 end
+
+@testitem "radiance record: a ray's hit and normal; a chunk's hit on the recorded hit's tangent plane" setup = [RCFixtures, HeightScene] begin
+    using RadiometricCamera: HEIGHT_NC, intersect_board
+    using StaticArrays, LinearAlgebra, ForwardDiff
+    # The record finds a ray's hit once (the height field's root) and keeps the board point and the surface's normal there; a Jacobian
+    # chunk meets the recorded hit's tangent plane with its dual ray: the same value, Core's implicit-function partials — on the
+    # warped board and on the plane.
+    for h in (hh, zero(hh))
+        rays = RC.BoardRays(board_hs, h)
+        o = SVector(0.1, -0.2, 1.4); d = normalize(SVector(0.05, 0.1, -1.0))
+        rec = [zero(RC.RadianceJac{Float64})]
+        s, x, n = RC._ray_hit(nothing, RC.RadianceRecord(rec, 0), 1, rays, o, d)
+        s0, x0 = intersect_board(rays, o, d)
+        @test abs(s - s0) < 1e-14 && norm(x - x0) < 1e-14 && dot(n, d) ≈ 1
+        @test norm(cross(normalize(n), VgtkCore.normal(rays.relief, x0))) < 1e-9          # Core's normal of the surface there (either sense)
+        # the record's entry as a chunk reads it, [L | ∂L/∂ℓ | 𝐱 | 𝐧], and the dual ray: origin and direction seeded
+        rec[1] = RC.RadianceJac{Float64}(ntuple(q -> (j = (q - 1) ÷ 3; c = (q - 1) % 3 + 1; j == RC.RAD_NL + 1 ? x[c] : j == RC.RAD_NL + 2 ? n[c] : 0.0), 3 * (RC.RAD_NL + 3)))
+        D = ForwardDiff.Dual{Nothing, Float64, 6}
+        seed(v, k0) = SVector{3, D}(ntuple(i -> D(v[i], ForwardDiff.Partials(ntuple(j -> Float64(j == k0 + i), 6))), 3))
+        od, dd = seed(o, 0), seed(d, 3)
+        st, xt, _ = RC._ray_hit(nothing, RC.RadianceRays(rec, 0), 1, rays, od, dd)
+        sc, xc = intersect_board(rays, od, dd)                    # Core's hit of the dual ray (the plane's, or the Newton's with its implicit step)
+        @test abs(ForwardDiff.value(st) - s0) < 1e-13 && norm(ForwardDiff.value.(xt) - x0) < 1e-13
+        @test all(j -> norm(map(q -> ForwardDiff.partials(q)[j], xt) - map(q -> ForwardDiff.partials(q)[j], xc)) < 1e-10, 1:6)
+        @test norm(collect(ForwardDiff.partials(st)) - collect(ForwardDiff.partials(sc))) < 1e-10
+        # a ray the record did not reach (zeros): not finite, so the flux skips it; the parts' hit likewise
+        blank = RC.RadianceRays([zero(RC.RadianceJac{Float64})], 0)
+        @test !isfinite(ForwardDiff.value(first(RC._ray_hit(nothing, blank, 1, rays, od, dd)))) && !isfinite(first(RC._parts_hit(blank, 1, rays, o, d)))
+        sp, xp = RC._parts_hit(RC.RadianceRays(rec, 0), 1, rays, o, d)
+        @test abs(sp - s0) < 1e-13 && xp == x && RC._parts_hit(nothing, 1, rays, o, d) == (s0, x0)
+    end
+end

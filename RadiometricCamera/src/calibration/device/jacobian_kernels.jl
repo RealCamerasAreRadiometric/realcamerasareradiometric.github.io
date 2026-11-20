@@ -425,7 +425,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     S = _slot_rows(be, [(c0, h, C) for (c0, h) in zip(c0s, hs)], P, npx)
     hh = need_h ? _heights_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st, m.surface.h; rays = hrays) :
          nothing                                           # the nodal heights: the height kernel's partials
-    ph = need_lin ? _parts_device(be, dc.px[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk, J, NV) : nothing
+    ph = need_lin ? _parts_device(be, dc.px[r.k], dc.idx[r.k], r.k, s.scene.H, vk, vigk, mk, lk, scenek, stk, J, NV; rays) : nothing
     # The residual must be BITWISE the one `computeresidual` returns for the same parameters: NLLSsolver
     # recomputes the cost through this function after every accepted step and stops ("internal discrepancy
     # in cost computations") if it differs from the trial cost beyond isapprox — and the value part of the
