@@ -53,7 +53,7 @@
     edge_true = SVector(0.6, 3.0)                                         # δ 0.6 mm, σ_print 3 mm: about one pixel on the board, so the renders resolve the edge
     mat_e = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     # the print's edge parameters (δ, σ_print) are the scene's surface parameters
-    board_edge(e) = with_state(board_e, TargetState(edge = e))
+    board_edge(e) = RadiometricCamera.with_state(board_e, TargetState(edge = e))
     edge_state(e, targets; kw...) = CalibrationState(board_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
     blank_e = [zeros(He, We, 3) for _ in 1:2]
     targets_e = render_all(edge_state(edge_true, blank_e))

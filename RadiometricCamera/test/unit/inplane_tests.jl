@@ -22,7 +22,7 @@
     board_i = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_i; facing = [0.0, 0.0, 1.5])
     Wi = Hi = 32
     board_i = board_i
-    board_iθ(θ) = with_state(board_i, TargetState(inplane = θ))                        # the print error is the scene's surface parameter
+    board_iθ(θ) = RadiometricCamera.with_state(board_i, TargetState(inplane = θ))                        # the print error is the scene's surface parameter
     lens_param_i = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wi, Hi)
     glens_i = grid_model(lens_param_i, 10, 10)
     focus_i = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wi, Hi))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])

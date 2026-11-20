@@ -43,7 +43,7 @@
     board_r = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_r; facing = [0.0, 0.0, 1.5])
     Wr = Hr = 32
     h_r = SVector{HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
-    board_r = with_state(board_r, TargetState(h = h_r))
+    board_r = RadiometricCamera.with_state(board_r, TargetState(h = h_r))
     focus_r = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wr, Hr))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_r = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_r = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wr, Hr); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
@@ -59,7 +59,7 @@
     camera_g = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
     masks_g = [compute_mask(camera_g, p, board_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
     targets_g = render_all(CalibrationState(board_r, st_r, camera_g, poses_r, mat_r, light_r, blank_r; masks = masks_g))
-    s_g = CalibrationState(with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
+    s_g = CalibrationState(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
     prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 1)
     tiles_g = RC.tile_costs(prob_g)
     res_g = tiles_g[argmax([length(t.pix) for t in tiles_g])]
@@ -185,10 +185,10 @@ end
     end
     board_e_r = with_sdf(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5]), sdf_r, page_r)
     # the print's (δ, σ_print) on the surface: σ_print 3 mm, about one pixel on the board, so the render resolves the edge
-    board_e_r = with_state(board_e_r, TargetState(edge = SVector(0.3, 3.0)))
+    board_e_r = RadiometricCamera.with_state(board_e_r, TargetState(edge = SVector(0.3, 3.0)))
     camera_e_r = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
     masks_e_r = [compute_mask(camera_e_r, p, board_e_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
-    targets_e_r = render_all(CalibrationState(with_state(board_e_r, TargetState(edge = SVector(0.6, 3.0))), st_r,
+    targets_e_r = render_all(CalibrationState(RadiometricCamera.with_state(board_e_r, TargetState(edge = SVector(0.6, 3.0))), st_r,
                                               camera_e_r, poses_r, mat_r, light_r, blank_r; masks = masks_e_r))
     s_e = CalibrationState(board_e_r, st_r, camera_e_r, poses_r, mat_r, light_r, targets_e_r; masks = masks_e_r)
     prob_e, _ = build_problem_grid(s_e; patch = (5, 5))
@@ -216,7 +216,7 @@ end
     # 4. the Float32 device path (under the GPU gate): CPU / GPU column parity per family and the residual bitwise from the flux kernel
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_gd = CalibrationState(with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
+        s_gd = CalibrationState(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
                                 backend = CUDA.CUDABackend())
         prob_gd, idx_gd = build_problem_grid(s_gd; patch = (5, 5), height_degree = 1)
         tiles_gd = RC.tile_costs(prob_gd)

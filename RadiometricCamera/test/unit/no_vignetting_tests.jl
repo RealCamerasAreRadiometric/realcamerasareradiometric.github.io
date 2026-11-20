@@ -54,10 +54,10 @@ end
     @test RC._vignetting_number_type(NoVignetting()) === Bool && RC._vignetting_number_type(a.flat.vignetting) === Float64
     c32(x) = VgtkCore.convert_eltype(Float32, x)
     v32 = RC.View(c32(a.pose), c32(a.lens), c32(a.none.focus), 0.0386f0)
-    Φ32 = RC._Φ_pixel(u, v, 1, v32, NoVignetting(), c32(a.mat), c32(a.light), c32(a.board), c32(a.st))
+    Φ32 = RC._Φ_pixel(u, v, 1, RC._image_height(a.lens), v32, NoVignetting(), c32(a.mat), c32(a.light), c32(a.board), c32(a.st))
     @test Φ32 isa SVector{3, Float32}
     @test Φ32 ≈ Φ rtol = 1e-4
-    @test Φ32 === RC._Φ_pixel(u, v, 1, v32, UnitField{Float32}(), c32(a.mat), c32(a.light), c32(a.board), c32(a.st))
+    @test Φ32 === RC._Φ_pixel(u, v, 1, RC._image_height(a.lens), v32, UnitField{Float32}(), c32(a.mat), c32(a.light), c32(a.board), c32(a.st))
     # no Θ_v: the linear blocks' analytic rows of a pixel have no vignetting columns
     p = pixel_parts(u, v, 1, a.none, a.pose, a.mat, a.light, a.board, a.st)
     L, G, JP = RC._linear_rows(p, NoVignetting(), VrtkCore.coefficients(a.light), a.mat.diffuse_weight)

@@ -39,7 +39,7 @@ function gold_board(W, H; h = nothing, edge = nothing, sdf = nothing)
         edge === nothing || (m = RCg.with_edge(m, edge))
         return board, m
     end
-    return with_state(board, TargetState(; h, edge)), m
+    return RadiometricCamera.with_state(board, TargetState(; h, edge)), m
 end
 gold_poses() = [RCg.VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
 const GOLD_W = 32                                       # the scenes' image: GOLD_W × GOLD_W pixels

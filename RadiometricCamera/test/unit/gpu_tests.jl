@@ -48,7 +48,7 @@ end
         camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.0, 16.0), 32, 32), Focus(3, 1.5, 32, 32), 0.0386, vg)
         stt = RenderSettings(; N = 4)
         args32 = VgtkCore.convert_eltype.(Float32, (View(pose, camera), vg, mt, lt, sc, stt))   # the kernels' Float32 record (the device's element type)
-        Φ32 = RC._Φ_pixel(16, 16, 1, args32...)
+        Φ32 = RC._Φ_pixel(16, 16, 1, RC._image_height(camera), args32...)   # the image's height is the camera's
         @test Φ32 isa SVector{3, Float32}
         Φ64 = Φ_pixel(16, 16, 1, camera, pose, mt, lt, sc, stt)
         @test maximum(abs, (Φ32 .- Φ64) ./ Φ64) < 1e-4

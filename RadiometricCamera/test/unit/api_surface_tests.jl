@@ -25,7 +25,7 @@
     @test_throws "the board is VisualRadiometryToolkitCore's `TexturedTarget`" RC.PrintedTarget(nothing, nothing)
     @test_throws "VisualRadiometryToolkitCore's `TargetState(; h, edge, inplane)`" RC.BoardSurface()
     @test_throws "there is no scene type. The image size is the camera's" RC.Scene(nothing, 4, 4)
-    @test_throws "VisualRadiometryToolkitCore's `with_state(board, state)`" RC.with_surface(nothing, nothing)
+    @test_throws "VisualRadiometryToolkitCore's `RadiometricCamera.with_state(board, state)`" RC.with_surface(nothing, nothing)
     @test_throws "`albedo` (the paper's symbol stays its alias, `ρ_c`)" RC.ρ_c(nothing, nothing)
     @test_throws "`edge_albedo(target, 𝐛)`" RC.edge_albedo(nothing, nothing, nothing)
     @test_throws "`posed_target(target)`" RC.posed_target(nothing)

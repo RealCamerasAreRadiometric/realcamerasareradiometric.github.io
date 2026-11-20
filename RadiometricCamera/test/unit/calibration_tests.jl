@@ -195,7 +195,7 @@ end
     board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
     h_true = SVector{HEIGHT_NC}([3e-3 * (1 - 4 * ((b[1] - 0.5)^2 + (b[2] - 0.5)^2)) + 1e-3 * 4 * (b[1] - 0.5) * (b[2] - 0.5) for b in RC.HEIGHT_NODES])   # bowl 3 mm + saddle 1 mm on the 2 m board
-    board_t = with_state(board, TargetState(h = h_true))
+    board_t = RadiometricCamera.with_state(board, TargetState(h = h_true))
     board_0 = board                                                      # the start: the flat page
     lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))

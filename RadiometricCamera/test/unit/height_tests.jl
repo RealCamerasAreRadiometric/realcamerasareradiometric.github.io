@@ -24,7 +24,7 @@
     board_hs = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
     Wh = Hh = 32
     board_h = board_hs
-    board_hh(h) = with_state(board_h, TargetState(h = h))               # the warping is the scene's surface parameter
+    board_hh(h) = RadiometricCamera.with_state(board_h, TargetState(h = h))               # the warping is the scene's surface parameter
     glens_h = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wh, Hh), 10, 10)
     focus_h = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wh, Hh))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_h = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
@@ -100,7 +100,7 @@ end
     @test height_on(shh) && shh.edge == sf0.edge
     @test with_edge(shh, shh.edge).h == hh && VgtkCore.convert_eltype(Float32, shh).h == SVector{HEIGHT_NC, Float32}(hh)
     @test TargetState(h = hh).h == hh && TargetState(h = hh).edge == zero(SVector{EDGE_NC, Float64})
-    @test board_h1.state == TargetState() && with_state(board_h1, shh).state.h == hh
+    @test board_h1.state == TargetState() && RadiometricCamera.with_state(board_h1, shh).state.h == hh
 
     r_nom_h = render_all(CalibrationState(board_h, st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_h))
     @test maximum(maximum(abs, targets_h[k] .- r_nom_h[k]) for k in 1:2) > 0.02 * maximum(maximum, r_nom_h)
@@ -225,9 +225,9 @@ end
         @test warping_aspect(tall) ≈ 0.7
         wd = Adapt.adapt(CUDA.CuArray, VgtkCore.convert_eltype(Float32, tall.warping))
         @test wd isa VgtkCore.MappedSurface                                     # the flat field's system on the device
-        board_t = with_state(tall, TargetState(h = 0.5 * height_true))
+        board_t = RadiometricCamera.with_state(tall, TargetState(h = 0.5 * height_true))
         masks_t = [compute_mask(camera_h, p, tall, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]
-        targets_t = render_all(CalibrationState(with_state(tall, TargetState(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
+        targets_t = render_all(CalibrationState(RadiometricCamera.with_state(tall, TargetState(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
         s_g = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
         s_c = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t)
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g), render_all(s_c))) < 2e-3 * maximum(maximum, render_all(s_c))

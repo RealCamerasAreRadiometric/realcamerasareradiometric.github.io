@@ -29,13 +29,14 @@
     D = ForwardDiff.Dual{Nothing, Float64, HEIGHT_NC}
     hd = SVector{HEIGHT_NC, D}(ntuple(i -> D(m.surface.h[i], ForwardDiff.Partials(ntuple(j -> Float64(i == j), Val(HEIGHT_NC)))), Val(HEIGHT_NC)))
     surf_d = RC.TargetState{D}(hd, SVector{RC.EDGE_NC, D}(m.surface.edge), SVector{RC.INPLANE_NC, D}(m.surface.inplane))
-    board_d = with_state(s_c.board, surf_d)
-    # the kernels' own form (the tile's window lens, the dual heights in the scene): the internal View and _Φ_pixel
+    board_d = RadiometricCamera.with_state(s_c.board, surf_d)
+    # the kernels' own form (the tile's window lens — a bare model: the image's height from the state's camera — and the dual heights in
+    # the board's state): the internal View and _Φ_pixel
     view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.camera.geometric, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
     Hd = zeros(3 * length(r.pix), HEIGHT_NC)
     for (i, iv) in enumerate(r.pix)
         u, v = s_c.px[r.k][iv]
-        Φ = RC._Φ_pixel(u, v, r.k, view, VgtkCore.model(vars[9]), m.mat, vars[10].light, board_d, s_c.settings)
+        Φ = RC._Φ_pixel(u, v, r.k, RC._image_height(s_c), view, VgtkCore.model(vars[9]), m.mat, vars[10].light, board_d, s_c.settings)
         for c in 1:3, j in 1:HEIGHT_NC
             Hd[3 * (i - 1) + c, j] = ForwardDiff.partials(Φ[c], j)
         end
