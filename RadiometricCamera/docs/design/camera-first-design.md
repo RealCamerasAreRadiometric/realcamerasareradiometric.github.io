@@ -354,9 +354,22 @@ The warped runs gain less than the flat ones because what remains is the Float64
 the heights kernel (19 ms) and, in the grid route, the tiles' assembly (as much as the view's kernels): the Core
 proposals 3.3 a–c and recommendation 1.
 
-CPU, 16 threads (`benchmark/linearization.jl` above; `run.jl`, 320 × 240 flat): view Jacobian 6.23 → 3.75 s, view
-normal equations 6.38 → 3.82 s; the forward and closed-form stages unchanged (flux 0.46, cost 1.4, parts 1.8, linear
-blocks 3.8, joint 6.5 s). LM, 1 iteration per view at 115f782: 24.5 s; grid 26.5 s.
+CPU backend, 16 threads (Emerald Rapids), baseline → 66ddb38, seconds:
+
+| stage | flat, 3 × 76,800 px | warped, 8 × 16,384 px, free heights |
+|---|---:|---:|
+| cost | 1.46 → 1.38 | 4.92 → 3.28 |
+| parts | 1.81 → 2.04 | 5.17 → 3.71 |
+| linear joint | 6.53 → 6.67 | 12.07 → 9.44 |
+| view Jacobian | 6.23 → 3.78 | 4.29 → 2.13 |
+| view normal equations | 6.38 → 3.94 | 4.11 → 2.33 |
+| LM, 1 iteration, per view | 38.8 → 24.8 | 71.1 → 37.0 |
+| LM, 3 iterations, per view | 75.9 → 48.0 | 135.1 → 72.1 |
+| a view's tiles: normal equations | 12.5 → 7.9 | 8.7 → 4.4 |
+| LM, 1 iteration, grid | 41.4 → 26.6 | 72.4 → 41.8 |
+| calibration | 43.5 → 30.0 | 76.6 → 44.2 |
+
+On the CPU backend every stage's checksum (cost, LM results, calibration) is the same number to the 12 digits printed.
 
 ### 5.3 Texture page solve (`experiments/tools/texture_benchmark.jl`, B200; 10 photographs, 739,848 sampled rows, 443,339 fit rows, 22.0 M fit nonzeros, 240 × 336 texels; warm calls)
 
@@ -368,8 +381,9 @@ blocks 3.8, joint 6.5 s). LM, 1 iteration per view at 115f782: 24.5 s; grid 26.5
 | `run_page` (both blur models, records) | 9.40 s | 1.28 s | 7.3× |
 
 Unchanged to every printed digit: the iterations (245, 195, 76), the textures' checksums (114911.70310207602;
-`run_page` 114911.82477413118), the fit nonzeros' energy and the recorded test and fit sums of squares. Not timed
-warm and still on the host: `sample_pixels` (15.5 s first call for 10 photographs: the photograph's read and a host
+`run_page` 114911.82477413118), the fit nonzeros' energy and the recorded test and fit sums of squares. On the CPU backend
+(16 threads) `run_page` 20.7 → 15.8 s with the same textures (the recorded sums of squares differ in the 15th digit: the
+row sums). Not timed warm and still on the host: `sample_pixels` (15.5 s first call for 10 photographs: the photograph's read and a host
 loop of chief-ray hits).
 
 ### 5.4 Tests (cluster, Julia 1.13.3)
