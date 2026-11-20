@@ -122,7 +122,7 @@ for (name, replacement) in (
         :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`",
         # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
         :posed_target => "`posed_target(target)` (under its state) or `posed_target(target, state)`", :texture_size => "`texture_size`",
-        :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`",
+        :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`", :physical_chart => "`physical_chart`",
         :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
         :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
     @eval begin

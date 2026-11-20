@@ -42,7 +42,8 @@ end
 
 @testitem "in-plane print error: the map, Core's posed target, the render" setup = [RCFixtures, InplaneScene] begin
     using RadiometricCamera: TargetState, design_chart, HEIGHT_NC, height_on, inplane_calibration, INPLANE_NC, inplane_on,
-                             intersect_board, physical_chart, TexturedTarget, render_all, with_edge, with_h, with_inplane
+                             intersect_board, TexturedTarget, render_all, with_edge, with_h, with_inplane
+    using VisualRadiometryToolkitCore: physical_chart
     using VisualRadiometryToolkitCore: posed_target
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
