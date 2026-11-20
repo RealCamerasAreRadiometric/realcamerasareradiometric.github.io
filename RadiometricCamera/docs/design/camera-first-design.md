@@ -128,7 +128,7 @@ img = render_view(k, camera, pose, material, light, scene, settings, mask; backe
 | function (constructor) | `RadiometricCameraModel(geometric; focus, aperture_radius, vignetting)`, `Focus(geometric, distance; n)` | composition; the image size read from the geometric camera's `extent` |
 | function (replacer) | `with_geometric`, `with_focus`, `with_aperture_radius`, `with_vignetting` | immutable update, one part each |
 | function (accessor) | `geometric`, `focus`, `aperture_radius` | the same names read a camera and a state |
-| trait-like dispatch (internal) | `_chief_ray(lens, 𝐩)`, `in_domain(lens, 𝐩)`, `_model_eltype`, `is_grid_lens` | the ONLY things RC asks of a geometric camera beyond Core's `backproject`/`project`; a new lens family needs nothing else |
+| trait-like dispatch (internal) | `chief_ray(lens, 𝐩)`, `in_domain(lens, 𝐩)`, `_model_eltype`, `is_grid_lens` | the ONLY things RC asks of a geometric camera beyond Core's `backproject`/`project`; a new lens family needs nothing else |
 
 - `focus`: a `Focus`, or a distance (metres): the surface focused there everywhere on a 3 × 3 grid.
 - `aperture_radius` has no default: r → 0 is not a pinhole limit of the code (Φ divides by πr²), and the radius is a

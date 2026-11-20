@@ -2,8 +2,10 @@
     using RadiometricCamera: center_constraint, 𝐩_of_pixel
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points, control_points, n_control_points, coefficient_jacobian, center
+    using VisualGeometryToolkitCore: center
+    using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points, control_points, n_control_points, coefficient_jacobian
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
 
     # (the knots and the basis against BSplineKit are VisualGeometryToolkitCore's tests: clamped_knots, bspline_basis)
     vig = TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, 400, 300); degree = 2)                              # over the sensor [0, 400] × [0, 300] (pixels)
@@ -38,7 +40,7 @@
     C, d = center_constraint(rv2); @test (C * c)[1] ≈ rv2(𝐜) && d == [1.0]
     # the pole tie (2026-10-29): the free directions tie P_0 = P_1, so V′(0) = 0 and the field has no cone at the centre
     Zr = RC.vignetting_basis(rv, nothing); @test size(Zr) == (7, 6) && Zr[:, 1] == [1, 1, 0, 0, 0, 0, 0] && Zr[3:7, 2:6] == I
-    rt = with_control_points(rv, Zr * [1.0, 0.9, 0.7, 0.5, 0.4, 0.35]); δ = SVector(1e-4 * VgtkCore.field_radius(rt), 0.0)
+    rt = with_control_points(rv, Zr * [1.0, 0.9, 0.7, 0.5, 0.4, 0.35]); δ = SVector(1e-4 * VrtkCore.field_radius(rt), 0.0)
     d1 = rt(𝐜 + δ) - rt(𝐜); d2 = rt(𝐜 + 2δ) - rt(𝐜)
     @test rt.P[1] == rt.P[2] && abs(d2 / d1 - 4) < 1e-2                                       # V − V(𝐜) = O(r²), not O(r)
     @test RC.tie_pole(rv2).P == setindex(rv2.P, rv2.P[1], 2) && RC.tie_pole(vig) === vig

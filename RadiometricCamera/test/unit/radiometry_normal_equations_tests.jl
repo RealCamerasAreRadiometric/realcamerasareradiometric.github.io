@@ -9,11 +9,12 @@
                              sphere_radius, with_μ, with_vignetting, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
-    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap, coefficients
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap, coefficients
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    using VisualGeometryToolkitCore: control_points
+    using VisualRadiometryToolkitCore: control_points
     export RC, ne_state, ne_host, relerr, coefficients, control_points
     const W = 24
     const SCENE = let tex = fixture_board()

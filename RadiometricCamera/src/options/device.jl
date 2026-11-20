@@ -1,6 +1,5 @@
 using TOML: TOML
-using VisualGeometryToolkitCore: TagRegistry, tag_of, check_keys, read_table, toml_key, toml_table, allowed_keys, convert_field,
-                                 VIGNETTING_TAGS, RadialVignetting
+using VisualGeometryToolkitCore: TagRegistry, tag_of, check_keys, read_table, toml_key, toml_table, allowed_keys, convert_field
 import VisualGeometryToolkitCore: toml_field
 
 """The device a driver runs the refinement on: [`CPUCompute`](@ref) or [`GPUCompute`](@ref) (tags in [`BACKEND_TAGS`](@ref)). A

@@ -7,6 +7,7 @@
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
 
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
@@ -17,7 +18,7 @@
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    vig_t = RC.gauge_center_value(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    vig_t = RC.gauge_center_value(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
@@ -69,6 +70,7 @@ end
     using RadiometricCamera: cost, run_lm!
     using Random, StaticArrays
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     f = photosite_scene(; W = 32, H = 32)
     K = 4.0; σr = 3.0                                                             # e⁻/code; read noise, codes
     model = VgtkCore.sensor_fixture(; gain = K, read_noise = (σr, σr, σr, σr), black = Tuple(PhotositeScene.BLACK)).model

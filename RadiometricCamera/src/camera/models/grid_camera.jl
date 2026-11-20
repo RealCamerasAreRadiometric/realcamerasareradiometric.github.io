@@ -7,7 +7,7 @@
 # `imaged_region(camera)`. A per-tile window (Core's `window`) is a bare camera of a block of the controls. This file holds no model:
 # only the chief-ray interface of models/geometric.jl for Core's types and the builders from this package's cameras and samples.
 #
-#   _chief_ray(m, 𝐩) the raw backward spline at K⁻¹𝐩 (Core's `cam.lens.backward(x)`): the unit chief direction is
+#   chief_ray(m, 𝐩)  VisualRadiometryToolkitCore's: the raw backward spline at K⁻¹𝐩 (Core's `cam.lens.backward(x)`): the unit chief direction is
 #                    taken downstream (`chief_dir`); a control's norm is a weight, not a gauge
 #   in_domain        Core's bounded camera's (pixel_camera.jl): inside the lens coverage, and the lens images 𝐩 (its window present)
 # ---------------------------------------------------------------------------
@@ -43,10 +43,8 @@ _route_label(::PerTileRoute) = "grid"
 
 """The backward (direction) spline of a spline model."""
 _backward(m::CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}) = m.lens.backward
-
-@inline _chief_ray(g::CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}, 𝐩::StaticVector{2}) =
-    SVector{3}(_backward(g)(VgtkCore.normalized_point(g.intrinsics, 𝐩)))   # Core's lattice evaluation at K⁻¹𝐩 (Core's normalized point)
-@inline _chief_ray(g::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, 𝐩::StaticVector{2}) = _chief_ray(VgtkCore.model(g), 𝐩)
+# (the image formation's chief ray of a SplineLens camera — the raw backward spline value at K⁻¹𝐩 — is VisualRadiometryToolkitCore's
+# `chief_ray`)
 
 _model_eltype(::Type, g::GridLike) = g                  # never seeded as a whole: the per-tile route seeds the chief directions
 # the element type of the grid's controls: a Float32 device grid (`convert_eltype(Float32, ·)`) gives a Float32 view — not a Float64 one, whose

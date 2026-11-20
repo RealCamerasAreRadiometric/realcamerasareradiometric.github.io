@@ -1,25 +1,10 @@
-@testitem "TPS / focus" setup = [RCFixtures] begin
+@testitem "focus start" setup = [RCFixtures] begin
     using RadiometricCamera: Focus, FocusSpline, in_domain, n_nodes, t̂, 𝔱
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
-    # the focus surface is Core's thin-plate spline (its interpolation and bending energy are Core's tests): the Focus of affine nodal
-    # values is that affine function, and of any values interpolates them
+    # (the focus surface — VisualRadiometryToolkitCore's Focus, a thin-plate spline of Core — is tested there; here: the calibration's start)
     W, H = 400, 300                                                  # the sensor [0, W] × [0, H] (pixels)
-    tps = FocusSpline(VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H)))
-    @test tps.nodes[1] == SVector(0.0, 0.0) && tps.nodes[25] == SVector(400.0, 300.0)
-    vals = [0.3 + 1e-3 * n[1] - 2e-3 * n[2] for n in tps.nodes]
-    fa = Focus(tps, vals)
-    @test maximum(abs, fa.w) < 1e-9
-    @test t̂(fa, SVector(244.0, 30.0)) ≈ 0.3 + 0.244 - 0.06 atol = 1e-10
-    vals2 = rand(25)
-    @test maximum(abs(t̂(Focus(tps, vals2), tps.nodes[i]) - vals2[i]) for i in 1:25) < 1e-9
-    f = Focus(5, 1.5, W, H)
-    @test 𝔱(f, SVector(280.0, 240.0)) ≈ 1.5 && t̂(f, SVector(40.0, 180.0)) ≈ 1 / 1.5
-    fd = Focus(tps, ForwardDiff.Dual.(vals2, 1.0))
-    @test t̂(fd, SVector(240.0, 180.0)) isa ForwardDiff.Dual
-    @test n_nodes(f) == 25
-
     # The focus start (focus_start): exactly cos αᵢ / 𝔱₀ when every node is usable with cos α ≥ 0; every start value floored at 0 (the
     # plane start has no meaning past 90°, and the LM keeps t̂ ≥ 0); a node outside the lens's domain or outside the given support is
     # filled in t̂ space by the TPS through the usable nodes, clamped to their (non-negative) range; fewer than 3 non-collinear usable
@@ -85,7 +70,7 @@ end
     # a lens that gives no ray (NaN) right of u = 300: the pixel counts skip it and count it, the largest chief-ray angle stays
     # finite (2026-11-08: two refined parametric lenses had masked corner pixels past their invertible range, focus_ab.json failed)
     struct _HalfLens end
-    RadiometricCamera._chief_ray(::_HalfLens, 𝐩::StaticVector{2}) = 𝐩[1] > 300 ? SVector(NaN, NaN, NaN) : SVector(𝐩[1] - 200, 𝐩[2] - 150, 400.0)
+    RadiometricCamera.chief_ray(::_HalfLens, 𝐩::StaticVector{2}) = 𝐩[1] > 300 ? SVector(NaN, NaN, NaN) : SVector(𝐩[1] - 200, 𝐩[2] - 150, 400.0)
     W, H = 400, 300
     f = Focus(5, 1.5, W, H)
     px = [[(10, 10), (390, 20), (100, 200)], [(250, 150), (399, 299)]]

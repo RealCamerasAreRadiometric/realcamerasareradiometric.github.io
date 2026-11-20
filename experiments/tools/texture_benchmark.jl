@@ -22,6 +22,7 @@ using LinearAlgebra, Statistics, Printf
 using StaticArrays: SVector, SMatrix
 import PNGFiles, JSON
 using ColorTypes: RGB, N0f16
+import VisualRadiometryToolkitCore as VrtkCore
 include(srcdir("experiments.jl"))
 include(srcdir("drivers.jl"))
 include(srcdir("radiometric_refinement.jl"))
@@ -41,7 +42,7 @@ function texture_benchmark_scene(dir)
     cam0 = VgtkCore.BoundedCamera(VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(600.0sc, 0, 0, 0, 600.0sc, 0, W / 2, H / 2, 1))),
                                                        VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.3))), VgtkCore.Size2(W, H))
     focus0 = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
-    camera = RC.RadiometricCameraModel(cam0, focus0, 0.004, VgtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    camera = RC.RadiometricCameraModel(cam0, focus0, 0.004, VrtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2))
     sett = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8)
     TW, TH = 60sc, 84sc
     design = [0.35 + 0.3 * sin(0.21 * i / sc) * cos(0.17 * j / sc) + 0.25 * (((i - 1) ÷ 6sc + (j - 1) ÷ 9sc) % 2) for i in 1:TW, j in 1:TH]

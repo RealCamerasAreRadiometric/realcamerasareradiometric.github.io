@@ -8,7 +8,7 @@
                              render_all, RenderSettings, Scene, sphere_radius, with_surface, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))

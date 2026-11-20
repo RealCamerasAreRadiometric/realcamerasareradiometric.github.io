@@ -4,8 +4,10 @@
                              solve_Θ_l!, solve_Θ_v!, solve_μ!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points, center
+    using VisualGeometryToolkitCore: center
+    using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     using Rotations: rotation_angle, RotMatrix
 
     tex = fixture_board()
@@ -162,7 +164,7 @@
     @test vig_r.P[1] ≈ vig_r.P[2] atol = 1e-10
     targets_r = [render_view(k, with_vignetting(camera_t, vig_r), poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
     s = CalibrationState(scene, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
-    solve_Θ_v!(s); @test maximum(abs, Matrix(VgtkCore.control_points(s.camera.vignetting)) - Matrix(VgtkCore.control_points(vig_r))) < 1e-6
+    solve_Θ_v!(s); @test maximum(abs, Matrix(VrtkCore.control_points(s.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
     s = CalibrationState(scene, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
     parts_r = all_parts(s); solve_radiometry_gn!(s, parts_r; max_iter = 80); cj_r = RC.parts_cost(s, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.ϕ)
@@ -186,8 +188,9 @@ end
     # height field is on for the Jacobian evaluation although the start is the plane)
     using StaticArrays, LinearAlgebra, Statistics
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
 
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])

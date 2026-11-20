@@ -7,10 +7,14 @@
     doc = read(joinpath(pkgdir(RadiometricCamera), "docs", "src", "api", "surface.md"), String)
     sec = doc[findfirst("## Exported", doc).stop:findfirst("## Public", doc).start]
     documented = Set(Symbol(m[1]) for m in eachmatch(r"\[`([^`]+)`\]\(@ref\)", sec))
+    reexported = Set(Symbol(m[1]) for m in eachmatch(r"`([^`]+)` \(re-exported", sec))   # an upstream name in the headline: no docstring of this package
+    @test reexported == Set([:RadiometricCameraModel]) && RC.RadiometricCameraModel === RC.VrtkCore.RadiometricCameraModel
+    documented = union(documented, reexported)
     exported = Set(n for n in names(RC) if Base.isexported(RC, n) && n !== :RadiometricCamera)   # (names() lists the public names too)
     @test exported == documented
     @test length(exported) <= 20                                                   # a headline, not the package
-    for n in (:𝔣, :𝔭, :ρ_c, :Φ_pixel, :render_view, :build_problem, :run_lm!, :save_state, :load_distance_map, :selfcheck)
+    @test !Base.ispublic(RC, :𝔣) && !Base.ispublic(RC, :𝔭) && RC.𝔣 === RC.VrtkCore.𝔣     # the paper's camera symbols are VisualRadiometryToolkitCore's
+    for n in (:ρ_c, :Φ_pixel, :render_view, :build_problem, :run_lm!, :save_state, :load_distance_map, :selfcheck)
         @test Base.ispublic(RC, n) && !Base.isexported(RC, n)
     end
     # the camera-first API (owner 2026-11-20): the kernels' View record and view_of are internal

@@ -50,8 +50,8 @@ RadiometricCamera
 ## Data conventions
 
 Pixel coordinates are COLMAP convention (pixel i spans [i, i+1), centre i + 0.5): every sensor position 𝐩 of the package —
-the cameras' K, the focus and vignetting splines, the masks, the detections — is in them ([`𝐩_of_pixel`](@ref)`(u, v)` of
-Julia's 1-based pixel `(u, v)`). Camera frame x right, y down, z forward; a photograph is the [`RadiometricCameraModel`](@ref) at a
+the cameras' K, the focus and vignetting splines, the masks, the detections — is in them (`𝐩_of_pixel``(u, v)` of
+Julia's 1-based pixel `(u, v)`). Camera frame x right, y down, z forward; a photograph is the `RadiometricCameraModel` at a
 pose, VisualGeometryToolkitCore's camera → world `EuclideanMap` (`R = R_cw`, `t` = the camera centre 𝐜; world = the board / session frame, metres). Photographs are
 RAW files (VisualGeometryToolkitFeatures' `load_raw_mosaic`, linearised under each photograph's sensor model:
 [`load_photo`](@ref RadiometricCamera.load_photo), [`photo_set`](@ref RadiometricCamera.photo_set)) or 16-bit linear PNGs, read by VisualGeometryToolkitFeatures'
@@ -62,20 +62,20 @@ board textures are read linearly too, as the renderers see them.
 
 ```
 src/RadiometricCamera.jl            module (the identifier → paper-symbol table is its docstring)
-src/camera/                         the geometric camera and its radiometric extension
-  models/geometric.jl                 the chief-ray interface: _chief_ray, in_domain (on the sensor's COLMAP pixels)
+(VisualRadiometryToolkitCore)       RadiometricCameraModel (Θ_d, Θ_f, r, V: the camera, one object), 𝔣, π̂⁻¹, the world rays; Focus;
+                                    the vignetting fields; the sensor domain ℐ and the quadrature rules; EnvironmentLight; Material
+                                    {Θ_m} with D, G₂, F_c, visible-normal sampling and f^CT — the generic radiometric types
+src/camera/                         the geometric camera's chief-ray models and the kernels' view of the radiometric camera
+  models/geometric.jl                 the chief-ray interface: chief_ray, in_domain (on the sensor's COLMAP pixels)
   models/                             pixel_camera.jl: any VisualGeometryToolkitCore lens as Core's pixel camera (a BoundedCamera of a
                                       CameraModel: Lens(DoubleSphere), KannalaBrandt, Division — BlobBoards' model —, the 14-coefficient
                                       chain, …) and its LM box and scale; grid_camera.jl: Core's spline cameras (a SplineLens camera
                                       and its per-tile windows) as chief-ray models, grid_model (any camera → the grid)
-  radiometric_camera.jl               RadiometricCameraModel (Θ_d, Θ_f, r, V: the camera, one object), the kernels' View of it at a
-                                      pose (Θ_e), 𝔣, π̂⁻¹, the world rays
-  vignetting.jl, focus.jl, pose.jl
-src/sensor/                         notation.jl (the sensor domain ℐ, pixel conventions), quadrature.jl (pixel footprint and aperture rules)
-(Core's EnvironmentLight)           y_l^m (sh_basis), the light on the sphere (𝔟, r_SH) with a_{c,l}^m (SphericalHarmonicMap), L^SVSH (radiance)
+  view.jl                             the kernels' View of the camera at a pose (Θ_e): one-line forwards to VisualRadiometryToolkitCore's
+                                      maps; flat_vignetting, the calibration's start of V
+  vignetting.jl, pose.jl              the vignetting's rules and gauge; the pose
 src/target/                         printed_target.jl (PrintedTarget, 𝓑: Core's posed planar target + the print: texture, ρ_c), warping.jl (h: thin
-                                    plate spline, Core's MappedSurface; BoardSurface), svbsdf.jl (Material{Θ_m}, D, G₂, F_c, visible-normal
-                                    sampling, f^CT), printed_edge.jl (ρ_c of a distance-map design)
+                                    plate spline, Core's MappedSurface; BoardSurface), printed_edge.jl (ρ_c of a distance-map design)
 src/image_formation/                radiance.jl (L_c, the per-basis responses), flux.jl (RenderSettings, Scene, Φ_pixel, masks)
 src/calibration/                    state.jl (CalibrationState), weighting.jl (the rows' weights: whitened under the sensor
                                     noise, or as measured), precision.jl, closed_form.jl (closed-form Θ_l, Θ_v, μ), smoothness.jl,
@@ -90,7 +90,7 @@ src/diagnostics/                    monitor.jl, selfcheck.jl, render.jl
 src/options/                        tables.jl, toml.jl (PipelineOptions from TOML: pipeline_options, config_dict), device.jl, retired.jl
 src/io/                             photographs.jl (photos, BlobBoards sessions), camera_models.jl (lens / grid records, Schöps import),
                                     run_outputs.jl (save_radiometric_calibration), records.jl (RC's record kinds)
-src/experiments/                    focus_ab.jl, focus_charts.jl (EXPERIMENT focus-ab)
+src/experiments/                    focus_ab.jl (EXPERIMENT focus-ab)
 bin/refine.jl                       the refinement driver (--config=<toml>; configs/default.toml lists every key)
 docs/                               this manual (docs/make.jl, built locally and by CI)
 examples/                           the commented walkthrough

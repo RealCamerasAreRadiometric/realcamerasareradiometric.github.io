@@ -4,7 +4,7 @@
                              world_ray, Φ_pixel, 𝐩_of_pixel, 𝔟, 𝔭
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
     import VisualGeometryToolkitCore as VgtkCore
 
     tex = fixture_board()

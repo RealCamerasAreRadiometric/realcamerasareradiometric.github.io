@@ -24,9 +24,9 @@
         l2 = load_parametric_lens(lpath)
         @test VgtkCore.extent(l2) == VgtkCore.Size2(W, H) && has_lens(l2, VgtkCore.Division{2})
         @test maximum(abs, pinhole_θ(l2) - pinhole_θ(rl)) < 1e-12 && VgtkCore.lens(l2) == VgtkCore.lens(rl)
-        @test maximum(norm(RC._chief_ray(l2, p) - RC._chief_ray(rl, p)) for p in ps) < 1e-12
+        @test maximum(norm(RC.chief_ray(l2, p) - RC.chief_ray(rl, p)) for p in ps) < 1e-12
         unp, label = load_model("lens:" * lpath, W, H)
-        @test unp(SVector(448.0, 288.0)) ≈ normalize(RC._chief_ray(rl, SVector(448.0, 288.0))) && startswith(label, "lens:")
+        @test unp(SVector(448.0, 288.0)) ≈ normalize(RC.chief_ray(rl, SVector(448.0, 288.0))) && startswith(label, "lens:")
         # a grid camera ↔ vgio/cameras/v5 (its K the initializing camera's own: the gauge, ruling 1; its lens coverage kept)
         circle = VgtkCore.Ellipse(VgtkCore.Point2{Float64}(320.0, 240.0), 300.0, 230.0, 0.1)
         g = grid_model(rl, 35, 25; coverage = circle); path = tempname() * ".json"
@@ -36,9 +36,9 @@
         g2 = load_grid(path)
         @test VgtkCore.directions(VgtkCore.model(g2)) == VgtkCore.directions(VgtkCore.model(g)) && grid_dims(g2) == (35, 25)
         @test VgtkCore.calibration_matrix(VgtkCore.model(g2)) ≈ VgtkCore.calibration_matrix(VgtkCore.model(g)) && VgtkCore.lens_coverage(g2) == circle
-        @test maximum(norm(normalize(RC._chief_ray(g2, p)) - normalize(RC._chief_ray(g, p))) for p in ps) < 1e-12
+        @test maximum(norm(normalize(RC.chief_ray(g2, p)) - normalize(RC.chief_ray(g, p))) for p in ps) < 1e-12
         unp2, _ = load_model("grid:" * path, W, H)
-        @test unp2(SVector(448.0, 288.0)) ≈ normalize(RC._chief_ray(g, SVector(448.0, 288.0)))
+        @test unp2(SVector(448.0, 288.0)) ≈ normalize(RC.chief_ray(g, SVector(448.0, 288.0)))
         @test VgtkCore.directions(VgtkCore.model(load_lens("grid:" * path))) == VgtkCore.directions(VgtkCore.model(g)) &&
               has_lens(load_lens("lens:" * lpath), VgtkCore.Division{2})
     end
@@ -72,7 +72,7 @@
         @test SVector(VgtkCore.principal_point(VgtkCore.model(g).intrinsics)...) ≈ SVector(320.0, 240.0) atol = 0.05
         worst = 0.0
         for x in 20.0:60.0:620.0, y in 20.0:60.0:460.0
-            d = normalize(RC._chief_ray(g, SVector(x, y)))
+            d = normalize(RC.chief_ray(g, SVector(x, y)))
             worst = max(worst, acos(clamp(dot(d, unp(x, y)), -1.0, 1.0)))
         end
         @test worst < 1e-4                                                   # the exact resample: his rays, up to the axis turn

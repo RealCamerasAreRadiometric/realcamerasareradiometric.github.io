@@ -15,9 +15,7 @@
 """A parametric chief-ray model: Core's bounded pixel camera of a `CameraModel`."""
 const _PixelCamera = VgtkCore.BoundedCamera{<:CameraModel}
 
-"""The image formation's chief ray of a parametric pixel camera (`_chief_ray`): Core's `backproject(camera, 𝐩)` (a unit ray; NaN
-where the lens does not image the point). Generic in the element type, kernel-safe."""
-@inline _chief_ray(c::_PixelCamera, 𝐩::StaticVector{2}) = SVector{3}(backproject(c, 𝐩))
+# (the image formation's chief ray of a pixel camera is VisualRadiometryToolkitCore's `chief_ray`: Core's `backproject(camera, 𝐩)`)
 
 """Whether the camera images the sensor position: its back-projection is finite there (a grid's: its 4 × 4 window holds present
 nodes) and, when its lens coverage is an image circle (Core's `lens_coverage`: a `Circle` or an `Ellipse`, the run's measured

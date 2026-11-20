@@ -21,8 +21,8 @@
                              PrintedTarget, render_all, RenderSettings, Scene, sphere_radius, with_surface, with_μ, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, n_control_points, EnvironmentLight, SphericalHarmonicMap,
-                                     sh_count, max_degree
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, n_control_points, EnvironmentLight, SphericalHarmonicMap,
+                                       sh_count, max_degree
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
@@ -83,7 +83,7 @@ end
                              PerViewResidual, PrintedTarget, render_all, Scene, t̂, with_sdf, with_surface, with_μ, with_vignetting, 𝛂, 𝛈
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: with_control_points, control_points, n_control_points
+    using VisualRadiometryToolkitCore: with_control_points, control_points, n_control_points
 
     """Central differences of `f` (a residual vector) along `update` of one block at the steps h, h/2, h/4 and the Richardson extrapolation;
     returns `(D_R, inrange)` with `inrange[i]` the in-range flag of row i. `fscale` = the magnitude of the summed flux (the observations ϕ of

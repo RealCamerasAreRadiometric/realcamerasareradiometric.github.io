@@ -18,7 +18,7 @@
 # RC_MIG_RECORD=1 (re)writes golden/session_fisheye3.json from the current stack instead of comparing with it.
 #   env RC_MIG_FIX=<fixture dir> RC_MIG_WORK=<run dir> [RC_MIG_REFINE=1 [RC_MIG_REFINE_ITERATIONS=30]] julia --project=test/integration_blobboards test/integration_blobboards/test_session_outputs.jl
 using Test, RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf
-using RadiometricCamera: _chief_ray
+using RadiometricCamera: chief_ray
 import TOML
 import FileIO                                                   # EXR truth maps via ImageIO / OpenEXR (the harness environment)
 const RC = RadiometricCamera
@@ -156,7 +156,7 @@ end
 the lens (Estimation's refine_absolute_pose from (R0, t0), trimmed at 5 × median), the error is the bearing angle × f_px — the metric of the
 experiments' hold-out tables. Returns (errors in px, fraction of points kept)."""
 function holdout_errors(lens, f_px, 𝐩s, Xs, R0, t0)
-    vs = [normalize(_chief_ray(lens, 𝐩)) for 𝐩 in 𝐩s]
+    vs = [normalize(chief_ray(lens, 𝐩)) for 𝐩 in 𝐩s]
     R, t = refine_pose(Xs, vs, R0, t0)
     err(ks) = [f_px * angle_between(vs[k], normalize(R * Xs[k] + t)) for k in ks]
     e = err(eachindex(Xs)); keep = findall(e .< 5 * median(e))
@@ -197,7 +197,7 @@ try
         Kb = VgtkCore.model(bblens).intrinsics.K
         pp = (; k = Tuple(VgtkCore.parameter_vector(VgtkCore.lens(bblens))))
         @test Kb[1, 1] ≈ fpx && Kb[1, 3] ≈ Kc[1, 3] && Kb[2, 3] ≈ Kc[2, 3]
-        @test in_domain(bblens, SVector(512.0, 512.0)) && norm(_chief_ray(bblens, SVector(819.2, 307.2))) ≈ 1
+        @test in_domain(bblens, SVector(512.0, 512.0)) && norm(chief_ray(bblens, SVector(819.2, 307.2))) ≈ 1
         resid = Float64(camj.provenance.refined.residual_px.after.median)
         @test resid < 0.15                                    # the detections fit the division camera at sub-0.1 px
         check_golden("refined.f_px", fpx, 0.005; rel = true)
@@ -213,7 +213,7 @@ try
         angs = Float64[]
         for x in 0.05:0.05:0.95, y in 0.05:0.05:0.95
             p = SVector(x * RW, y * RH); (in_domain(bblens, p) && hypot(x - 0.5, y - 0.5) <= 0.4) || continue
-            push!(angs, angle_mrad(_chief_ray(g35, p), _chief_ray(bblens, p)))
+            push!(angs, angle_mrad(chief_ray(g35, p), chief_ray(bblens, p)))
         end
         @info "grid init vs the division camera [mrad]" median = median(angs) p95 = quantile(angs, 0.95) max = maximum(angs) n = length(angs)
         @test median(angs) < 0.05 && quantile(angs, 0.95) < 1.0
@@ -317,7 +317,7 @@ try
                 check_golden("refine.rel_rms_final", r2, 0.05)
                 gr = RC.load_grid(gf); gi = RC.load_grid(joinpath(OUT, "grid_init.json"))
                 probe = [SVector(x, y) for x in -0.4:0.05:0.4, y in -0.4:0.05:0.4]
-                drift = [angle_mrad(_chief_ray(gr, p), _chief_ray(gi, p)) for p in probe]
+                drift = [angle_mrad(chief_ray(gr, p), chief_ray(gi, p)) for p in probe]
                 @info "grid drift after $(REFINE_ITERATIONS) iterations [mrad]" median = median(drift) max = maximum(drift)
                 @test median(drift) < 5.0 && maximum(drift) < 50.0
                 # what the drift did, against the truth: the held-out bearing error (test views) of the start grid and the refined one.

@@ -8,6 +8,7 @@
     using DrWatson
     using TOML: TOML
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import VisualGeometryToolkitIO as VgtkIO
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
@@ -41,7 +42,7 @@
         @test o.masks.samples_per_view == 8192 && o.masks.gradient_bias == 0.0 && o.masks.edge_fraction == 0.0 && o.masks.addon_samples == 0
         @test o.rendering.N == 16 && o.rendering.n_p == 2 && o.rendering.hammersley
         @test (o.material.alpha_ink, o.material.alpha_noink, o.material.eta_ink, o.material.eta_noink, o.material.mu) == (0.6, 0.6, 2.0, 1.3, 0.244)
-        @test o.vignetting.model === RadiometricCamera.VgtkCore.RadialVignetting && o.vignetting.node_count == 19 && o.vignetting.chart === :projective
+        @test o.vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && o.vignetting.node_count == 19 && o.vignetting.chart === :projective
         @test o.warping.degree == 1 && o.edge.print_sigma_mm == 0.0277 && o.lm.max_iter == 25 && isempty(o.fixed)
         @test o.io.checkpoint_each && o.io.channel == "G" && o.compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)

@@ -128,7 +128,7 @@ end
         cosα′ <= 0 && continue
         pdf = PDF_reflect(α, 𝐧_h, ω_l)
         ForwardDiff.value(pdf) <= pdf_guard && continue
-        Lin = VgtkCore.radiance(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
+        Lin = VrtkCore.radiance(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
         acc += f_CT(m, ρ, α, η, ω_l, ω′, 𝐧_h) .* Lin * (cosα′ / pdf)
     end
     return acc / s.N
@@ -173,7 +173,7 @@ function radiance_parts(bd::PrintedTarget, surf::BoardSurface, m::Material, lt::
         cosα′ <= 0 && continue
         pdf = PDF_reflect(α, 𝐧_h, ω_l)
         ForwardDiff.value(pdf) <= pdf_guard && continue
-        y = VgtkCore.coefficient_jacobian(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
+        y = VrtkCore.coefficient_jacobian(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
         d, sp = f_CT_parts(ρ, α, η, ω_l, ω′, 𝐧_h)
         w = cosα′ / pdf / s.N
         Bd += (w * d) * y'

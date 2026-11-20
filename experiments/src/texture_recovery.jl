@@ -22,6 +22,7 @@ using RadiometricCamera: chart, compute_mask, draws, focus, inside, photo_file, 
                          world_ray
 const RC = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
+import VisualRadiometryToolkitCore as VrtkCore
 import VisualGeometryToolkitEstimation as VgtkEstimation
 import VisualGeometryToolkitFeatures as VgtkFeatures
 import VisualGeometryToolkitIO as VgtkIO
@@ -402,7 +403,7 @@ alone), everything else the same.
 function variant_camera(ctx, name::AbstractString; pinhole_r::Real)
     c = ctx.camera
     name == "learned" && return c
-    name == "pinhole" && return RC.with_aperture_radius(c, Float64(pinhole_r))
+    name == "pinhole" && return VrtkCore.with_aperture_radius(c, Float64(pinhole_r))
     throw(ArgumentError("variant_camera: unknown blur model $(repr(name)) ($(join(TEXTURE_VARIANTS, " | ")))"))
 end
 

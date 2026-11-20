@@ -16,7 +16,7 @@
                           SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
     pixel_camera(lens) = VgtkCore.BoundedCamera(CameraModel(LogicalIntrinsics(CameraCalibrationMat(SMatrix{3, 3}(30.912, 0, 0, 0, 30.912, 0, 12.24, 11.52, 1))), lens),
                                                 VgtkCore.Size2(W, H))
-    vignetting() = VgtkCore.with_control_points(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2),
+    vignetting() = VrtkCore.with_control_points(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2),
                                                 [1.0 - 0.1 * (i + j) / 8 for i in 1:4, j in 1:4])
     # the residual and the Jacobian of a problem's first cost block, with every variable free
     function first_block(prob, blocks)
@@ -66,7 +66,7 @@
         # the grid lens (Core's central generic model): evaluate, project, back-project, and its per-tile blocks (with the warping)
         g = grid_model(ds, 10, 10)
         𝐩 = SVector(10.0, 13.0)
-        d = _chief_ray(g, 𝐩); project(g, d); backproject(g, 𝐩); in_domain(g, 𝐩)
+        d = chief_ray(g, 𝐩); project(g, d); backproject(g, 𝐩); in_domain(g, 𝐩)
         grid_angular_error(g, ds)
         sg = state(g)
         per_tile(sg)

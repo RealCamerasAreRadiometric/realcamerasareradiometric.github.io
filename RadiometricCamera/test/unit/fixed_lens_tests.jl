@@ -4,10 +4,10 @@
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, grid_model, in_domain,
                              Material, PerViewResidual, PrintedTarget, render_view, RenderSettings, run_lm!, Scene,
-                             sphere_radius, _chief_ray, 𝔟
+                             sphere_radius, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting
+    using VisualRadiometryToolkitCore: TensorProductVignetting
 
     import VisualGeometryToolkitCore as VgtkCore
     using VisualGeometryToolkitCore: Lens, Perspective, Equidistant, Additive, Radial, Tangential
@@ -24,7 +24,7 @@
         @test last(RC.lens_free(l; fixed = VgtkCore.parameter_names(VgtkCore.model(l)))) && !last(RC.lens_free(l))
         for 𝐩 in px
             m = SVector((𝐩[1] - c_px[1]) / f_px, (𝐩[2] - c_px[2]) / f_px)              # Core's normalised (distorted) point
-            d = _chief_ray(l, 𝐩)
+            d = chief_ray(l, 𝐩)
             @test norm(d) ≈ 1 && in_domain(l, 𝐩)
             x_u = SVector(d[1] / d[3], d[2] / d[3])                                     # the undistorted perspective point
             @test VgtkCore.lens(l)(x_u) ≈ m atol = 1e-9                                 # Core's forward distortion closes the loop
@@ -33,16 +33,16 @@
         # Float32 narrowing (the device path)
         l32 = VgtkCore.convert_eltype(Float32, l)
         @test has_lens(l32, VgtkCore.AbstractLensModel) && eltype(pinhole_θ(l32)) === Float32 && isbitstype(typeof(l32))
-        @test maximum(abs, _chief_ray(l32, SVector{2, Float32}(px[1])) .- _chief_ray(l, px[1])) < 1e-4    # Float32 Newton / undistortion
+        @test maximum(abs, chief_ray(l32, SVector{2, Float32}(px[1])) .- chief_ray(l, px[1])) < 1e-4    # Float32 Newton / undistortion
     end
     # the Kannala–Brandt route is spherical: rays beyond 90° are admitted (a perspective inverse is not)
     kbw = cam(VgtkCore.KannalaBrandt(0.05, 0.0, 0.0, 0.0), 180.0, (W₀ / 2, H₀ / 2), W₀, H₀)
-    d = _chief_ray(kbw, SVector(1140.0, 400.0))
+    d = chief_ray(kbw, SVector(1140.0, 400.0))
     @test norm(d) ≈ 1 && d[3] < 0.3                                                     # ≈ 80° off axis
     @test in_domain(kbw, SVector(1140.0, 400.0))
     # duals go through the model (the dual sensor positions of the grid sampling / AD seeds)
     l = cam(kb, f_px, c_px, W₀, H₀)
-    @test _chief_ray(l, SVector(ForwardDiff.Dual(720.0, 1.0), ForwardDiff.Dual(440.0, 0.0))) isa SVector{3, <:ForwardDiff.Dual}
+    @test chief_ray(l, SVector(ForwardDiff.Dual(720.0, 1.0), ForwardDiff.Dual(440.0, 0.0))) isa SVector{3, <:ForwardDiff.Dual}
     @test has_lens(l, VgtkCore.KannalaBrandt{4, Float64}) && VgtkCore.lens(l) == kb
     # the refinable route: sample into the SplineLens camera, whose K is the camera's own (the gauge)
     g = grid_model(l, 35, 25)

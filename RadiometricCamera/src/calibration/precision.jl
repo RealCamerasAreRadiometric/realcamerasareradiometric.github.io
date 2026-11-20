@@ -5,15 +5,10 @@
 # verbatim. The lens methods live next to their lens types.
 # ---------------------------------------------------------------------------
 
-VgtkCore.convert_eltype(::Type{T}, f::Focus{S, N}) where {T, S, N} =
-    Focus{T, N}(SVector{N}(SVector{2, T}.(f.nodes)), SVector{N, T}(f.t̂_i), SVector{N, T}(f.w), SVector{3, T}(f.a), f.kind)
+# (a focus surface's, the quadrature rules' and a material's conversions are VisualRadiometryToolkitCore's, with the types)
 VgtkCore.convert_eltype(::Type{T}, v::View) where {T} =
     View(_pose_eltype(T, v.pose), VgtkCore.convert_eltype(T, v.geometric), VgtkCore.convert_eltype(T, v.focus), T(v.r))
 
-VgtkCore.convert_eltype(::Type{T}, q::SensorQuadrature{S, NS}) where {T, S, NS} =
-    SensorQuadrature{T, NS}(SVector{NS}(SVector{2, T}.(q.offsets)), SVector{NS, T}(q.weights))
-VgtkCore.convert_eltype(::Type{T}, q::ApertureQuadrature{S, NA, NB}) where {T, S, NA, NB} =
-    ApertureQuadrature{T, NA, NB}(SVector{NA}(SVector{2, T}.(q.â)), SVector{NA, T}(q.w̃), SVector{NB, T}(q.φ_border), SVector{NB, T}(q.w_border))
 VgtkCore.convert_eltype(::Type{T}, st::RenderSettings) where {T} =
     RenderSettings(VgtkCore.convert_eltype(T, st.sensor), VgtkCore.convert_eltype(T, st.aperture), st.sampler)
 

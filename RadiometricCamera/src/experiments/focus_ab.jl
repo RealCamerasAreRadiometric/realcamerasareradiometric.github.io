@@ -28,7 +28,7 @@ function focus_theta_max(lens0, W::Integer, H::Integer)
     end
     θ = Float64[]
     for 𝐩 in pts
-        d = _chief_ray(lens0, 𝐩)
+        d = chief_ray(lens0, 𝐩)
         all(isfinite, d) && push!(θ, acos(clamp(normalize(d)[3], -1.0, 1.0)))
     end
     isempty(θ) && error("focus_theta_max: the start lens images no point of the border")
@@ -55,7 +55,7 @@ function focus_variant(fo::FocusOptions, lens0, nodes, focusA::Focus, in_support
         if !(VgtkCore.lens_coverage(lens0) isa VgtkCore.Ellipse) && features !== nothing          # no image circle: the start lens's border can be an extrapolation (a
             θf = Float64[]                                            # grid lens past its calibrated region): the cap is the detections'
             for fv in features, (𝐩, _) in fv                          # largest chief-ray angle + 5 %
-                d = _chief_ray(lens0, 𝐩); all(isfinite, d) && push!(θf, acos(clamp(normalize(d)[3], -1.0, 1.0)))
+                d = chief_ray(lens0, 𝐩); all(isfinite, d) && push!(θf, acos(clamp(normalize(d)[3], -1.0, 1.0)))
             end
             info[:theta_max_border] = θmax; info[:theta_max_detections] = maximum(θf)
             θmax = min(1.05 * maximum(θf), θmax)
@@ -113,7 +113,7 @@ function focus_node_pixel_counts(f::Focus, lens, px, W::Integer, H::Integer)
     dirs = [ae_dir(SVector{2, Float64}(n)) for n in f.nodes]
     for pv in px, (u, v) in pv
         𝐩 = 𝐩_of_pixel(u, v)
-        d = normalize(SVector{3, Float64}(_chief_ray(lens, 𝐩)))
+        d = normalize(SVector{3, Float64}(chief_ray(lens, 𝐩)))
         all(isfinite, d) || (noray += 1; continue)
         θpx = max(θpx, acos(clamp(d[3], -1.0, 1.0)))
         i = f.kind == 0 ? argmin([sum(abs2, 𝐩 - n) for n in f.nodes]) : argmax([dot(d, e) for e in dirs])

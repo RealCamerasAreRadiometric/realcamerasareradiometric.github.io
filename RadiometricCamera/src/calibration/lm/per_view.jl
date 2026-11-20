@@ -86,11 +86,8 @@ function _seeded_lens(v::_LensBlock, bound::_PixelCamera, cst, seed)
     return VgtkCore.with_model(bound, VgtkCore.retract(ch, full))
 end
 
-# Core's parameter protocol of a focus surface: its nodal values t̂ᵢ (unbounded; the block's box keeps them ≥ 0), rebuilt through its
-# host-side spline system
-VgtkCore.parameter_vector(f::Focus) = f.t̂_i
-VgtkCore.parameter_names(::Focus{T, N}) where {T, N} = ntuple(i -> Symbol(:t̂, i), N)
-VgtkCore.with_parameters(f::Focus, θ) = Focus(FocusSpline(f), θ)
+# (Core's parameter protocol of a focus surface — its nodal values t̂ᵢ, rebuilt through its host-side spline system — is
+# VisualRadiometryToolkitCore's, with the type)
 """
     focus_block(f; fixed = ()) -> VgtkCore.SubsetManifold
 

@@ -15,8 +15,8 @@ using RadiometricCamera: all_parts, aperture_radius, BoardSurface, build_problem
                          sphere_radius, t̂, View, with_sdf, with_μ, Φ_pixel, 𝔟
 const RCg = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
-using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, control_points, EnvironmentLight, SphericalHarmonicMap,
-                                 coefficients, with_coefficients, sh_count, max_degree
+using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, control_points, EnvironmentLight, SphericalHarmonicMap,
+                                   coefficients, with_coefficients, sh_count, max_degree
 include(joinpath(@__DIR__, "..", "unit", "fixture_camera.jl"))   # cam: Core's pixel camera of a test image
 const GOLDEN_SCHEMA = "rc/golden_outputs/v1.0"   # the golden files' record schema (IO 0.10's `write_record` states every file's)
 if OLD_STACK
@@ -115,7 +115,7 @@ function gold_outputs()
     ds = cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H)
     # (Core 0.9: the SplineLens camera of that function, re-gauged to the double sphere's K — a pixel's lattice coordinate, so its
     # ray, does not depend on K)
-    gcam = RCg.VgtkCore.CameraModel(RCg.VgtkCore.SplineLens, p -> (q = SVector{2, Float64}(p[1], p[2]); RCg.in_domain(ds, q) ? RCg._chief_ray(ds, q) : nothing),
+    gcam = RCg.VgtkCore.CameraModel(RCg.VgtkCore.SplineLens, p -> (q = SVector{2, Float64}(p[1], p[2]); RCg.in_domain(ds, q) ? RCg.chief_ray(ds, q) : nothing),
                                     RCg.VgtkCore.Size2(W, H); grid_size = (10, 10), init = :quasi_interpolate)
     glens = RCg.VgtkCore.BoundedCamera(RCg.VgtkCore.CameraModel(gcam, RCg.VgtkCore.model(ds).intrinsics.K), RCg.VgtkCore.Size2(W, H))
     # 1. flux values: plane / warped board, KB / grid lens

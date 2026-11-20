@@ -1,41 +1,11 @@
-@testitem "BSDF / radiance" setup = [RCFixtures] begin
-    using RadiometricCamera: BoardSurface, chart, D_ggx, D_v, draws, f_CT, F_dielectric, G1_ggx, G2_ggx, L_c, L_from_parts,
-                             Material, PrintedTarget, radiance_parts, RadianceSampler, sample_vndf_caps, SampleKey,
+@testitem "radiance" setup = [RCFixtures] begin
+    using RadiometricCamera: BoardSurface, chart, draws, f_CT, L_c, L_from_parts,
+                             Material, PrintedTarget, radiance_parts, RadianceSampler, SampleKey,
                              texture_weight, with_μ, ρ_c, 𝔟, 𝛂, 𝛈
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
-    @test F_dielectric(1.5, 1.0) ≈ ((1.5 - 1) / (1.5 + 1))^2
-    @test F_dielectric(1.5, 0.0) ≈ 1
-    # GGX normalisation ∫ D cosθ dω = 1
-    nθ = 4000
-    @test sum(D_ggx(0.3, cos(θ)) * cos(θ) * sin(θ) * (π / 2 / nθ) * 2π for θ in ((i - 0.5) * (π / 2) / nθ for i in 1:nθ)) ≈ 1 atol = 1e-3
-    @test G2_ggx(0.5, 0.7, 0.4) <= min(G1_ggx(0.5, 0.7), G1_ggx(0.5, 0.4))
-    @test G1_ggx(0.3, 1.0) ≈ 1
-    # VNDF sampler ↔ density: E_{𝐧∼D^v}[ h(𝐧) / D^v(𝐧) ] = ∫_{𝐧_z>0, ω⋅𝐧>0} h d𝐧  (D^v integrates to one on the visible set)
-    ω = normalize(SVector(0.3, 0.1, 1.0)); α = 0.35
-    s = RadianceSampler(40000; hammersley = true)
-    acc = 0.0
-    for i in 1:s.N
-        u1, u2 = draws(s, SampleKey(1, 1, 1, 1), i)
-        n = sample_vndf_caps(α, ω, u1, u2)
-        global acc += n[3] / D_v(α, n, ω)
-    end
-    ref_vis = 0.0; nθ_v, nφ_v = 400, 800
-    for i in 1:nθ_v, j in 1:nφ_v
-        θ = (i - 0.5) * (π / 2) / nθ_v; φ = (j - 0.5) * 2π / nφ_v
-        n = SVector(sin(θ) * cos(φ), sin(θ) * sin(φ), cos(θ))
-        dot(ω, n) > 0 && (global ref_vis += n[3] * sin(θ) * (π / 2 / nθ_v) * (2π / nφ_v))
-    end
-    @test acc / s.N ≈ ref_vis rtol = 0.02
-    # density integrates to one over the visible normals
-    acc1 = 0.0
-    for i in 1:nθ_v, j in 1:nφ_v
-        θ = (i - 0.5) * (π / 2) / nθ_v; φ = (j - 0.5) * 2π / nφ_v
-        n = SVector(sin(θ) * cos(φ), sin(θ) * sin(φ), cos(θ))
-        global acc1 += D_v(α, n, ω) * sin(θ) * (π / 2 / nθ_v) * (2π / nφ_v)
-    end
-    @test acc1 ≈ 1 rtol = 5e-3
+    # (the Cook–Torrance BSDF and its GGX pieces are VisualRadiometryToolkitCore's, tested there; here: the Monte-Carlo radiance)
     # Monte-Carlo radiance vs brute-force hemisphere integral of f^CT L cos
     tex = ones(16, 16, 3) .* reshape([0.8, 0.5, 0.3], 1, 1, 3)
     bd = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.0])
@@ -50,7 +20,7 @@
         θ = (i - 0.5) * (π / 2) / nθ; φ = (j - 0.5) * 2π / nφ
         ω′ = SVector(sin(θ) * cos(φ), sin(θ) * sin(φ), cos(θ))
         h = normalize(ω_l + ω′)
-        L = VgtkCore.radiance(lt, 𝐱,RC.local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
+        L = VrtkCore.radiance(lt, 𝐱,RC.local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
         global ref += f_CT(m, ρ, αb, ηb, ω_l, ω′, h) .* L * cos(θ) * sin(θ) * (π / 2 / nθ) * (2π / nφ)
     end
     mc = L_c(bd, BoardSurface(), m, lt, RadianceSampler(60000; hammersley = true), SampleKey(1, 2, 3, 4), 𝐛, 𝐱, -ωv)

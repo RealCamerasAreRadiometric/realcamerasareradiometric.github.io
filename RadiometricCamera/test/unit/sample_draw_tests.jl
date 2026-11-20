@@ -226,7 +226,7 @@ end
     scene = Scene(board, W, H)
     pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector{3}(SVector(0.05, -0.05, 1.5)); check = false)
     camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 140.0, (80.0, 80.0), W, H), Focus(3, 1.5, W, H), 0.0386,
-                                    VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+                                    VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     view = View(pose, camera)        # the mask test's internal record (BoardValidity, board_valid take the kernels' view)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     region = [(u - 80)^2 + (v - 80)^2 < 75^2 for v in 1:H, u in 1:W]

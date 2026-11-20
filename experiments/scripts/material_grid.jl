@@ -15,6 +15,7 @@
 using RadiometricCamera, Printf, StaticArrays
 using RadiometricCamera: all_parts, cost, Material, material, set_vignetting!, solve_Θ_l!, solve_μ!, with_μ
 import VisualGeometryToolkitCore as VgtkCore
+import VisualRadiometryToolkitCore as VrtkCore
 const RC = RadiometricCamera
 const USAGE = "usage: experiments/scripts/material_grid.jl --config=<toml> --init=<state.json> --out=<dir> [--set table.key=value …] [--alphas=…] [--etas=…] [--limit=<n>]"
 
@@ -56,7 +57,7 @@ end
 s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.start
 RC.load_state_into!(s, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
 let v = s.camera.vignetting                                              # V flat: the grid scores the material and the lighting alone
-    set_vignetting!(s, VgtkCore.with_control_points(v, ones(size(VgtkCore.control_points(v)))))
+    set_vignetting!(s, VrtkCore.with_control_points(v, ones(size(VrtkCore.control_points(v)))))
 end
 cands = vec([(ai, an, ei, en) for ai in αs, an in αs, ei in ηs, en in ηs])
 cands = cands[1:min(length(cands), limit)]

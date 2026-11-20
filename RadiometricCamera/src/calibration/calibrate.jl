@@ -9,7 +9,7 @@
     CalibrationEstimate(camera, poses, target, light)
 
 The estimate of a radiometric calibration ([`refine_calibration!`](@ref), [`calibrate`](@ref)): the calibrated camera (a
-[`CalibratedCamera`](@ref): the [`RadiometricCameraModel`](@ref) — the geometric camera, the focus surface, the aperture radius and
+[`CalibratedCamera`](@ref): the `RadiometricCameraModel` — the geometric camera, the focus surface, the aperture radius and
 the vignetting — with the observation model its photographs were read under and its render settings), the poses (camera →
 world, one per photograph), the radiometric target (the printed target, its warping, its material and print) and the light.
 """
@@ -131,7 +131,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
         c1, rms1 = cost(s)
         sv = sst.camera.vignetting
         @printf("resumed from %s at iteration %d: rel-RMS %.4f%s\n", opts.resume.state, opts.resume.iteration_offset, rms1,
-                vig_ok ? "" : "; the state's vignetting ($(nameof(typeof(sv))), $(join(size(control_points(sv)), " × "))$(sv isa RadialVignetting ? ", r_max $(round(VgtkCore.field_radius(sv); digits = 1)) px" : "")) is not the run's ($(meta.vig_desc)) → V flat"); flush(stdout)
+                vig_ok ? "" : "; the state's vignetting ($(nameof(typeof(sv))), $(join(size(control_points(sv)), " × "))$(sv isa RadialVignetting ? ", r_max $(round(VrtkCore.field_radius(sv); digits = 1)) px" : "")) is not the run's ($(meta.vig_desc)) → V flat"); flush(stdout)
         if !vig_ok || opts.resume.sweep                      # the closed-form start of the linear blocks on the resumed geometry (and material)
             tsw = time()
             solve_linear_blocks!(s; light = !("lighting" in opts.fixed), vignetting = !("vignetting" in opts.fixed), mu = !pinned_material,

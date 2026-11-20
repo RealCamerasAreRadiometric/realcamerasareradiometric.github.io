@@ -17,10 +17,10 @@ over a double-sphere fisheye lens; any Core lens plugs in the same way. The imag
 runs at the sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
 
 ```@example tutorial
-using RadiometricCamera, VisualGeometryToolkitCore
+using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
-using RadiometricCamera: Focus, Material, PrintedTarget, RenderSettings, Scene, compute_mask, render_view, solve_linear_blocks!, sphere_radius,
-                         with_vignetting, 𝔟
+using VisualRadiometryToolkitCore: Focus, Material, with_vignetting   # the generic radiometric types: the focus surface, the material, a camera's parts
+using RadiometricCamera: PrintedTarget, RenderSettings, Scene, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
@@ -54,8 +54,8 @@ board misses the sphere).
 
 ## The truth, and its photographs
 
-The true radiometric camera is one object, a [`RadiometricCameraModel`](@ref): the geometric camera `geometric`, a focus surface at
-1.5 m ([`Focus`](@ref): a constant inverse focus distance on a 3 × 3 node grid of the sensor), an aperture radius of 4 cm (no image
+The true radiometric camera is one object, a `RadiometricCameraModel`: the geometric camera `geometric`, a focus surface at
+1.5 m (`Focus`: a constant inverse focus distance on a 3 × 3 node grid of the sensor), an aperture radius of 4 cm (no image
 distance: the defocus is the focus surface's) and a vignetting that falls off quadratically from the sensor's centre. The true
 lighting is a coloured spherical-harmonics field of degree 2, and the true material has the diffuse weight μ = 0.4. Each
 photograph is the camera at one of the poses: [`compute_mask`](@ref) and [`render_view`](@ref) take the camera and the pose (and
@@ -63,7 +63,7 @@ the photograph's index `k`, which keys its Monte Carlo samples).
 
 ```@example tutorial
 xs = range(-0.5, 0.5; length = 4)
-vignetting_true = VisualGeometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
+vignetting_true = VisualRadiometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
 camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # geometric camera, focus surface, aperture radius (m), vignetting
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
@@ -76,7 +76,7 @@ size(photos[1])
 ## Calibrating the radiometry
 
 A [`CalibrationState`](@ref) holds one camera, the poses of its photographs, the lighting, the material and the photographs ϕ.
-Here the geometry is known: the state starts from the true camera with a flat vignetting ([`with_vignetting`](@ref)), a grey
+Here the geometry is known: the state starts from the true camera with a flat vignetting (`with_vignetting`), a grey
 lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² and the relative RMS residual.
 
 ```@example tutorial

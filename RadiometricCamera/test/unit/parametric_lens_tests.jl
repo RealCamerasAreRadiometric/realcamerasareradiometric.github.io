@@ -24,7 +24,7 @@
         # π⁻¹ and project against the lens on the normalised point written out here, ((𝐩 − c)/f): the same rays, to rounding
         n = 0
         for 𝐩 in ps
-            d = RC._chief_ray(l, 𝐩); all(isfinite, d) || continue
+            d = RC.chief_ray(l, 𝐩); all(isfinite, d) || continue
             n += 1
             mm = SVector((𝐩[1] - cx) / fx, (𝐩[2] - cy) / fy)
             @test norm(d - normalize(SVector{3}(VgtkCore.backproject(VgtkCore.lens(l), mm)))) < 1e-14
@@ -54,11 +54,11 @@
         # element types: Float32 (the device) and duals (the LM Jacobian: the seeded coordinates against central differences of the update)
         l32 = VgtkCore.convert_eltype(Float32, l)
         @test has_lens(l32, VgtkCore.AbstractLensModel) && eltype(pinhole_θ(l32)) == Float32 &&
-              norm(RC._chief_ray(l32, SVector{2, Float32}(384.0, 192.0)) - RC._chief_ray(l, SVector(384.0, 192.0))) < 1e-5
+              norm(RC.chief_ray(l32, SVector{2, Float32}(384.0, 192.0)) - RC.chief_ray(l, SVector(384.0, 192.0))) < 1e-5
         M = length(free_names(v)); 𝐩 = SVector(390.4, 206.4)
-        J = ForwardDiff.jacobian(z -> RC._chief_ray(RC._seeded_lens(v, l, x -> x + zero(eltype(z)), j -> z[j]), 𝐩), zeros(M))
+        J = ForwardDiff.jacobian(z -> RC.chief_ray(RC._seeded_lens(v, l, x -> x + zero(eltype(z)), j -> z[j]), 𝐩), zeros(M))
         e(i) = (z = zeros(M); z[i] = 1e-6; z)
-        Jfd = hcat([(RC._chief_ray(block_camera(RC.NLLSsolver.update(v, e(i)), l), 𝐩) - RC._chief_ray(block_camera(RC.NLLSsolver.update(v, -e(i)), l), 𝐩)) / 2e-6 for i in 1:M]...)
+        Jfd = hcat([(RC.chief_ray(block_camera(RC.NLLSsolver.update(v, e(i)), l), 𝐩) - RC.chief_ray(block_camera(RC.NLLSsolver.update(v, -e(i)), l), 𝐩)) / 2e-6 for i in 1:M]...)
         @test maximum(abs, J - Jfd) < 1e-7 * max(1.0, maximum(abs, Jfd))
     end
     # OpenCV's convention is VisualGeometryToolkitIO's: cv2's vector and pixel K back out exactly (opencv_parameters), and opencv_camera agrees

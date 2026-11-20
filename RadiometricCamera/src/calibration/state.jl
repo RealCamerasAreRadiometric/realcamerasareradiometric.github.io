@@ -32,7 +32,7 @@ _LmRun() = _LmRun(false, Dict{Symbol, Int}(), Dict{Symbol, Int}(:flux => 0, :jac
     CalibrationState
 
 Everything the calibration works on: fixed scene data (board, image size, quadrature, masks, observed images ϕ) and the current
-parameters Θ̄ — the camera every view shares (`camera`, a [`RadiometricCameraModel`](@ref)), one pose per view (`poses`, camera → world),
+parameters Θ̄ — the camera every view shares (`camera`, a `RadiometricCameraModel`), one pose per view (`poses`, camera → world),
 the material and the lighting.
 """
 mutable struct CalibrationState{N, SC <: Scene, ST <: RenderSettings, TC <: RadiometricCameraModel, TL <: EnvironmentLight, TP <: EuclideanMap}
@@ -107,7 +107,7 @@ each of its `ϕ`'s length (whitened rows: the residuals and the Jacobians divide
 each row's RAW code step in its units (`masked_observations`), or `nothing` (a decoded image): what the data resolve
 (`lm_abstol`).
 
-The state of the [`RadiometricCameraModel`](@ref) `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
+The state of the `RadiometricCameraModel` `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
 seen from `poses` (camera → world, one per photograph). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
 (`vignetting_rule`, extrapolated with a zero `boundary_order`-th difference), its parameters the interior ones; a radial profile's nodes with less than `support_min` of the mean data
 weight are dependent the same way, continuing the supported ones with that order (`RadialSupportRule`). Builds the masks from the initial views (∩ `external_masks`) unless `masks` is given. Float64 targets are
@@ -143,6 +143,11 @@ function CalibrationState(scene::Scene, settings::RenderSettings, camera::Radiom
     weights = weights isa Unweighted ? weights : [Vector{Float64}(w) for w in weights]
     length(quanta) == K && all(k -> quanta[k] === nothing || length(quanta[k]) == length(ϕ[k]), 1:K) ||
         throw(DimensionMismatch("the code steps are one per measured value of each view (or nothing: a decoded image)"))
+    camera.vignetting isa NoVignetting &&                                   # the method estimates V: Θ_v under the gauge V(𝐜) = 1, a block of every solve
+        throw(ArgumentError("CalibrationState: the camera has no vignetting (`NoVignetting`: V ≡ 1, no parameters), and the calibration " *
+                            "estimates V (Θ_v, under the gauge V(𝐜) = 1). Give the camera a field to estimate: " *
+                            "`with_vignetting(camera, flat_vignetting(geometric(camera)))` (the flat 4 × 4 start) or a `RadialVignetting`. " *
+                            "A camera without vignetting renders as it is (`render_view`, `Φ_pixel`)"))
     camera = with_vignetting(camera, gauge_center_value(camera.vignetting))   # the gauge V(𝐜) = 1, held exactly: the start's, kept by every step (`gauge_basis`)
     if channel > 0                                                          # the other channels' lighting and η follow channel `channel`
         light = tie_channels(light, channel); mat = tie_channels(mat, channel)

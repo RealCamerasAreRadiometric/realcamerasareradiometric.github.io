@@ -45,7 +45,7 @@ _continues(::OffSensorModel, a::ObservationModel{SensorRecord}, b::ObservationMo
 # type, number of nodes, degree and knots, and for a radial profile the same centre and r_max.
 _same_field(a::AbstractVignetting, b::AbstractVignetting) = false
 _same_field(a::RadialVignetting, b::RadialVignetting) =
-    n_control_points(a) == n_control_points(b) && VgtkCore.spline_degree(a) == VgtkCore.spline_degree(b) &&
-    VgtkCore.radial_chart(a) == VgtkCore.radial_chart(b) &&
-    all(map(≈, VgtkCore.knot_vectors(a), VgtkCore.knot_vectors(b))) && VgtkCore.center(a) ≈ VgtkCore.center(b) &&
-    isapprox(VgtkCore.field_radius(a), VgtkCore.field_radius(b); rtol = 1e-9)
+    n_control_points(a) == n_control_points(b) && VrtkCore.spline_degree(a) == VrtkCore.spline_degree(b) &&
+    VrtkCore.radial_chart(a) == VrtkCore.radial_chart(b) &&
+    all(map(≈, VrtkCore.knot_vectors(a), VrtkCore.knot_vectors(b))) && VgtkCore.center(a) ≈ VgtkCore.center(b) &&
+    isapprox(VrtkCore.field_radius(a), VrtkCore.field_radius(b); rtol = 1e-9)

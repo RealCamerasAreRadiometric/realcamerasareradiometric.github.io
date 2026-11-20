@@ -8,6 +8,7 @@
     using DrWatson
     using TOML: TOML
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import VisualGeometryToolkitIO as VgtkIO
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
@@ -90,8 +91,10 @@ end
     using ColorTypes: ColorTypes, RGB
     const N0f16 = ColorTypes.FixedPointNumbers.N0f16                     # the 16-bit linear photographs (ColorTypes' fixed-point numbers)
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import VisualGeometryToolkitIO as VgtkIO
-    using VisualGeometryToolkitCore: exp_so3, EnvironmentLight, SphericalHarmonicMap
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
     include(srcdir("radiometric_refinement.jl"))
@@ -110,7 +113,7 @@ end
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
     focus = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
-    vig = RC.gauge_center_value(VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+    vig = RC.gauge_center_value(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     camera = RC.RadiometricCameraModel(glens, focus, 0.0386, vig)
     b = RC.𝔟(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))

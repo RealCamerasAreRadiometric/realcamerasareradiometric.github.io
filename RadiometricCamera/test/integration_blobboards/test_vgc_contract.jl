@@ -7,10 +7,10 @@
 # in the package environment ([compat] in Project.toml, then Pkg.update / instantiate):
 #   julia --project=test/integration_blobboards test/integration_blobboards/test_vgc_contract.jl
 using Test, RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf
-using RadiometricCamera: _chief_ray
+using RadiometricCamera: chief_ray
 import VisualGeometryToolkitCore as VgtkCore
 using VisualGeometryToolkitCore: exp_so3
-using VisualGeometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
+using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
 const RC = RadiometricCamera
 include(joinpath(@__DIR__, "..", "unit", "fixture_board.jl"))
 include(joinpath(@__DIR__, "..", "unit", "fixture_camera.jl"))       # cam: Core's pixel camera of a test image
@@ -38,12 +38,12 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         rl = cam(VgtkCore.Division(0.144, -0.293), 32.4, (12.24, 11.52), 24, 24; f_y = 18.24)
         vk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
         for l in (ds, rl, vk), u in (SVector(19.2, 7.2), SVector(9.6, 15.6))
-            @test _chief_ray(l, u) ≈ normalize(SVector{3, Float64}(VgtkCore.backproject(VgtkCore.model(l), u))) atol = 1e-12
-            @test VgtkCore.project(l, _chief_ray(l, u)) ≈ u atol = 1e-9
+            @test chief_ray(l, u) ≈ normalize(SVector{3, Float64}(VgtkCore.backproject(VgtkCore.model(l), u))) atol = 1e-12
+            @test VgtkCore.project(l, chief_ray(l, u)) ≈ u atol = 1e-9
         end
         l32 = VgtkCore.convert_eltype(Float32, ds)                         # the device precision: Core's convert_eltype
-        @test _chief_ray(l32, SVector(19.2f0, 7.2f0)) isa SVector{3, Float32}
-        @test _chief_ray(l32, SVector(19.2f0, 7.2f0)) ≈ _chief_ray(ds, SVector(19.2, 7.2)) atol = 1e-5
+        @test chief_ray(l32, SVector(19.2f0, 7.2f0)) isa SVector{3, Float32}
+        @test chief_ray(l32, SVector(19.2f0, 7.2f0)) ≈ chief_ray(ds, SVector(19.2, 7.2)) atol = 1e-5
     end
 
     @testset "a pose is Core's camera → world EuclideanMap" begin
@@ -67,7 +67,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
             cm = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), lens)        # K in COLMAP px
             l = VgtkCore.BoundedCamera(cm, VgtkCore.Size2(W₀, H₀))
             for (x, y) in ((300.0, 200.0), (W₀ / 2, H₀ / 2), (1000.0, 700.0))
-                @test _chief_ray(l, SVector(x, y)) ≈ normalize(SVector{3, Float64}(VgtkCore.backproject(cm, SVector(x, y)))) atol = 1e-12
+                @test chief_ray(l, SVector(x, y)) ≈ normalize(SVector{3, Float64}(VgtkCore.backproject(cm, SVector(x, y)))) atol = 1e-12
             end
         end
     end
@@ -109,21 +109,21 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
     @testset "fixed values: lens back-projection" begin
         # (an image of 100 × 100 px, f = 100 px, the principal point at its centre: m = (𝐩 − (50, 50)) / 100)
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), 100.0, (50.0, 50.0), 100, 100)
-        @test _chief_ray(pin, SVector(75.0, 37.5)) ≈ SVector(0.25, -0.125, 1.0) / sqrt(1.078125) atol = 1e-12
+        @test chief_ray(pin, SVector(75.0, 37.5)) ≈ SVector(0.25, -0.125, 1.0) / sqrt(1.078125) atol = 1e-12
         # unified camera model (DoubleSphere with α = 0, ξ = 0.5): d ∝ (ξ + √(1 + (1 − ξ²) r²))/(1 + r²) · (m, 1) − (0, 0, ξ)
         ucm = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.5, 0.0)), 100.0, (50.0, 50.0), 100, 100)
-        @test _chief_ray(ucm, SVector(80.0, 70.0)) ≈ SVector(0.4108716, 0.2739144, 0.8695719) atol = 1e-6
+        @test chief_ray(ucm, SVector(80.0, 70.0)) ≈ SVector(0.4108716, 0.2739144, 0.8695719) atol = 1e-6
         @test VgtkCore.project(ucm, SVector(0.4108716, 0.2739144, 0.8695719)) ≈ SVector(80.0, 70.0) atol = 1e-4
         # division model: x_u = m / (1 + k₁ r² + k₂ r⁴), m = (0.3, 0.2), r² = 0.13, k₁ = −0.1 → (0.3039514, 0.2026343, 1) normalised
         div = cam(VgtkCore.Division(-0.1, 0.0), 100.0, (50.0, 50.0), 100, 100)
-        @test _chief_ray(div, SVector(80.0, 70.0)) ≈ SVector(0.2854983, 0.1903322, 0.9392893) atol = 1e-6
+        @test chief_ray(div, SVector(80.0, 70.0)) ≈ SVector(0.2854983, 0.1903322, 0.9392893) atol = 1e-6
         @test VgtkCore.project(div, SVector(0.2854983, 0.1903322, 0.9392893)) ≈ SVector(80.0, 70.0) atol = 1e-4
         # intrinsics: f and the principal point in pixels, f_y independent of f_x
         off = cam(VgtkCore.Division(0.0, 0.0), 200.0, (60.0, 40.0), 100, 100; f_y = 50.0)
-        @test _chief_ray(off, SVector(80.0, 60.0)) ≈ normalize(SVector((80.0 - 60.0) / 200.0, (60.0 - 40.0) / 50.0, 1.0))
+        @test chief_ray(off, SVector(80.0, 60.0)) ≈ normalize(SVector((80.0 - 60.0) / 200.0, (60.0 - 40.0) / 50.0, 1.0))
         # a pinhole Core lens with f = 900 px and the principal point at the image centre of a 1200 × 900 image
         pv = cam(VgtkCore.Pinhole(), 900.0, (600.0, 450.0), 1200, 900)
-        @test _chief_ray(pv, SVector(900.0, 450.0)) ≈ normalize(SVector(300 / 900, 0.0, 1.0)) atol = 1e-12
+        @test chief_ray(pv, SVector(900.0, 450.0)) ≈ normalize(SVector(300 / 900, 0.0, 1.0)) atol = 1e-12
     end
 
     @testset "fixed values: pose, board hit, board chart, forward projection" begin
@@ -131,14 +131,14 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         bd = PrintedTarget([-1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), 100.0, (50.0, 50.0), 100, 100)
         # identity pose: the pixel (75, 37.5) (m = (0.25, −0.125)) hits z = 2 at (0.5, −0.25, 2) → board chart (0.75, 0.375)
-        s, X = intersect_board(bd, SVector(0.0, 0.0, 0.0), _chief_ray(pin, SVector(75.0, 37.5)))
+        s, X = intersect_board(bd, SVector(0.0, 0.0, 0.0), chief_ray(pin, SVector(75.0, 37.5)))
         @test X ≈ SVector(0.5, -0.25, 2.0) atol = 1e-12
         @test chart(bd, X) ≈ SVector(0.75, 0.375) atol = 1e-12
         @test world_point(bd, SVector(0.75, 0.375)) ≈ SVector(0.5, -0.25, 2.0) atol = 1e-12
         # camera rotated +90° about z (e₁ → e₂), centre (0.1, 0.2, 0): world direction (0.125, 0.25, 1) → hit (0.35, 0.7, 2)
         p = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(0.0, 0.0, π / 2))), SVector{3}(SVector(0.1, 0.2, 0.0)); check = false)
         @test p.R * SVector(1.0, 0.0, 0.0) ≈ SVector(0.0, 1.0, 0.0) atol = 1e-12
-        dw = p.R * _chief_ray(pin, SVector(75.0, 37.5))
+        dw = p.R * chief_ray(pin, SVector(75.0, 37.5))
         s, X = intersect_board(bd, p.t, dw)
         @test X ≈ SVector(0.35, 0.7, 2.0) atol = 1e-12
         @test chart(bd, X) ≈ SVector(0.675, 0.85) atol = 1e-12

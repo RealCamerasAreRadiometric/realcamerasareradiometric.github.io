@@ -251,7 +251,7 @@ function _check_options(opts::PipelineOptions)
     opts.warping.inplane in INPLANE_KINDS || throw(ArgumentError("`warping.inplane` = $(repr(opts.warping.inplane)) is not one of $(collect(INPLANE_KINDS))"))
     length(opts.warping.inplane_start) in (0, INPLANE_NC) && all(isfinite, opts.warping.inplane_start) ||
         throw(ArgumentError("`warping.inplane_start` needs $INPLANE_NC finite values [a, u] (the log-stretch and the shear) or none, got $(opts.warping.inplane_start)"))
-    opts.vignetting.chart in VgtkCore.RADIAL_CHARTS || throw(ArgumentError("`vignetting.chart` = :$(opts.vignetting.chart) is not one of $(collect(VgtkCore.RADIAL_CHARTS))"))
+    opts.vignetting.chart in VrtkCore.RADIAL_CHARTS || throw(ArgumentError("`vignetting.chart` = :$(opts.vignetting.chart) is not one of $(collect(VrtkCore.RADIAL_CHARTS))"))
     # the components' smoothness: the grid any type; the vignetting profile a pspline of its Δ³ (the closed-form solve's operator,
     # `vignetting_smoothness`) or none; the focus surface a bending of a number (no GCV) or none
     _check_smoothness(opts.grid.smoothness, "grid.smoothness")

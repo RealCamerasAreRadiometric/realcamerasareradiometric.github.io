@@ -7,7 +7,7 @@
     using RadiometricCamera: grid_model, in_domain
     using StaticArrays, Random, Statistics, PNGFiles, ImageCore
     using VisualGeometryToolkitCore: thrown_message
-    using VisualGeometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
+    using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     W, H = 520, 348
     # a fisheye whose fold lies inside the sensor: the blob board's Kannala–Brandt fit (its fold at 133°), f = 93.2 px
     kb = VgtkCore.KannalaBrandt(-0.041634590670699925, 0.00040687025248368753, 0.00018535670662213487, -7.735440193838873e-5)
@@ -34,7 +34,7 @@
     @test held == VgtkCore.node_mask(VgtkCore.model(g), VgtkCore.imaged_region(g))
     # the lens holding them evaluates every imaged pixel bit for bit, and its record stores the present nodes alone
     gm = RC.VgtkCore.with_present(g, held)
-    @test all(p -> !inside(region, p) || RC._chief_ray(gm, SVector(p...)) == RC._chief_ray(g, SVector(p...)), raster)
+    @test all(p -> !inside(region, p) || RC.chief_ray(gm, SVector(p...)) == RC.chief_ray(g, SVector(p...)), raster)
     path_m = tempname() * ".json"; RC.save_grid(path_m, gm)
     back = RC.load_grid(path_m)
     D(c) = VgtkCore.directions(VgtkCore.model(c))

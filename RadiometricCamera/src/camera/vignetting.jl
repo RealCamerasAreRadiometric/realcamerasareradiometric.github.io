@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Vignetting V: ℐ → ℝ — VisualGeometryToolkitCore's model (`TensorProductVignetting`: a tensor B-spline surface over the sensor;
 # `RadialVignetting`: a B-spline profile in the pixel radius about a fixed centre), linear in its nodes Θ_v, so V is
-# solved by linear least squares (closed_form.jl): `VgtkCore.coefficient_jacobian(v, 𝐩)` is the row of the design matrix in the
+# solved by linear least squares (closed_form.jl): `VrtkCore.coefficient_jacobian(v, 𝐩)` is the row of the design matrix in the
 # `vec(P)` (column-major) ordering. What is the calibration's own lives here: the run's rule for the nodes the data
 # constrain (`vignetting_rule`, `RadialSupportRule`), their free directions (`vignetting_basis`), the gauge V(𝐜) = 1
 # (`center_constraint`, `gauge_basis`, `gauge_center_value`) and the smoothness penalty's nodes (`smoothness_nodes`).
@@ -10,9 +10,6 @@
 # revolution of the generatrix (ρ, V(ρ)) about the centre (Piegl & Tiller §8.5), smooth at the pole only when V′(0) = 0 —
 # otherwise the field is the cone V(𝐜) + V′(0) ‖𝐩 − 𝐜‖ near the centre, where few pixels constrain the slope.
 # ---------------------------------------------------------------------------
-
-using VisualGeometryToolkitCore: AbstractVignetting, RadialVignetting, coefficient_jacobian, control_points,
-    with_control_points, n_control_points   # the vignetting model (Core's; its centre is `VgtkCore.center`)
 
 # The radial profile's chart (`:linear` or `:projective`) is Core's `RadialVignetting(…; chart)` (hoisted from this package
 # bit-identically, 2026-11-11; its `radial_chart`, `projective_knots`, `with_center`). Its centre is the camera's principal point,
@@ -35,8 +32,8 @@ knot span meets the region are the parameters, the others DEPENDENT (the extrapo
 nothing outside the region is frozen or unconstrained). `nothing` for a radial profile (its domain is the region's radius already;
 its rule is the data's, `vignetting_rule(vig, region, px)`) or no region (every node a parameter).
 """
-vignetting_rule(v::VgtkCore.TensorProductVignetting, region; order::Integer = 2) = VgtkCore.BoundaryRule(v, region; order)
-vignetting_rule(::VgtkCore.TensorProductVignetting, ::Nothing; order::Integer = 2) = nothing
+vignetting_rule(v::VrtkCore.TensorProductVignetting, region; order::Integer = 2) = VgtkCore.BoundaryRule(v, region; order)
+vignetting_rule(::VrtkCore.TensorProductVignetting, ::Nothing; order::Integer = 2) = nothing
 
 """
     vignetting_basis(vig, rule) -> Matrix{Float64}
@@ -47,9 +44,9 @@ identity for a tensor surface without a rule, and for a radial profile the pole 
 first two nodes move together (one column), the others one each (`n − 1` columns), so V′(0) = 0 and the field is C² at
 the centre like at every knot.
 """
-vignetting_basis(vig::AbstractVignetting, ::Nothing) = Matrix{Float64}(I, VgtkCore.n_control_points(vig), VgtkCore.n_control_points(vig))
+vignetting_basis(vig::AbstractVignetting, ::Nothing) = Matrix{Float64}(I, VrtkCore.n_control_points(vig), VrtkCore.n_control_points(vig))
 vignetting_basis(::AbstractVignetting, rule::VgtkCore.BoundaryRule) = VgtkCore.boundary_rule_jacobian(rule)
-vignetting_basis(v::RadialVignetting, ::Nothing) = VgtkCore.pole_regular_basis(v)
+vignetting_basis(v::RadialVignetting, ::Nothing) = VrtkCore.pole_regular_basis(v)
 
 """
     center_constraint(v) -> (C::Matrix, d::Vector)
@@ -58,7 +55,7 @@ The gauge `V(𝐜) = 1` at the field's centre (`VgtkCore.center`: a tensor surfa
 symmetry) as one linear row `C ⋅ vec(P) = d`.
 """
 function center_constraint(v::AbstractVignetting)
-    row = VgtkCore.coefficient_jacobian(v, VgtkCore.center(v))
+    row = VrtkCore.coefficient_jacobian(v, VgtkCore.center(v))
     return reshape(collect(Float64, row), 1, :), [1.0]
 end
 
@@ -71,7 +68,7 @@ vignetting_rule(::RadialVignetting, region; order::Integer = 2) = nothing
 A radial profile with the pole tie applied to its values, `P_1 := P_0` (`V(𝐜)` kept): a state written before the tie (2026-10-29)
 resumes on the tied profile, as `vignetting_basis` ties the increments only. A tensor surface as it is.
 """
-tie_pole(v::RadialVignetting) = (P = collect(vec(VgtkCore.control_points(v))); P[2] = P[1]; VgtkCore.with_control_points(v, P))
+tie_pole(v::RadialVignetting) = (P = collect(vec(VrtkCore.control_points(v))); P[2] = P[1]; VrtkCore.with_control_points(v, P))
 tie_pole(v::AbstractVignetting) = v
 
 """
@@ -108,7 +105,7 @@ supported ones with a zero `order`-th difference (Core's `BoundaryRule(mask; ord
 """
 vignetting_rule(v::AbstractVignetting, region, px; support_min::Real = 0.0, order::Integer = 2) = vignetting_rule(v, region; order)
 function vignetting_rule(v::RadialVignetting, region, px; support_min::Real = 0.0, order::Integer = 2)
-    w = data_weight(𝐩 -> VgtkCore.coefficient_jacobian(v, 𝐩), px, VgtkCore.n_control_points(v))   # Σ N_i(ρ)² over the masked pixels
+    w = data_weight(𝐩 -> VrtkCore.coefficient_jacobian(v, 𝐩), px, VrtkCore.n_control_points(v))   # Σ N_i(ρ)² over the masked pixels
     (; weight, supported) = node_support(w, support_min)          # the camera's one support rule (node_support.jl)
     supported[1] = supported[2] = true                            # the pole pair: the gauge's parameter, never extrapolated inward
     return RadialSupportRule(supported, weight; order)
@@ -134,8 +131,8 @@ end
 supported ones (`vignetting_basis` ties the increments only), so a resumed profile obeys the rule from its first step.
 """
 function tie_pole(v::RadialVignetting, rule::RadialSupportRule)
-    P = collect(vec(VgtkCore.control_points(tie_pole(v))))
-    return VgtkCore.with_control_points(v, VgtkCore.boundary_rule_jacobian(rule.rule) * P[rule.supported])
+    P = collect(vec(VrtkCore.control_points(tie_pole(v))))
+    return VrtkCore.with_control_points(v, VgtkCore.boundary_rule_jacobian(rule.rule) * P[rule.supported])
 end
 tie_pole(v::AbstractVignetting, rule) = tie_pole(v)
 
@@ -146,8 +143,8 @@ The nodes the vignetting solve's smoothness penalty reads, laid like `control_po
 `N × 1`): the parameters under the run's rule — a tensor surface's interior nodes (`rule.interior`), a radial profile's supported
 ones — or every point without a rule. Its rows are Core's `difference_rows(mask, 3)`.
 """
-smoothness_nodes(v::AbstractVignetting, ::Nothing) = trues(size(VgtkCore.control_points(v)))
-smoothness_nodes(::VgtkCore.TensorProductVignetting, rule::VgtkCore.BoundaryRule) = BitMatrix(rule.interior)
+smoothness_nodes(v::AbstractVignetting, ::Nothing) = trues(size(VrtkCore.control_points(v)))
+smoothness_nodes(::VrtkCore.TensorProductVignetting, rule::VgtkCore.BoundaryRule) = BitMatrix(rule.interior)
 smoothness_nodes(::RadialVignetting, rule::RadialSupportRule) = BitMatrix(reshape(rule.supported, :, 1))
 
 """
@@ -163,7 +160,7 @@ free direction (nothing to eliminate).
 """
 function gauge_basis(vig::AbstractVignetting, Z::AbstractMatrix)
     Zm = Matrix{Float64}(Z)
-    r = vec(collect(Float64, VgtkCore.coefficient_jacobian(vig, VgtkCore.center(vig)))' * Zm)      # the centre value's dependence on the free directions
+    r = vec(collect(Float64, VrtkCore.coefficient_jacobian(vig, VgtkCore.center(vig)))' * Zm)      # the centre value's dependence on the free directions
     k = argmax(abs.(r)); abs(r[k]) > 0 || return Zm
     n = size(Zm, 2); E = zeros(n, n - 1); j = 0
     for i in 1:n

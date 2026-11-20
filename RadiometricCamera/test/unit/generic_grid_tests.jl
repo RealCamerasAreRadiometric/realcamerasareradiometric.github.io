@@ -32,7 +32,7 @@
     @test grid_dims(g) == (GX, GY) && RC._direction_node(g, 3, 7) == Gxy[4, 8]
     ps = [SVector(W * rand(rng), H * rand(rng)) for _ in 1:5000]
     # Core's pixel → lattice coordinate path rounds differently from the former's: equal to a few ulps
-    worst = maximum(p -> norm(RC._chief_ray(g, p) - former_π⁻¹(Gxy, p, W, H)) / norm(former_π⁻¹(Gxy, p, W, H)), ps)
+    worst = maximum(p -> norm(RC.chief_ray(g, p) - former_π⁻¹(Gxy, p, W, H)) / norm(former_π⁻¹(Gxy, p, W, H)), ps)
     @test worst < 1e-14
     # a tile window (Core's `window`: a camera of the block) evaluates as the full camera wherever its controls cover the support,
     # to the rounding of the lattice coordinate (Core's own statement of a window); its cells are the full lattice's, shifted by its
@@ -46,11 +46,11 @@
         n += 1
         wx, _, wy, _ = RC._grid_support(w, p)
         @test (wx + first(cols) - 1, wy + first(rows) - 1) == (cx, cy)
-        @test RC._chief_ray(w, p) ≈ RC._chief_ray(g, p) rtol = 1e-14
+        @test RC.chief_ray(w, p) ≈ RC.chief_ray(g, p) rtol = 1e-14
     end
     @test n > 100
     # Float32 (the device precision) stays Float32
-    @test RC._chief_ray(VgtkCore.convert_eltype(Float32, g), SVector{2, Float32}(720.0, 240.0)) isa SVector{3, Float32}
+    @test RC.chief_ray(VgtkCore.convert_eltype(Float32, g), SVector{2, Float32}(720.0, 240.0)) isa SVector{3, Float32}
 end
 
 # The start perturbation (`grid.start_perturbation`, perturb_start / perturb_directions in per_tile_smoothness.jl): every direction control

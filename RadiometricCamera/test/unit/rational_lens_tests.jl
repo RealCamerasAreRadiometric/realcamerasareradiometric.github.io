@@ -1,34 +1,34 @@
 @testitem "division lens (BlobBoards division model)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, Focus, FocusSpline, grid_model, in_domain, Material, PerViewResidual,
-                             PrintedTarget, render_view, RenderSettings, Scene, sphere_radius, View, _chief_ray, 𝔟
+                             PrintedTarget, render_view, RenderSettings, Scene, sphere_radius, View, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting
+    using VisualRadiometryToolkitCore: TensorProductVignetting
 
     import VisualGeometryToolkitCore as VgtkCore
     _kc(l) = VgtkCore.parameter_vector(VgtkCore.lens(l))      # the lens coefficients (Core's parameter_vector)
     W = H = 24                                                # the image (pixels)
     lens = cam(VgtkCore.Division(0.144, -0.293), 32.4, (12.24, 11.52), W, H; f_y = 18.24)
     for 𝐩 in (SVector(12.0, 12.0), SVector(19.2, 7.2), SVector(1.2, 22.8), SVector(23.76, 12.0))
-        d = _chief_ray(lens, 𝐩)
+        d = chief_ray(lens, 𝐩)
         @test norm(d) ≈ 1
         @test VgtkCore.project(lens, d) ≈ 𝐩 atol = 1e-9               # π ∘ π⁻¹ = id (Newton on the radial equation)
         @test VgtkCore.project(lens, 3.7 * d) ≈ 𝐩 atol = 1e-9          # scale invariance
         @test in_domain(lens, 𝐩)
     end
     pin = cam(VgtkCore.Division(0.0, 0.0), 24.0, (12.0, 12.0), W, H)
-    @test _chief_ray(pin, SVector(19.2, 16.8)) ≈ normalize(SVector(0.3, 0.2, 1.0))      # k = 0: pinhole
+    @test chief_ray(pin, SVector(19.2, 16.8)) ≈ normalize(SVector(0.3, 0.2, 1.0))      # k = 0: pinhole
     # the division model in BlobBoards' normalised plane: x_u = x_d / (1 + k₁ρ² + k₂ρ⁴)
     θp = pinhole_θ(lens)
     m = SVector((19.2 - θp[3]) / θp[1], (7.2 - θp[4]) / θp[2]); s = dot(m, m)
-    d = _chief_ray(lens, SVector(19.2, 7.2))
+    d = chief_ray(lens, SVector(19.2, 7.2))
     @test SVector(d[1] / d[3], d[2] / d[3]) ≈ m ./ (1 + _kc(lens)[1] * s + _kc(lens)[2] * s^2)
     # the domain is Core's (owner decision 2026-10-26: the division model is omnidirectional): with k₁ = −3 the point at ρ_d² = 0.405 is
     # past the 90° circle (Q < 0) and imaged behind the camera — formerly outside RC's mask (Q > 0); past the lift's fold nothing is imaged
-    @test in_domain(cam(VgtkCore.Division(-3.0, 0.0), 24.0, (12.0, 12.0), W, H), SVector(22.8, 22.8)) && _chief_ray(cam(VgtkCore.Division(-3.0, 0.0), 24.0, (12.0, 12.0), W, H), SVector(22.8, 22.8))[3] < 0
+    @test in_domain(cam(VgtkCore.Division(-3.0, 0.0), 24.0, (12.0, 12.0), W, H), SVector(22.8, 22.8)) && chief_ray(cam(VgtkCore.Division(-3.0, 0.0), 24.0, (12.0, 12.0), W, H), SVector(22.8, 22.8))[3] < 0
     @test !in_domain(cam(VgtkCore.Division(0.0, 1.0), 24.0, (12.0, 12.0), W, H), SVector(26.4, 26.4))   # beyond the fold of ρ/Q (ρ² = 1/√3)
     ld = camera_of(VgtkCore.Division(0.0, 0.0), ForwardDiff.Dual.(vcat(pinhole_θ(lens), _kc(lens)), 1.0), W, H)
-    @test _chief_ray(ld, SVector(14.4, 14.4)) isa SVector{3, <:ForwardDiff.Dual}
+    @test chief_ray(ld, SVector(14.4, 14.4)) isa SVector{3, <:ForwardDiff.Dual}
     @test all(x -> x isa ForwardDiff.Dual, VgtkCore.project(ld, SVector(0.1, 0.05, 1.0)))
     @test pinhole_θ(lens) == SVector(32.4, 18.24, 12.24, 11.52) && Tuple(_kc(lens)) == (0.144, -0.293)
     @test camera_of(VgtkCore.Division(0.0, 0.0), vcat(pinhole_θ(lens), _kc(lens)), W, H) == lens && has_lens(camera_of(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), SVector(24, 24, 12, 12, 0.1, 0.2), W, H), VgtkCore.Lens{VgtkCore.DoubleSphere{Float64}, Nothing})
@@ -99,21 +99,21 @@
         P = [SVector(x, y) for x in range(-24.0, 48.0, length = 151), y in range(-24.0, 48.0, length = 151)]   # the image and one image size around it
         for (i, l) in enumerate(lenses)
             both = [𝐩 for 𝐩 in P if in_domain(l, 𝐩) && in_domain_old(l, 𝐩)]
-            @test maximum(norm(_chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) for 𝐩 in both) < 1e-14
+            @test maximum(norm(chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) for 𝐩 in both) < 1e-14
             newonly = [𝐩 for 𝐩 in P if in_domain(l, 𝐩) && !in_domain_old(l, 𝐩)]
-            @test all(_chief_ray(l, 𝐩)[3] <= 0 for 𝐩 in newonly)                              # only rays past 90° are new
+            @test all(chief_ray(l, 𝐩)[3] <= 0 for 𝐩 in newonly)                              # only rays past 90° are new
             oldonly = count(in_domain_old(l, 𝐩) && !in_domain(l, 𝐩) for 𝐩 in P)
             @test i == length(lenses) ? oldonly > 0 : oldonly == 0                      # only past a first fold is dropped
             for 𝐩 in (SVector(13.2, 11.28), SVector(17.04, 7.92))
                 Jo = ForwardDiff.jacobian(t -> π⁻¹_old(camera_of(VgtkCore.Division(0.0, 0.0), t, W, H), 𝐩), vcat(pinhole_θ(l), _kc(l)))
-                @test maximum(abs, ForwardDiff.jacobian(t -> _chief_ray(camera_of(VgtkCore.Division(0.0, 0.0), t, W, H), 𝐩), vcat(pinhole_θ(l), _kc(l))) - Jo) < 1e-14 * max(1.0, maximum(abs, Jo))
+                @test maximum(abs, ForwardDiff.jacobian(t -> chief_ray(camera_of(VgtkCore.Division(0.0, 0.0), t, W, H), 𝐩), vcat(pinhole_θ(l), _kc(l))) - Jo) < 1e-14 * max(1.0, maximum(abs, Jo))
                 Jq = ForwardDiff.jacobian(q -> π⁻¹_old(l, q), 𝐩)
-                @test maximum(abs, ForwardDiff.jacobian(q -> _chief_ray(l, q), 𝐩) - Jq) < 1e-14 * max(1.0, maximum(abs, Jq))
+                @test maximum(abs, ForwardDiff.jacobian(q -> chief_ray(l, q), 𝐩) - Jq) < 1e-14 * max(1.0, maximum(abs, Jq))
             end
             excess = 0.0; rt = 0.0
             for 𝐩 in P
                 in_domain(l, 𝐩) || continue
-                X = _chief_ray(l, 𝐩); new = VgtkCore.project(l, X)
+                X = chief_ray(l, 𝐩); new = VgtkCore.project(l, X)
                 rt = max(rt, norm(new - 𝐩))
                 if X[3] > 0
                     old = project_old(l, X)
@@ -124,8 +124,8 @@
             i == length(lenses) || @test rt < 1e-12 * W
         end
         l32 = VgtkCore.convert_eltype(Float32, lenses[1])
-        @test _chief_ray(l32, SVector{2, Float32}(19.2, 7.2)) isa SVector{3, Float32}
-        @test norm(_chief_ray(l32, SVector{2, Float32}(19.2, 7.2)) - _chief_ray(lenses[1], SVector(19.2, 7.2))) < 1e-6
+        @test chief_ray(l32, SVector{2, Float32}(19.2, 7.2)) isa SVector{3, Float32}
+        @test norm(chief_ray(l32, SVector{2, Float32}(19.2, 7.2)) - chief_ray(lenses[1], SVector(19.2, 7.2))) < 1e-6
     end
 
     # The grid model of a source lens whose domain ends INSIDE the image (a division model whose fold sits at ≈ 0.37 of the image size at f = 0.4 of it):
@@ -147,9 +147,9 @@
             gl = grid_model(src, G, G; coverage = VgtkCore.valid_domain(src))
             @test all(all(isfinite, n) for n in VgtkCore.directions(VgtkCore.model(gl)))
             @test all(in_domain(src, p) for p in P if in_domain(gl, p)) && count(p -> in_domain(gl, p), P) > 0.5 * count(p -> in_domain(src, p), P)
-            @test maximum(ang(normalize(_chief_ray(gl, p)), _chief_ray(src, p)) for p in P if in_domain(gl, p)) < tol
+            @test maximum(ang(normalize(chief_ray(gl, p)), chief_ray(src, p)) for p in P if in_domain(gl, p)) < tol
             ts = range(0.0, 0.5, length = 26)
-            θs = [acos(clamp(normalize(_chief_ray(gl, SVector(320 + 640t, 320 + 640t)))[3], -1.0, 1.0)) for t in ts]
+            θs = [acos(clamp(normalize(chief_ray(gl, SVector(320 + 640t, 320 + 640t)))[3], -1.0, 1.0)) for t in ts]
             inside = [in_domain(src, SVector(320 + 640t, 320 + 640t)) for t in ts]
             # outward past the source's edge: since 2026-11-04 the grid is the P-spline fit (Estimation's pspline_grid) over the source's
             # valid domain, whose nodes outside it carry the third-difference penalty's continuation (the curvature carried on) instead of

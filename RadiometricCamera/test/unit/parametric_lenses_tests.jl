@@ -4,10 +4,10 @@
 @testitem "Kannala–Brandt / 14-coefficient lenses (cv2, parametric LM)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens_type_name, load_lens,
                              load_model, load_parametric_lens, Material, PerViewResidual, PrintedTarget, render_view,
-                             RenderSettings, run_lm!, save_lens, Scene, sphere_radius, View, _chief_ray, 𝔟
+                             RenderSettings, run_lm!, save_lens, Scene, sphere_radius, View, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
 
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitIO as VgtkIO
@@ -35,24 +35,24 @@
     colpx(px) = cv2col(SVector{2, Float64}(px))
     # forward map = cv2.projectPoints, inverse = cv2.undistortPoints (+ Newton), round trip
     @test maximum(norm(cvpx(VgtkCore.project(l14, SVector(Float64(x[1]), Float64(x[2]), 1.0))) - SVector(Float64(p[1]), Float64(p[2]))) for (x, p) in zip(o.undist_norm, o.proj_px)) < 1e-9
-    @test maximum(begin d = RC._chief_ray(l14, colpx(SVector(Float64(p[1]), Float64(p[2])))); norm(SVector(d[1] / d[3], d[2] / d[3]) - SVector(Float64(u[1]), Float64(u[2]))) end
+    @test maximum(begin d = RC.chief_ray(l14, colpx(SVector(Float64(p[1]), Float64(p[2])))); norm(SVector(d[1] / d[3], d[2] / d[3]) - SVector(Float64(u[1]), Float64(u[2]))) end
                   for (p, u) in zip(o.px, o.undist_of_px)) < 1e-12
-    @test maximum(norm(VgtkCore.project(l14, RC._chief_ray(l14, colpx(SVector(Float64(p[1]), Float64(p[2]))))) - colpx(SVector(Float64(p[1]), Float64(p[2])))) for p in o.px) < 1e-10
+    @test maximum(norm(VgtkCore.project(l14, RC.chief_ray(l14, colpx(SVector(Float64(p[1]), Float64(p[2]))))) - colpx(SVector(Float64(p[1]), Float64(p[2])))) for p in o.px) < 1e-10
     @test all(in_domain(l14, SVector(x, y)) for x in 0.0:300.0:1200.0, y in 0.0:225.0:900.0)
-    @test all(norm(RC._chief_ray(l14, SVector(x, y))) ≈ 1 for x in 0.0:300.0:1200.0, y in 0.0:225.0:900.0)
+    @test all(norm(RC.chief_ray(l14, SVector(x, y))) ≈ 1 for x in 0.0:300.0:1200.0, y in 0.0:225.0:900.0)
     @test has_lens(camera_of(VgtkIO.opencv_lens(zeros(14)), _θd(l14), W, H), typeof(VgtkIO.opencv_lens(zeros(14)))) && _θd(camera_of(VgtkIO.opencv_lens(zeros(14)), 2 .* _θd(l14), W, H)) == 2 .* _θd(l14)
     @test length(VgtkCore.parameter_names(VgtkCore.lens(l14))) == 14
     pp = VgtkIO.opencv_parameters(VgtkCore.model(l14)); @test pp.K ≈ K && pp.dist ≈ Float64.(collect(o.dist))
     # AD through the Newton inverse (parameters and position) against finite differences; Float32 agreement
     θ = _θd(l14); 𝐩 = SVector(972.0, 252.0)
-    Jθ = ForwardDiff.jacobian(t -> RC._chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), t, W, H), 𝐩), θ)
+    Jθ = ForwardDiff.jacobian(t -> RC.chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), t, W, H), 𝐩), θ)
     hθ = [i <= 4 ? 1e-3 : 1e-6 for i in 1:18]                                     # the pinhole in pixels, the coefficients unit-free
-    Jfd = hcat([(RC._chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), θ + hθ[i] * (1:18 .== i), W, H), 𝐩) - RC._chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), θ - hθ[i] * (1:18 .== i), W, H), 𝐩)) / 2hθ[i] for i in 1:18]...)
+    Jfd = hcat([(RC.chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), θ + hθ[i] * (1:18 .== i), W, H), 𝐩) - RC.chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), θ - hθ[i] * (1:18 .== i), W, H), 𝐩)) / 2hθ[i] for i in 1:18]...)
     @test maximum(abs, (Jθ - Jfd) .* hθ') < 1e-7 * maximum(abs, Jfd .* hθ')
-    J𝐩 = ForwardDiff.jacobian(q -> RC._chief_ray(l14, q), 𝐩)
-    @test norm(J𝐩[:, 1] - (RC._chief_ray(l14, 𝐩 + SVector(1e-3, 0.0)) - RC._chief_ray(l14, 𝐩 - SVector(1e-3, 0.0))) / 2e-3) < 1e-6 * norm(J𝐩[:, 1])
+    J𝐩 = ForwardDiff.jacobian(q -> RC.chief_ray(l14, q), 𝐩)
+    @test norm(J𝐩[:, 1] - (RC.chief_ray(l14, 𝐩 + SVector(1e-3, 0.0)) - RC.chief_ray(l14, 𝐩 - SVector(1e-3, 0.0))) / 2e-3) < 1e-6 * norm(J𝐩[:, 1])
     l32 = VgtkCore.convert_eltype(Float32, l14)
-    @test has_lens(l32, typeof(VgtkCore.convert_eltype(Float32, VgtkIO.opencv_lens(zeros(14))))) && norm(RC._chief_ray(l32, SVector{2, Float32}(𝐩)) - RC._chief_ray(l14, 𝐩)) < 1e-6
+    @test has_lens(l32, typeof(VgtkCore.convert_eltype(Float32, VgtkIO.opencv_lens(zeros(14))))) && norm(RC.chief_ray(l32, SVector{2, Float32}(𝐩)) - RC.chief_ray(l14, 𝐩)) < 1e-6
     @test isbitstype(typeof(View(VgtkCore.EuclideanMap(SMatrix{3, 3}(1.0I), zeros(SVector{3}); check = false), l32, VgtkCore.convert_eltype(Float32, Focus(3, 1.5, W, H)), 0.03f0)))
     # a folded model (k₁ = −3: r(1 − 3r²) turns over at r = 1/√9) leaves in_domain false beyond the fold, true near the axis
     lf = cam(VgtkIO.opencv_lens(vcat(-3.0, zeros(13))), pinhole_θ(l14)[1], (pinhole_θ(l14)[3], pinhole_θ(l14)[4]), W, H; f_y = pinhole_θ(l14)[2])
@@ -64,7 +64,7 @@
     @test has_lens(lj, typeof(VgtkIO.opencv_lens(zeros(14)))) && maximum(abs, _θd(lj) - _θd(l14)) < 1e-12 && VgtkCore.extent(lj) == VgtkCore.Size2(W, H)
     @test has_lens(load_lens("lens:" * joinpath(tmp, "l.json")), typeof(VgtkIO.opencv_lens(zeros(14))))
     unp, lab = load_model("lens:" * joinpath(tmp, "l.json"), W, H)
-    @test lab == "lens:l.json" && unp(𝐩) ≈ RC._chief_ray(l14, 𝐩)
+    @test lab == "lens:l.json" && unp(𝐩) ≈ RC.chief_ray(l14, 𝐩)
     @test lens_type_name(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.5)), 1560.0, (600.0, 450.0), W, H)) == "double_sphere"
     save_lens(joinpath(tmp, "ds.json"), cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.5)), 1560.0, (612.0, 450.0), W, H))
     @test has_lens(load_parametric_lens(joinpath(tmp, "ds.json")), VgtkCore.Lens{VgtkCore.DoubleSphere{Float64}, Nothing})
@@ -76,17 +76,17 @@
                                                      VgtkCore.KannalaBrandt(Float64.(collect(fo.k))...)), VgtkCore.Size2(W, H))
     @test length(_θd(kb)) == 8 && isbitstype(typeof(kb)) && VgtkCore.parameter_names(VgtkCore.lens(kb)) == (:k1, :k2, :k3, :k4)
     @test maximum(norm(cvpx(VgtkCore.project(kb, SVector(Float64(x[1]), Float64(x[2]), 1.0))) - SVector(Float64(p[1]), Float64(p[2]))) for (x, p) in zip(fo.undist_norm, fo.proj_px)) < 1e-9
-    @test maximum(begin d = RC._chief_ray(kb, colpx(SVector(Float64(p[1]), Float64(p[2])))); norm(SVector(d[1] / d[3], d[2] / d[3]) - SVector(Float64(u[1]), Float64(u[2]))) end
+    @test maximum(begin d = RC.chief_ray(kb, colpx(SVector(Float64(p[1]), Float64(p[2])))); norm(SVector(d[1] / d[3], d[2] / d[3]) - SVector(Float64(u[1]), Float64(u[2]))) end
                   for (p, u) in zip(fo.px, fo.undist_of_px)) < 1e-12
     @test all(in_domain(kb, SVector(x, y)) for x in 0.0:300.0:1200.0, y in 0.0:225.0:900.0)
     θk = _θd(kb)
     hk = [i <= 4 ? 1e-3 : 1e-6 for i in 1:8]
-    Jk = ForwardDiff.jacobian(t -> RC._chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), t, W, H), 𝐩), θk)
-    Jkfd = hcat([(RC._chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), θk + hk[i] * (1:8 .== i), W, H), 𝐩) - RC._chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), θk - hk[i] * (1:8 .== i), W, H), 𝐩)) / 2hk[i] for i in 1:8]...)
+    Jk = ForwardDiff.jacobian(t -> RC.chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), t, W, H), 𝐩), θk)
+    Jkfd = hcat([(RC.chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), θk + hk[i] * (1:8 .== i), W, H), 𝐩) - RC.chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), θk - hk[i] * (1:8 .== i), W, H), 𝐩)) / 2hk[i] for i in 1:8]...)
     @test maximum(abs, (Jk - Jkfd) .* hk') < 1e-7 * maximum(abs, Jkfd .* hk')
-    @test RC._chief_ray(kb, pinhole_θ(kb)[SVector(3, 4)]) ≈ SVector(0.0, 0.0, 1.0)
+    @test RC.chief_ray(kb, pinhole_θ(kb)[SVector(3, 4)]) ≈ SVector(0.0, 0.0, 1.0)
     @test has_lens(VgtkCore.convert_eltype(Float32, kb), VgtkCore.KannalaBrandt{4, Float32})
-    @test maximum(norm(VgtkCore.project(kb, RC._chief_ray(kb, SVector(x, y))) - SVector(x, y)) for x in 60.0:180.0:1140.0, y in 45.0:135.0:855.0) < 1e-9
+    @test maximum(norm(VgtkCore.project(kb, RC.chief_ray(kb, SVector(x, y))) - SVector(x, y)) for x in 60.0:180.0:1140.0, y in 45.0:135.0:855.0) < 1e-9
     @test pinhole_θ(kb)[1] ≈ Kf[1, 1] && pinhole_θ(kb)[3] ≈ Kf[1, 3] + 0.5
     # the per-view parametric route with an 18-coordinate lens block (Core's ParameterManifold of the pixel camera, the skew fixed): layout,
     # Jacobian vs finite differences of the block's own update, a few LM steps
@@ -199,13 +199,13 @@
                   _rel(VgtkCore.KannalaBrandt(-0.05, 0.01, 0.0, 0.0), 0.9, 0.9, 0.0, 0.0), kb,             # test_unit_chief's, the cv2 fixture's
                   _rel(VgtkCore.KannalaBrandt(-0.3, 0.0, 0.0, 0.0), 0.2, 0.2, 0.0, 0.0))                   # folds at θ = 1.05, inside the lattice
             @test all(in_domain(l, 𝐩) == in_domain_old(l, 𝐩) for 𝐩 in P)
-            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(_chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) : 0.0, P) < 1e-11
-            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(VgtkCore.project(l, _chief_ray(l, 𝐩)) - project_old(l, _chief_ray(l, 𝐩))) : 0.0, P) < 1e-10
+            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) : 0.0, P) < 1e-11
+            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(VgtkCore.project(l, chief_ray(l, 𝐩)) - project_old(l, chief_ray(l, 𝐩))) : 0.0, P) < 1e-10
             𝐩 = SVector(660.0, 423.0)                                                           # inside every lens's domain
             Jo = ForwardDiff.jacobian(t -> π⁻¹_old(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), t, W, H), 𝐩), _θd(l))
-            @test maximum(abs, ForwardDiff.jacobian(t -> _chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), t, W, H), 𝐩), _θd(l)) - Jo) < 1e-10 * max(1.0, maximum(abs, Jo))
+            @test maximum(abs, ForwardDiff.jacobian(t -> chief_ray(camera_of(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), t, W, H), 𝐩), _θd(l)) - Jo) < 1e-10 * max(1.0, maximum(abs, Jo))
             Jq = ForwardDiff.jacobian(q -> π⁻¹_old(l, q), 𝐩)
-            @test maximum(abs, ForwardDiff.jacobian(q -> _chief_ray(l, q), 𝐩) - Jq) < 1e-10 * max(1.0, maximum(abs, Jq))
+            @test maximum(abs, ForwardDiff.jacobian(q -> chief_ray(l, q), 𝐩) - Jq) < 1e-10 * max(1.0, maximum(abs, Jq))
         end
         # the bug fixes: the old 10-step Newton did not converge (the old mask under-reported) …
         lu = _rel(VgtkCore.KannalaBrandt(0.5, -0.4, 0.1, 0.0), 0.3, 0.3, 0.0, 0.0)
@@ -213,7 +213,7 @@
         @test all(!in_domain_old(lu, 𝐩) || in_domain(lu, 𝐩) for 𝐩 in P)
         # Core's root is a root: within 1e-9 (re-stated after a first run at 1e-12 measured 1.8e-10 — Core's solve stops at a residual of
         # 1e-10 on the radial ratio, which this steep polynomial (θ_d′ ≈ 100 at θ = 2.5) amplifies in the image)
-        @test maximum(𝐩 -> in_domain(lu, 𝐩) ? norm(VgtkCore.project(lu, _chief_ray(lu, 𝐩)) - 𝐩) : 0.0, P) < 1e-9 * W
+        @test maximum(𝐩 -> in_domain(lu, 𝐩) ? norm(VgtkCore.project(lu, chief_ray(lu, 𝐩)) - 𝐩) : 0.0, P) < 1e-9 * W
         # … or landed on the far branch past the fold (the old mask accepted a second preimage)
         lf = _rel(VgtkCore.KannalaBrandt(-0.49173344963610416, 0.037315197007153224, 0.03316026423284343, -0.005033188743362174), 0.5985644145049734, 0.6284672124839231, -0.01982355235865314, -0.015258732442595378)
         S = [SVector(x, y) for x in range(0.0, Float64(W), length = 101), y in range(0.0, Float64(H), length = 101)]
@@ -222,8 +222,8 @@
         @test all(!in_domain(lf, 𝐩) || in_domain_old(lf, 𝐩) for 𝐩 in S)
         # Float32 (the GPU precision)
         l32 = VgtkCore.convert_eltype(Float32, kb)
-        @test _chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) isa SVector{3, Float32} &&
-              norm(_chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) - _chief_ray(kb, SVector(972.0, 252.0))) < 1e-5
+        @test chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) isa SVector{3, Float32} &&
+              norm(chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) - chief_ray(kb, SVector(972.0, 252.0))) < 1e-5
     end
 
     # The 14-coefficient lens on Core's OpenCV chain (Task 2b of the VisualGeometryToolkitCore port): equivalence against the deleted RC body (tilt
@@ -243,7 +243,7 @@
     # The detections `feats[k] = [(𝐩, X)]` that `lens` images both ways under the view's pose `poses[k] = (R, t)` (X_cam = R X + t): a ray
     # at 𝐩 (π⁻¹ finite) and a finite projection of the board point; (feats′, the number dropped).
     function imaged_features(lens, poses, feats)
-        keep(𝐩, X, R, t) = all(isfinite, RC._chief_ray(lens, 𝐩)) && all(isfinite, VgtkCore.project(lens, R * X + t))
+        keep(𝐩, X, R, t) = all(isfinite, RC.chief_ray(lens, 𝐩)) && all(isfinite, VgtkCore.project(lens, R * X + t))
         out = [[(𝐩, X) for (𝐩, X) in fk if keep(𝐩, X, poses[k][1], poses[k][2])] for (k, fk) in enumerate(feats)]
         return out, sum(length, feats; init = 0) - sum(length, out; init = 0)
     end
@@ -322,17 +322,17 @@
         for l in (l14, lens_t, lens_start, lf)  # fixture, tests/GPU, its LM start, k₁ = −3
             P = _P(l, 121); Wl, Hl = VgtkCore.extent(l)
             @test all(in_domain(l, 𝐩) == in_domain_old(l, 𝐩) for 𝐩 in P)
-            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(_chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) : 0.0, P) < 1e-12
-            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(VgtkCore.project(l, _chief_ray(l, 𝐩)) - project_old(l, _chief_ray(l, 𝐩))) : 0.0, P) < 1e-13 * Wl
+            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) : 0.0, P) < 1e-12
+            @test maximum(𝐩 -> in_domain(l, 𝐩) ? norm(VgtkCore.project(l, chief_ray(l, 𝐩)) - project_old(l, chief_ray(l, 𝐩))) : 0.0, P) < 1e-13 * Wl
             # the dual Jacobians near the axis, halfway out and at the in-domain lattice point farthest out (next to the fold for the
             # k₁ = −3 lens): measured ≤ 6.4e-14 relative
             ctr = SVector(Wl / 2, Hl / 2)
             ins = [𝐩 for 𝐩 in P if in_domain(l, 𝐩)]; rmax = maximum(q -> norm(q - ctr), ins)
             for 𝐩 in (SVector(0.55Wl, 0.47Hl), ins[argmin([abs(norm(q - ctr) - rmax / 2) for q in ins])], ins[argmax([norm(q - ctr) for q in ins])])
                 Jo = ForwardDiff.jacobian(t -> π⁻¹_old(camera_of(VgtkIO.opencv_lens(zeros(14)), t, Wl, Hl), 𝐩), _θd(l))
-                @test maximum(abs, ForwardDiff.jacobian(t -> _chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), t, Wl, Hl), 𝐩), _θd(l)) - Jo) < 1e-10 * max(1.0, maximum(abs, Jo))
+                @test maximum(abs, ForwardDiff.jacobian(t -> chief_ray(camera_of(VgtkIO.opencv_lens(zeros(14)), t, Wl, Hl), 𝐩), _θd(l)) - Jo) < 1e-10 * max(1.0, maximum(abs, Jo))
                 Jq = ForwardDiff.jacobian(q -> π⁻¹_old(l, q), 𝐩)
-                @test maximum(abs, ForwardDiff.jacobian(q -> _chief_ray(l, q), 𝐩) - Jq) < 1e-10 * max(1.0, maximum(abs, Jq))
+                @test maximum(abs, ForwardDiff.jacobian(q -> chief_ray(l, q), 𝐩) - Jq) < 1e-10 * max(1.0, maximum(abs, Jq))
             end
             Jx = ForwardDiff.jacobian(X -> VgtkCore.project(l, X), SVector(0.1, -0.2, 1.0))
             @test maximum(abs, Jx - ForwardDiff.jacobian(X -> project_old(l, X), SVector(0.1, -0.2, 1.0))) < 1e-12 * max(1.0, maximum(abs, Jx))
@@ -346,14 +346,14 @@
                                 -0.0018545536464766863, -0.03269226430994721, -0.025050333188344983))
         gained = [𝐩 for 𝐩 in P if in_domain(lu, 𝐩) && !in_domain_old(lu, 𝐩)]
         @test length(gained) > 1000 && all(!in_domain_old(lu, 𝐩) || in_domain(lu, 𝐩) for 𝐩 in P)
-        @test maximum(norm(VgtkCore.project(lu, _chief_ray(lu, 𝐩)) - 𝐩) for 𝐩 in gained) < 1e-9 * W
+        @test maximum(norm(VgtkCore.project(lu, chief_ray(lu, 𝐩)) - 𝐩) for 𝐩 in gained) < 1e-9 * W
         function old_conditions(l, 𝐩, x)                     # the deleted mask's conditions (but the Newton residual) at a given root x = (x', y')
             m = SVector((𝐩[1] - _θcv(l)[3]) / _θcv(l)[1], (𝐩[2] - _θcv(l)[4]) / _θcv(l)[2])
             _, Mi = tilt_matrices_old(_θcv(l)[17], _θcv(l)[18]); w = (Mi * SVector(m[1], m[2], 1.0))[3]
             _, _, J11, J12, J21, J22 = distort_and_jacobian_old(l, x[1], x[2]); g, dR = radial_factor_old(l, x[1], x[2])
             return g > 0 && dR > 0 && J11 * J22 - J12 * J21 > 0 && w > 0
         end
-        @test all(old_conditions(lu, 𝐩, VgtkCore.to_euclidean(_chief_ray(lu, 𝐩))) for 𝐩 in gained)   # the root x = (x', y'): the ray dehomogenised
+        @test all(old_conditions(lu, 𝐩, VgtkCore.to_euclidean(chief_ray(lu, 𝐩))) for 𝐩 in gained)   # the root x = (x', y'): the ray dehomogenised
         # … or its local test accepted a root past the rational factor's first fold or pole (a second preimage; the old mask over-reported)
         lo = _cv14(SVector(0.5135197409036605, 0.5377846170745176, 0.015410813940947269, 0.010569859546944045, -0.1509936742262308,
                                 -0.05018233099799057, 0.002444691139998182, 0.005751991767387469, 0.023916020849413303, 0.18709720259547577,
@@ -370,8 +370,8 @@
                                  -0.8623919371120291, 0.13759282039735848, -0.019471951657020366, -6.579762770258748e-5, -0.0059362784294636995,
                                  0.008116914651566842, 0.1343776475729164, -0.14137932872911954))
         θ28 = _θcv(l28); ρ28 = radial_branch_radius((θ28[5], θ28[6], θ28[9]), (θ28[10], θ28[11], θ28[12]), 50.0; h = 1e-4)    # 1.265
-        two = [𝐩 for 𝐩 in P if in_domain(l28, 𝐩) && in_domain_old(l28, 𝐩) && norm(_chief_ray(l28, 𝐩) - π⁻¹_old(l28, 𝐩)) > 1e-9]
-        @test length(two) == 4151 && all(norm(VgtkCore.to_euclidean(_chief_ray(l28, 𝐩))) < ρ28 < norm(undistort_old(l28, 𝐩)[1]) for 𝐩 in two)
+        two = [𝐩 for 𝐩 in P if in_domain(l28, 𝐩) && in_domain_old(l28, 𝐩) && norm(chief_ray(l28, 𝐩) - π⁻¹_old(l28, 𝐩)) > 1e-9]
+        @test length(two) == 4151 && all(norm(VgtkCore.to_euclidean(chief_ray(l28, 𝐩))) < ρ28 < norm(undistort_old(l28, 𝐩)[1]) for 𝐩 in two)
 
         # The classifier of the Task 2b report, on Task 2's 32 random in-bounds lenses (MersenneTwister(7)): every point where the two masks
         # or roots disagree, judged against the axis component of {det J > 0, rational factor before its first fold or pole} (flood fill,
@@ -391,18 +391,18 @@
         function classify_inverse(l)
             c = Dict{Symbol, Int}(); bump(k) = (c[k] = get(c, k, 0) + 1)
             recs = [(𝐩, in_domain_old(l, 𝐩), in_domain(l, 𝐩)) for 𝐩 in P]
-            rmax = maximum(r -> max(r[2] ? norm(undistort_old(l, r[1])[1]) : 0.0, r[3] ? norm(VgtkCore.to_euclidean(_chief_ray(l, r[1]))) : 0.0), recs; init = 0.5)
+            rmax = maximum(r -> max(r[2] ? norm(undistort_old(l, r[1])[1]) : 0.0, r[3] ? norm(VgtkCore.to_euclidean(chief_ray(l, r[1]))) : 0.0), recs; init = 0.5)
             θ = _θcv(l); ρ = radial_branch_radius((θ[5], θ[6], θ[9]), (θ[10], θ[11], θ[12]), 1.05rmax)
             ac = axis_component(x -> distort_tilt_old(l, x), ρ, 1.05rmax, 1201)
             for (𝐩, a, b) in recs
                 if a && b
-                    norm(_chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) <= 1e-9 && (bump(:same); continue)
-                    ic, io = in_component(ac, VgtkCore.to_euclidean(_chief_ray(l, 𝐩))), in_component(ac, undistort_old(l, 𝐩)[1])
+                    norm(chief_ray(l, 𝐩) - π⁻¹_old(l, 𝐩)) <= 1e-9 && (bump(:same); continue)
+                    ic, io = in_component(ac, VgtkCore.to_euclidean(chief_ray(l, 𝐩))), in_component(ac, undistort_old(l, 𝐩)[1])
                     bump(ic && !io ? :differ_rc_off_component : :differ_core_bug_or_policy)
                 elseif a
                     bump(in_component(ac, undistort_old(l, 𝐩)[1]) ? :rc_only_core_bug : :rc_only_rc_off_component)
                 elseif b
-                    x = VgtkCore.to_euclidean(_chief_ray(l, 𝐩))
+                    x = VgtkCore.to_euclidean(chief_ray(l, 𝐩))
                     bump(in_component(ac, x) && old_conditions(l, 𝐩, x) ? :core_only_rc_missed : :core_only_core_bug_or_policy)
                 else
                     bump(:neither)
@@ -454,8 +454,8 @@
         @test_throws ArgumentError VgtkEstimation.refine_camera_and_poses(cam_t, [P_t], LensToolsTest.views_in_pixels(feats_t); free = ())
         # Float32 (the GPU precision): through the same Core chain
         l32 = VgtkCore.convert_eltype(Float32, l14)
-        @test _chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) isa SVector{3, Float32} &&
-              norm(_chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) - π⁻¹_old(l14, SVector(972.0, 252.0))) < 1e-6
+        @test chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) isa SVector{3, Float32} &&
+              norm(chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) - π⁻¹_old(l14, SVector(972.0, 252.0))) < 1e-6
         @test eltype(VgtkCore.project(l32, SVector{3, Float32}(0.1, -0.2, 1))) === Float32
     end
 
@@ -463,8 +463,8 @@
     # round-trip. Tolerance fixed before the run: 1e-12 (measured 1.7e-16 by the review).
     let l = cam(VgtkCore.KannalaBrandt(-0.0416, 0.000407, 0.000185, -7.7e-5), 932.2, (2604.0, 1738.0), 5208, 3476; f_y = 931.6),   # the blob_kb lens
         S = [SVector(x, y) for x in range(0.0, 5208.0, length = 101), y in range(0.0, 3476.0, length = 101)]
-        back = [𝐩 for 𝐩 in S if in_domain(l, 𝐩) && _chief_ray(l, 𝐩)[3] < 0]
+        back = [𝐩 for 𝐩 in S if in_domain(l, 𝐩) && chief_ray(l, 𝐩)[3] < 0]
         @test length(back) > 100
-        @test maximum(norm(VgtkCore.project(l, _chief_ray(l, 𝐩)) - 𝐩) for 𝐩 in back) < 1e-9
+        @test maximum(norm(VgtkCore.project(l, chief_ray(l, 𝐩)) - 𝐩) for 𝐩 in back) < 1e-9
     end
 end

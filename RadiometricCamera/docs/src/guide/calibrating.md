@@ -10,7 +10,7 @@ The radiometric camera needs one thing from a geometric model: Core's `backproje
 point 𝐩 in the COLMAP pixels of the image (𝓘 = [0, W] × [0, H], Core's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be
 refined, VisualGeometryToolkitCore's parameter protocol.
 
-Any VisualGeometryToolkitCore lens plugs into the [`RadiometricCameraModel`](@ref) as Core's pixel camera — a `BoundedCamera` of
+Any VisualGeometryToolkitCore lens plugs into the `RadiometricCameraModel` as Core's pixel camera — a `BoundedCamera` of
 `CameraModel(LogicalIntrinsics(K), lens)`, K in the image's pixels (isbits: it travels into the GPU kernels as it is) — whose
 back-projection is Core's `backproject` and whose parameters are Core's parameter protocol; [`run_lm!`](@ref) refines it in its own
 parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and the image-size coordinate scale
@@ -27,7 +27,8 @@ own session, so it is not run here:
 ```julia
 # Illustrative: needs a calibration session's records and its photographs.
 using RadiometricCamera, VisualGeometryToolkitCore
-using RadiometricCamera: Material, RenderSettings, geometric, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
+using VisualRadiometryToolkitCore: Material, geometric
+using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.scene.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])

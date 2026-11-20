@@ -9,7 +9,7 @@
     TargetRadiometry(material, ink_spread, print_blur)
     TargetRadiometry(material, surface::BoardSurface)
 
-The radiometry of a printed calibration target: its SVBSDF (`material`, a [`Material`](@ref): Θ_m = the roughnesses and refractive
+The radiometry of a printed calibration target: its SVBSDF (`material`, a `Material`: Θ_m = the roughnesses and refractive
 indices of ink and paper and the diffuse weight μ) and, for a design given as a distance map, its printed edge — the ink spread δ
 (`ink_spread`, a length: a FlexUnits quantity in metres) and the print's own blur (`print_blur`, Core's `GaussianBlur` on the print,
 round, its moment in m²); a plain ink spread or a plain (px²) print blur is an `ArgumentError`.
@@ -34,12 +34,12 @@ end
 TargetRadiometry(m::Material, surface::BoardSurface) =
     TargetRadiometry(m, VgtkIO.read_length(Float64(surface.edge[1]), VgtkCore.mm), VgtkCore.GaussianBlur(VgtkIO.read_length(Float64(surface.edge[2]), VgtkCore.mm)))
 
-"""The target's SVBSDF Θ_m ([`Material`](@ref))."""
+"""The target's SVBSDF Θ_m (`Material`)."""
 material(r::TargetRadiometry) = r.material
 """
     RadiometricTarget(target, warping, aspect, radiometry)
 
-A calibration target as a refinement knows it, parallel to the geometric camera ↔ the [`RadiometricCameraModel`](@ref): the
+A calibration target as a refinement knows it, parallel to the geometric camera ↔ the `RadiometricCameraModel`: the
 geometric target (`target`, Core's `AbstractTarget` as the session's target record holds it, so its content identity is the
 session's; `nothing` for a state converted from a RadiometricCamera 0.5 `.jls` file, which did not record it), the board's warping as
 the refinement learned it (`warping`, the [`HEIGHT_NC`](@ref) nodal heights of `BoardSurface.h`, plain metres along the board normal —

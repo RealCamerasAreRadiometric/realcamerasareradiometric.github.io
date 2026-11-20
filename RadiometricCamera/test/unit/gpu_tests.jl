@@ -5,7 +5,7 @@
     using RadiometricCamera: Material, PrintedTarget, RenderSettings, Scene, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
+    using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
@@ -27,7 +27,7 @@ end
     using RadiometricCamera: cost, Focus, in_domain, Material, PrintedTarget, render_view, RenderSettings, Scene, View, Φ_pixel, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting
+    using VisualRadiometryToolkitCore: TensorProductVignetting
 
     import VisualGeometryToolkitCore as VgtkCore
 
@@ -77,10 +77,10 @@ end
 @testitem "GPU backend" tags = [:gpu] setup = [RCFixtures, RCGPU, GPUDomainScene] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, Material, PerViewResidual, PrintedTarget,
                              render_all, render_view, RenderSettings, run_lm!, Scene, solve_Θ_v!, sphere_radius, View,
-                             with_nonlinear, _chief_ray, 𝐩_of_pixel, 𝔟
+                             with_nonlinear, chief_ray, 𝐩_of_pixel, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
+    using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     import VisualGeometryToolkitCore as VgtkCore
     import CUDA
 
@@ -215,12 +215,12 @@ end
             Pq = [SVector{2, Float32}(x, y) for x in range(0.0f0, Float32(Wl), length = 64), y in range(0.0f0, Float32(Hl), length = 64)]
             Pq_d = CUDA.CuArray(Pq)
             l32 = VgtkCore.convert_eltype(Float32, l)
-            dev = Array(map(p -> _chief_ray(l32, p), Pq_d)); host = [_chief_ray(l32, p) for p in Pq]
+            dev = Array(map(p -> chief_ray(l32, p), Pq_d)); host = [chief_ray(l32, p) for p in Pq]
             fin = [all(isfinite, d) for d in host]
             @test fin == [all(isfinite, d) for d in dev] && any(fin)
             @test maximum(i -> fin[i] ? norm(dev[i] - host[i]) : 0.0f0, eachindex(Pq)) < 1f-5
             ld = RC._seeded_lens(RC.lens_manifold(l32), l32, x -> ForwardDiff.Dual{Nothing}(Float32(x), 0.0f0), j -> ForwardDiff.Dual{Nothing}(0.0f0, j == 5 ? 1.0f0 : 0.0f0))   # the first lens coefficient (after f, aspect, cx, cy)
-            devd = Array(map(p -> ForwardDiff.partials.(_chief_ray(ld, p), 1), Pq_d)); hostd = [ForwardDiff.partials.(_chief_ray(ld, p), 1) for p in Pq]
+            devd = Array(map(p -> ForwardDiff.partials.(chief_ray(ld, p), 1), Pq_d)); hostd = [ForwardDiff.partials.(chief_ray(ld, p), 1) for p in Pq]
             scale = maximum(i -> fin[i] ? maximum(abs, hostd[i]) : 0.0f0, eachindex(Pq))
             @test maximum(i -> fin[i] ? norm(devd[i] - hostd[i]) : 0.0f0, eachindex(Pq)) < 1f-3 * max(1.0f0, scale)
         end

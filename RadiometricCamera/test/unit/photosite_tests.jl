@@ -9,7 +9,8 @@
     using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, PrintedTarget, render_view, RenderSettings, Scene,
                              sphere_radius, View, 𝔟
     using RadiometricCamera, StaticArrays
-    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitFeatures as VgtkFeatures
     const RC = RadiometricCamera

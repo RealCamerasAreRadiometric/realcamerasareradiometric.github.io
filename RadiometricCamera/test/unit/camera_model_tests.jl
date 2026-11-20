@@ -1,10 +1,10 @@
 # The radiometric camera as one value (RadiometricCameraModel: geometric camera, focus, aperture, vignetting), its photographs (View) and the
 # target's radiometry record (TargetRadiometry).
 @testitem "radiometric camera model and target radiometry" setup = [RCFixtures] begin
-    using RadiometricCamera: BoardSurface, edge_parameters, Focus, Material, material, TargetRadiometry, View, with_vignetting
+    using RadiometricCamera: BoardSurface, edge_parameters, flat_vignetting, Focus, Material, material, TargetRadiometry, View, with_vignetting
     using StaticArrays, LinearAlgebra
     using Statistics: var
-    using VisualGeometryToolkitCore: TensorProductVignetting
+    using VisualRadiometryToolkitCore: TensorProductVignetting, NoVignetting
     # the camera and its photographs: the kernels' (internal) view is the camera at a pose, its parts flattened
     W = H = 24
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
@@ -15,31 +15,35 @@
     v = View(pose, c)
     @test v.geometric === lens && v.focus == focus && v.r == 0.0386 && v.pose == pose
     @test with_vignetting(c, vig).vignetting === vig
-    # the camera composed from its geometric camera: the focus surface (a distance: focused there everywhere), the aperture radius and
-    # the vignetting (V ≡ 1 by default) added; the image size is the geometric camera's, stated once
-    @test RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386) === c
-    @test RadiometricCameraModel(lens; focus, aperture_radius = 0.0386, vignetting = vig) === c
-    @test Focus(lens, 1.5) == focus && RC.n_nodes(Focus(lens, 2.0; n = 4)) == 16 && RC.𝔱(Focus(lens, 2.0; n = 4), SVector(5.0, 7.0)) ≈ 2.0
-    @test_throws UndefKeywordError RadiometricCameraModel(lens; focus = 1.5)          # no default aperture: r is a physical statement
+    # (the camera — VisualRadiometryToolkitCore's RadiometricCameraModel, its composed constructor, its parts and their replacers — is
+    # tested there.) The camera composed from its geometric camera has NO vignetting unless one is stated; the calibration's start of
+    # the vignetting, the flat estimable surface, is asked for by name
+    @test RadiometricCameraModel === VrtkCore.RadiometricCameraModel
+    @test RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386).vignetting === NoVignetting()
+    @test flat_vignetting(lens) === vig
+    @test RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386, vignetting = flat_vignetting(lens)) === c
     @test isbits(c) && isbits(v)                                                        # the camera and the kernels' view travel into a device kernel as they are
-    # its parts read and replaced one at a time: the others are kept
-    @test RC.geometric(c) === lens && RC.focus(c) === focus && RC.aperture_radius(c) == 0.0386
-    f2 = Focus(lens, 2.0); c2 = RC.with_aperture_radius(RC.with_focus(c, f2), 0.01)
-    @test c2.focus === f2 && c2.aperture_radius == 0.01 && c2.geometric === lens && c2.vignetting === vig
     lens2 = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.3, 0.4)), 30.912, (12.24, 11.52), W, H)
-    @test RC.with_geometric(c, lens2).geometric === lens2 && RC.with_geometric(c, lens2).focus === focus
-    # `lens` is Core's lens model everywhere: RC's old spellings of the geometric camera are refused by name with the replacement
+    # `lens` is Core's lens model everywhere: RC's old spelling of the replacer is refused by name with the replacement
     @test_throws "with_lens is retired" RC.with_lens(c, lens2)
-    @test_throws "lens(camera) is retired" VgtkCore.lens(c)
-    @test !isdefined(RC, :lens) && Base.ispublic(RC, :geometric) && Base.ispublic(RC, :with_geometric) && !Base.ispublic(RC, :with_lens)
-    @test VgtkCore.lens(RC.geometric(c)) === VgtkCore.lens(lens)                      # the camera's lens model: Core's, of its geometric camera
+    @test !isdefined(RC, :lens) && !Base.ispublic(RC, :with_lens)
+    # what moved to VisualRadiometryToolkitCore is not a public name here; a moved name this package does not use is refused by name
+    @test !Base.ispublic(RC, :geometric) && !Base.ispublic(RC, :Focus) && Base.ispublic(RC, :flat_vignetting) && Base.isexported(RC, :RadiometricCameraModel)
+    @test RC.geometric === VrtkCore.geometric && RC.Focus === VrtkCore.Focus && RC.Material === VrtkCore.Material
+    for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx)
+        @test_throws "moved to VisualRadiometryToolkitCore" getfield(RC, n)(1)
+    end
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it
     @test fieldnames(RadiometricCameraModel) == (:geometric, :focus, :aperture_radius, :vignetting) && fieldnames(View) == (:pose, :geometric, :focus, :r)
     @test !any(n -> isdefined(RC, n), (:InFocusBlur, :NO_BLUR, :in_focus_blur, :blur_sigmas, :with_blur, :with_in_focus_blur, :set_camera!))
     @test !isdefined(RC, :_shared_camera) && !Base.ispublic(RC, :View) && !Base.ispublic(RC, :view_of)   # one camera, never parts
     @test RC.𝔣(c, SVector(5.0, 7.0)) == RC.𝔣(v, SVector(5.0, 7.0)) && RC.t̂(c, SVector(5.0, 7.0)) == RC.t̂(v, SVector(5.0, 7.0))
     @test RC.world_ray(c, pose, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0)) == RC.world_ray(v, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0))
-    @test VgtkCore.project(c, SVector(0.1, 0.0, 1.0)) == VgtkCore.project(lens, SVector(0.1, 0.0, 1.0))
+    # the view's maps are VisualRadiometryToolkitCore's implementation on the view's parts (one-line forwards), bit for bit
+    let 𝐩 = SVector(5.0, 7.0), 𝐚 = SVector(0.01, 0.0, 0.0)
+        @test RC.chief_dir(v, 𝐩) === RC.chief_dir(lens, 𝐩) && RC.π̂⁻¹(v, 𝐩, 𝐚) === RC.π̂⁻¹(c, 𝐩, 𝐚) === RC.π̂⁻¹(v, 𝐩, 𝐚, RC.t̂(v, 𝐩))
+        @test RC.world_ray(v, 𝐩, 𝐚, RC.t̂(v, 𝐩)) == RC.world_ray(v, 𝐩, 𝐚) == RC.world_ray_dir(v, 𝐚, RC.chief_dir(v, 𝐩), RC.t̂(v, 𝐩))
+    end
     # the target's radiometry: the material and the print's edge, lengths as quantities, the state's mm values back bit for bit
     m = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
     surf = BoardSurface(edge = SVector(0.6, 0.028))

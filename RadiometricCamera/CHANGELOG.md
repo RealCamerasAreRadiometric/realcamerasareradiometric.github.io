@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+The generic radiometric layer is VisualRadiometryToolkitCore's (branch `vrtk/port`, 2026-11-20). RadiometricCamera keeps the paper's
+calibration method and depends on VisualRadiometryToolkitCore (the Visual Radiometry Toolkit extends the Visual Geometry Toolkit). No
+number of a calibration changes: the moved code is the same arithmetic, and the goldens hold unmodified.
+
+- **Moved to VisualRadiometryToolkitCore (breaking: no longer public names of RadiometricCamera):** the radiometric camera
+  `RadiometricCameraModel` with `geometric`, `focus`, `aperture_radius`, `with_geometric`, `with_focus`, `with_aperture_radius`,
+  `with_vignetting`, `chief_dir`, `𝔣`, `t̂`, `π̂⁻¹`, `world_ray`, `𝔭`; the focus surface `Focus`, `FocusSpline`, `n_nodes`, `𝔱` and the
+  focus kinds; the sensor domain and quadrature (`𝐩_of_pixel`, `pixel_of_𝐩`, `ℐ_𝐮`, `luma`, `luma_image`, `SensorQuadrature`,
+  `ApertureQuadrature`, `sensor_samples`, `aperture_samples`, `aperture_border`, `𝐩_sample`, `𝐚_sample`, `𝐚_weight`, `𝐚_border`,
+  `n_disc`, `n_border`); the material (`Material`, `Θ_m_nonlinear`, `with_nonlinear`, `with_μ`, `texture_weight`, `𝛂`, `𝛈`, `D_ggx`,
+  `Λ_ggx`, `G1_ggx`, `G2_ggx`, `F_dielectric`, `sample_vndf_caps`, `D_v`, `PDF_reflect`, `reflect`, `f_CT_parts`, `f_CT`). Import
+  them from there (`using VisualRadiometryToolkitCore: Focus, Material`). `RadiometricCameraModel` stays exported here (a re-export: the
+  headline's camera type). The moved names this package does not use itself (`with_geometric`, `with_focus`, `with_aperture_radius`,
+  `pixel_of_𝐩`, `ℐ_𝐮`, `aperture_samples`, `aperture_border`, `Λ_ggx`, `G1_ggx`, `ae_chart`) are refused by name with the replacement.
+- **Changed (breaking):** the vignetting fields and the light (`TensorProductVignetting`, `RadialVignetting`, `EnvironmentLight`,
+  `SphericalHarmonicMap` and their functions) are VisualRadiometryToolkitCore's, no longer VisualGeometryToolkitCore's: every use
+  here names that package.
+- **Changed (breaking):** a camera composed from its geometric camera has NO vignetting:
+  `RadiometricCameraModel(geometric; focus, aperture_radius)` holds VisualRadiometryToolkitCore's `NoVignetting()` (V ≡ 1, no
+  parameters; was the flat 4 × 4 surface). It renders as it is — the flux kernels hold no multiplication by V, on the host and on a
+  device, and the image equals the flat surface's bit for bit. A calibration estimates V (Θ_v under the gauge V(𝐜) = 1), so
+  `CalibrationState` refuses such a camera by name; the calibration's flat start is asked for:
+  `vignetting = flat_vignetting(geometric)` (new, public; was the internal default).
+- **Changed:** the kernels' `View` forwards the camera-frame maps to VisualRadiometryToolkitCore's one implementation on the parts
+  they read (`π̂⁻¹(view, 𝐩, 𝐚) = π̂⁻¹(view.geometric, view.focus, 𝐩, 𝐚)`, …); the image formation's chief ray of a geometric camera is
+  VisualRadiometryToolkitCore's `chief_ray` (was the internal `_chief_ray`).
+- **Removed:** the refusal `lens(camera)` of a radiometric camera (the camera type is another package's: a method here would be type
+  piracy); `lens(state)` is still refused by name. The record functions of a camera are RadiometricCamera's own (`_camera_body`), not
+  methods of `JSON.lower` / `JSON.lift` on another package's type; the records are unchanged.
+- **Temporary:** `[sources]` in the project files point VisualRadiometryToolkitCore and the Visual Geometry Toolkit packages at their
+  migration branches until they are registered.
+
 Performance and composition (branch `perf/optimize-and-compose`, 2026-11-20). No number of a calibration changes beyond rounding:
 the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10).
 

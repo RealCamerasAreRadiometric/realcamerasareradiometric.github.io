@@ -166,6 +166,7 @@ end
     include(srcdir("radiometric_refinement.jl"))
     include(srcdir("texture_recovery.jl"))
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import VisualGeometryToolkitEstimation as VgtkEstimation
     import BlobBoards
     Rxyz(a, b, c) = SMatrix{3, 3, Float64}(VgtkCore.Rotations.RotXYZ(a, b, c))
@@ -253,6 +254,7 @@ end
     include(srcdir("radiometric_refinement.jl"))
     include(srcdir("texture_recovery.jl"))
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     rng = StableRNG(3)
     # a camera: a Double Sphere pixel camera (600 px focal length on 240 × 180), a focus surface at 0.45 m, an aperture of 4 mm, a flat
     # vignetting, the pixel-centre quadrature
@@ -260,7 +262,7 @@ end
     cam0 = VgtkCore.BoundedCamera(VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(600.0, 0, 0, 0, 600.0, 0, 120.0, 90.0, 1))),
                                                        VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.3))), VgtkCore.Size2(W, H))
     focus0 = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
-    vig = VgtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2)
+    vig = VrtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2)
     camera = RC.RadiometricCameraModel(cam0, focus0, 0.004, vig)
     sett = RC.RenderSettings(; n_𝐩 = 1, n_ρ = 2, n_φ = 6)
     # the sheet: 60 × 84 mm, 1 mm texels, a design of smooth blobs and sharp bars; a flat target radiometry for the edge parameters
@@ -472,6 +474,7 @@ end
     include(srcdir("radiometric_refinement.jl"))
     include(srcdir("texture_recovery.jl"))
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     # a block of "text": white with 13 lines of ink 5 rows high and 3 blank rows between them (line l: rows 3 + 8(l − 1) … 7 + 8(l − 1))
     lined(TW, TH, n) = (B = ones(TW, TH); for l in 1:n, j in (3 + 8 * (l - 1)):(7 + 8 * (l - 1)), i in 3:(TW - 2 - l); B[i, j] = 0.1; end; B)
     block = lined(40, 110, 13)

@@ -7,51 +7,51 @@
 #            LM's blocks for those who build their own problem, the paper's symbols — D14: demoted, names kept), reached qualified
 #            (`RadiometricCamera.name`) or imported by name (`using RadiometricCamera: name`).
 # Everything else is internal. The names of Core's functions RC adds methods to (`chart`, `cost`, `residuals`) are Core's:
-# reach them through VisualGeometryToolkitCore.
+# reach them through VisualGeometryToolkitCore. The generic radiometric types and functions are VisualRadiometryToolkitCore's (the
+# vignetting fields and the light, which were VisualGeometryToolkitCore's, and what moved there from this package: the camera's
+# parts and maps, the focus surface, the sensor domain and quadrature, the material): reach them through
+# VisualRadiometryToolkitCore — they are not public names of this package. The one re-export is the headline's camera type,
+# `RadiometricCameraModel`, which every verb here takes.
 # ---------------------------------------------------------------------------
 
 export calibrate, start_calibration, refine_calibration!, StartGeometry, start_geometry, load_calibration_start,
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        CalibrationState, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
 
-public 𝐩_of_pixel, pixel_of_𝐩, ℐ_𝐮, luma, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, aperture_samples,
-       aperture_border, 𝐩_sample, 𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border, center_constraint, FocusSpline, Focus, t̂, 𝔱,
-       n_nodes, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model, exact_start, start_grid, region_start, coverage_region,
-       check_coverage, calibrated_folds, grid_angular_error, schoeps_gridlens,
+public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model, exact_start,
+       start_grid, region_start, coverage_region, check_coverage, calibrated_folds, grid_angular_error, schoeps_gridlens,
        schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera, save_lens,
-       load_parametric_lens, load_lens, lens_type_name, 𝔭, 𝔣, π̂⁻¹, chief_dir, world_ray, TargetRadiometry, material,
-       edge_parameters, target_radiometry, board_surface, radiometric_target, set_radiometric_target!, geometric, with_geometric,
-       with_vignetting, with_focus, with_aperture_radius,
-       PrintedTarget, posed_target, board_normal, 𝔟, texture_size, corners, intersect_board, board_plane_hit, world_point,
-       inside, ρ_c, with_sdf, has_sdf, BoardSurface, with_h, with_edge, height_on, HEIGHT_NC, HEIGHT_NFREE, EDGE_NC,
-       warping_nodes, warping_aspect, warping_field, page_points, height_manifold, height_basis, board_height, board_relief,
-       height_nparams, edge_albedo, INPLANE_NC, with_inplane, inplane_on, inplane_calibration, design_chart, physical_chart,
-       sphere_radius, Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈, D_ggx, Λ_ggx, G1_ggx, G2_ggx,
-       F_dielectric, sample_vndf_caps, D_v, PDF_reflect, reflect, f_CT_parts, f_CT, RadianceSampler, SampleKey, draws,
-       key_hash, L_c, RadianceParts, radiance_parts, L_from_parts, RenderSettings, Scene, with_surface, pixel_id, Φ_pixel,
-       compute_mask, masked_pixels, render_view, masked_vector, n_views, focus, aperture_radius, set_surface!,
-       set_vignetting!, set_pose!, render_all, photometric_residuals, PixelParts, pixel_parts, RadiometryParts, all_parts,
-       solve_Θ_l!, solve_Θ_v!, solve_μ!, solve_radiometry_gn!, solve_linear_blocks!, lens_free, lens_manifold, focus_block,
-       ApertureVar, MaterialVar, LightingVar, PerViewResidual, build_problem, read_back!, run_lm!, extract_variables,
-       Θ̄_snapshot, tile_costs, build_problem_grid, run_lm_grid!, extract_variables_grid, load_session,
-       thin_lens_focus_distance, dataset_features, REFINE_ONLY_KEYS, split_refine_only, start_options, start_pipeline_table,
-       check_start_options, bearing_px, detection_bearings, state_bearings, fpx_of, residual_vectors, board_hits, render_dump!, load_state_into!, save_poses,
-       load_pipeline_metrics, RECORD_SCHEMAS, save_run_parameters, load_run_parameters, save_initialization_region,
-       measure_image_region, save_image_region, load_image_region, run_lens_coverage, SENSOR_LENS_COVERAGE,
-       GEOMETRY_IMAGES, check_geometry_image, raw_green_image,
-       stored_initialization_region, save_state, load_state, save_radiometric_camera, load_radiometric_camera,
-       save_radiometric_target, load_radiometric_target, initialization_region, in_initialization, selfcheck, settings_line,
-       RAW_EXTENSIONS, green_photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file,
-       load_photo, sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe, SensorStatement, SensorRecord, NoSensorRecord, PhotoKind,
-       SensorModelMode, AutoSensorModel, OnSensorModel, OffSensorModel, sensor_model_mode, warn_sensor_model_off,
-       Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet, observation_model, sensor_statement, observation_line,
-       names_input_path, PRINT_PLANE, load_distance_map, config_dict, write_pipeline_config, IOOptions,
-       LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions, StartPerturbationOptions, FocusOptions, MaskOptions,
-       RenderingOptions, LightingOptions, MaterialOptions, VignettingOptions, WarpingOptions, EdgeOptions, LMOptions,
-       SweepOptions, ResumeOptions, SelfcheckOptions, ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS,
-       rc_backend, FIXABLE_BLOCKS, PIPELINE_PATH_KEYS, AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend,
-       AbstractComputeBackend, CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations,
-       LatticeRule, DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
+       load_parametric_lens, load_lens, lens_type_name, TargetRadiometry, material, edge_parameters, target_radiometry,
+       board_surface, radiometric_target, set_radiometric_target!, PrintedTarget, posed_target, board_normal, 𝔟,
+       texture_size, corners, intersect_board, board_plane_hit, world_point, inside, ρ_c, with_sdf, has_sdf, BoardSurface,
+       with_h, with_edge, height_on, HEIGHT_NC, HEIGHT_NFREE, EDGE_NC, warping_nodes, warping_aspect, warping_field,
+       page_points, height_manifold, height_basis, board_height, board_relief, height_nparams, edge_albedo, INPLANE_NC,
+       with_inplane, inplane_on, inplane_calibration, design_chart, physical_chart, sphere_radius, RadianceSampler,
+       SampleKey, draws, key_hash, L_c, RadianceParts, radiance_parts, L_from_parts, RenderSettings, Scene, with_surface,
+       pixel_id, Φ_pixel, compute_mask, masked_pixels, render_view, masked_vector, n_views, set_surface!, set_vignetting!,
+       set_pose!, render_all, photometric_residuals, PixelParts, pixel_parts, RadiometryParts, all_parts, solve_Θ_l!,
+       solve_Θ_v!, solve_μ!, solve_radiometry_gn!, solve_linear_blocks!, lens_free, lens_manifold, focus_block, ApertureVar,
+       MaterialVar, LightingVar, PerViewResidual, build_problem, read_back!, run_lm!, extract_variables, Θ̄_snapshot,
+       tile_costs, build_problem_grid, run_lm_grid!, extract_variables_grid, load_session, thin_lens_focus_distance,
+       dataset_features, REFINE_ONLY_KEYS, split_refine_only, start_options, start_pipeline_table, check_start_options,
+       bearing_px, detection_bearings, state_bearings, fpx_of, residual_vectors, board_hits, render_dump!, load_state_into!,
+       save_poses, load_pipeline_metrics, RECORD_SCHEMAS, save_run_parameters, load_run_parameters,
+       save_initialization_region, measure_image_region, save_image_region, load_image_region, run_lens_coverage,
+       SENSOR_LENS_COVERAGE, GEOMETRY_IMAGES, check_geometry_image, raw_green_image, stored_initialization_region,
+       save_state, load_state, save_radiometric_camera, load_radiometric_camera, save_radiometric_target,
+       load_radiometric_target, initialization_region, in_initialization, selfcheck, settings_line, RAW_EXTENSIONS,
+       green_photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file, load_photo,
+       sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe, SensorStatement,
+       SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel, OffSensorModel,
+       sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet, observation_model,
+       sensor_statement, observation_line, names_input_path, PRINT_PLANE, load_distance_map, config_dict,
+       write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
+       StartPerturbationOptions, FocusOptions, MaskOptions, RenderingOptions, LightingOptions, MaterialOptions,
+       VignettingOptions, WarpingOptions, EdgeOptions, LMOptions, SweepOptions, ResumeOptions, SelfcheckOptions,
+       ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, FIXABLE_BLOCKS, PIPELINE_PATH_KEYS,
+       AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend, CPUCompute, GPUCompute,
+       start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule, DerivedLattice,
+       NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
 
 # ---- retired names (RC 0.11.0), each refused by name with its replacement (no alias, no forwarding)
 """Retired (RC 0.11.0, owner 2026-11-15): VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""
@@ -93,11 +93,23 @@ pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
 # ---- retired names (owner 2026-11-20: `lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
 # camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of a state, the replacer.
 # The old spellings are refused by name with their replacement (no alias, no forwarding).
-"""Retired (owner 2026-11-20): [`with_geometric`](@ref)."""
+"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `with_geometric`."""
 with_lens(args...; kwargs...) = throw(ArgumentError("with_lens is retired: a radiometric camera's geometric camera is its `geometric` — " *
-                                                    "use `with_geometric(camera, geometric)`"))
+                                                    "use VisualRadiometryToolkitCore's `with_geometric(camera, geometric)`"))
 _retired_lens_accessor(what) =
     throw(ArgumentError("lens($what) is retired: `lens` is VisualGeometryToolkitCore's lens model of a geometric camera. The geometric camera of " *
-                        "a radiometric camera or a calibration state is `RadiometricCamera.geometric($what)`; its lens model `lens(geometric($what))`"))
-VgtkCore.lens(::RadiometricCameraModel) = _retired_lens_accessor("camera")
+                        "a radiometric camera or a calibration state is `VisualRadiometryToolkitCore.geometric($what)`; its lens model `lens(geometric($what))`"))
 VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
+
+# ---- moved names (owner 2026-11-20: the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
+# imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
+# their replacement (no alias, no forwarding).
+_moved_to_radiometry(name::Symbol) = throw(ArgumentError(
+    "RadiometricCamera.$name moved to VisualRadiometryToolkitCore, under the same name — `using VisualRadiometryToolkitCore: $name`"))
+for name in (:with_geometric, :with_focus, :with_aperture_radius, :ae_chart, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border,
+             :Λ_ggx, :G1_ggx)
+    @eval begin
+        @doc $("Moved (owner 2026-11-20): `VisualRadiometryToolkitCore.$name`.")
+        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)))
+    end
+end

@@ -1,3 +1,61 @@
+"""
+    chief_cos_at_nodes(lens, nodes) -> Vector{Float64}
+
+cos α of the chief ray at each focus-surface node 𝐩ᵢ, `normalize(π⁻¹(lens, 𝐩ᵢ))[3]`, and NaN at a node the lens does not image (no
+ray: π⁻¹ not finite, outside the lens's domain).
+"""
+function chief_cos_at_nodes(lens, nodes::AbstractVector{<:StaticVector{2}})
+    return [begin d = backproject(lens, 𝐩); all(isfinite, d) ? Float64(normalize(d)[3]) : NaN end for 𝐩 in nodes]
+end
+
+"""
+    focus_start(lens, nodes, 𝔱₀; support = nothing) -> Vector{Float64}
+
+Start values t̂ᵢ = max(cos αᵢ / 𝔱₀, 0) of the focus surface's TPS nodes for a focus plane at distance 𝔱₀ (the LM refines them; they
+are a start, not a fit).
+
+- The plane start has no meaning for a ray past 90° (cos α < 0: the plane lies behind it), and the LM's own constraint is t̂ ≥ 0
+  (the focus block, `focus_block`, sets t̂ᵢ = max(t̂ᵢ + uᵢ, 0): its box); so every start value is floored at 0, back rays included. (A better start for back rays
+  is a modelling question, left open.)
+- A node is USABLE when the lens images it (π⁻¹ finite) and, if `support` (a `Bool` per node: inside the observed support, e.g. the
+  image circle) is given, it lies in the support. Any other node has no data — no pixel sees its light, and only the TPS coupling to
+  its neighbours sees its value — and is filled (`fill_unimaged_nodes`) from the usable ones: the TPS through them clamped to their
+  (non-negative) range, their mean when fewer than 3 are non-collinear, an `ArgumentError` naming the lens when there is none.
+
+When every node is usable with cos α ≥ 0 the result is exactly `cos αᵢ / 𝔱₀`. (The parametric lenses' π⁻¹ used to return finite
+non-rays outside the image circle — an unconverged Newton's θ — and the focus start took them as they came.)
+"""
+function focus_start(lens, nodes::AbstractVector{<:StaticVector{2}}, 𝔱₀::Real; support = nothing)
+    t = [max(c / 𝔱₀, 0.0) for c in chief_cos_at_nodes(lens, nodes)]            # NaN (no ray) stays NaN: max(NaN, 0) is NaN
+    support === nothing || (t[.!support] .= NaN)
+    return fill_unimaged_nodes(t, nodes; lens)
+end
+
+"""
+    fill_unimaged_nodes(values, nodes; lens) -> Vector{Float64}
+
+The nodal t̂ `values` with their non-finite entries (unimaged nodes) filled as `focus_start` describes: the TPS through the finite ones clamped to
+their range, their mean when fewer than 3 of them are non-collinear; an `ArgumentError` naming `lens` when none is finite.
+"""
+function fill_unimaged_nodes(values::AbstractVector{<:Real}, nodes::AbstractVector{<:StaticVector{2}}; lens = nothing)
+    v = Float64.(values)
+    ok = isfinite.(v)                                          # the usable nodes
+    all(ok) && return v
+    any(ok) || throw(ArgumentError("focus start: the lens $(lens === nothing ? "" : string(typeof(lens)))" *
+                                   " images none of the $(length(nodes)) focus nodes"))
+    lo, hi = extrema(v[ok])
+    A = [ones(count(ok)) getindex.(nodes[ok], 1) getindex.(nodes[ok], 2)]
+    if rank(A) < 3                                             # fewer than 3 non-collinear imaged nodes: no TPS through them
+        v[.!ok] .= sum(v[ok]) / count(ok)
+    else
+        f = Focus(FocusSpline(nodes[ok]), v[ok])
+        for i in findall(.!ok)
+            v[i] = clamp(t̂(f, SVector{2, Float64}(nodes[i])), lo, hi)
+        end
+    end
+    return v
+end
+
 """The support predicate of the focus nodes, fixed at the start of a run: a sensor position 𝐩 can see light when the START lens images
 it (π⁻¹ finite) and it lies in the run's region (Core's `imaged_region`). Being imaged by the model is not enough: the refined blob_kb lens
 images all 25 focus nodes, 16 of them outside its image circle and dark."""

@@ -74,7 +74,7 @@ end
 """
     pixel_parts(u, v, k, camera, pose, mat::Material, light::EnvironmentLight, scene::Scene, settings::RenderSettings) -> PixelParts
 
-THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of photograph `k`, `camera` (a [`RadiometricCameraModel`](@ref)) at
+THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of photograph `k`, `camera` (a `RadiometricCameraModel`) at
 `pose` (camera → world), in the settings' float type: the sensor and aperture quadratures evaluated once, so the closed-form solves
 of `Θ_l`, `Θ_v` and μ ([`solve_linear_blocks!`](@ref)) need no re-rendering. The sample keys are `k`'s, so the Monte Carlo radiance
 matches [`Φ_pixel`](@ref)'s. The vignetting is not applied: it is one of the parts' linear factors.

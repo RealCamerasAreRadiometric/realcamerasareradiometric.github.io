@@ -6,6 +6,7 @@
 @testsetup module ObservationFixtures
     using RadiometricCamera, Test
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import VisualGeometryToolkitIO as VgtkIO
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_camera.jl"))       # cam
@@ -15,7 +16,7 @@
         W = H = 24
         lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
         focus = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
-        return RC.RadiometricCameraModel(lens, focus, 0.0386, VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
+        return RC.RadiometricCameraModel(lens, focus, 0.0386, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     end
     "A characterisation of the FX3 at `iso` with the channel black `black`, saved through IO at `path`; returns its sha256."
     function write_characterisation(path; black = (512.3, 512.2, 512.3, 512.2), iso = 100, body = FX3)

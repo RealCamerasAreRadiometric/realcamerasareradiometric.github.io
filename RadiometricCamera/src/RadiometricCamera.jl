@@ -3,7 +3,9 @@
 
 Radiometric camera calibration by inverse ray tracing in sensor × aperture space (the paper's model, in the paper's symbols).
 
-A geometric back-projection π⁻¹(𝐩) (a VisualGeometryToolkitCore camera on the sensor's pixels 𝐩 ∈ [0, W] × [0, H], src/camera/)
+The generic radiometric types are VisualRadiometryToolkitCore's (the radiometric camera `RadiometricCameraModel` and its back-projection,
+the focus surface, the vignetting fields, the sensor's quadrature rules, the light, the material); this package is the paper's
+calibration METHOD on them. A geometric back-projection π⁻¹(𝐩) (a VisualGeometryToolkitCore camera on the sensor's pixels 𝐩 ∈ [0, W] × [0, H], src/camera/)
 becomes the radiometric back-projection from the aperture disc 𝒜 of radius r, with the focus point 𝔣(𝐩); the radiant flux of a
 pixel is evaluated by fixed quadrature rules on the pixel 𝓘_𝐮 and on the unit disc with a Monte-Carlo radiance, and the
 calibration minimises 𝐫(Θ̄) over Θ̄ by Levenberg–Marquardt with injected pathwise Jacobians (forward-mode dual numbers through
@@ -19,14 +21,14 @@ Identifier ↔ paper symbol (section):
 
 ```text
 Core's backproject, in_domain              π⁻¹(𝐩; Θ_d), the geometric model              (Radiometric Camera Model)
-RadiometricCameraModel                     Θ_d, Θ_f, r and Θ_v                             (Radiometric Camera Model)
+RadiometricCameraModel (VRTK Core's)       Θ_d, Θ_f, r and Θ_v                             (Radiometric Camera Model)
 View (pose, the camera's parts)            Θ_e + the camera, as the renderer evaluates it  (Radiometric Camera Model)
 chief_dir, 𝔣, π̂⁻¹                          π⁻¹/‖π⁻¹‖, 𝔣(𝐩), π̂⁻¹(𝐩, 𝐚)                      (Radiometric Camera Model)
-Focus, t̂, 𝔱, FocusSpline                   t̂ = 1/t, the thin plate spline (Core's)         (Focus surface)
+Focus, t̂, 𝔱, FocusSpline (VRTK Core's)     t̂ = 1/t, the thin plate spline (Core's)         (Focus surface)
 𝔭                                          the centre of projection 𝔭                     (Radiometric Camera Model)
 SensorQuadrature, ApertureQuadrature       the rules on 𝓘_𝐮 and on the unit disc 𝒟        (Image Formation)
-Core's RadialVignetting (P)               V(𝐩) = Σ_i N_{i,p}(‖𝐩 − 𝐜‖/r_max) P_i         (Vignetting)
-Core's EnvironmentLight (𝔟, r_SH, a)       L_c^SVSH on the sphere (𝔟, r_SH), a_{c,l}^m     (Lighting)
+VRTK Core's RadialVignetting (P)          V(𝐩) = Σ_i N_{i,p}(‖𝐩 − 𝐜‖/r_max) P_i         (Vignetting)
+VRTK Core's EnvironmentLight (𝔟, r_SH, a)  L_c^SVSH on the sphere (𝔟, r_SH), a_{c,l}^m     (Lighting)
 Material (𝛂_*, 𝛈_*, μ), f_CT               Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}, f_c^CT  (SVBSDF and Monte Carlo Estimation)
 D_ggx, G2_ggx, F_dielectric, D_v           D, G₂, F_c, D^v (visible-normal sampling)      (SVBSDF and Monte Carlo Estimation)
 PrintedTarget, BoardSurface.h, board_height 𝓑 (Core's posed target + the print) and its warping h  (Board Warping)
@@ -36,8 +38,8 @@ computeresjac, _PartsAt                    the pathwise Jacobian; the Θ_v, Θ_l
 _focus_chain!, _patch_fanout!              inner linear map × ForwardDiff of the outer     (Second Order Optimization)
 ```
 
-Layout: `sensor/` (the sensor domain, the quadrature rules), `camera/` (the geometric models and the radiometric
-back-projection), `target/` (𝓑, its warping h, the SVBSDF), `image_formation/` (the radiance, the flux), `calibration/` (the state,
+Layout: `camera/` (the geometric models, the kernels' view of the camera at a pose, the vignetting's rules and gauge),
+`target/` (𝓑, its warping h, the print's edge), `image_formation/` (the radiance, the flux), `calibration/` (the state,
 the closed-form blocks, the problem, the LM's per-view and per-tile blocks in `lm/`, the device kernels in `device/`, the LM driver),
 `start/` (the start: front ends, poses, masks, the radiometric start, the start record), `diagnostics/` (the live monitor, the
 self-check, the render dumps), `options/` (the options, their TOML reader, the device tags, the retired keys), `io/` (photographs,
@@ -82,25 +84,36 @@ using VisualGeometryToolkitCore: LogicalIntrinsics, CameraCalibrationMat,
 using VisualGeometryToolkitCore: backproject, project
 using VisualGeometryToolkitCore: grid_nodes                      # the focus and warping node grids (Core's thin-plate spline)
 using VisualGeometryToolkitCore: angle_between                   # the angle of two rays (Core's atan(‖u × v‖, u · v))
-using VisualGeometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light (Core's: real SH on a sphere)
+using VisualGeometryToolkitCore: hammersley                      # the radiance sampler's low-discrepancy points
+# VisualRadiometryToolkitCore: the generic radiometric types this package's calibration method is written on (moved there from here and
+# from VisualGeometryToolkitCore; every name listed)
+import VisualRadiometryToolkitCore as VrtkCore
+using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light: real SH on a sphere
+using VisualRadiometryToolkitCore: AbstractVignetting, NoVignetting, TensorProductVignetting, RadialVignetting, VIGNETTING_TAGS,
+                                   coefficient_jacobian, control_points, with_control_points, n_control_points   # the vignetting fields (their centre is `VgtkCore.center`)
+using VisualRadiometryToolkitCore: RadiometricCameraModel, with_vignetting, chief_ray, 𝔭       # the radiometric camera, its geometric camera's chief ray
+using VisualRadiometryToolkitCore: Focus, FocusSpline, n_nodes, 𝔱, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE, ae_dir, t̂_dir,
+                                   focus_weights, polar_cap_nodes                                # the focus surface and its kinds
+using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, 𝐩_sample,
+                                   𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border              # the sensor domain and the quadrature rules
+using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈, D_ggx, G2_ggx, F_dielectric,
+                                   sample_vndf_caps, D_v, PDF_reflect, reflect, f_CT_parts, f_CT   # the material: the Cook–Torrance BSDF
+# its camera-frame maps and part accessors, which this package's records answer by forwarding (VisualRadiometryToolkitCore's
+# CONTRACT_GENERICS): the kernels' `View` (camera/view.jl) and the calibration state (calibration/state.jl)
+import VisualRadiometryToolkitCore: chief_dir, t̂, 𝔣, π̂⁻¹, world_ray, geometric, focus, aperture_radius
 
-# camera: the geometric back-projection models and their radiometric extension
-include("sensor/notation.jl")
-include("sensor/quadrature.jl")
+# camera: the geometric back-projection models and the kernels' view of the radiometric camera
 include("camera/node_support.jl")            # the data support of a spline's nodes: one rule (vignetting, focus)
 include("camera/vignetting.jl")
-include("camera/focus.jl")
-include("experiments/focus_charts.jl")                   # EXPERIMENT (focus-ab): direction-chart and spherical focus surfaces
 include("camera/pose.jl")
 include("camera/models/geometric.jl")
-include("camera/radiometric_camera.jl")
+include("camera/view.jl")                           # the kernels' record of a photograph (the camera at a pose); the vignetting's flat start
 include("camera/models/pixel_camera.jl")             # the parametric chief-ray models: Core's pixel cameras (BoundedCamera of a CameraModel)
 include("camera/models/grid_camera.jl")             # Core's generic models as chief-ray models (needs the parametric lenses)
 include("io/camera_models.jl")                         # lens / grid JSON, Schöps import (all model types defined above)
 # target: the calibration target, its warping and its SVBSDF
 include("target/printed_target.jl")
 include("target/warping.jl")
-include("target/svbsdf.jl")
 include("target/printed_edge.jl")
 include("target/target_radiometry.jl")               # the target's radiometry as one record (the material and the print's edge)
 include("image_formation/radiance.jl")

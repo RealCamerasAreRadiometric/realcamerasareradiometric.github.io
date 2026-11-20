@@ -20,6 +20,6 @@ Private = false
 
 ```@autodocs
 Modules = [RadiometricCamera]
-Pages = ["target/svbsdf.jl", "image_formation/radiance.jl"]
+Pages = ["image_formation/radiance.jl"]
 Private = false
 ```

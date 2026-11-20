@@ -22,6 +22,7 @@ using RadiometricCamera: aperture_radius, cost, focus, Focus, FocusSpline, grid_
                          load_session, Material, render_all, RenderSettings, run_lm_grid!, save_grid, schoeps_gridlens,
                          solve_linear_blocks!, sphere_radius, t̂, 𝔟
 import CUDA
+const VrtkCore = RadiometricCamera.VrtkCore                                  # VisualRadiometryToolkitCore through the package
 const VgtkCore = RadiometricCamera.VgtkCore                                  # VisualGeometryToolkitCore through the package
 const RC = RadiometricCamera
 EXP = joinpath(ENV["VGTK_DATA_ROOT"], "geometric_accuracy")                       # the data root (experiments/data/README.md)
@@ -84,10 +85,10 @@ f_m = VgtkCore.model(ds.lens₀).intrinsics.K[1, 1] * (22.3e-3 / W); d_f = 0.5; 
 nodes = VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))
 focus0 = Focus(FocusSpline(nodes), [normalize(VgtkCore.backproject(lens0, 𝐩))[3] / d_f for 𝐩 in nodes])
 r0 = 17e-3 / (2 * 8)                                                          # f/8 → r = f / (2N) = 1.06 mm
-vig0 = VgtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degree = 2)
+vig0 = VrtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degree = 2)
 camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: geometric camera, focus, aperture, vignetting
 b = 𝔟(ds.scene.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
-light0 = VgtkCore.EnvironmentLight(VgtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
+light0 = VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
 mat0 = Material(; 𝛂_ink = 0.15, 𝛂_noink = 0.4, 𝛈_ink = 1.6, 𝛈_noink = 1.33, μ = 0.5)
 st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 @printf("f %.2f mm, d_s %.3f mm, r %.2f mm, light sphere r_SH %.2f m around 𝔟 = (%.2f, %.2f, %.2f) m\n", 1e3f_m, 1e3d_s, 1e3r0, r_SH, b...)

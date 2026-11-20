@@ -87,7 +87,8 @@ end
     using RadiometricCamera: build_problem_grid, compute_mask, exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, grid_model,
                              grid_present, Material, PrintedTarget, render_view, RenderSettings, run_lm_grid!, Scene, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
-    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
 
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])

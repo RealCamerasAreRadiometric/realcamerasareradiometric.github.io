@@ -92,7 +92,9 @@ function _focus_from_body(b)
     return Focus(FocusSpline([SVector{2, Float64}(_floats(n)...) for n in b.nodes::Vector{Any}], kind - 1), _floats(b.parameters))
 end
 
-JSON.lower(s::VgtkIO.VgioStyle, c::RadiometricCameraModel) = (
+# (RC's own functions, not methods of JSON.lower / JSON.lift: the camera type is VisualRadiometryToolkitCore's and the style IO's — a
+# method here would be type piracy; the kind `rc/radiometric_camera` is RC's)
+_camera_body(s::VgtkIO.VgioStyle, c::RadiometricCameraModel) = (
     camera = VgtkIO.camera_json(c.geometric, _COLMAP; length_unit = s.length_unit), aperture = _aperture_body(s.length_unit, c), focus = _focus_body(c.focus),
     vignetting = c.vignetting,
 )
@@ -117,7 +119,7 @@ function _check_pixel_frame(path, r)
     return r
 end
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{RadiometricCameraModel}, r)
+function _camera_from_body(s::VgtkIO.VgioStyle, r)
     lens = _lens_from_body(s, r.camera, r.aperture)
     return RadiometricCameraModel(lens, _focus_from_body(r.focus), VgtkIO.metres(r.aperture.radius, s.length_unit),
                                   JSON.lift(s, AbstractVignetting, r.vignetting))
@@ -142,9 +144,9 @@ end
 JSON.lift(::VgtkIO.VgioStyle, ::Type{ObservationModel}, b) =
     ObservationModel(_sensor_statement_from_body(b.sensor), _kind_from_body(b.photos), Symbol(b.photos.channel::String))
 JSON.lower(s::VgtkIO.VgioStyle, c::CalibratedCamera) =
-    merge(JSON.lower(s, c.model), (observation_model = c.observation, settings = _settings_body(c.settings)))
+    merge(_camera_body(s, c.model), (observation_model = c.observation, settings = _settings_body(c.settings)))
 JSON.lift(s::VgtkIO.VgioStyle, ::Type{CalibratedCamera}, r) =
-    CalibratedCamera(JSON.lift(s, RadiometricCameraModel, r), JSON.lift(s, ObservationModel, r.observation_model), _settings_from_body(r.settings))
+    CalibratedCamera(_camera_from_body(s, r), JSON.lift(s, ObservationModel, r.observation_model), _settings_from_body(r.settings))
 
 # ---- the radiometric target ----------------------------------------------------------------------------------------------------
 _material_body(m::Material) = (alpha_ink = Float64(m.𝛂_ink), alpha_noink = Float64(m.𝛂_noink), eta_ink = Float64.(collect(m.𝛈_ink)),
@@ -423,7 +425,7 @@ save_state(path::AbstractString, s::CalibrationState, names; page_flip = nothing
 function save_state(path::AbstractString, st::NamedTuple; length_unit = VgtkCore.mm, provenance::NamedTuple = (;))
     s = _style(length_unit)
     body = merge((schema = RECORD_SCHEMAS.calibration_state,),
-                 (camera = st.camera, target = st.target, poses = _poses_trajectory(st.poses, st.names), light = _with_metres(st.light),
+                 (camera = _camera_body(s, st.camera), target = st.target, poses = _poses_trajectory(st.poses, st.names), light = _with_metres(st.light),
                   settings = _settings_body(st.settings), observation_model = st.observation::ObservationModel),
                  st.page_flip === nothing ? (;) : (page_flip = Float64(st.page_flip),))
     VgtkIO.write_record(path, VgtkIO.with_provenance(body, provenance); style = s)
@@ -434,7 +436,7 @@ end
     load_state(path) -> NamedTuple
 
 The state of a refinement's state file (`state.json`, `state_it<N>.json`, a start record's state.json; `rc/calibration_state/v3.1`,
-[`save_state`](@ref)): `(; camera, target, poses, names, light, settings, observation, page_flip)` — the [`RadiometricCameraModel`](@ref), the
+[`save_state`](@ref)): `(; camera, target, poses, names, light, settings, observation, page_flip)` — the `RadiometricCameraModel`, the
 [`RadiometricTarget`](@ref) (`board_surface(board, target)` the scene's surface on a board of its page's aspect), the poses (camera → world, plain metres) of the
 photographs `names`, Core's `EnvironmentLight` (plain metres), the [`RenderSettings`](@ref), the photographs' [`ObservationModel`](@ref)
 and the ±y choice (`nothing` when the state records none); `calibrated_camera(load_state(path))` its [`CalibratedCamera`](@ref). A
@@ -443,12 +445,12 @@ v3.0 state (RC 0.9–0.11.0) states no observation model and is refused by name 
 function load_state(path::AbstractString)
     r, s = _read_kind(path, :calibration_state)
     _check_pixel_frame(path, r)
-    camera = JSON.lift(s, RadiometricCameraModel, r.camera)
+    camera = _camera_from_body(s, r.camera)
     tr = JSON.lift(s, VgtkCore.Trajectory, r.poses)
     ks = sort!(collect(keys(tr)))
     poses = [_pose_eltype(Float64, VgtkCore.ustrip(VgtkCore.m, tr[k])) for k in ks]   # unlabelled, plain metres
     return (; camera, target = JSON.lift(s, RadiometricTarget, r.target), poses, names = [tr.images[k] for k in ks],
-              light = VgtkCore.ustrip(VgtkCore.m, JSON.lift(s, VgtkCore.EnvironmentLight, r.light)), settings = _settings_from_body(r.settings),
+              light = VgtkCore.ustrip(VgtkCore.m, JSON.lift(s, VrtkCore.EnvironmentLight, r.light)), settings = _settings_from_body(r.settings),
               observation = JSON.lift(s, ObservationModel, r.observation_model),
               page_flip = haskey(r, :page_flip) ? Float64(r.page_flip::Real) : nothing)
 end

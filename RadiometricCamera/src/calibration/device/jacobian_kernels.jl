@@ -145,7 +145,7 @@ Base.@propagate_inbounds function _jacobian_row!(J, i, r, ids, bufidx, gidx, H, 
     end
     𝐩of = ks -> 𝐩_sample(sensor, ks, u, v)
     if pxy !== nothing                                     # a tile's patches: the chief directions' gradients fanned out on its window
-        dg = ntuple(ks -> (x = _chief_ray(lensw, 𝐩of(ks));
+        dg = ntuple(ks -> (x = chief_ray(lensw, 𝐩of(ks));
                            ntuple(c -> _dir_gradient(S[klay.off_dir + 2ks - 1, c, iv], S[klay.off_dir + 2ks, c, iv], x), Val(3))), Val(NS))
         _patch_fanout!(rows, 0, lensw, bases, klay, P0, pxy[1], pxy[2], NS, 𝐩of, (ks, comp, c) -> dg[ks][c][comp])
     end

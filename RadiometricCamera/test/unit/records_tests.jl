@@ -8,7 +8,8 @@
                              RECORD_SCHEMAS, RenderSettings, save_radiometric_camera, save_radiometric_target, save_state,
                              TargetRadiometry, warping_aspect, 𝔟
     using StaticArrays, LinearAlgebra
-    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting, RadialVignetting, with_control_points
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
@@ -77,7 +78,8 @@ end
                              Material, PrintedTarget, radiometric_target, RenderSettings, save_radiometric_target, save_state,
                              Scene, TargetRadiometry, warping_aspect, 𝔟
     using StaticArrays, LinearAlgebra
-    using VisualGeometryToolkitCore: exp_so3, TensorProductVignetting
+    using VisualGeometryToolkitCore: exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting
     tex = fixture_board()
     square = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
@@ -181,7 +183,7 @@ end
 @testitem "records: a grid lens reads back as written; a non-central camera record is refused by name" setup = [RCFixtures] begin
     using RadiometricCamera: Focus, FocusSpline, load_radiometric_camera, save_radiometric_camera
     using StaticArrays, LinearAlgebra, Random
-    using VisualGeometryToolkitCore: TensorProductVignetting
+    using VisualRadiometryToolkitCore: TensorProductVignetting
     import JSON
     rng = Xoshiro(3)
     W, H, GX, GY = 120, 80, 9, 7
@@ -196,7 +198,7 @@ end
         c = load_radiometric_camera(f).model
         @test typeof(c.geometric) == typeof(g)
         ps = [SVector(W * rand(rng), H * rand(rng)) for _ in 1:50]
-        @test maximum(p -> norm(RC._chief_ray(c.geometric, p) - RC._chief_ray(g, p)), ps) < 1e-15
+        @test maximum(p -> norm(RC.chief_ray(c.geometric, p) - RC.chief_ray(g, p)), ps) < 1e-15
         # the record of the removed non-central model (its aperture body holds a `radius_grid`): refused by name, never read as a central camera
         d = JSON.parsefile(f); d["aperture"]["radius_grid"] = [[0.002, 0.002, 0.002, 0.002] for _ in 1:4]
         f2 = joinpath(dir, "noncentral.json"); open(io -> JSON.print(io, d), f2, "w")
@@ -208,7 +210,8 @@ end
     using RadiometricCamera: BoardSurface, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera, load_state, Material,
                              posed_target, PrintedTarget, RenderSettings, save_radiometric_camera, save_state, TargetRadiometry, 𝔟
     using StaticArrays, LinearAlgebra, Random
-    using VisualGeometryToolkitCore: TensorProductVignetting, Ellipse, Point2, Sensor, Size2, μm, lens_coverage, sensor, exp_so3
+    using VisualGeometryToolkitCore: Ellipse, Point2, Sensor, Size2, μm, lens_coverage, sensor, exp_so3
+    using VisualRadiometryToolkitCore: TensorProductVignetting
     W = H = 24
     focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)
@@ -256,7 +259,7 @@ end
     import JSON
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), 24, 24)
     focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))), fill(1 / 1.5, 9))
-    camera = RadiometricCameraModel(lens, focus, 0.0386, VgtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2))
+    camera = RadiometricCameraModel(lens, focus, 0.0386, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2))
     cc = RC.CalibratedCamera(camera, RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), :G), RC.RenderSettings())
     mktempdir() do out
         f = joinpath(out, "camera.json")

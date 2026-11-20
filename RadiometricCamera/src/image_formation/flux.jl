@@ -84,7 +84,7 @@ no branch to fall on different sides of).
     b = -n[1] * n[2] * a
     return SVector(1 - n[1] * n[1] * a, b, -n[1]), SVector(b, 1 - n[2] * n[2] * a, -n[2])
 end
-"""Chief-direction seed (grid-lens chain rule): the raw direction `x = _chief_ray(𝐩_ks)` moved across itself by duals with unit partials
+"""Chief-direction seed (grid-lens chain rule): the raw direction `x = chief_ray(𝐩_ks)` moved across itself by duals with unit partials
 in the 2 slots `base + 2(ks−1) + c`, `x + ε₁e₁ + ε₂e₂` (`_seed_tangents`); the dual type is taken from the (already dual) hoisted
 `t̂` value. The flux sees a chief direction only through its normalisation, so its gradient in `x` has no part along `x` and the two
 slots carry all of it: `∂Φ/∂x = (∂Φ/∂ε₁)e₁ + (∂Φ/∂ε₂)e₂` (`_dir_gradient`) — the chain rule, exact; the patch columns' parameters
@@ -110,10 +110,10 @@ through the chart (the dual template of the direction seeds is a zero of the foc
     f = view.focus
     if f.kind == 0
         t̂s = _t̂_seeded(t̂(f, 𝐩), fseed, ks)
-        return t̂s, normalize(_dir_seeded(_chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
+        return t̂s, normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
     end
     tmpl = _t̂_seeded(zero(eltype(f.w)), fseed, ks)
-    dch = normalize(_dir_seeded(_chief_ray(view.geometric, 𝐩), dirseed, ks, tmpl))
+    dch = normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, tmpl))
     return _t̂_seeded(t̂_dir(f, dch), fseed, ks), dch
 end
 @inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
@@ -241,12 +241,18 @@ end
     Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings) -> SVector{3}
 
 Radiant flux of pixel `(u, v)` (column `u`, row `v` of the `H × W` image) of photograph `k`: `camera` (a
-[`RadiometricCameraModel`](@ref)) at `pose` (camera → world). `k` is the photograph's index: it keys the common random numbers of
+`RadiometricCameraModel`) at `pose` (camera → world). `k` is the photograph's index: it keys the common random numbers of
 the radiance (`SampleKey`), so the flux of a state's view `k` is `Φ_pixel(u, v, k, camera, poses[k], …)`.
 """
 Φ_pixel(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
         scene::Scene, st::RenderSettings) =
     _Φ_pixel(u, v, k, View(pose, camera), camera.vignetting, mat, light, scene, st)
+
+"""The number type a vignetting brings into the flux: its nodes' element type; the absent vignetting (VisualRadiometryToolkitCore's
+`NoVignetting`: V ≡ 1, `vig(𝐩) === true`) brings none — `Bool`, the neutral element of the promotion — so a Float32 kernel stays
+Float32, and its factor `w * true` is `w`: the kernel holds no multiplication by V and V has no Jacobian columns (no Θ_v)."""
+@inline _vignetting_number_type(vig::AbstractVignetting) = eltype(control_points(vig))
+@inline _vignetting_number_type(::NoVignetting) = Bool
 
 """
     _Φ_pixel(u, v, k, view, vig, mat, light, scene, settings[, fseed, dirseed, hrays, lrays]) -> SVector{3}
@@ -261,7 +267,7 @@ radiance.
                  light::EnvironmentLight, scene::Scene, st::RenderSettings, fseed = nothing, dirseed = nothing,
                  hrays = nothing, lrays = nothing) where {T}
     bd = scene.board
-    Tz = promote_type(T, eltype(mat.𝛈_ink), eltype(coefficients(light)), eltype(control_points(vig)))
+    Tz = promote_type(T, eltype(mat.𝛈_ink), eltype(coefficients(light)), _vignetting_number_type(vig))
     acc = _ray_zero(hrays, Tz)
     pid = pixel_id(u, v, scene.H)
     rays = _pixel_rays(hrays, scene)                                    # the board warping h's relief, formed once for the pixel's rays
@@ -289,7 +295,7 @@ end
 """
     compute_mask(camera, pose, scene, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
 
-Pixel mask of `camera` (a [`RadiometricCameraModel`](@ref)) at `pose` (camera → world): `true` where the chief ray and every
+Pixel mask of `camera` (a `RadiometricCameraModel`) at `pose` (camera → world): `true` where the chief ray and every
 (footprint corner × aperture border sample) ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with
 `external`. `board_valid` over every pixel of `external` (all of them without one): one kernel on `backend`, required. A caller
 that needs only some of the pixels (the start's draw, `draw_samples`) tests those alone through `BoardValidity`.
@@ -374,7 +380,7 @@ masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)
 """
     render_view(k, camera, pose, mat, light, scene, settings, mask; backend = CPU()) -> Array{Float64, 3}
 
-`H × W × 3` image of photograph `k`, `camera` (a [`RadiometricCameraModel`](@ref)) at `pose` (camera → world), zeros outside the
+`H × W × 3` image of photograph `k`, `camera` (a `RadiometricCameraModel`) at `pose` (camera → world), zeros outside the
 mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (KernelAbstractions' `CPU()` by default; a device:
 `rc_backend("gpu")`), in the backend's kernel float as a state's kernels (`_kernel_float`: Float64 on the CPU backend, Float32 on a
 device, where the image agrees with the CPU's to Float32 rounding). `k` is the photograph's index: it keys the common random numbers

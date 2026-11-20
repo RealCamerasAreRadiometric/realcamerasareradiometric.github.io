@@ -8,8 +8,9 @@
                              render_view, RenderSettings, Scene, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
@@ -54,6 +55,7 @@ end
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
 
     # quasi-interpolation converges with grid resolution (the wide-FOV test lens is strongly curved;
     # the fine 64 × 48 production grid on the phone's division camera reaches ~3e-7 rad)
@@ -105,7 +107,7 @@ end
     # recovery vs the grid truth (not the DS source), modulo the common rotation the gauge holds at the start's (`rotation_gauge_coordinates`):
     # the rays compared after Core's Kabsch rotation between the two lenses' rays
     let probe = [SVector(x, y) for x in 2.0:4.0:22.0 for y in 2.0:4.0:22.0]
-        a = [normalize(RC._chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC._chief_ray(s2.camera.geometric, p)) for p in probe]
+        a = [normalize(RC.chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC.chief_ray(s2.camera.geometric, p)) for p in probe]
         R = SMatrix{3, 3, Float64}(VgtkCore.kabsch([a[i] => b[i] for i in eachindex(a)]))
         @test maximum(VgtkCore.angle_between(R' * b[i], a[i]) for i in eachindex(a)) < 5e-4
     end
@@ -119,6 +121,7 @@ end
     using RadiometricCamera: build_problem_grid, render_view
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     # the nodes under the model's imaged region: Core's footprint rule (the double sphere source: the whole plane, every node present)
     held_t = RC.grid_present(glens_t)
     @test held_t == VgtkCore.node_mask(VgtkCore.model(glens_t), VgtkCore.imaged_region(glens_t)) && all(held_t)
@@ -209,6 +212,7 @@ end
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     import CUDA
 
     # --- device (GPU) per-tile path: bitwise residual, column parity, LM smoke ---
@@ -253,7 +257,7 @@ end
         @test rj_p == rj_pu
         @test device_parity(Jg_p, Jg_pu)
         lay_full = RC._tile_layout(RC.static(1023), length(VgtkCore.model(varsg[6]).nodes), length(s_g.settings.sensor), 25, VgtkCore.tangent_size(varsg[9]),
-                                   Int(VgtkCore.n_control_points(VgtkCore.model(varsg[9]))), Int(sh_count(max_degree(varsg[10].light))))
+                                   Int(VrtkCore.n_control_points(VgtkCore.model(varsg[9]))), Int(sh_count(max_degree(varsg[10].light))))
         @test size(Jg_p, 2) == lay_full.ncol - 1
         @test device_parity(Jg_p, Jg[:, setdiff(1:lay_full.ncol, lay_full.col_r)])
         # (the 24 × 24 fixture has one tile per view, so the cache-hit check re-evaluates the same tile)

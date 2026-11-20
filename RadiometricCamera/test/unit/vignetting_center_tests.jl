@@ -7,8 +7,9 @@
     using StaticArrays, LinearAlgebra
     using Test                          # (loads Core's TestExt: thrown_message)
     using VisualGeometryToolkitCore: thrown_message
-    using VisualGeometryToolkitCore: RadialVignetting, TensorProductVignetting, with_control_points, control_points, n_control_points, center,
-                                     field_radius, knot_vectors, radial_chart, projective_knots, with_center
+    using VisualGeometryToolkitCore: center
+    using VisualRadiometryToolkitCore: RadialVignetting, TensorProductVignetting, with_control_points, control_points, n_control_points,
+                                       field_radius, knot_vectors, radial_chart, projective_knots, with_center
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitEstimation as VgtkEstimation
     W, H = 640, 480

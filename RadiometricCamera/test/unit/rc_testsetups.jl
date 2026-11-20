@@ -7,6 +7,7 @@
     using RadiometricCamera
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitIO as VgtkIO
+    import VisualRadiometryToolkitCore as VrtkCore
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))       # cam, camera_of, pinhole_θ
@@ -16,8 +17,8 @@
     free_names(block) = Tuple(VgtkCore.parameter_names(VgtkCore.model(block))[i] for i in block.idx)
     """`block_camera(block, bound)`: the pixel camera of a lens block (its model), bounded like `bound`."""
     block_camera(block, bound) = VgtkCore.with_model(bound, VgtkCore.model(block))
-    using VisualGeometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light (Core's)
-    export RC, VgtkCore, VgtkIO, FIXTURE_DIR, FIXTURE_BASE, fixture_paths, fixture_board, cam, camera_of, pinhole_θ, saddle, updated_vars, unit_increment, has_lens, free_names, block_camera,
+    using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light (VisualRadiometryToolkitCore's)
+    export RC, VgtkCore, VrtkCore, VgtkIO, FIXTURE_DIR, FIXTURE_BASE, fixture_paths, fixture_board, cam, camera_of, pinhole_θ, saddle, updated_vars, unit_increment, has_lens, free_names, block_camera,
            EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count
 end
 

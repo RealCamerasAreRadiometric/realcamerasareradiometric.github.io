@@ -8,7 +8,8 @@
                              Scene, solve_linear_blocks!, solve_Θ_v!, sphere_radius, with_vignetting, 𝔟
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: exp_so3
-    using VisualGeometryToolkitCore: TensorProductVignetting, with_control_points, center
+    using VisualGeometryToolkitCore: center
+    using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
     tex = fixture_board()
     board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24

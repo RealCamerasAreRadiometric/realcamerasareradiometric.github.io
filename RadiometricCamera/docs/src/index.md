@@ -13,12 +13,12 @@ identifiers.
 
 ## What it provides
 
-- **The radiometric camera** around any chief-ray model: [`RadiometricCameraModel`](@ref) (the geometric camera, the focus surface
-  [`Focus`](@ref), the aperture radius and the vignetting — VisualGeometryToolkitCore's `TensorProductVignetting` and `RadialVignetting`,
+- **The radiometric camera** around any chief-ray model: `RadiometricCameraModel` (the geometric camera, the focus surface
+  `Focus`, the aperture radius and the vignetting — VisualGeometryToolkitCore's `TensorProductVignetting` and `RadialVignetting`,
   with the calibration's gauge pin [`center_constraint`](@ref)) as one object, a photograph being the camera at a pose
-  ([`render_view`](@ref)), and the radiometric back-projection [`π̂⁻¹`](@ref).
+  ([`render_view`](@ref)), and the radiometric back-projection `π̂⁻¹`.
 - **The scene**: the printed board [`PrintedTarget`](@ref) and its warping [`BoardSurface`](@ref), its radiometry
-  [`TargetRadiometry`](@ref) (the Cook–Torrance SVBSDF [`Material`](@ref) and the printed edge), and VisualGeometryToolkitCore's
+  [`TargetRadiometry`](@ref) (the Cook–Torrance SVBSDF `Material` and the printed edge), and VisualGeometryToolkitCore's
   spherical-harmonics `EnvironmentLight`.
 - **Image formation**: the radiant flux of a pixel [`Φ_pixel`](@ref) and the render [`render_view`](@ref), by fixed quadrature
   rules on the pixel and the aperture and a Monte Carlo radiance with common random numbers.
@@ -41,7 +41,7 @@ Install the package from its repository, where it lives in the subdirectory `Rad
 planned), and the stack package the example uses:
 
 ```julia-repl
-pkg> add https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io:RadiometricCamera VisualGeometryToolkitCore
+pkg> add https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io:RadiometricCamera VisualGeometryToolkitCore https://github.com/VisualRadiometryToolkit/visualradiometrytoolkit.github.io:VisualRadiometryToolkitCore
 ```
 
 (`<repository URL>:RadiometricCamera` is Pkg's spelling of the subdirectory: `Pkg.add(url = …, subdir = "RadiometricCamera")`.)
@@ -54,8 +54,9 @@ A 320 × 240 px fisheye camera 1.5 m in front of a printed checkerboard: the exa
 board covers, through the camera's aperture and focus surface.
 
 ```julia
-using RadiometricCamera, VisualGeometryToolkitCore
-using RadiometricCamera: Material, PrintedTarget, RenderSettings, Scene, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
+using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
+using RadiometricCamera: PrintedTarget, RenderSettings, Scene, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
+using VisualRadiometryToolkitCore: Material
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
 # camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
@@ -65,13 +66,13 @@ W, H = 320, 240                               # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)   # focal length 412 px, principal point at the centre
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
 
-# The radiometric camera, one object, composed from the geometric camera: focused at 1.5 m, aperture radius 4 cm, and V ≡ 1
-# (the default vignetting: a flat 4 × 4 B-spline surface on the image, Core's).
+# The radiometric camera, one object, composed from the geometric camera: focused at 1.5 m, aperture radius 4 cm, and no
+# vignetting (VisualRadiometryToolkitCore's NoVignetting, the default: V ≡ 1, no parameters).
 camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)
 # The photograph's pose, camera → world, metres: lookat_pose(camera centre, the point it looks at, the world's up direction, which fixes the roll)
 pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
 scene = Scene(board, W, H)
-light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # Core's light, L ≡ 1
+light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # VisualRadiometryToolkitCore's light, L ≡ 1
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 mask = compute_mask(camera, pose, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
 img = render_view(1, camera, pose, Material(), light, scene, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)

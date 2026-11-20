@@ -77,6 +77,9 @@ struct ObservationModel{S <: SensorStatement, K <: PhotoKind}
 end
 Base.:(==)(a::ObservationModel, b::ObservationModel) = a.sensor == b.sensor && a.kind == b.kind && a.channel === b.channel
 
+"""The colour channels by name, in the photographs' and every per-channel quantity's order (the lighting rows, the η's,
+`io.channel`)."""
+const CHANNEL_NAMES = ("R", "G", "B")
 """The observation model's channel of a state's channel index (0: `:RGB`; 1–3: `:R`, `:G`, `:B`)."""
 _channel_symbol(c::Integer) = c == 0 ? :RGB : Symbol(CHANNEL_NAMES[c])
 
@@ -203,7 +206,7 @@ _characterisation_path(spec::AbstractString, om::ObservationModel) = om.sensor i
 """
     CalibratedCamera(model, observation, settings)
 
-A COMPLETE calibration: the [`RadiometricCameraModel`](@ref) `model` (the kernel type: lens, focus surface, aperture, vignetting), the
+A COMPLETE calibration: the `RadiometricCameraModel` `model` (the kernel type: lens, focus surface, aperture, vignetting), the
 [`ObservationModel`](@ref) its photographs were observed under and the [`RenderSettings`](@ref) its predictions were integrated with.
 What a prediction of the camera must reproduce; the unit `rc/radiometric_camera` and `rc/calibration_state` records save and load
 (`load_radiometric_camera`, `calibrated_camera(load_state(path))`). Photographs it predicts are read through [`photo_set`](@ref).

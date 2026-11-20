@@ -268,11 +268,12 @@ end
 
 @testitem "pipeline options (TOML): tags: the registries, an unknown tag, a retired tag" setup = [RCFixtures, PipelineOptionsHelpers] begin
     import VisualGeometryToolkitCore as VgtkCore
+    import VisualRadiometryToolkitCore as VrtkCore
     for reg in (RC.FRONTEND_TAGS, RC.VIGNETTING_CONFIG_TAGS, RC.BACKEND_TAGS, RC.LATTICE_TAGS, RC.SENSOR_MODEL_TAGS)   # every enumeration a registry (0.11.5)
         @test isempty(VgtkCore.tag_rule_violations(reg))
     end
     @test RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps"))).frontend.type === RC.SchoepsFrontend
-    @test RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial"))).vignetting.model === VgtkCore.RadialVignetting
+    @test RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial"))).vignetting.model === VrtkCore.RadialVignetting
     # the vignetting field is a tag of Core's VIGNETTING_TAGS, and a refinement fits the radial profile alone: "tensor_product" and
     # "log" are refused by name, the retired "tensor" names its successor
     @test occursin("a refinement fits \"radial\" alone", thrown_message(() -> RC.pipeline_options(Dict("vignetting" => Dict("model" => "tensor_product")))))
@@ -318,7 +319,7 @@ end
                            camera = RC.CameraOptions(; lens_coverage = "regions/image_region.json"),
                            grid = RC.GridOptions(; smoothness = RC.BendingSmoothness(1e-2),
                                                  start_perturbation = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)), focus = RC.FocusOptions(; variant = "C", node_count = 30),
-                           vignetting = RC.VignettingOptions(; model = VgtkCore.RadialVignetting, node_count = 16),
+                           vignetting = RC.VignettingOptions(; model = VrtkCore.RadialVignetting, node_count = 16),
                            fixed = ["material", "lighting", "aperture"], lm = RC.LMOptions(; max_iter = 2),
                            edge = RC.EdgeOptions(; ink_spread_mm = 0.02, print_sigma_mm = 0.03), compute = RC.ComputeOptions(; backend = RC.CPUCompute))
     back = RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o)))))
