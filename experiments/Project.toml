@@ -56,6 +56,8 @@ VisualGeometryToolkitFeatures = {url = "https://github.com/VisualGeometryToolkit
 # 0.12) and PanoramaStitching from its port branch, until they are registered. Removed before a release.
 VisualGeometryToolkitEval = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitEval"}
 PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "vrtk/port"}
+BlobBoards = {url = "https://github.com/VisualGeometryToolkit/BlobBoards.jl", rev = "cascade/vgtk-0.12"}   # (its compat on VisualGeometryToolkitCore 0.12)
+LocalOptimizationDoneRight = {url = "https://github.com/VisualGeometryToolkit/LocalOptimizationDoneRight.jl", rev = "cascade/vgtk-0.12"}   # (the same)
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
