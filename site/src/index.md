@@ -81,11 +81,13 @@ pkg> add https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.
 
 ## Getting started
 
-A radiometric camera is one object: a geometric camera (any central model of the VisualGeometryToolkit), a focus surface, an
+```@raw html
+<p>A radiometric camera is one object: a geometric camera (any central model of the VisualGeometryToolkit), a focus surface, an
 aperture radius and a vignetting function. A photograph is the camera at a pose. The example below builds a 320 × 240 px fisheye
 camera 1.5 m in front of a printed checkerboard and renders the radiant flux of every pixel through the camera's aperture and
-focus surface. The [Getting Started](docs/guide/getting-started.html) guide continues from here: it renders two photographs and
-recovers the lighting, the vignetting and the material from them.
+focus surface. The <a href="docs/guide/getting-started.html">Getting Started</a> guide continues from here: it renders two
+photographs and recovers the lighting, the vignetting and the material from them.</p>
+```
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore
