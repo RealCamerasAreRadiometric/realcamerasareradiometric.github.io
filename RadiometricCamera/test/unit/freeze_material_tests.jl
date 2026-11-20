@@ -3,7 +3,7 @@
 # `_hold_material`), its 9 columns (8 nonlinear by AD + the analytic μ column) are zero, every other column and the residual are
 # unchanged, and `update` leaves Θ_m while moving the warping.
 @testitem "frozen material (staged refinement)" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, build_problem_grid, grid_model, lens, PerViewResidual
+    using RadiometricCamera: build_problem, build_problem_grid, grid_model, PerViewResidual
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 

@@ -194,7 +194,7 @@ grid). `(nothing, nothing)` for none. `selection` is `gcv_select`'s record plus 
 """
 function select_grid_smoothness_weight(s::CalibrationState, sm::AbstractSmoothness, interior::AbstractMatrix{Bool}; patch::Tuple{Int, Int} = GRID_PATCH,
                                        build_kwargs...)
-    lens = s.camera.lens
+    lens = s.camera.geometric
     ϕ² = data_norm2(s)
     unit = grid_smoothness(sm, lens, ϕ², interior; weight = 1.0)
     unit === nothing && return nothing, nothing

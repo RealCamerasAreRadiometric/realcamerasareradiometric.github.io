@@ -2,7 +2,7 @@
 # 14-coefficient model with tilt and of a random fisheye model), Core's pixel cameras over them, AD through the inverses, and the per-view
 # LM with an 18-coordinate lens block (Jacobian vs finite differences, the GPU path in gpu_tests.jl).
 @testitem "Kannala–Brandt / 14-coefficient lenses (cv2, parametric LM)" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens, lens_type_name, load_lens,
+    using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens_type_name, load_lens,
                              load_model, load_parametric_lens, Material, PerViewResidual, PrintedTarget, render_view,
                              RenderSettings, run_lm!, save_lens, Scene, sphere_radius, View, _chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
@@ -99,7 +99,7 @@
     # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
     camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
-    @test has_lens(View(poses[1], camera_t).lens, typeof(VgtkIO.opencv_lens(zeros(14))))     # the kernels' view keeps the 14-coefficient lens
+    @test has_lens(View(poses[1], camera_t).geometric, typeof(VgtkIO.opencv_lens(zeros(14))))     # the kernels' view keeps the 14-coefficient lens
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
@@ -156,8 +156,8 @@
     its = Int[]
     result = run_lm!(s2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy), iter_callback = (it, c, camera, poses, mat, surface, light) -> push!(its, it))
-    @test result.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.lens(s2), typeof(VgtkIO.opencv_lens(zeros(14))))
-    @test abs(pinhole_θ(RC.lens(s2))[1] - pinhole_θ(lens_t)[1]) < 0.24
+    @test result.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2), typeof(VgtkIO.opencv_lens(zeros(14))))
+    @test abs(pinhole_θ(RC.geometric(s2))[1] - pinhole_θ(lens_t)[1]) < 0.24
 
     # Kannala–Brandt on Core's `KannalaBrandt(k…)` (Task 2 of the VisualGeometryToolkitCore port, fix round 1): equivalence against the
     # deleted RC body (fixed 10-step Newton from θ = θ_d), copied here verbatim as the reference. Tolerances fixed before the run, from

@@ -90,7 +90,7 @@ end
     run_lm!(one; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
     @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-6 atol = 1e-20
     @test all(rad2deg(rotation_angle(RotMatrix{3}(one.poses[k].R' * ref.poses[k].R))) < 1e-6 for k in 1:2)
-    @test maximum(abs, VgtkCore.parameter_vector(VgtkCore.model(RC.lens(one))) .- VgtkCore.parameter_vector(VgtkCore.model(RC.lens(ref)))) < 1e-6
+    @test maximum(abs, VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(one))) .- VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(ref)))) < 1e-6
     @test maximum(abs, coefficients(one.light) .- coefficients(ref.light)) < 1e-6 * maximum(abs, coefficients(ref.light))
     @test abs(one.mat.μ - ref.mat.μ) < 1e-6 && abs(one.mat.𝛈_ink[c] - ref.mat.𝛈_ink[c]) < 1e-6
     # the other channels still follow the measured one

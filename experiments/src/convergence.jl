@@ -351,7 +351,7 @@ function detection_reprojection_series(start_dir::AbstractString, refine_dir::Ab
         for k in eachindex(g.names)
             length(feats[k]) == length(g.observations[k]) && all(feats[k][i][1] == g.observations[k][i][1] for i in eachindex(feats[k])) ||
                 throw(ArgumentError("$f view $k: the board features are not the detections, in order"))
-            for v in RC_.residual_vectors(st.camera.lens, poses[k], feats[k])
+            for v in RC_.residual_vectors(st.camera.geometric, poses[k], feats[k])
                 j += 1; D[j, m] = hypot(v[3], v[4])
             end
         end

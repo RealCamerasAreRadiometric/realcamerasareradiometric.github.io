@@ -8,7 +8,7 @@
 VgtkCore.convert_eltype(::Type{T}, f::Focus{S, N}) where {T, S, N} =
     Focus{T, N}(SVector{N}(SVector{2, T}.(f.nodes)), SVector{N, T}(f.t̂_i), SVector{N, T}(f.w), SVector{3, T}(f.a), f.kind)
 VgtkCore.convert_eltype(::Type{T}, v::View) where {T} =
-    View(_pose_eltype(T, v.pose), VgtkCore.convert_eltype(T, v.lens), VgtkCore.convert_eltype(T, v.focus), T(v.r))
+    View(_pose_eltype(T, v.pose), VgtkCore.convert_eltype(T, v.geometric), VgtkCore.convert_eltype(T, v.focus), T(v.r))
 
 VgtkCore.convert_eltype(::Type{T}, q::SensorQuadrature{S, NS}) where {T, S, NS} =
     SensorQuadrature{T, NS}(SVector{NS}(SVector{2, T}.(q.offsets)), SVector{NS, T}(q.weights))

@@ -74,7 +74,7 @@ import LibRaw_jll                  # Features' RAW decoder (its LibRaw extension
 # RC's methods of the stack's generic functions where RC's function is the same concept (owner ruling 2026-11-11: no new binding):
 # a surface point's chart (the board's page fraction), a camera's lens (the state's), the cost and residuals of a problem's state,
 # an estimate refined in place (the calibration state), an options struct's TOML table, a lens's identity (the options' stated one)
-import VisualGeometryToolkitCore: chart, lens, cost, residuals
+import VisualGeometryToolkitCore: chart, cost, residuals
 import VisualGeometryToolkitEstimation: config_dict
 import VisualGeometryToolkitFeatures: lens_identity
 using VisualGeometryToolkitCore: LogicalIntrinsics, CameraCalibrationMat,

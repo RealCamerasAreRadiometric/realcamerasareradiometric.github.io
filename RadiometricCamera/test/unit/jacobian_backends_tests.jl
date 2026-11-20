@@ -31,7 +31,7 @@
     surf_d = RC.BoardSurface{D}(hd, SVector{RC.EDGE_NC, D}(m.surface.edge), SVector{RC.INPLANE_NC, D}(m.surface.inplane))
     scene_d = with_surface(s_c.scene, surf_d)
     # the kernels' own form (the tile's window lens, the dual heights in the scene): the internal View and _Φ_pixel
-    view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.camera.lens, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
+    view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.camera.geometric, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
     Hd = zeros(3 * length(r.pix), HEIGHT_NC)
     for (i, iv) in enumerate(r.pix)
         u, v = s_c.px[r.k][iv]

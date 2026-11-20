@@ -3,7 +3,7 @@
 # item shows the gauge direction and that the parametrization has no coordinate along it.
 
 @testitem "gauges: the grid's common rotation is held by three coordinates of two nodes" setup = [RCFixtures, GridTilesScene] begin
-    using RadiometricCamera: build_problem_grid, cost, lens, run_lm_grid!
+    using RadiometricCamera: build_problem_grid, cost, run_lm_grid!
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     # the near-gauge: one infinitesimal rotation ω of every node direction (its tangent coordinates t_k · (ω × d)) and of every
@@ -52,9 +52,9 @@
     sl = CalibrationState(scene, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     (gx1, gy1, _) = pin[1]; (gx3, gy3, c3) = pin[3]
     node(lens, gx, gy) = normalize(SVector{3, Float64}(VgtkCore.directions(VgtkCore.model(lens))[gy, gx]))
-    roll = [node(sl.camera.lens, gx3, gy3)]; chief = [node(sl.camera.lens, gx1, gy1)]
+    roll = [node(sl.camera.geometric, gx3, gy3)]; chief = [node(sl.camera.geometric, gx1, gy1)]
     run_lm_grid!(sl; patch = (5, 5), maxiters = 3, fixed = (:focus, :aperture, :vignetting, :lighting),
-                 iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.lens, gx3, gy3)); push!(chief, node(camera.lens, gx1, gy1))))
+                 iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
     @test length(roll) == 4 && all(d -> norm(d - chief[1]) < 1e-14, chief)                       # the chief node: both coordinates held
     moves = [roll[k + 1] - roll[k] for k in 1:3]
     @test norm(roll[end] - roll[1]) > 0

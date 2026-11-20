@@ -1,4 +1,4 @@
-# The radiometric camera as one value (RadiometricCameraModel: lens, focus, aperture, vignetting), its photographs (View) and the
+# The radiometric camera as one value (RadiometricCameraModel: geometric camera, focus, aperture, vignetting), its photographs (View) and the
 # target's radiometry record (TargetRadiometry).
 @testitem "radiometric camera model and target radiometry" setup = [RCFixtures] begin
     using RadiometricCamera: BoardSurface, edge_parameters, Focus, Material, material, TargetRadiometry, View, with_vignetting
@@ -13,7 +13,7 @@
     c = RadiometricCameraModel(lens, focus, 0.0386, vig)
     pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(1.0I), SVector(0.0, 0.0, -1.5); check = false)
     v = View(pose, c)
-    @test v.lens === lens && v.focus == focus && v.r == 0.0386 && v.pose == pose
+    @test v.geometric === lens && v.focus == focus && v.r == 0.0386 && v.pose == pose
     @test with_vignetting(c, vig).vignetting === vig
     # the camera composed from its geometric camera: the focus surface (a distance: focused there everywhere), the aperture radius and
     # the vignetting (V ≡ 1 by default) added; the image size is the geometric camera's, stated once
@@ -23,13 +23,18 @@
     @test_throws UndefKeywordError RadiometricCameraModel(lens; focus = 1.5)          # no default aperture: r is a physical statement
     @test isbits(c) && isbits(v)                                                        # the camera and the kernels' view travel into a device kernel as they are
     # its parts read and replaced one at a time: the others are kept
-    @test RC.lens(c) === lens && RC.focus(c) === focus && RC.aperture_radius(c) == 0.0386
+    @test RC.geometric(c) === lens && RC.focus(c) === focus && RC.aperture_radius(c) == 0.0386
     f2 = Focus(lens, 2.0); c2 = RC.with_aperture_radius(RC.with_focus(c, f2), 0.01)
-    @test c2.focus === f2 && c2.aperture_radius == 0.01 && c2.lens === lens && c2.vignetting === vig
+    @test c2.focus === f2 && c2.aperture_radius == 0.01 && c2.geometric === lens && c2.vignetting === vig
     lens2 = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.3, 0.4)), 30.912, (12.24, 11.52), W, H)
-    @test RC.with_lens(c, lens2).lens === lens2 && RC.with_lens(c, lens2).focus === focus
+    @test RC.with_geometric(c, lens2).geometric === lens2 && RC.with_geometric(c, lens2).focus === focus
+    # `lens` is Core's lens model everywhere: RC's old spellings of the geometric camera are refused by name with the replacement
+    @test_throws "with_lens is retired" RC.with_lens(c, lens2)
+    @test_throws "lens(camera) is retired" VgtkCore.lens(c)
+    @test !isdefined(RC, :lens) && Base.ispublic(RC, :geometric) && Base.ispublic(RC, :with_geometric) && !Base.ispublic(RC, :with_lens)
+    @test VgtkCore.lens(RC.geometric(c)) === VgtkCore.lens(lens)                      # the camera's lens model: Core's, of its geometric camera
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it
-    @test fieldnames(RadiometricCameraModel) == (:lens, :focus, :aperture_radius, :vignetting) && fieldnames(View) == (:pose, :lens, :focus, :r)
+    @test fieldnames(RadiometricCameraModel) == (:geometric, :focus, :aperture_radius, :vignetting) && fieldnames(View) == (:pose, :geometric, :focus, :r)
     @test !any(n -> isdefined(RC, n), (:InFocusBlur, :NO_BLUR, :in_focus_blur, :blur_sigmas, :with_blur, :with_in_focus_blur, :set_camera!))
     @test !isdefined(RC, :_shared_camera) && !Base.ispublic(RC, :View) && !Base.ispublic(RC, :view_of)   # one camera, never parts
     @test RC.𝔣(c, SVector(5.0, 7.0)) == RC.𝔣(v, SVector(5.0, 7.0)) && RC.t̂(c, SVector(5.0, 7.0)) == RC.t̂(v, SVector(5.0, 7.0))

@@ -36,7 +36,7 @@
         @test st.names == ["V01.png", "V02.png"] && st.page_flip === -1.0
         @test all(norm(st.poses[k].R - poses[k].R) < 1e-15 && st.poses[k].t == poses[k].t for k in 1:2)
         c = st.camera
-        @test c.lens == lens && c.focus == focus && c.vignetting == vig
+        @test c.geometric == lens && c.focus == focus && c.vignetting == vig
         @test ulps(c.aperture_radius, 0.0386) <= 2
         @test coefficients(st.light) == coefficients(light) && ulps(VgtkCore.radius(st.light), 2.5) <= 2
         @test st.settings == settings
@@ -194,9 +194,9 @@ end
         f = joinpath(dir, "camera.json")
         save_radiometric_camera(f, RC.CalibratedCamera(RadiometricCameraModel(g, focus, 0.002, vig), RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), :G), RC.RenderSettings()))
         c = load_radiometric_camera(f).model
-        @test typeof(c.lens) == typeof(g)
+        @test typeof(c.geometric) == typeof(g)
         ps = [SVector(W * rand(rng), H * rand(rng)) for _ in 1:50]
-        @test maximum(p -> norm(RC._chief_ray(c.lens, p) - RC._chief_ray(g, p)), ps) < 1e-15
+        @test maximum(p -> norm(RC._chief_ray(c.geometric, p) - RC._chief_ray(g, p)), ps) < 1e-15
         # the record of the removed non-central model (its aperture body holds a `radius_grid`): refused by name, never read as a central camera
         d = JSON.parsefile(f); d["aperture"]["radius_grid"] = [[0.002, 0.002, 0.002, 0.002] for _ in 1:4]
         f2 = joinpath(dir, "noncentral.json"); open(io -> JSON.print(io, d), f2, "w")
@@ -226,11 +226,11 @@ end
             c = RadiometricCameraModel(lens, focus, 0.0386, vig)
             f = joinpath(dir, "camera.json"); save_radiometric_camera(f, RC.CalibratedCamera(c, RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :G), RenderSettings()))
             r = load_radiometric_camera(f).model
-            @test lens_coverage(r.lens) == e && sensor(r.lens) == sensor(lens)                    # bit for bit: the coverage, the bound
+            @test lens_coverage(r.geometric) == e && sensor(r.geometric) == sensor(lens)                    # bit for bit: the coverage, the bound
             if lens === central
-                @test r.lens == lens
+                @test r.geometric == lens
             else                                   # the grid's directions bit for bit, its K
-                m1, m2 = VgtkCore.model(r.lens), VgtkCore.model(lens)
+                m1, m2 = VgtkCore.model(r.geometric), VgtkCore.model(lens)
                 @test isequal(VgtkCore.directions(m1), VgtkCore.directions(m2)) && m1.intrinsics == m2.intrinsics
             end
             @test haskey(VgtkIO.read_record(f).camera, :lens_coverage)                              # IO's encoding, not a second one
@@ -247,7 +247,7 @@ end
         f = joinpath(dir, "state.json")
         save_state(f, (; camera, target, poses, names = ["V01.png"], light, settings = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4),
                        observation = RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB), page_flip = nothing))
-        @test load_state(f).camera.lens == central
+        @test load_state(f).camera.geometric == central
     end
 end
 

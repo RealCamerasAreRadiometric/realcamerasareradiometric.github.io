@@ -4,7 +4,6 @@
 
 # The package alias and the 256² BlobBoards fixture board (test/unit/fixture_board.jl), which runtests.jl used to define in Main.
 @testsetup module RCFixtures
-    using RadiometricCamera: lens
     using RadiometricCamera
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitIO as VgtkIO

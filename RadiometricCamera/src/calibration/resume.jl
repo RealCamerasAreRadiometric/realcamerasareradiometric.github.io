@@ -25,9 +25,9 @@ function load_state_into!(s::CalibrationState, sst, names; sensor_model::SensorM
         set_pose!(s, k, sst.poses[idx[k]])
     end
     c = sst.camera
-    lens = c.lens
-    if !(typeof(lens) === typeof(s.camera.lens))
-        lens = _with_run_region(lens, s.camera.lens)
+    lens = c.geometric
+    if !(typeof(lens) === typeof(s.camera.geometric))
+        lens = _with_run_region(lens, s.camera.geometric)
         println("state: written under another imaged region — its grid lens takes the run's region")
     end
     light_ok = size(coefficients(sst.light)) == size(coefficients(s.light))

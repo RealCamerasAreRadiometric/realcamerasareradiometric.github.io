@@ -93,7 +93,7 @@ function _focus_from_body(b)
 end
 
 JSON.lower(s::VgtkIO.VgioStyle, c::RadiometricCameraModel) = (
-    camera = VgtkIO.camera_json(c.lens, _COLMAP; length_unit = s.length_unit), aperture = _aperture_body(s.length_unit, c), focus = _focus_body(c.focus),
+    camera = VgtkIO.camera_json(c.geometric, _COLMAP; length_unit = s.length_unit), aperture = _aperture_body(s.length_unit, c), focus = _focus_body(c.focus),
     vignetting = c.vignetting,
 )
 # A blur block's PLANE (IO 0.10's blur body names it; its covariance's frame in memory): the print's blur is on the board's printed

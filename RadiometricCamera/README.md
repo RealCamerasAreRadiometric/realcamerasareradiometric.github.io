@@ -38,11 +38,11 @@ texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                               # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)   # focal length 412 px, principal point at the centre
-lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))   # the geometric camera
+geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
 
 # The radiometric camera, one object, composed from the geometric camera: focused at 1.5 m, aperture radius 4 cm, and V ≡ 1
 # (the default vignetting: a flat 4 × 4 B-spline surface on the image, Core's).
-camera = RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.04)
+camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)
 # The photograph's pose, camera → world, metres: lookat_pose(camera centre, the point it looks at, the world's up direction, which fixes the roll)
 pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
 scene = Scene(board, W, H)

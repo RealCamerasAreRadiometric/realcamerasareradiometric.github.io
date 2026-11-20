@@ -18,7 +18,7 @@
 # records on rendered photographs) and the Schöps calibration of the FX3 fisheye (`geometric_accuracy/night_stars/data/fx3-fisheye/schoeps`).
 
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
-using RadiometricCamera: aperture_radius, cost, focus, Focus, FocusSpline, grid_angular_error, grid_dims, grid_model, lens,
+using RadiometricCamera: aperture_radius, cost, focus, Focus, FocusSpline, grid_angular_error, grid_dims, grid_model, geometric,
                          load_session, Material, render_all, RenderSettings, run_lm_grid!, save_grid, schoeps_gridlens,
                          solve_linear_blocks!, sphere_radius, t̂, 𝔟
 import CUDA
@@ -85,7 +85,7 @@ nodes = VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))
 focus0 = Focus(FocusSpline(nodes), [normalize(VgtkCore.backproject(lens0, 𝐩))[3] / d_f for 𝐩 in nodes])
 r0 = 17e-3 / (2 * 8)                                                          # f/8 → r = f / (2N) = 1.06 mm
 vig0 = VgtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degree = 2)
-camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: lens, focus, aperture, vignetting
+camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: geometric camera, focus, aperture, vignetting
 b = 𝔟(ds.scene.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
 light0 = VgtkCore.EnvironmentLight(VgtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
 mat0 = Material(; 𝛂_ink = 0.15, 𝛂_noink = 0.4, 𝛈_ink = 1.6, 𝛈_noink = 1.33, μ = 0.5)
@@ -132,9 +132,9 @@ c2, rms2 = cost(s)
 
 ϕ² = sum(sum(abs2, p) for p in s.ϕ)
 println("rel-RMS per LM iteration: ", join([@sprintf("%.4f", sqrt(2t.cost / ϕ²)) for t in trace], " → "))
-save_grid(joinpath(OUT, "grid_refined.json"), lens(s); provenance = (; model = "example_refined"))
+save_grid(joinpath(OUT, "grid_refined.json"), geometric(s); provenance = (; model = "example_refined"))
 save_grid(joinpath(OUT, "grid_start.json"), lens0; provenance = (; model = "example_start"))
-drift = [1e3 * acos(clamp(dot(normalize(lens(s).grid[i]), normalize(lens0.grid[i])), -1, 1)) for i in eachindex(lens0.grid)]
+drift = [1e3 * acos(clamp(dot(normalize(geometric(s).grid[i]), normalize(lens0.grid[i])), -1, 1)) for i in eachindex(lens0.grid)]
 @printf("grid moved: median %.3f mrad, max %.3f mrad; aperture r %.3f mm; focus 1/t̂ mean %.2f m\n", median(drift), maximum(drift), 1e3 * aperture_radius(s), 1 / mean(focus(s).t̂_i))
 
 # ## 5. Validation

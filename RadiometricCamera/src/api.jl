@@ -6,7 +6,7 @@
 #   public   the user-facing names beyond it (the image formation, the camera and target models, the records, the diagnostics, the
 #            LM's blocks for those who build their own problem, the paper's symbols — D14: demoted, names kept), reached qualified
 #            (`RadiometricCamera.name`) or imported by name (`using RadiometricCamera: name`).
-# Everything else is internal. The names of Core's functions RC adds methods to (`lens`, `chart`, `cost`, `residuals`) are Core's:
+# Everything else is internal. The names of Core's functions RC adds methods to (`chart`, `cost`, `residuals`) are Core's:
 # reach them through VisualGeometryToolkitCore.
 # ---------------------------------------------------------------------------
 
@@ -20,8 +20,8 @@ public 𝐩_of_pixel, pixel_of_𝐩, ℐ_𝐮, luma, luma_image, SensorQuadratur
        check_coverage, calibrated_folds, grid_angular_error, schoeps_gridlens,
        schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera, save_lens,
        load_parametric_lens, load_lens, lens_type_name, 𝔭, 𝔣, π̂⁻¹, chief_dir, world_ray, TargetRadiometry, material,
-       edge_parameters, target_radiometry, board_surface, radiometric_target, set_radiometric_target!, with_vignetting, with_lens,
-       with_focus, with_aperture_radius,
+       edge_parameters, target_radiometry, board_surface, radiometric_target, set_radiometric_target!, geometric, with_geometric,
+       with_vignetting, with_focus, with_aperture_radius,
        PrintedTarget, posed_target, board_normal, 𝔟, texture_size, corners, intersect_board, board_plane_hit, world_point,
        inside, ρ_c, with_sdf, has_sdf, BoardSurface, with_h, with_edge, height_on, HEIGHT_NC, HEIGHT_NFREE, EDGE_NC,
        warping_nodes, warping_aspect, warping_field, page_points, height_manifold, height_basis, board_height, board_relief,
@@ -72,7 +72,7 @@ sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_charac
                                                                   "(its sha256), `photo_set` reads it at the location given"))
 
 # ---- retired call forms (owner 2026-11-20: the camera-first API). A radiometric camera is ONE object, a `RadiometricCameraModel`
-# (lens, focus surface, aperture radius, vignetting); a photograph is the camera at a pose. The forms that took a `View` assembled
+# (geometric camera, focus surface, aperture radius, vignetting); a photograph is the camera at a pose. The forms that took a `View` assembled
 # from the camera's parts, with the vignetting as a separate argument, are refused by name with their replacement (no alias, no
 # forwarding). `View` itself is the kernels' internal record (`View(pose, camera)`).
 _retired_view_form(name, replacement) =
@@ -80,7 +80,7 @@ _retired_view_form(name, replacement) =
                         "Give the camera and the pose: $replacement"))
 CalibrationState(::Scene, ::RenderSettings, ::AbstractVector{<:View}, ::AbstractVignetting, args...; kwargs...) =
     _retired_view_form("CalibrationState", "`CalibrationState(scene, settings, camera, poses, mat, light, targets; …)`, " *
-                       "`camera = RadiometricCameraModel(lens, focus, aperture_radius, vignetting)`")
+                       "`camera = RadiometricCameraModel(geometric, focus, aperture_radius, vignetting)`")
 render_view(::Integer, ::View, ::AbstractVignetting, args...) =
     _retired_view_form("render_view", "`render_view(k, camera, pose, mat, light, scene, settings, mask)`")
 compute_mask(::View, ::Scene, ::RenderSettings; kwargs...) =
@@ -89,3 +89,15 @@ compute_mask(::View, ::Scene, ::RenderSettings; kwargs...) =
     _retired_view_form("Φ_pixel", "`Φ_pixel(u, v, k, camera, pose, mat, light, scene, settings)`")
 pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
     _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, scene, settings)`")
+
+# ---- retired names (owner 2026-11-20: `lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
+# camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of a state, the replacer.
+# The old spellings are refused by name with their replacement (no alias, no forwarding).
+"""Retired (owner 2026-11-20): [`with_geometric`](@ref)."""
+with_lens(args...; kwargs...) = throw(ArgumentError("with_lens is retired: a radiometric camera's geometric camera is its `geometric` — " *
+                                                    "use `with_geometric(camera, geometric)`"))
+_retired_lens_accessor(what) =
+    throw(ArgumentError("lens($what) is retired: `lens` is VisualGeometryToolkitCore's lens model of a geometric camera. The geometric camera of " *
+                        "a radiometric camera or a calibration state is `RadiometricCamera.geometric($what)`; its lens model `lens(geometric($what))`"))
+VgtkCore.lens(::RadiometricCameraModel) = _retired_lens_accessor("camera")
+VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")

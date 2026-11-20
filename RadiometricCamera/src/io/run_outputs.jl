@@ -60,7 +60,7 @@ function save_radiometric_calibration(state::CalibrationState, result::VgtkCore.
 end
 function _write_calibration(s::CalibrationState, meta, opts::PipelineOptions, res, trace, costs)
     names = meta.names; K = length(names); W₀ = meta.W₀; H₀ = meta.H₀; lens0 = meta.lens0; views0 = meta.views0; route = lm_route(lens0)
-    rcam = s.camera; gfin = rcam.lens
+    rcam = s.camera; gfin = rcam.geometric
     (c0, rms0) = meta.costs.init; (c1, rms1) = costs.linear; (c2, rms2) = costs.final
     _write_run_cameras(route, opts, meta, gfin, lens0, trace, costs, (rms0, rms1, rms2))
     write_focus_ab(joinpath(opts.io.out, "focus_ab.json"), meta.focus_info, s, W₀, H₀)     # EXPERIMENT (focus-ab)

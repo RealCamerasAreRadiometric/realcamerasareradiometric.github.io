@@ -101,8 +101,8 @@
     result = run_lm!(s2; maxiters = 200, reldcost = 1e-12)
     @test result.cost / 2 < 1e-20 * c0          # (Core's record: ‖r‖²; `cost` ½‖r‖²)
     @test aperture_radius(s2) ≈ r_t rtol = 1e-9
-    @test pinhole_θ(RC.lens(s2))[3] ≈ pinhole_θ(lens_t)[3] atol = 1e-9 * W      # (`lens` is shadowed by a test variable)
-    @test pinhole_θ(RC.lens(s2))[4] ≈ pinhole_θ(lens_t)[4] atol = 1e-9 * H
+    @test pinhole_θ(RC.geometric(s2))[3] ≈ pinhole_θ(lens_t)[3] atol = 1e-9 * W      # (`lens` is shadowed by a test variable)
+    @test pinhole_θ(RC.geometric(s2))[4] ≈ pinhole_θ(lens_t)[4] atol = 1e-9 * H
     @test all(rad2deg(rotation_angle(RotMatrix{3}(s2.poses[k].R' * poses[k].R))) < 1e-8 for k in 1:2)
     @test maximum(abs, focus(s2).t̂_i - focus_t.t̂_i) < 1e-9
     @test s2.mat.𝛂_ink ≈ 0.12 atol = 1e-9

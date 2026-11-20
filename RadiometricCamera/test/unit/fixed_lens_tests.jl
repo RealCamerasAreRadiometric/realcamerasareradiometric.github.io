@@ -3,7 +3,7 @@
 # refinable), Float32 cleanliness, duals through Core's lens inverses, and the per-view problem with the lens block fixed.
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, grid_model, in_domain,
-                             lens, Material, PerViewResidual, PrintedTarget, render_view, RenderSettings, run_lm!, Scene,
+                             Material, PerViewResidual, PrintedTarget, render_view, RenderSettings, run_lm!, Scene,
                              sphere_radius, _chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -78,5 +78,5 @@
     c0 = cost(s2)[1]
     run_lm!(s2; maxiters = 8, fixed)
     @test cost(s2)[1] < 1e-3 * c0
-    @test pinhole_θ(RC.lens(s2)) ≈ pinhole_θ(lk) && VgtkCore.lens(RC.lens(s2)) == VgtkCore.lens(lk)   # untouched by the LM
+    @test pinhole_θ(RC.geometric(s2)) ≈ pinhole_θ(lk) && VgtkCore.lens(RC.geometric(s2)) == VgtkCore.lens(lk)   # untouched by the LM
 end

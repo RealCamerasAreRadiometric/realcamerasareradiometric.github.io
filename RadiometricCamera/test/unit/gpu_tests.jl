@@ -183,7 +183,7 @@ end
         co0 = cost(so2)[1]
         ro = run_lm!(so2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
-        @test ro.cost / 2 < 0.05 * co0 && has_lens(RC.lens(so2), typeof(VgtkIO.opencv_lens(zeros(14))))
+        @test ro.cost / 2 < 0.05 * co0 && has_lens(RC.geometric(so2), typeof(VgtkIO.opencv_lens(zeros(14))))
         # radial vignetting profile on the device (2026-10-21): render parity, and the closed-form V solve from the DEVICE parts
         # (the parts kernel evaluates coefficient_jacobian / V of the radial type) recovers the profile
         vig_r = with_control_points(RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W), [1.0, 1.0, 0.9, 0.75, 0.6])   # P_0 = P_1: the pole tie

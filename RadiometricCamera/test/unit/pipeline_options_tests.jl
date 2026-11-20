@@ -112,7 +112,7 @@ end
 end
 
 @testitem "pipeline options (TOML): unknown tables, keys and values are refused" setup = [RCFixtures, PipelineOptionsHelpers] begin
-    using RadiometricCamera: focus, lens, material
+    using RadiometricCamera: focus, material
     m = thrown_message(() -> RC.pipeline_options(Dict("lm" => Dict("fto" => 1))))
     @test occursin("fto", m) && occursin("max_iter", m) && occursin("max_time", m) && occursin("[lm]", m)
     m = thrown_message(() -> RC.pipeline_options(Dict("lmm" => Dict("max_iter" => 1))))

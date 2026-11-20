@@ -441,8 +441,8 @@ end
 
 "The samples per lattice node of a start: each sample's nearest node of the start lattice (state.json's grid), over every view."
 function coverage_metrics(sdir)
-    st = RadiometricCamera.load_state(joinpath(sdir, "state.json")); m = VgtkCore.model(st.camera.lens)
-    g = Tuple(RadiometricCamera.grid_dims(st.camera.lens))
+    st = RadiometricCamera.load_state(joinpath(sdir, "state.json")); m = VgtkCore.model(st.camera.geometric)
+    g = Tuple(RadiometricCamera.grid_dims(st.camera.geometric))
     p11 = VgtkCore.node_position(m, CartesianIndex(1, 1)); p22 = VgtkCore.node_position(m, CartesianIndex(2, 2))
     h = Float64.(p22 .- p11)
     counts = zeros(Int, g)

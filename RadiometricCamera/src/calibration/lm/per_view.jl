@@ -335,7 +335,7 @@ NLLSsolver.getvars(r::PerViewResidual{N}, vars::Vector) where {N} =
 """View of the residual's variables (element type generic)."""
 @inline function _view_of(r::PerViewResidual, pose::_PoseBlock, dist::_LensBlock, foc::_FocusBlock, ap::ApertureVar)
     c = r.state.camera
-    return View(VgtkCore.model(pose), VgtkCore.with_model(c.lens, VgtkCore.model(dist)), VgtkCore.model(foc), ap.r)
+    return View(VgtkCore.model(pose), VgtkCore.with_model(c.geometric, VgtkCore.model(dist)), VgtkCore.model(foc), ap.r)
 end
 
 """The per-view residual on every backend (NLLSsolver's `computeresidual`, per_tile.jl): the flux kernel (device/jacobian_kernels.jl, `_flux_device`)
@@ -348,7 +348,7 @@ function _block_residual(r::PerViewResidual, pose::_PoseBlock, dist::_LensBlock,
     # a non-finite trial state must yield a NaN cost (the device kernels would silently render zero flux
     # for NaN rays, which leaves NLLSsolver's damping loop without an exit condition); the material block's finiteness is its
     # `is_valid`, checked above
-    finite = all(isfinite, view.pose.t) && all(isfinite, view.pose.R) && all(isfinite, VgtkCore.parameter_vector(view.lens.camera)) &&
+    finite = all(isfinite, view.pose.t) && all(isfinite, view.pose.R) && all(isfinite, VgtkCore.parameter_vector(view.geometric.camera)) &&
              all(isfinite, view.focus.t̂_i) && isfinite(view.r) && all(isfinite, control_points(VgtkCore.model(vg))) && all(isfinite, coefficients(lt.light))
     finite || return fill(NaN, NLLSsolver.nres(r))
     fluxv = _flux_device(s, r.k, view, VgtkCore.model(vg), m.mat, lt.light, m.surface)
@@ -720,7 +720,7 @@ function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Intege
     vv = VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), vignetting_basis(s))   # Θ_v: Core's LinearSubspaceManifold
     lv = LightingVar(s.light; s.channel)
     blocks_held, lens_held = _split_fixed(fixed)           # the blocks `fixed` names, and the lens model's parameters
-    lv_d = lens_manifold(lens(s); fixed = lens_held)
+    lv_d = lens_manifold(geometric(s); fixed = lens_held)
     NH = _surface_held(fixed, :height) ? 0 : height_nparams(height_degree)   # a free board warping: the nodal heights ride in the material block (as in the grid route)
     inplane = inplane && !_surface_held(fixed, :inplane)
     material_held, blocks_held = _hold_material(blocks_held, NH > 0 || inplane)
@@ -733,7 +733,7 @@ function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Intege
     _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)                                 # EXPERIMENT (focus-ab)
     idx = (; poses = 1:K, distortion = i_d, focus = i_f, aperture = i_r, material = i_m, vignetting = i_v, lighting = i_l)
     free = trues(length(variables))
-    last(lens_free(lens(s); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
+    last(lens_free(geometric(s); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
     _free_mask!(free, idx, blocks_held; lens_key = :distortion, lens_idx = i_d)
     return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free), damping = LM_DAMPING), (; idx..., free)
 end
@@ -745,7 +745,7 @@ The camera, the poses, the material, the surface and the lighting encoded in a v
 and tracing).
 """
 function extract_variables(s::CalibrationState, vars::Vector, idx)
-    lens_new = VgtkCore.with_model(lens(s), VgtkCore.model(vars[idx.distortion]::_LensBlock))
+    lens_new = VgtkCore.with_model(geometric(s), VgtkCore.model(vars[idx.distortion]::_LensBlock))
     mv = vars[idx.material]::MaterialVar
     camera = RadiometricCameraModel(lens_new, VgtkCore.model(vars[idx.focus]::_FocusBlock), (vars[idx.aperture]::ApertureVar).r,
                                     VgtkCore.model(vars[idx.vignetting]::VgtkCore.LinearSubspaceManifold))

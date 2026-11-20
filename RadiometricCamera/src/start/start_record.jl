@@ -84,8 +84,8 @@ function save_start(dir::AbstractString, s::CalibrationState, meta, opts::Pipeli
     names = meta.names
     save_state(joinpath(dir, "state.json"), s, names; page_flip = meta.page_flip, provenance = (; stage = "start (closed-form sweep)"))
     tag = _frontend_tag(opts)
-    route = lm_route(lens(s))                         # the state's camera's route (a SplineLens camera per tile)
-    for (file, g, what) in ((joinpath(dir, "$(_camera_file(route)).json"), lens(s), "start"),
+    route = lm_route(geometric(s))                         # the state's camera's route (a SplineLens camera per tile)
+    for (file, g, what) in ((joinpath(dir, "$(_camera_file(route)).json"), geometric(s), "start"),
                             (joinpath(dir, "frontend", "$(_camera_file(route)).json"), meta.lens_start, "frontend"))
         mkpath(dirname(file))
         _save_run_camera(route, file, g, meta.init_region; provenance = (; model = "$(what)_$(_model_label(route, g))_$tag", frontend = tag))

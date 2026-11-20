@@ -481,7 +481,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     # in cost computations") if it differs from the trial cost beyond isapprox — and the value part of the
     # dual kernel differs from the plain flux kernel in its last bits. So take it from the flux kernel.
     flux = _launch_rows(_flux_functor(s, r.k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, dc.px[r.k])
-    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), view0.lens, 1:npx, dc.idx[r.k]) : (nothing, nothing)
+    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), view0.geometric, 1:npx, dc.idx[r.k]) : (nothing, nothing)
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
@@ -541,7 +541,7 @@ function _view_chunk(::Val{F}, s::CalibrationState, r::PerViewResidual{N}, lay, 
                      rays) where {F, N}
     be = s.backend
     D, cd, pose_d, focus_d, mat_d, scene_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, scene, n_inplane(m))
-    lens_d = _seeded_lens(dist, s.camera.lens, x -> cd(x, 0), j -> cd(0.0, lay.off_d + j))   # a pixel camera is isbits: to the kernel as-is
+    lens_d = _seeded_lens(dist, s.camera.geometric, x -> cd(x, 0), j -> cd(0.0, lay.off_d + j))   # a pixel camera is isbits: to the kernel as-is
     view_d = View{D, N, typeof(lens_d)}(pose_d, lens_d, focus_d, cd(ap.r, lay.col_r > 0 ? lay.off_r + 1 : 0))   # r seeded: AD through r² w̃ and r â
     fbase = Int32(!isempty(lay.focus_cols) ? lay.off_f - c0 : -1000000)
     return _jac_device(be, s.device_cache.px[r.k], s.device_cache.idx[r.k], r.k, s.scene.H, view_d, vigk, mat_d, lk, scene_d, stk, Val(C), fbase, -1000000;

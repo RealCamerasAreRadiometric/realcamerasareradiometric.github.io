@@ -2,7 +2,7 @@
 # model ↔ a camera record, a grid camera ↔ a camera record), an old grid file read
 # through IO's migration, and synthetic Schöps intrinsics0.yaml files (VisualGeometryToolkitIO's readers) resampled into our grid lenses.
 @testitem "grid I/O (Schöps import)" setup = [RCFixtures] begin
-    using RadiometricCamera: grid_dims, grid_model, initialization_region, lens, load_camera, load_grid, load_lens, load_model,
+    using RadiometricCamera: grid_dims, grid_model, initialization_region, load_camera, load_grid, load_lens, load_model,
                              load_parametric_lens, load_start, pixel_of_𝐩, save_grid, save_initialization_region, save_lens,
                              save_run_parameters, schoeps_gridlens, schoeps_start, stored_initialization_region, 𝐩_of_pixel
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff

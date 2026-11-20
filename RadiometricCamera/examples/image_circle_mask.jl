@@ -11,7 +11,7 @@
 # images; `out.png` defaults to `examples/output/image_circle_mask.png`. (The experiments environment carries CairoMakie.)
 
 using RadiometricCamera, Printf
-using RadiometricCamera: lens, luma_image
+using RadiometricCamera: luma_image
 using CairoMakie: Figure, Axis, image!, lines!, Label, save, RGBAf, DataAspect, Point2f
 import VisualGeometryToolkitCore as VgtkCore
 import VisualGeometryToolkitFeatures as VgtkFeatures

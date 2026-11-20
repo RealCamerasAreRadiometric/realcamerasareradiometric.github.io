@@ -107,7 +107,7 @@ each of its `ϕ`'s length (whitened rows: the residuals and the Jacobians divide
 each row's RAW code step in its units (`masked_observations`), or `nothing` (a decoded image): what the data resolve
 (`lm_abstol`).
 
-The state of the [`RadiometricCameraModel`](@ref) `camera` (one camera: lens, focus surface, aperture radius and vignetting)
+The state of the [`RadiometricCameraModel`](@ref) `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
 seen from `poses` (camera → world, one per photograph). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
 (`vignetting_rule`, extrapolated with a zero `boundary_order`-th difference), its parameters the interior ones; a radial profile's nodes with less than `support_min` of the mean data
 weight are dependent the same way, continuing the supported ones with that order (`RadialSupportRule`). Builds the masks from the initial views (∩ `external_masks`) unless `masks` is given. Float64 targets are
@@ -166,11 +166,11 @@ Internal: the kernels' view `k`, the state's camera at its pose `k` (`View(s.pos
 """
 view_of(s::CalibrationState, k::Integer) = View(s.poses[k], s.camera)
 """
-    lens(s::CalibrationState)
+    geometric(s::CalibrationState)
 
-The geometric model π⁻¹ (Θ_d) the views share: Core's pixel camera or a grid model.
+The geometric camera π⁻¹ (Θ_d) the views share: Core's pixel camera or a grid model.
 """
-lens(s::CalibrationState) = lens(s.camera)
+geometric(s::CalibrationState) = geometric(s.camera)
 """
     focus(s::CalibrationState) -> Focus
 

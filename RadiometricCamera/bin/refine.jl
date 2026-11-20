@@ -127,7 +127,7 @@ function _print_free_parameters(s, opts)
     problem, idx = RC.build_problem_grid(s; lp.kw...)
     vars = problem.problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)
-    present = count(VgtkCore.present_nodes(VgtkCore.model(s.camera.lens)))
+    present = count(VgtkCore.present_nodes(VgtkCore.model(s.camera.geometric)))
     gauge = lp.blocks.poses ? 3 : 0                                        # the rotation gauge: three direction coordinates held while the poses are free
     lensfree = lp.blocks.grid ? 2present - gauge : 0                       # a held lens ("camera" in fixed) has no free coordinate
     println("PARAMETERS route=PerTileRoute grid_nodes_present=$present lens=$lensfree lens_solver_coordinates=$(n(vec(idx.patches))) ",

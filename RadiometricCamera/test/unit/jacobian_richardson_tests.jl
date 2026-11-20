@@ -79,7 +79,7 @@
 end
 
 @testitem "pathwise Jacobian vs Richardson finite differences" setup = [RCFixtures, RichardsonScene] begin
-    using RadiometricCamera: BoardSurface, build_problem, build_problem_grid, compute_mask, focus, lens, material,
+    using RadiometricCamera: BoardSurface, build_problem, build_problem_grid, compute_mask, focus, material,
                              PerViewResidual, PrintedTarget, render_all, Scene, t̂, with_sdf, with_surface, with_μ, with_vignetting, 𝛂, 𝛈
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3

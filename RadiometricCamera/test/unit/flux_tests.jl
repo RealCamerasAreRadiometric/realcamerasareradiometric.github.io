@@ -15,7 +15,7 @@
     vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); mat = Material(); light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))
     camera = RadiometricCameraModel(lens, Focus(3, 1.5, 24, 24), 0.0386, vig)
     # the camera with another aperture radius (a number or a dual)
-    with_r(r) = RadiometricCameraModel(camera.lens, camera.focus, r, camera.vignetting)
+    with_r(r) = RadiometricCameraModel(camera.geometric, camera.focus, r, camera.vignetting)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)                    # Φ = the aperture integral over πr²
     mask = compute_mask(camera, pose, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
     @test 0 < count(mask) <= length(mask)

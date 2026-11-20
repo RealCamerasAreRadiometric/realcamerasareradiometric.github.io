@@ -78,8 +78,8 @@ function focus_surface_points(camera, W::Integer, H::Integer; spacing::Integer)
     X = fill(NaN, length(xs), length(ys)); Y = copy(X); Z = copy(X); D = copy(X)
     for (j, y) in enumerate(ys), (i, x) in enumerate(xs)
         p = SVector(Float64(x), Float64(y))
-        RadiometricCamera.in_domain(camera.lens, p) || continue
-        all(isfinite, VgtkCore.backproject(camera.lens, p)) || continue
+        RadiometricCamera.in_domain(camera.geometric, p) || continue
+        all(isfinite, VgtkCore.backproject(camera.geometric, p)) || continue
         t̂ = RadiometricCamera.t̂(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
         X[i, j], Y[i, j], Z[i, j] = RadiometricCamera.𝔣(camera, p); D[i, j] = 1 / t̂  # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩), camera frame
     end
@@ -97,7 +97,7 @@ function figure_focus_surfaces(t, out)
         rec = joinpath(dir, "radiometric_camera.json")
         isfile(rec) || throw(ArgumentError("[figures] focus panel $(p["case"]): $dir has no radiometric_camera.json (the refinement is not complete)"))
         cam = RadiometricCamera.load_radiometric_camera(rec).model          # (geometric: the focus surface of the model)
-        W, H = _sensor_size(cam.lens)
+        W, H = _sensor_size(cam.geometric)
         X, Y, Z, D = focus_surface_points(cam, W, H; spacing = Int(t["spacing_px"]))
         n = count(isfinite, D); n > 0 || throw(ArgumentError("[figures] focus panel $(p["case"]): no pixel of $W × $H has a focus point"))
         println("   $(p["case"]): $n of $(length(D)) lattice points in focus, distance $(round(minimum(filter(isfinite, D)); digits = 3)) … $(round(maximum(filter(isfinite, D)); digits = 3)) m")

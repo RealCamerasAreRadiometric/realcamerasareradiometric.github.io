@@ -39,7 +39,7 @@ function state_bearings(g::StartGeometry, st)
     idx = [findfirst(==(n), st.names) for n in g.names]
     any(isnothing, idx) && throw(ArgumentError("state_bearings: the state has no view $(join(g.names[isnothing.(idx)], ", ")) of the start geometry"))
     feats = _board_features(g, board_surface(g.target, st.target), g.observations)
-    return detection_bearings(st.camera.lens, st.poses[idx], feats)
+    return detection_bearings(st.camera.geometric, st.poses[idx], feats)
 end
 
 # ---- the self-check and its outputs --------------------------------------------------------------------------------------------

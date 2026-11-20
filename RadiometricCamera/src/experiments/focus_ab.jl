@@ -125,7 +125,7 @@ end
 """focus_ab.json: the variant as built, its start and final nodal values, and the node pixel counts."""
 function write_focus_ab(path, info, s::CalibrationState, W::Integer, H::Integer)
     f = focus(s)
-    cnt, θpx, noray = focus_node_pixel_counts(f, lens(s), s.px, W, H)
+    cnt, θpx, noray = focus_node_pixel_counts(f, geometric(s), s.px, W, H)
     noray > 0 && (@printf("focus_ab.json: %d of %d masked pixels have no ray through the lens (non-finite back-projection): in no node count\n",
                           noray, sum(length, s.px)); flush(stdout))
     VgtkIO.write_record(path, (; schema = RECORD_SCHEMAS.focus_ab, variant = info[:variant], kind = info[:kind], nodes = [collect(n) for n in f.nodes],

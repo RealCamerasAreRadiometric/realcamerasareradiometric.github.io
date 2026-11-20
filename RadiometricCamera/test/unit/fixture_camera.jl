@@ -1,4 +1,3 @@
-using RadiometricCamera: lens
 # Core's pixel cameras for the test scenes (included where the fixture board is: a `@testsetup` module cannot use another): the module
 # that includes this file has VisualGeometryToolkitCore as `VgtkCore`.
 

@@ -133,7 +133,7 @@ end
     run_lm!(s; maxiters = 100, reldcost = 1e-12, fixed = (:focus, :aperture, :vignetting, :lighting, :material))
     @test cost(s)[1] < 1e-3 * c0 && cost(s)[1] <= 1.01 * c_truth + 1e-12
     @test all(rad2deg(rotation_angle(RotMatrix{3}(s.poses[k].R' * f.poses[k].R))) < 1e-3 for k in 1:2)
-    @test maximum(abs, pinhole_θ(RC.lens(s))[3:4] .- pinhole_θ(f.lens_t)[3:4]) < 1e-3 * f.W
+    @test maximum(abs, pinhole_θ(RC.geometric(s))[3:4] .- pinhole_θ(f.lens_t)[3:4]) < 1e-3 * f.W
 end
 
 @testitem "photosites: the device evaluates the same residual" tags = [:gpu] setup = [RCFixtures, RCGPU, PhotositeScene] begin

@@ -110,10 +110,10 @@ through the chart (the dual template of the direction seeds is a zero of the foc
     f = view.focus
     if f.kind == 0
         t̂s = _t̂_seeded(t̂(f, 𝐩), fseed, ks)
-        return t̂s, normalize(_dir_seeded(_chief_ray(view.lens, 𝐩), dirseed, ks, t̂s))
+        return t̂s, normalize(_dir_seeded(_chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
     end
     tmpl = _t̂_seeded(zero(eltype(f.w)), fseed, ks)
-    dch = normalize(_dir_seeded(_chief_ray(view.lens, 𝐩), dirseed, ks, tmpl))
+    dch = normalize(_dir_seeded(_chief_ray(view.geometric, 𝐩), dirseed, ks, tmpl))
     return _t̂_seeded(t̂_dir(f, dch), fseed, ks), dch
 end
 @inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
@@ -354,7 +354,7 @@ const _MASK_CORNERS = (SVector(-0.5, -0.5), SVector(0.5, -0.5), SVector(-0.5, 0.
     view, bd, ap = f.view, f.board, f.aperture
     for c in _MASK_CORNERS
         𝐩 = 𝐩_of_pixel(u + c[1], v + c[2])
-        in_domain(view.lens, 𝐩) || return false
+        in_domain(view.geometric, 𝐩) || return false
         o, d = world_ray(view, 𝐩, 𝔭)
         s, 𝐱 = intersect_board(bd, o, d)
         (isfinite(s) && s > 0 && inside(chart(bd, 𝐱), f.δ)) || return false

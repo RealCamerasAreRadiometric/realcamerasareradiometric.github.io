@@ -285,7 +285,7 @@ function _from_start(s::CalibrationState, meta, start, opts::PipelineOptions)
     if _grid_gcv(opts)                                          # the GCV's weight of the start (a grid start's: `_grid_gcv`), its smoothness rebuilt there
         grid_gcv = start.grid_gcv
         grid_gcv === nothing && throw(ArgumentError("the start record $(start.dir) records no grid-smoothness GCV, the run chooses its weight by GCV"))
-        grid_sm = grid_smoothness(opts.grid.smoothness, s.camera.lens, data_norm2(s), meta.grid_int; weight = grid_gcv.β)
+        grid_sm = grid_smoothness(opts.grid.smoothness, s.camera.geometric, data_norm2(s), meta.grid_int; weight = grid_gcv.β)
     end
     c1, rms1 = start.costs.linear
     @printf("start loaded from %s: closed-form start rel-RMS %.4f; μ %.3f%s\n", start.dir, rms1, start.μ_lin,

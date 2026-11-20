@@ -11,7 +11,7 @@ block below runs when the documentation is built.
 ## The scene and the camera
 
 The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The geometric camera
-`lens` is VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels,
+`geometric` is VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels,
 over a double-sphere fisheye lens; any Core lens plugs in the same way. The image is `W × H` = 320 × 240 pixels (the
 `BoundedCamera`'s `Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration
 runs at the sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
@@ -26,7 +26,7 @@ texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 
 board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                                   # the image, in pixels
 K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)
-lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))   # the geometric camera
+geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
 scene = Scene(board, W, H)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide
@@ -54,7 +54,7 @@ board misses the sphere).
 
 ## The truth, and its photographs
 
-The true radiometric camera is one object, a [`RadiometricCameraModel`](@ref): the geometric camera `lens`, a focus surface at
+The true radiometric camera is one object, a [`RadiometricCameraModel`](@ref): the geometric camera `geometric`, a focus surface at
 1.5 m ([`Focus`](@ref): a constant inverse focus distance on a 3 × 3 node grid of the sensor), an aperture radius of 4 cm (no image
 distance: the defocus is the focus surface's) and a vignetting that falls off quadratically from the sensor's centre. The true
 lighting is a coloured spherical-harmonics field of degree 2, and the true material has the diffuse weight μ = 0.4. Each
@@ -64,7 +64,7 @@ the photograph's index `k`, which keys its Monte Carlo samples).
 ```@example tutorial
 xs = range(-0.5, 0.5; length = 4)
 vignetting_true = VisualGeometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
-camera_true = RadiometricCameraModel(lens, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # lens, focus surface, aperture radius (m), vignetting
+camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # geometric camera, focus surface, aperture radius (m), vignetting
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; μ = 0.4)

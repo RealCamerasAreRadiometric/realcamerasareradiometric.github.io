@@ -5,11 +5,17 @@
 Performance and composition (branch `perf/optimize-and-compose`, 2026-11-20). No number of a calibration changes beyond rounding:
 the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10).
 
-- **Added:** the radiometric camera composed from its geometric camera: `RadiometricCameraModel(lens; focus, aperture_radius,
+- **Added:** the radiometric camera composed from its geometric camera: `RadiometricCameraModel(geometric; focus, aperture_radius,
   vignetting)` — the focus surface (a `Focus`, or a distance: focused there everywhere), the aperture radius and the vignetting
   (V ≡ 1 by default: the flat 4 × 4 quadratic B-spline surface on the image); the image size is the geometric camera's.
-  `Focus(lens, distance; n = 3)`; `with_lens`, `with_focus`, `with_aperture_radius` beside `with_vignetting`; `lens`, `focus`,
-  `aperture_radius` of a camera. The positional constructor is unchanged.
+  `Focus(geometric, distance; n = 3)`; `with_geometric`, `with_focus`, `with_aperture_radius` beside `with_vignetting`;
+  `geometric`, `focus`, `aperture_radius` of a camera. The positional constructor is unchanged.
+- **Changed (breaking):** a radiometric camera's geometric camera is its `geometric`: the field of `RadiometricCameraModel` (was
+  `lens`), `geometric(camera)` and `geometric(state)` (were `lens(camera)`, `lens(state)`), `with_geometric` (the replacer). `lens`
+  is VisualGeometryToolkitCore's lens model everywhere: `lens(geometric(camera))`. The old spellings are refused by name with the
+  replacement (`with_lens`, `lens(camera)`, `lens(state)`; RadiometricCamera has no `lens` of its own). The records are unchanged:
+  the geometric camera's key in `rc/radiometric_camera/v3.1` and `rc/calibration_state/v3.1` is `"camera"`, as before. The start
+  records' and `load_session`'s `lens` entries (a start's camera, the `lens = :grid | :camera` choice) keep their names.
 - **Changed:** a ray's hit with the board is found once per linearization. The radiance record keeps each ray's board point and the
   surface's normal there (`RadianceJac`: `[L | ∂L/∂ℓ | 𝐱 | 𝐧]`); the Jacobian chunks meet the recorded hit's tangent plane with their
   dual ray (the implicit-function theorem's partials, no Newton) and the parts kernel takes the recorded hit (`_ray_hit`,

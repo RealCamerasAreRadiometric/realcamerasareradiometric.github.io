@@ -123,9 +123,9 @@ poses(p) = produce(p; product_records(DRIVER, CFG_PATH)...) do dir
     g1, g2 = decode_gain(CFG, SET), decode_gain(REFINEMENT, CFG["upstream"]["images"])
     g1 == g2 || error("the sheet's photographs were decoded at gain $g1, the refinement's at $g2 ($theirs): the two decodes must agree ([prepare.$SET] gain)")
     st = RC.load_state(state); p = CFG["poses"]
-    W, H = Tuple(VgtkCore.extent(st.camera.lens))   # the photographs' size: the refinement's camera (its pixels are theirs)
+    W, H = Tuple(VgtkCore.extent(st.camera.geometric))   # the photographs' size: the refinement's camera (its pixels are theirs)
     sheet = read_sheet(sheet_dir()); photos = config_input(CFG, p["images"]); design = config_input(CFG, p["board_design"])
-    finder = board_finder(design, st.camera.lens, p["find_boards"]; gallery = joinpath(dir, "gallery.jld2"))
+    finder = board_finder(design, st.camera.geometric, p["find_boards"]; gallery = joinpath(dir, "gallery.jld2"))
     page = board_page_map(finder.board.bundle, sheet)
     say(@sprintf("poses: state %s (aperture r %.4f mm), page %.1f × %.1f mm with %d blobs; board %s (%s) on the page: %d blobs, rigid fit RMS %.4f mm, max %.4f mm; BlobBoards' pose arm on %s (%s); decode gain %g", state, 1e3 * st.camera.aperture_radius, 1e3 * sheet.page_w, 1e3 * sheet.page_h,
                  length(sheet.blobs), finder.board.uid, design, length(page.residuals_mm), sqrt(mean(abs2, page.residuals_mm)), maximum(page.residuals_mm),
@@ -160,7 +160,7 @@ refine(fold::Integer) = produce(texture_product(fold); product_records(DRIVER, C
     device = RC.rc_backend("gpu"; inline = false, fallback = false)   # refused without a functional GPU: no CPU fallback
     say("refine: the page solve on the GPU ($(TextureGPU.gpu_name()))")
     s = CFG["texture"]
-    st = RC.load_state(state); sheet = read_sheet(sheet_dir()); images = prepared_images(CFG, SET); W, H = Tuple(VgtkCore.extent(st.camera.lens))
+    st = RC.load_state(state); sheet = read_sheet(sheet_dir()); images = prepared_images(CFG, SET); W, H = Tuple(VgtkCore.extent(st.camera.geometric))
     poses = read_poses(joinpath(product_dir(poses_product()), "poses.json"))
     # the camera held fixed is the calibration's COMPLETE camera (its observation model and render settings): the sheet's photographs
     # are read through RadiometricCamera's entry point under the camera's own sensor record, located by the case's characterisation input
@@ -300,7 +300,7 @@ function stacked_photograph(t, rep)
                           "$(CFG["texture"]["split_every"])): the figure shows a training photograph — name a fit one")
     img = VgtkFeatures.load_linear_image(joinpath(config_input(CFG, CFG["poses"]["images"]), t["photograph"]))[:, :, 1]
     _, R, tr = poses[k]
-    return page_photograph(img, RC.load_state(require_state()).camera.lens, R, tr; TW = Int(rep["TW"]), TH = Int(rep["TH"]), tex_mm = Float64(rep["tex_mm"]))
+    return page_photograph(img, RC.load_state(require_state()).camera.geometric, R, tr; TW = Int(rep["TW"]), TH = Int(rep["TH"]), tex_mm = Float64(rep["tex_mm"]))
 end
 figures(p) = produce_figures(p, figure_assets(CFG); driver = DRIVER, config_path = CFG_PATH,
                              inputs = [product_dir(report_product()), product_dir(poses_product()), config_input(CFG, CFG["poses"]["images"])]) do dir

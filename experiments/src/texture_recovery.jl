@@ -18,7 +18,7 @@
 # bootstrap. Only the cells enough fit, validation and test photographs cover are scored.
 # =============================================================================
 using RadiometricCamera
-using RadiometricCamera: chart, compute_mask, draws, focus, inside, lens, photo_file, residuals,
+using RadiometricCamera: chart, compute_mask, draws, focus, inside, photo_file, residuals,
                          world_ray
 const RC = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
@@ -350,7 +350,7 @@ The image circle of the refinement's radiometric camera (its state's `camera`: t
 state record holds in IO's bounded camera body), or `nothing` when the lens lights the whole sensor (the coverage is the sensor).
 """
 function image_circle_of(camera::RC.RadiometricCameraModel)
-    c = VgtkCore.lens_coverage(camera.lens)
+    c = VgtkCore.lens_coverage(camera.geometric)
     c isa VgtkCore.Ellipse && return c
     c isa VgtkCore.Circle && return Ellipse(Point2(Float64(c.center[1]), Float64(c.center[2])), Float64(c.r), Float64(c.r), 0.0)
     return nothing

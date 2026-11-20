@@ -105,7 +105,7 @@ end
     # recovery vs the grid truth (not the DS source), modulo the common rotation the gauge holds at the start's (`rotation_gauge_coordinates`):
     # the rays compared after Core's Kabsch rotation between the two lenses' rays
     let probe = [SVector(x, y) for x in 2.0:4.0:22.0 for y in 2.0:4.0:22.0]
-        a = [normalize(RC._chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC._chief_ray(s2.camera.lens, p)) for p in probe]
+        a = [normalize(RC._chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC._chief_ray(s2.camera.geometric, p)) for p in probe]
         R = SMatrix{3, 3, Float64}(VgtkCore.kabsch([a[i] => b[i] for i in eachindex(a)]))
         @test maximum(VgtkCore.angle_between(R' * b[i], a[i]) for i in eachindex(a)) < 5e-4
     end
@@ -198,8 +198,8 @@ end
     end
     # the solved lens: its present nodes moved, its absent ones still absent (no value: NaN)
     moved = [v isa RC._Patch ? RC.NLLSsolver.update(v, 1e-3 .* cos.(1:50)) : v for v in prob_f.variables]
-    lens = RC.extract_variables_grid(s, moved, idx_f)[1].lens       # (camera, poses, …): the camera's lens
-    l0 = s.camera.lens
+    lens = RC.extract_variables_grid(s, moved, idx_f)[1].geometric     # (camera, poses, …): the camera's lens
+    l0 = s.camera.geometric
     @test VgtkCore.present_nodes(VgtkCore.model(lens)) == held
     @test D(lens)[held] != D(l0)[held] && all(v -> all(isnan, v), D(lens)[.!held])
 end
@@ -276,6 +276,6 @@ end
         c0g = cost(s2g)[1]
         run_lm_grid!(s2g; patch = (5, 5), maxiters = 15)
         @test cost(s2g)[1] < 0.05 * c0g
-        @test grid_angular_error(s2g.camera.lens, glens_t) < 2e-3
+        @test grid_angular_error(s2g.camera.geometric, glens_t) < 2e-3
     end
 end

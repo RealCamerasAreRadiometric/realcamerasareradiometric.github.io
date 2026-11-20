@@ -27,7 +27,7 @@ own session, so it is not run here:
 ```julia
 # Illustrative: needs a calibration session's records and its photographs.
 using RadiometricCamera, VisualGeometryToolkitCore
-using RadiometricCamera: Material, RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
+using RadiometricCamera: Material, RenderSettings, geometric, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.scene.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])
@@ -37,7 +37,7 @@ s = CalibrationState(ds.scene, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, 
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # Core's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
 run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)
-save_grid("grid.json", lens(s))
+save_grid("grid.json", geometric(s))
 ```
 
 `lens = :grid` samples the session's camera into the generic grid model; `lens = :camera` keeps the pixel camera, which

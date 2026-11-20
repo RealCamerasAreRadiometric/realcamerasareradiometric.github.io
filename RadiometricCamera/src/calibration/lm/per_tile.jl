@@ -318,7 +318,7 @@ function build_problem_grid(s::CalibrationState{N}; patch::Tuple{Int, Int} = GRI
                             smoothness = nothing, rotation_gauge::Bool = !(:poses in Symbol.(fixed)),
                             inplane::Bool = false) where {N}
     fixed = Tuple(Symbol(k) for k in fixed)                 # the holds by name, once (a config's strings): every test below reads these
-    lens0 = s.camera.lens
+    lens0 = s.camera.geometric
     is_grid_lens(lens0) || throw(ArgumentError("build_problem_grid needs grid-lens views (Core's SplineLens camera; loader lens = :grid)"))
     G_x, G_y = grid_dims(lens0)
     C_x, C_y = G_x - 3, G_y - 3
@@ -426,7 +426,7 @@ end
 """The camera (with the re-assembled grid lens), the poses, the material, the surface and the lighting from a grid-problem variable
 vector (as `extract_variables`)."""
 function extract_variables_grid(s::CalibrationState, vars::Vector, idx)
-    lens0 = s.camera.lens::GridLike
+    lens0 = s.camera.geometric::GridLike
     ap = vars[idx.aperture]::ApertureVar
     lens_new = _assemble_lens(lens0, vars, idx.patches)
     mv = vars[idx.material]::MaterialVar
@@ -491,7 +491,7 @@ end
 problem not registered, `_register_grid_problem!`, or variables it cannot locate) — the same kernels as the view's batch, so the
 same values bit for bit."""
 _tile_batch(r::PerTileResidual, vars, need_jac::Bool) =
-    _await(_batch_launch(r.state, r.k, vars, _window_lens(r.state.camera.lens, r.P0, vars[2], vars[3], vars[4], vars[5]), vars[2],
+    _await(_batch_launch(r.state, r.k, vars, _window_lens(r.state.camera.geometric, r.P0, vars[2], vars[3], vars[4], vars[5]), vars[2],
                          _tile_dev!(r).px, _tile_dev!(r).idx, nothing, need_jac))
 
 """
@@ -665,7 +665,7 @@ cache's entry. One queue: the kernels share the scene's buffers, and a buffer us
 last, so separate queues bought little concurrency and made every launch wait for a kernel to end."""
 function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, need_jac::Bool)
     gb = _grid_batch(s)
-    lensf = _assemble_lens(s.camera.lens::GridLike, vec, gb.patches)
+    lensf = _assemble_lens(s.camera.geometric::GridLike, vec, gb.patches)
     return _batch_launch(s, k, vars, lensf, vec[first(gb.patches)], s.device_cache.px[k], s.device_cache.idx[k], key, need_jac)
 end
 """One chunk of a view batch's Jacobian (`_batch_launch`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on the
@@ -723,7 +723,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
             lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.scene, hk.st, m.surface.h))
         end
         plan = _chunk_plan(_chunk_starts(P, C), F, (lens32, dc.scene),
-                           hk === nothing ? nothing : (hk.view.lens, hk.scene))
+                           hk === nothing ? nothing : (hk.view.geometric, hk.scene))
         for (c0, Fc, inputs, high) in plan
             push!(jacf, (c0, _tile_chunk(Val(Fc), c0, C, lay, pose, foc, ap, m, inputs..., high)))
         end
@@ -780,7 +780,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
     need_f = !isempty(lay.focus_cols)
     need_g = any(q -> lay.patch_cols[q] > 0, 1:4)
     need_h = !isempty(lay.height_cols)
-    lens64 = _window_lens(s.camera.lens, r.P0, p00, p10, p01, p11)
+    lens64 = _window_lens(s.camera.geometric, r.P0, p00, p10, p01, p11)
     td = _tile_dev!(r)
     bufidx = ivs === r.pix ? td.pix : td.idx                # the tile's pixels among the buffer's: the view's (batched) or its own
     Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), lens64, r.pix, td.pix) : (nothing, nothing)

@@ -60,7 +60,7 @@ function refine_calibration!(state::CalibrationState; options::PipelineOptions, 
     res, trace, costs = _refine_calibration!(state, state.start, options; load_state)
     # the calibrated camera on output (the fold policy, 2026-11-15): held to the coverage assertion, and a remaining fold flags the
     # calibration non-converged — no calibration is accepted with a folded camera
-    folds = calibrated_folds(state.camera.lens; device = state.backend)
+    folds = calibrated_folds(state.camera.geometric; device = state.backend)
     folds === nothing || @printf("calibrated camera: folds %d of %d samples over its coverage (%d unimaged)%s\n", length(folds.folded), folds.samples,
                                  folds.unimaged, isempty(folds.folded) ? "" : " — NOT CONVERGED: a folded camera is no calibration")
     # the calibrated focus surface on output: a support node run to t̂ ≤ 0 (focus at infinity) or a non-finite one flags the
@@ -111,7 +111,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
     c1, rms1 = meta.costs.linear
     ϕ² = data_norm2(s)
     probe = [SVector(x * W₀, y * H₀) for x in 0.05:0.05:0.95, y in 0.05:0.05:0.95]   # a 19 × 19 probe grid of the image (pixels)
-    lens_init = lens(s)
+    lens_init = geometric(s)
     rays_init = [normalize(backproject(lens_init, p)) for p in probe]   # the start camera's probe rays, once (the drift monitor)
     pinned_material = "material" in opts.fixed
     lp = _refinement_lm(opts, route; smoothness = meta.grid_smoothness)   # THE problem: its blocks and holds (a parametric start has no grid smoothness)
@@ -151,7 +151,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
             @printf("      in-plane print error: a %+.4e (x by %+.4f %%, y by %+.4f %%)  shear u %+.4e (x += u·y in the placed chart, y up)\n",
                     surf.inplane[1], 100 * (exp(surf.inplane[1]) - 1), 100 * (exp(-surf.inplane[1]) - 1), surf.inplane[2])
         feats = _board_features(meta, surf, features)   # the board features follow the refined warping and print error
-        lens = camera.lens
+        lens = camera.geometric
         dr = [angle_between(normalize(backproject(lens, p)), r0) for (p, r0) in zip(probe, rays_init)]   # radians; NaN where a lens images no ray
         drift = any(isfinite, dr) ? median(filter(isfinite, dr)) : NaN
         it > 0 && _print_camera_parameters(route, lens)

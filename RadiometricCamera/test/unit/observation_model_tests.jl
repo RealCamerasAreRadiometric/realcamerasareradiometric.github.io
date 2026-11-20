@@ -41,7 +41,7 @@ end
             RC.save_radiometric_camera(f, RC.CalibratedCamera(small_model(), om, settings))
             c = RC.load_radiometric_camera(f)
             @test c isa RC.CalibratedCamera && c.observation == om && typeof(c.observation) == typeof(om) && c.settings == settings
-            @test c.model.lens == small_model().lens
+            @test c.model.geometric == small_model().geometric
         end
         @test VgtkIO.read_record(joinpath(dir, "camera.json")).observation_model.photos.kind == "decoded"
     end

@@ -21,7 +21,7 @@ Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the textu
 | `FocusSpline{N}` | the host solver of a `Focus` (Core's `ThinPlateSplineSystem`): values → coefficients | RC | no (host only) | Float64 |
 | aperture radius | a number, metres | — | yes | `T` |
 | vignetting | Core's `AbstractVignetting`: `TensorProductVignetting`, `RadialVignetting`, `LogVignetting` | Core | yes | `T` |
-| `RadiometricCameraModel{L, F, T, V}` | **the camera**: `(lens, focus, aperture_radius, vignetting)`, what every photograph shares | RC | yes (parametric lens) | host Float64 |
+| `RadiometricCameraModel{L, F, T, V}` | **the camera**: `(geometric, focus, aperture_radius, vignetting)`, what every photograph shares | RC | yes (parametric lens) | host Float64 |
 | pose | Core's `EuclideanMap`, camera → world | Core | yes | `T` |
 | `View{T, N, L, P}` | internal: the camera at a pose flattened to ONE element type, the vignetting apart (the kernels differentiate V analytically) | RC | yes | Float64 / Float32 / dual |
 | `PrintedTarget` | the board: Core's posed quad, its texture (or edge map), the warping's flat surface | RC over Core | no (arrays; adapted) | `T` |
@@ -98,25 +98,25 @@ camera = RadiometricCameraModel(lens, Focus(3, 1.5, W, H), 0.04,
 The image size is stated three times (the bound, the focus grid, the vignetting's rectangle), the common case needs
 two constructors of other types, and only the vignetting had a replacer (`with_vignetting`).
 
-### 2.2 Proposed (implemented on the branch, commit e37cde5; additive — the positional form is unchanged)
+### 2.2 Proposed (implemented on the branch, commit e37cde5; additive — the positional form is unchanged; names as of decision 1)
 
 ```julia
 # 1. the geometric camera: Core's, any lens
-lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
 
 # 2. the radiometric camera composed from it: what a geometric camera lacks, by name
-camera = RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.04)        # V ≡ 1 by default
-camera = RadiometricCameraModel(lens; focus = Focus(lens, 1.5; n = 5), aperture_radius = 0.04,
+camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)   # V ≡ 1 by default
+camera = RadiometricCameraModel(geometric; focus = Focus(geometric, 1.5; n = 5), aperture_radius = 0.04,
                                 vignetting = RadialVignetting(5, 𝐜, r_max))
 
 # 3. one part replaced, the others kept (immutable updates; each returns a new isbits camera)
-camera = with_focus(camera, Focus(lens, 2.0))
+camera = with_focus(camera, Focus(geometric, 2.0))
 camera = with_aperture_radius(camera, 0.02)
 camera = with_vignetting(camera, v)
-camera = with_lens(camera, other_lens)
+camera = with_geometric(camera, other)
 
 # 4. the parts read
-lens(camera), focus(camera), aperture_radius(camera), camera.vignetting
+geometric(camera), focus(camera), aperture_radius(camera), camera.vignetting
 
 # 5. a photograph is the camera at a pose
 img = render_view(k, camera, pose, material, light, scene, settings, mask; backend)
@@ -125,9 +125,9 @@ img = render_view(k, camera, pose, material, light, scene, settings, mask; backe
 | Kind | Names | Why this kind |
 |---|---|---|
 | type | `RadiometricCameraModel`, `Focus`, Core's cameras and vignettings | data with a layout the kernels read; all isbits |
-| function (constructor) | `RadiometricCameraModel(lens; focus, aperture_radius, vignetting)`, `Focus(lens, distance; n)` | composition; the image size read from the geometric camera's `extent` |
-| function (replacer) | `with_lens`, `with_focus`, `with_aperture_radius`, `with_vignetting` | immutable update, one part each |
-| function (accessor) | `lens` (Core's generic), `focus`, `aperture_radius` | the same names read a camera and a state |
+| function (constructor) | `RadiometricCameraModel(geometric; focus, aperture_radius, vignetting)`, `Focus(geometric, distance; n)` | composition; the image size read from the geometric camera's `extent` |
+| function (replacer) | `with_geometric`, `with_focus`, `with_aperture_radius`, `with_vignetting` | immutable update, one part each |
+| function (accessor) | `geometric`, `focus`, `aperture_radius` | the same names read a camera and a state |
 | trait-like dispatch (internal) | `_chief_ray(lens, 𝐩)`, `in_domain(lens, 𝐩)`, `_model_eltype`, `is_grid_lens` | the ONLY things RC asks of a geometric camera beyond Core's `backproject`/`project`; a new lens family needs nothing else |
 
 - `focus`: a `Focus`, or a distance (metres): the surface focused there everywhere on a 3 × 3 grid.
@@ -147,11 +147,11 @@ construction time.
 
 ### 2.3 What I did not change, and recommend
 
-1. **The field `lens` holds a camera.** `RadiometricCameraModel.lens` is a `BoundedCamera`, while Core's `lens(camera)`
-   returns the `Lens` of a camera; RC's `lens(state)` (and now `lens(camera)`) return the geometric camera. Two
-   meanings of one word across the stack. Recommendation: rename the field and accessor to `geometric` (the docs
-   already say "the geometric camera"), refusing the old spelling by name as the package does elsewhere. Public API
-   break; decided: section 6, decision 1.
+1. **The field `lens` held a camera** (done, decision 1). `RadiometricCameraModel.lens` was a `BoundedCamera`, while Core's
+   `lens(camera)` returns the `Lens` of a camera, and RC's `lens(state)` / `lens(camera)` returned the geometric camera: two
+   meanings of one word across the stack. Now the field (of the camera and of the kernels' `View`), the accessor of a camera and
+   of a state and the replacer are `geometric` / `with_geometric`; `lens` is Core's lens model everywhere
+   (`lens(geometric(camera))`), and RC's old spellings are refused by name.
 2. **No `convert_eltype`/`Adapt` method for `RadiometricCameraModel`.** Every kernel takes a `View`, so none is
    needed today; adding both (four lines) would let user kernels take the camera itself. Low value until someone
    needs it.
@@ -421,7 +421,7 @@ The owner's answers (2026-11-20) to the nine questions of this report's first ve
 
 | # | Question | Decision | Status |
 |---|---|---|---|
-| 1 | `lens` vs `geometric` | RENAME: the field, `geometric(camera)` / `geometric(state)`, the constructor's first argument, `with_lens` → `with_geometric`; the old spellings refused by name (src/api.jl); docs, README / index / landing, examples, experiments, tests follow | **not started** (≈ 150 sites; `r.lens`, `st.lens`, `m0.lens`, `ds.lens₀` are OTHER structs' fields and stay; the records' JSON keys are a separate question to settle with the rename). The constructor's argument is already named `geometric` (ee6c96b). |
+| 1 | `lens` vs `geometric` | RENAME: the field, `geometric(camera)` / `geometric(state)`, the constructor's first argument, `with_lens` → `with_geometric`; the old spellings refused by name (src/api.jl); docs, README / index / landing, examples, experiments, tests follow | **done** (RENAME_SHA). The fields of `RadiometricCameraModel` and of the internal `View` are `geometric`; `geometric` and `with_geometric` are public (beside `focus`, `aperture_radius`); `with_lens(…)`, `lens(camera)` and `lens(state)` throw an `ArgumentError` naming the replacement (the last two as methods of Core's `lens`: RC has no `lens` binding). No `getproperty` method refuses `camera.lens`: the camera and the `View` are kernel arguments, and Julia's own "type RadiometricCameraModel has no field lens" lists the fields. **Records unchanged**: no record key carried the field's name (the geometric camera is `"camera"` in `rc/radiometric_camera/v3.1` and `rc/calibration_state/v3.1`), so no schema moves. Left as `lens`: other structs' entries (a start record's and a start's `lens`, `ds.lens₀`, `load_session(…; lens = :grid)`, `photo_set(…; lens)` the lens identity, `[lens]`-family config keys, the `lens.json` files) and internal locals. No number changes (goldens untouched). |
 | 2 | Finding C's device numbers | ACCEPTED. Follow-up of high priority: re-centred Float32 geometry with Float64 accumulation (each pixel's chief-ray hit once in Float64 as a local origin, the per-ray hits and texture / edge lookups as Float32 offsets from it), measured against the 0.4 % gate per tile on the Siemens case, to drop the Float64 estimator and record (Float64 is 1/64 rate on the RTX Pro 6000s, 1/2 on a B200) | follow-up, not started |
 | 3 | Core 3.3 a–g | DO ALL, pushed and released through the stack's release process (the owner posts the Registrator comment), then RC adopts | a: committed locally on the monorepo branch `perf/height-field-fused-jacobian` (ea3cc069), not pushed; b–g not started |
 | 4 | Texture solve | (a) Krylov.jl (LSMR or CGLS, Jacobi-preconditioned by diag(AᵀA)), the penalty stacked `[A; √λ D]`, cuSPARSE CSR for `A` and an explicit `Aᵀ` in the CUDA extension; benchmark against `cgls`, verify the textures within tolerance, delete the redundant custom solver / CSR code, re-run the texture records once. (b) the error scoring stays on the device | (b) done (36c9de9); (a) not started. The device construction of this branch (`page_footprints`, `fit_operator`) produces exactly the CSR arrays a `CuSparseMatrixCSR` holds, so it carries over. |

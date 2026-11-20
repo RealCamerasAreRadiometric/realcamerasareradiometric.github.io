@@ -10,7 +10,7 @@
 # stopping tests (so the defaults' change does not enter).
 using RadiometricCamera, StaticArrays, LinearAlgebra
 using RadiometricCamera: all_parts, aperture_radius, BoardSurface, build_problem, build_problem_grid, compute_mask, cost, focus,
-                         Focus, FocusSpline, height_basis, HEIGHT_NFREE, lens, material, Material, PerViewResidual,
+                         Focus, FocusSpline, height_basis, HEIGHT_NFREE, geometric, material, Material, PerViewResidual,
                          PrintedTarget, render_all, RenderSettings, residuals, run_lm!, Scene, solve_radiometry_gn!,
                          sphere_radius, t̂, View, with_sdf, with_μ, Φ_pixel, 𝔟
 const RCg = RadiometricCamera
@@ -138,7 +138,7 @@ function gold_outputs()
     out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.camera.vignetting))), a = vec(Matrix(coefficients(s2.light))), μ = s2.mat.μ)
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
     s3 = deepcopy(s); cost0 = cost(s3)[1]; run_lm!(s3; maxiters = 3, reldcost = 1e-12, xtol = 1e-14)
-    out["lm3"] = (; cost = cost(s3)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(lens(s3)))), t̂ = collect(focus(s3).t̂_i), r = aperture_radius(s3),
+    out["lm3"] = (; cost = cost(s3)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3)))), t̂ = collect(focus(s3).t̂_i), r = aperture_radius(s3),
                   poses = [vcat(vec(p.R), collect(p.t)) for p in s3.poses], mat = collect(RCg.Θ_m_nonlinear(s3.mat)), μ = s3.mat.μ)
     # 3. per-tile problem (grid model, warping free): the largest tile
     s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., glens)
