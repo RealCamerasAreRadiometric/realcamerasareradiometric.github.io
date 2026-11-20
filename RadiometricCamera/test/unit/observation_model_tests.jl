@@ -89,7 +89,7 @@ end
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(VgtkCore.exp_so3(SVector(π, 0.0, 0.0))), SVector(0.0, 0.0, 1.4); check = false)]
     a = zeros(3, 9); a[:, 1] .= 1.0
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), RC.𝔟(board), 2.5)
-    mat = RC.Material(; 𝛂_ink = 0.2, 𝛂_noink = 0.3, 𝛈_ink = 1.5, 𝛈_noink = 1.4, μ = 0.5)
+    mat = RC.Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     s = RC.CalibrationState(RC.Scene(board, W, H), settings, camera, poses, mat, light, [zeros(H, W, 3)])       # decoded renders, no record
     @test RC.observation_model(s) == RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB)

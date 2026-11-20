@@ -58,7 +58,7 @@ end
     @test all(k -> one.ϕ[k] == ref.ϕ[k][c:3:end], 1:2)                                 # the measured entries, once
     # the other channels' lighting and η follow the measured channel
     a = coefficients(one.light)
-    @test a[1, :] == a[c, :] == a[3, :] && one.mat.𝛈_ink == fill(one.mat.𝛈_ink[c], 3) && one.mat.𝛈_noink == fill(one.mat.𝛈_noink[c], 3)
+    @test a[1, :] == a[c, :] == a[3, :] && one.mat.refractive_index_ink == fill(one.mat.refractive_index_ink[c], 3) && one.mat.refractive_index_paper == fill(one.mat.refractive_index_paper[c], 3)
     @test coefficients(ref.light) == a && ref.mat == one.mat
     # the cost: exactly a third (the same squared residuals, once instead of three times)
     @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-12
@@ -93,7 +93,7 @@ end
     @test all(rad2deg(rotation_angle(RotMatrix{3}(one.poses[k].R' * ref.poses[k].R))) < 1e-6 for k in 1:2)
     @test maximum(abs, VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(one))) .- VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(ref)))) < 1e-6
     @test maximum(abs, coefficients(one.light) .- coefficients(ref.light)) < 1e-6 * maximum(abs, coefficients(ref.light))
-    @test abs(one.mat.μ - ref.mat.μ) < 1e-6 && abs(one.mat.𝛈_ink[c] - ref.mat.𝛈_ink[c]) < 1e-6
+    @test abs(one.mat.diffuse_weight - ref.mat.diffuse_weight) < 1e-6 && abs(one.mat.refractive_index_ink[c] - ref.mat.refractive_index_ink[c]) < 1e-6
     # the other channels still follow the measured one
     a = coefficients(one.light); @test a[1, :] == a[c, :] == a[3, :]
 end

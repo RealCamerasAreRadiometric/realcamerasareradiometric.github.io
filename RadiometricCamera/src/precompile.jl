@@ -35,7 +35,7 @@
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)
-        mat = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+        mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         # a state of the scene seen through `lens`, its targets rendered at the truth
         function state(lens, scene_ = scene, st_ = st; kw...)

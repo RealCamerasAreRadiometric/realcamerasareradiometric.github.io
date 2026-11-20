@@ -86,13 +86,13 @@ open(joinpath(out, "grid.tsv"), "w") do io
     println(io, "α_ink\tα_noink\tη_ink\tη_noink\tμ\trel_RMS\tseconds"); flush(io)
     for (i, (ai, an, ei, en)) in enumerate(cands)
         t = time()
-        s.mat = Material(; 𝛂_ink = ai, 𝛂_noink = an, 𝛈_ink = ei, 𝛈_noink = en, μ = 0.5)
+        s.mat = Material(; roughness_ink = ai, roughness_paper = an, refractive_index_ink = ei, refractive_index_paper = en, diffuse_weight = 0.5)
         parts = all_parts(s)
         c = fit_light_mu!(s, parts); parts = nothing
         dt = time() - t
-        @printf(io, "%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.6f\t%.1f\n", ai, an, ei, en, s.mat.μ, relrms(c), dt); flush(io)
+        @printf(io, "%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.6f\t%.1f\n", ai, an, ei, en, s.mat.diffuse_weight, relrms(c), dt); flush(io)
         c < best.c && (global best = (; c, mat = s.mat, light = s.light))
-        @printf("%4d/%d  α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f  (%.0f s)%s\n", i, length(cands), ai, an, ei, en, s.mat.μ, relrms(c), dt,
+        @printf("%4d/%d  α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f  (%.0f s)%s\n", i, length(cands), ai, an, ei, en, s.mat.diffuse_weight, relrms(c), dt,
                 c == best.c ? "  *" : ""); flush(stdout)
         i % 16 == 0 && GC.gc()
     end
@@ -103,5 +103,5 @@ RC.save_state(joinpath(out, "state.json"),
               (; init..., target = RC.RadiometricTarget(init.target.target, init.target.warping, init.target.aspect, RC.TargetRadiometry(best.mat, r0.ink_spread, r0.print_blur)),
                  light = best.light, camera = s.camera);
               provenance = (; iteration = 0, material_grid = (; alphas = αs, etas = ηs, candidates = length(cands), rel_rms = relrms(best.c))))
-@printf("best: α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f → %s\n", best.mat.𝛂_ink, best.mat.𝛂_noink, η₂(best.mat.𝛈_ink), η₂(best.mat.𝛈_noink),
-        best.mat.μ, relrms(best.c), joinpath(out, "state.json"))
+@printf("best: α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f → %s\n", best.mat.roughness_ink, best.mat.roughness_paper, η₂(best.mat.refractive_index_ink), η₂(best.mat.refractive_index_paper),
+        best.mat.diffuse_weight, relrms(best.c), joinpath(out, "state.json"))

@@ -40,7 +40,7 @@
         @test RCg.material_fixed(mvh) == (:material,) && RCg.material_fixed(mv) == ()
         u = fill(0.01, Int(NL.nvars(mv)))
         m2 = NL.update(mvh, u)
-        @test RCg.Θ_m_nonlinear(m2.mat) == RCg.Θ_m_nonlinear(mv.mat) && m2.mat.μ == mv.mat.μ   # Θ_m held
+        @test RCg.Θ_m_nonlinear(m2.mat) == RCg.Θ_m_nonlinear(mv.mat) && m2.mat.diffuse_weight == mv.mat.diffuse_weight   # Θ_m held
         @test m2.surface.h != mv.surface.h                                                   # the warping moves
         m3 = NL.update(mv, u)
         @test RCg.Θ_m_nonlinear(m3.mat) != RCg.Θ_m_nonlinear(mv.mat)                         # (unfrozen: the material moves)

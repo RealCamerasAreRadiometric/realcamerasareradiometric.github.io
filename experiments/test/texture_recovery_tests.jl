@@ -272,7 +272,7 @@ end
     PNGFiles.save(joinpath(sheetdir, "texture.png"), [RGB{N0f16}(design[i, j], design[i, j], design[i, j]) for j in 1:TH, i in 1:TW])
     save_sheet_target(sheetdir; page_mm = (60.0, 84.0), blobs_mm = Dict(1 => SVector(5.0, 5.0)))
     sheet = read_sheet(sheetdir)
-    rad = RC.TargetRadiometry(RC.Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4), RC.BoardSurface(; edge = [0.021, 0.034]))
+    rad = RC.TargetRadiometry(RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), RC.BoardSurface(; edge = [0.021, 0.034]))
     target = RC.RadiometricTarget(nothing, zero(SVector{RC.HEIGHT_NC, Float64}), 1.0, rad)
     # five photographs (roles val, fit, fit, fit, test) of the sheet from 0.30–0.42 m (the sheet ≈ 100–130 px wide, defocused: the focus
     # is at 0.45 m), the camera on the printed side; world → camera

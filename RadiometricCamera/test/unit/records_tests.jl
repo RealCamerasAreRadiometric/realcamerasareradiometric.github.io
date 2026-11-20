@@ -23,7 +23,7 @@
                                    SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
     a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)
-    rad = TargetRadiometry(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
     target = RadiometricTarget(VgtkCore.model(posed_target(board)), SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC)), warping_aspect(board), rad)
     settings = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 7)
     ulps(a, b) = maximum(abs.(a .- b) ./ eps.(abs.(b)))
@@ -84,7 +84,7 @@ end
     square = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
     @test warping_aspect(square) == 1.0 && warping_aspect(tall) ≈ 0.7
-    rad = TargetRadiometry(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
     warped = RadiometricTarget(nothing, h, 1.0, rad)                    # learned on a square page
     flat = RadiometricTarget(nothing, zero(h), nothing, rad)              # a flat warping: aspect-free
@@ -125,7 +125,7 @@ end
         dec = RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB)          # a state of decoded renders, as `state_on`'s
         save_state(joinpath(dir, "state.json"), (; camera, target = warped, poses, names, light, settings, observation = dec, page_flip = nothing))
         sst = load_state(joinpath(dir, "state.json"))
-        mat0 = Material(; 𝛂_ink = 0.2, 𝛂_noink = 0.3, 𝛈_ink = 1.5, 𝛈_noink = 1.4, μ = 0.5)
+        mat0 = Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
         state_on(board) = CalibrationState(Scene(board, W, H), settings, camera, poses, mat0, light, [zeros(H, W, 3) for _ in 1:2])
         s = state_on(tall)
         @test_throws "learned on a page of aspect" RC.load_state_into!(s, sst, names)
@@ -143,7 +143,7 @@ end
     tex = fixture_board()
     square = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     tall = PrintedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
-    rad = TargetRadiometry(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+    rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
     θ = SVector(0.0123456789, -0.00098765)
     # the record holds (a, u); a flat, as-designed target has none; the error needs the page's aspect as the warping does; it is finite
@@ -241,7 +241,7 @@ end
         # …and through the calibration state that holds the camera
         tex = fixture_board()
         board = PrintedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        rad = TargetRadiometry(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4), BoardSurface(; edge = [0.021, 0.034]))
+        rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), BoardSurface(; edge = [0.021, 0.034]))
         target = RadiometricTarget(VgtkCore.model(posed_target(board)), zero(SVector{HEIGHT_NC, Float64}), nothing, rad)
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)

@@ -114,7 +114,7 @@ through the chart (the dual template of the direction seeds is a zero of the foc
     end
     tmpl = _t̂_seeded(zero(eltype(f.w)), fseed, ks)
     dch = normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, tmpl))
-    return _t̂_seeded(t̂_dir(f, dch), fseed, ks), dch
+    return _t̂_seeded(t̂(f, dch), fseed, ks), dch
 end
 @inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
     slot = fbase + ks
@@ -267,7 +267,7 @@ radiance.
                  light::EnvironmentLight, scene::Scene, st::RenderSettings, fseed = nothing, dirseed = nothing,
                  hrays = nothing, lrays = nothing) where {T}
     bd = scene.board
-    Tz = promote_type(T, eltype(mat.𝛈_ink), eltype(coefficients(light)), _vignetting_number_type(vig))
+    Tz = promote_type(T, eltype(mat.refractive_index_ink), eltype(coefficients(light)), _vignetting_number_type(vig))
     acc = _ray_zero(hrays, Tz)
     pid = pixel_id(u, v, scene.H)
     rays = _pixel_rays(hrays, scene)                                    # the board warping h's relief, formed once for the pixel's rays

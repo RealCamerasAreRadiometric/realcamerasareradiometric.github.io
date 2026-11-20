@@ -82,7 +82,7 @@ function benchmark_scene()
     vig = VisualRadiometryToolkitCore.with_control_points(flat, [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
     a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)
-    mat = RC.Material(; μ = 0.4)
+    mat = RC.Material(; diffuse_weight = 0.4)
     camera = RC.RadiometricCameraModel(lens, RC.Focus(3, 1.5, W, H), 0.04, vig)
     cpu = KA.CPU()
     masks = [RC.compute_mask(camera, p, scene, settings; δ = 0.02, backend = cpu) for p in poses]
@@ -91,7 +91,7 @@ function benchmark_scene()
     start_light = EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH)
     # the timed states: a perturbed start on the benchmark's device
     state(lens_ = lens) = RC.CalibrationState(scene, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
-                                              RC.Material(; μ = 0.7), start_light, photos; masks, backend = BE)
+                                              RC.Material(; diffuse_weight = 0.7), start_light, photos; masks, backend = BE)
     return (; board, scene, settings, poses, light, mat, camera, masks, photos, state, lens)
 end
 

@@ -14,6 +14,10 @@
 # reaches 178°).
 # ---------------------------------------------------------------------------
 
+# the azimuthal-equidistant chart of the chief directions is VisualGeometryToolkitCore's equidistant lens, called directly (a chart
+# point's direction is its `backproject`)
+const _FOCUS_CHART = VgtkCore.Lens(VgtkCore.Equidistant())
+
 """Largest and smallest chief-ray angle (to +z) of `lens0` on its image circle (Core's `lens_coverage`, an `Ellipse`: half a pixel
 inside it; its points on the sensor) or, when the lens lights the whole sensor, on the image border."""
 function focus_theta_max(lens0, W::Integer, H::Integer)
@@ -63,7 +67,7 @@ function focus_variant(fo::FocusOptions, lens0, nodes, focusA::Focus, in_support
         end
         cn = polar_cap_nodes(n, θmax)
         kind = variant == "C" ? FOCUS_DIRECTION_CHART : FOCUS_SPHERE
-        t0 = [max(ae_dir(ξ)[3] / d_c, 0.0) for ξ in cn]                    # the plane start cos θᵢ / 𝔱₀, floored at 0 (back rays)
+        t0 = [max(SVector{3}(backproject(_FOCUS_CHART, ξ))[3] / d_c, 0.0) for ξ in cn]                    # the plane start cos θᵢ / 𝔱₀, floored at 0 (back rays)
         f = Focus(FocusSpline(cn, kind), t0)
         info[:kind] = kind; info[:free] = fill(true, n); info[:theta_max] = θmax; info[:theta_min_border] = θmin
         sup = _ -> true                                                    # every node is a direction inside the cap
@@ -110,7 +114,7 @@ parametric lens refined past its invertible range at a corner, 2026-11-08) — c
 function focus_node_pixel_counts(f::Focus, lens, px, W::Integer, H::Integer)
     N = length(f.t̂_i)
     cnt = zeros(Int, N); θpx = 0.0; noray = 0
-    dirs = [ae_dir(SVector{2, Float64}(n)) for n in f.nodes]
+    dirs = [SVector{3}(backproject(_FOCUS_CHART, SVector{2, Float64}(n))) for n in f.nodes]
     for pv in px, (u, v) in pv
         𝐩 = 𝐩_of_pixel(u, v)
         d = normalize(SVector{3, Float64}(chief_ray(lens, 𝐩)))
@@ -129,7 +133,7 @@ function write_focus_ab(path, info, s::CalibrationState, W::Integer, H::Integer)
     noray > 0 && (@printf("focus_ab.json: %d of %d masked pixels have no ray through the lens (non-finite back-projection): in no node count\n",
                           noray, sum(length, s.px)); flush(stdout))
     VgtkIO.write_record(path, (; schema = RECORD_SCHEMAS.focus_ab, variant = info[:variant], kind = info[:kind], nodes = [collect(n) for n in f.nodes],
-            node_dirs = f.kind == 0 ? nothing : [collect(ae_dir(SVector{2, Float64}(n))) for n in f.nodes],
+            node_dirs = f.kind == 0 ? nothing : [collect(SVector{3}(backproject(_FOCUS_CHART, SVector{2, Float64}(n)))) for n in f.nodes],
             free = collect(info[:free]), n_free = count(info[:free]), start = info[:start], final = collect(f.t̂_i),
             theta_max = get(info, :theta_max, nothing), theta_min_border = get(info, :theta_min_border, nothing), theta_max_border = get(info, :theta_max_border, nothing), theta_max_detections = get(info, :theta_max_detections, nothing), theta_max_masked_px = θpx,
             smoothness = (; get(info, :smoothness, smoothness_record(NoSmoothness()))..., row_weight = get(info, :smoothness_row_weight, 0.0)),

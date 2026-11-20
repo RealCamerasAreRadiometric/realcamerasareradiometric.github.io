@@ -19,7 +19,7 @@
     @testset "unit chief direction" begin
         @test maximum(abs(norm(RCU.chief_ray(g_u, 𝐩)) - 1) for 𝐩 in 𝐩s_u) > 0.05          # the raw blend is deliberately far from unit
         for 𝐩 in 𝐩s_u
-            d̂ = RCU.chief_dir(g_u, 𝐩)
+            d̂ = RCU.chief_direction(g_u, 𝐩)
             @test norm(d̂) ≈ 1 atol = 1e-14
             @test d̂ ≈ normalize(RCU.chief_ray(g_u, 𝐩)) atol = 1e-14
             @test norm(RCU.𝔣(camera_u, 𝐩)) * RCU.t̂(camera_u.focus, 𝐩) ≈ 1 atol = 1e-12  # 𝔭 = 0: the focus distance is exactly 1/t̂
@@ -29,12 +29,12 @@
             end
             @test RCU.π̂⁻¹(camera_u, 𝐩, SVector(0.0, 0.0, 0.0)) ≈ d̂ atol = 1e-14              # π̂⁻¹(𝐩, 𝔭) = d̂(𝐩)
             # the sensor Jacobian of the UNIT direction is tangent to the unit sphere
-            Jg = ForwardDiff.jacobian(p -> RCU.chief_dir(g_u, p), 𝐩)
+            Jg = ForwardDiff.jacobian(p -> RCU.chief_direction(g_u, p), 𝐩)
             @test all(abs.(Jg' * d̂) .< 1e-10)
         end
-        # parametric lenses are unit already: chief_dir changes nothing there
+        # parametric lenses are unit already: chief_direction changes nothing there
         for 𝐩 in 𝐩s_u
-            @test RCU.chief_dir(kb_u, 𝐩) ≈ RCU.chief_ray(kb_u, 𝐩) atol = 1e-14
+            @test RCU.chief_direction(kb_u, 𝐩) ≈ RCU.chief_ray(kb_u, 𝐩) atol = 1e-14
         end
     end
 end

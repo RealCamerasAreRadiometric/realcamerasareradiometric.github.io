@@ -16,6 +16,20 @@ number of a calibration changes: the moved code is the same arithmetic, and the 
   them from there (`using VisualRadiometryToolkitCore: Focus, Material`). `RadiometricCameraModel` stays exported here (a re-export: the
   headline's camera type). The moved names this package does not use itself (`with_geometric`, `with_focus`, `with_aperture_radius`,
   `pixel_of_𝐩`, `ℐ_𝐮`, `aperture_samples`, `aperture_border`, `Λ_ggx`, `G1_ggx`, `ae_chart`) are refused by name with the replacement.
+- **Changed (breaking): VisualRadiometryToolkitCore's public names are descriptive ASCII.** The paper's symbols are its public
+  aliases of the same functions (`𝔭`, `𝔣`, `π̂⁻¹`, `t̂`, `𝔱`, `𝐩_of_pixel`, `pixel_of_𝐩`, `ℐ_𝐮`, `𝐩_sample`, `𝐚_sample`, `𝐚_weight`,
+  `𝐚_border`, `Θ_m_nonlinear`, `with_μ`, `𝛂`, `𝛈`, `Λ_ggx`): this package's source keeps them. The plain spellings changed and have
+  no alias: `chief_dir` → `chief_direction`, `D_ggx` → `ggx_distribution`, `G1_ggx` → `ggx_masking`, `G2_ggx` →
+  `ggx_masking_shadowing`, `F_dielectric` → `fresnel_dielectric`, `sample_vndf_caps` → `sample_visible_normal`, `D_v` →
+  `visible_normal_density`, `PDF_reflect` → `reflection_pdf`, `f_CT_parts` → `cook_torrance_terms`, `f_CT` → `cook_torrance`,
+  `t̂_dir(focus, d)` → `t̂(focus, d)` (`inverse_focus_distance`); `ae_chart` and `ae_dir` are gone (VisualGeometryToolkitCore's
+  equidistant lens, `project` / `backproject` of `Lens(Equidistant())`). Each old spelling is refused here by name with what to call.
+  The radiometric back-projection `π̂⁻¹(camera, 𝐩, 𝐚)` is a method of VisualGeometryToolkitCore's `backproject` (the aperture point
+  its third argument; `π̂⁻¹` is an alias of `backproject`); on a camera's parts it is VisualRadiometryToolkitCore's
+  `aperture_direction`.
+- **Changed (breaking):** `Material`'s fields and constructor keywords are ASCII: `roughness_ink`, `roughness_paper`,
+  `refractive_index_ink`, `refractive_index_paper`, `diffuse_weight` (were `𝛂_ink`, `𝛂_noink`, `𝛈_ink`, `𝛈_noink`, `μ`). The records'
+  JSON keys (`alpha_ink`, `alpha_noink`, `eta_ink`, `eta_noink`, `mu`) and the options' TOML keys are unchanged.
 - **Changed (breaking):** the vignetting fields and the light (`TensorProductVignetting`, `RadialVignetting`, `EnvironmentLight`,
   `SphericalHarmonicMap` and their functions) are VisualRadiometryToolkitCore's, no longer VisualGeometryToolkitCore's: every use
   here names that package.

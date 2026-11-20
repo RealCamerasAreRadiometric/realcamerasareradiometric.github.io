@@ -216,7 +216,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
                                 dropped = length(dropped), dropped_nodes = dropped)
     end
     empty_targets = [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:K]
-    material0 = Material(; 𝛂_ink = opts.material.alpha_ink, 𝛂_noink = opts.material.alpha_noink, 𝛈_ink = opts.material.eta_ink, 𝛈_noink = opts.material.eta_noink, μ = opts.material.mu)
+    material0 = Material(; roughness_ink = opts.material.alpha_ink, roughness_paper = opts.material.alpha_noink, refractive_index_ink = opts.material.eta_ink, refractive_index_paper = opts.material.eta_noink, diffuse_weight = opts.material.mu)
     light0 = EnvironmentLight(SphericalHarmonicMap(1.0, opts.lighting.sh_order), b, r_SH)   # L ≡ 1 in every channel
     make_vig, vig_desc = _vignetting_spec(opts, W₀, H₀, coverage, vig_c)
     println("vignetting field: ", vig_desc, "; gauge V(𝐜) = 1 held ", "exactly (the centre's free direction eliminated)"); flush(stdout)
@@ -255,7 +255,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     solve_linear_blocks!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint,
                          vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
-    c1, rms1 = cost(s); μ_lin = s.mat.μ
+    c1, rms1 = cost(s); μ_lin = s.mat.diffuse_weight
     @printf("linear sweep (%.0f s): cost %.4e rel-RMS %.4f; μ %.3f; V centre %.3f\n", time() - t1, c1, rms1, μ_lin, s.camera.vignetting(VgtkCore.center(s.camera.vignetting))); flush(stdout)
     isempty(meta.vignetting_gcv) || (g = last(meta.vignetting_gcv);
         @printf("vignetting smoothness: β %.4g by GCV (minimum %.6g, %.1f effective parameters of %d%s)\n", g.β, g.gcv, g.dof, g.n_free,

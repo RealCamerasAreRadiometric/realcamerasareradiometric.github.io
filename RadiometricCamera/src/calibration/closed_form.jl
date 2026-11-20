@@ -313,7 +313,7 @@ function _radiometry_lm(s::CalibrationState, parts::RadiometryParts, lay)
     be = s.backend
     Z = adapt(be, Matrix{Float64}(vignetting_basis(s)))
     return _RadiometryLm(parts.parts, parts.ϕ, parts.w, VgtkCore.convert_eltype(Float64, s.camera.vignetting),
-                         SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light)), Float64(s.mat.μ), Z, fit_channels(s), lay,
+                         SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light)), Float64(s.mat.diffuse_weight), Z, fit_channels(s), lay,
                          VgtkCore.device_zeros(Float64, be, 1 + lay.N + lay.N^2, _reduction_items(length(parts))))
 end
 
@@ -371,7 +371,7 @@ function _design_matrix(s::CalibrationState, parts::RadiometryParts, blk::Val)
     a = SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light))
     n = blk === Val(:light) ? size(a, 2) : n_control_points(vig)
     A = VgtkCore.device_zeros(Float64, s.backend, length(chs) * length(parts), n)
-    VgtkCore._launch_rows!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(s.mat.μ), blk)
+    VgtkCore._launch_rows!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(s.mat.diffuse_weight), blk)
     return Array(A)
 end
 
@@ -465,7 +465,7 @@ in μ) of the μ-only normal equations, the reduction kernel's (`radiometry_norm
 """
 function solve_μ!(s::CalibrationState, parts::RadiometryParts = all_parts(s))
     _, g, H = radiometry_normal_equations(s, parts; light = false, vignetting = false, mu = true, chart = false)
-    H[1, 1] > 0 && (s.mat = with_μ(s.mat, clamp(s.mat.μ - g[1] / H[1, 1], s.mu_bounds...)))
+    H[1, 1] > 0 && (s.mat = with_μ(s.mat, clamp(s.mat.diffuse_weight - g[1] / H[1, 1], s.mu_bounds...)))
     return s
 end
 

@@ -23,14 +23,14 @@ Identifier ↔ paper symbol (section):
 Core's backproject, in_domain              π⁻¹(𝐩; Θ_d), the geometric model              (Radiometric Camera Model)
 RadiometricCameraModel (VRTK Core's)       Θ_d, Θ_f, r and Θ_v                             (Radiometric Camera Model)
 View (pose, the camera's parts)            Θ_e + the camera, as the renderer evaluates it  (Radiometric Camera Model)
-chief_dir, 𝔣, π̂⁻¹                          π⁻¹/‖π⁻¹‖, 𝔣(𝐩), π̂⁻¹(𝐩, 𝐚)                      (Radiometric Camera Model)
+chief_direction, 𝔣, π̂⁻¹                    π⁻¹/‖π⁻¹‖, 𝔣(𝐩), π̂⁻¹(𝐩, 𝐚)                      (Radiometric Camera Model)
 Focus, t̂, 𝔱, FocusSpline (VRTK Core's)     t̂ = 1/t, the thin plate spline (Core's)         (Focus surface)
 𝔭                                          the centre of projection 𝔭                     (Radiometric Camera Model)
 SensorQuadrature, ApertureQuadrature       the rules on 𝓘_𝐮 and on the unit disc 𝒟        (Image Formation)
 VRTK Core's RadialVignetting (P)          V(𝐩) = Σ_i N_{i,p}(‖𝐩 − 𝐜‖/r_max) P_i         (Vignetting)
 VRTK Core's EnvironmentLight (𝔟, r_SH, a)  L_c^SVSH on the sphere (𝔟, r_SH), a_{c,l}^m     (Lighting)
-Material (𝛂_*, 𝛈_*, μ), f_CT               Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}, f_c^CT  (SVBSDF and Monte Carlo Estimation)
-D_ggx, G2_ggx, F_dielectric, D_v           D, G₂, F_c, D^v (visible-normal sampling)      (SVBSDF and Monte Carlo Estimation)
+Material, cook_torrance                    Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}, f_c^CT  (SVBSDF and Monte Carlo Estimation)
+VRTK Core's ggx_distribution, ggx_masking_shadowing, fresnel_dielectric, visible_normal_density   D, G₂, F_c, D^v   (SVBSDF and Monte Carlo Estimation)
 PrintedTarget, BoardSurface.h, board_height 𝓑 (Core's posed target + the print) and its warping h  (Board Warping)
 Φ_pixel, L_c                               Φ_c(𝐮), L_c(𝐱, ω)                              (Image Formation)
 PerViewResidual                            ϕ − Φ(Θ̄); V(0) = 1 held by `gauge_basis`        (Calibration Pipeline)
@@ -91,16 +91,18 @@ import VisualRadiometryToolkitIO                  # the vignetting and environme
 using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light: real SH on a sphere
 using VisualRadiometryToolkitCore: AbstractVignetting, NoVignetting, TensorProductVignetting, RadialVignetting, VIGNETTING_TAGS,
                                    coefficient_jacobian, control_points, with_control_points, n_control_points   # the vignetting fields (their centre is `VgtkCore.center`)
-using VisualRadiometryToolkitCore: RadiometricCameraModel, with_vignetting, chief_ray, 𝔭       # the radiometric camera, its geometric camera's chief ray
-using VisualRadiometryToolkitCore: Focus, FocusSpline, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE, ae_dir, t̂_dir,
+using VisualRadiometryToolkitCore: RadiometricCameraModel, with_vignetting, chief_ray, 𝔭, aperture_direction   # the radiometric camera, its geometric camera's chief ray, the back-projection from the aperture on a camera's parts
+using VisualRadiometryToolkitCore: Focus, FocusSpline, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE,
                                    focus_weights, polar_cap_nodes                                # the focus surface and its kinds
 using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, 𝐩_sample,
                                    𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border              # the sensor domain and the quadrature rules
 using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈,
-                                   sample_vndf_caps, PDF_reflect, reflect, f_CT_parts, f_CT   # the material: the Cook–Torrance BSDF
+                                   sample_visible_normal, reflection_pdf, reflect, cook_torrance_terms, cook_torrance   # the material: the Cook–Torrance BSDF
 # its camera-frame maps and part accessors, which this package's records answer by forwarding (VisualRadiometryToolkitCore's
-# CONTRACT_GENERICS): the kernels' `View` (camera/view.jl) and the calibration state (calibration/state.jl)
-import VisualRadiometryToolkitCore: chief_dir, t̂, 𝔣, π̂⁻¹, world_ray, geometric, focus, aperture_radius
+# CONTRACT_GENERICS, and VisualGeometryToolkitCore's `backproject`, whose alias there is the paper's π̂⁻¹): the kernels' `View`
+# (camera/view.jl) and the calibration state (calibration/state.jl). The paper's symbols are VisualRadiometryToolkitCore's public
+# aliases of its descriptive names (𝔣 = focus_point, t̂ = inverse_focus_distance, …): this package's source keeps the symbols.
+import VisualRadiometryToolkitCore: chief_direction, t̂, 𝔣, π̂⁻¹, world_ray, geometric, focus, aperture_radius
 
 # camera: the geometric back-projection models and the kernels' view of the radiometric camera
 include("camera/node_support.jl")            # the data support of a spline's nodes: one rule (vignetting, focus)

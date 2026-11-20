@@ -30,9 +30,17 @@
     # what moved to VisualRadiometryToolkitCore is not a public name here; a moved name this package does not use is refused by name
     @test !Base.ispublic(RC, :geometric) && !Base.ispublic(RC, :Focus) && Base.ispublic(RC, :flat_vignetting) && Base.isexported(RC, :RadiometricCameraModel)
     @test RC.geometric === VrtkCore.geometric && RC.Focus === VrtkCore.Focus && RC.Material === VrtkCore.Material
-    for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱)
+    for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱,
+              :chief_dir, :sample_vndf_caps, :PDF_reflect, :f_CT_parts, :f_CT, :t̂_dir, :ae_chart, :ae_dir)
         @test_throws "moved to VisualRadiometryToolkitCore" getfield(RC, n)(1)
     end
+    # VisualRadiometryToolkitCore's public names are descriptive; the refusal names the one to call, and the paper's symbols this
+    # package's source keeps are its aliases of the same functions (π̂⁻¹ is VisualGeometryToolkitCore's `backproject`)
+    @test_throws "`chief_direction`" RC.chief_dir(1)
+    @test_throws "`cook_torrance`" RC.f_CT(1)
+    @test_throws "`backproject(Lens(Equidistant()), ξ)`" RC.ae_dir(1)
+    @test RC.𝔣 === VrtkCore.focus_point && RC.t̂ === VrtkCore.inverse_focus_distance && RC.π̂⁻¹ === VgtkCore.backproject && RC.𝔭 === VrtkCore.center_of_projection
+    @test RC.π̂⁻¹(v, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0)) === VrtkCore.aperture_direction(v.geometric, v.focus, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0))
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it
     @test fieldnames(RadiometricCameraModel) == (:geometric, :focus, :aperture_radius, :vignetting) && fieldnames(View) == (:pose, :geometric, :focus, :r)
     @test !any(n -> isdefined(RC, n), (:InFocusBlur, :NO_BLUR, :in_focus_blur, :blur_sigmas, :with_blur, :with_in_focus_blur, :set_camera!))
@@ -41,11 +49,11 @@
     @test RC.world_ray(c, pose, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0)) == RC.world_ray(v, SVector(5.0, 7.0), SVector(0.01, 0.0, 0.0))
     # the view's maps are VisualRadiometryToolkitCore's implementation on the view's parts (one-line forwards), bit for bit
     let 𝐩 = SVector(5.0, 7.0), 𝐚 = SVector(0.01, 0.0, 0.0)
-        @test RC.chief_dir(v, 𝐩) === RC.chief_dir(lens, 𝐩) && RC.π̂⁻¹(v, 𝐩, 𝐚) === RC.π̂⁻¹(c, 𝐩, 𝐚) === RC.π̂⁻¹(v, 𝐩, 𝐚, RC.t̂(v, 𝐩))
-        @test RC.world_ray(v, 𝐩, 𝐚, RC.t̂(v, 𝐩)) == RC.world_ray(v, 𝐩, 𝐚) == RC.world_ray_dir(v, 𝐚, RC.chief_dir(v, 𝐩), RC.t̂(v, 𝐩))
+        @test RC.chief_direction(v, 𝐩) === RC.chief_direction(lens, 𝐩) && RC.π̂⁻¹(v, 𝐩, 𝐚) === RC.π̂⁻¹(c, 𝐩, 𝐚) === RC.π̂⁻¹(v, 𝐩, 𝐚, RC.t̂(v, 𝐩))
+        @test RC.world_ray(v, 𝐩, 𝐚, RC.t̂(v, 𝐩)) == RC.world_ray(v, 𝐩, 𝐚) == RC.world_ray_dir(v, 𝐚, RC.chief_direction(v, 𝐩), RC.t̂(v, 𝐩))
     end
     # the target's radiometry: the material and the print's edge, lengths as quantities, the state's mm values back bit for bit
-    m = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
+    m = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     surf = BoardSurface(edge = SVector(0.6, 0.028))
     r = TargetRadiometry(m, surf)
     @test material(r) == m && edge_parameters(r) == surf.edge

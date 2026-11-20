@@ -104,12 +104,26 @@ VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 # ---- moved names (owner 2026-11-20: the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
 # imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
 # their replacement (no alias, no forwarding).
-_moved_to_radiometry(name::Symbol) = throw(ArgumentError(
-    "RadiometricCamera.$name moved to VisualRadiometryToolkitCore, under the same name — `using VisualRadiometryToolkitCore: $name`"))
-for name in (:with_geometric, :with_focus, :with_aperture_radius, :ae_chart, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border,
-             :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱)
+# VisualRadiometryToolkitCore's public names are descriptive; a symbol of the paper is its public alias of the same function, and a
+# plain old spelling has no alias: each row names what to call there.
+_moved_to_radiometry(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
+    "RadiometricCamera.$name moved to VisualRadiometryToolkitCore: $replacement"))
+for (name, replacement) in (
+        :with_geometric => "`with_geometric`", :with_focus => "`with_focus`", :with_aperture_radius => "`with_aperture_radius`",
+        :aperture_samples => "`aperture_samples`", :aperture_border => "`aperture_border`", :luma => "`luma`", :n_nodes => "`n_nodes`",
+        :pixel_of_𝐩 => "`pixel_position` (the paper's symbol stays its alias, `pixel_of_𝐩`)",
+        :ℐ_𝐮 => "`pixel_footprint` (the paper's symbol stays its alias, `ℐ_𝐮`)",
+        :𝔱 => "`focus_distance` (the paper's symbol stays its alias, `𝔱`)",
+        :Λ_ggx => "`ggx_lambda` (the paper's symbol stays its alias, `Λ_ggx`)",
+        :G1_ggx => "`ggx_masking`", :D_ggx => "`ggx_distribution`", :G2_ggx => "`ggx_masking_shadowing`",
+        :F_dielectric => "`fresnel_dielectric`", :D_v => "`visible_normal_density`",
+        :chief_dir => "`chief_direction`", :sample_vndf_caps => "`sample_visible_normal`", :PDF_reflect => "`reflection_pdf`",
+        :f_CT_parts => "`cook_torrance_terms`", :f_CT => "`cook_torrance`",
+        :t̂_dir => "`inverse_focus_distance(focus, direction)` (the paper's `t̂`, its alias, of a unit chief direction)",
+        :ae_chart => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `project(Lens(Equidistant()), d)`",
+        :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`")
     @eval begin
-        @doc $("Moved (owner 2026-11-20): `VisualRadiometryToolkitCore.$name`.")
-        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)))
+        @doc $("Moved (owner 2026-11-20) to VisualRadiometryToolkitCore: $replacement.")
+        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)), $replacement)
     end
 end

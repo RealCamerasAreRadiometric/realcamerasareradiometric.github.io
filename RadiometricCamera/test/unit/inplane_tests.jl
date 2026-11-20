@@ -32,7 +32,7 @@
     camera_param_i = RadiometricCameraModel(lens_param_i, focus_i, 0.0386, vig_i)         # the parametric camera it is sampled from
     b_i = 𝔟(board_i); a_i = zeros(3, 9); a_i[:, 1] .= (2.0, 1.9, 1.8); a_i[:, 3] .= (0.4, 0.3, 0.2)
     light_i = EnvironmentLight(SphericalHarmonicMap(a_i, 2), b_i, sphere_radius(b_i, [p.t for p in poses_i]))
-    mat_i = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
+    mat_i = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     st_i = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks_i = [compute_mask(camera_i, p, scene_i, st_i; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_i]                 # the mask is the plane's, padded past the 3 % stretch
     blank_i = [zeros(Hi, Wi, 3) for _ in 1:2]

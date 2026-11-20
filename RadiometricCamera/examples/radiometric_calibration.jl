@@ -7,7 +7,7 @@
 # * `𝔣(𝐩) = 𝔭 + π⁻¹(𝐩)/t̂(𝐩)` the focus surface, `t̂` the inverse focus depth (thin plate spline with kernel `U` and affine part
 #   `a_1, a_x, a_y`, nodal values `Θ_f`); `π̂⁻¹(𝐩, 𝐚)` the radiometric back-projection through the aperture point `𝐚 = r â`;
 # * `V(𝐩; Θ_v)` vignetting (B-spline surface, V = 1 at the sensor centre), `L_SH` / `L_SVSH` the ambient light on the sphere `(𝔟, r_SH)`
-#   (`Θ_l`), `f_CT` the Cook–Torrance SVBSDF with `𝛂, 𝛈` blended by the texture value and the diffuse weight `μ` (`Θ_m`);
+#   (`Θ_l`), `cook_torrance` the Cook–Torrance SVBSDF with `𝛂, 𝛈` blended by the texture value and the diffuse weight `μ` (`Θ_m`);
 # * `Φ_c(𝐮; Θ̄)` the radiant flux of pixel 𝐮: Gauss–Legendre over the pixel footprint × polar rule over the fixed unit disc
 #   (`𝐚 = r â`, weights `r² w̃`), `L_c` by Monte Carlo over VNDF samples with common random numbers.
 #
@@ -77,7 +77,7 @@ lens0 = grid_model(ds.lens₀, 35, 25);
 #   camera → world `EuclideanMap` (`ds.poses`);
 # * `EnvironmentLight(SphericalHarmonicMap(radiance, l_max), 𝔟, r_SH)` (VisualGeometryToolkitCore's): SH light of order l_max on the
 #   sphere of radius `r_SH` around the board centre `𝔟` (`sphere_radius` = the sphere through the farthest camera);
-# * `Material(; 𝛂_ink, 𝛂_noink, 𝛈_ink, 𝛈_noink, μ)`: Θ_m — GGX roughness and refractive index of ink and paper (blended by the texture
+# * `Material(; roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper, diffuse_weight)`: Θ_m — GGX roughness and refractive index of ink and paper (blended by the texture
 #   value) and the diffuse weight μ; the board warping h and the printed-edge parameters are the scene's `BoardSurface` (flat here);
 # * `RenderSettings(; n_𝐩, n_ρ, n_φ, N)`: n_𝐩² sensor nodes per pixel, n_ρ × n_φ polar aperture nodes, N VNDF samples per node.
 
@@ -89,7 +89,7 @@ vig0 = VrtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degre
 camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: geometric camera, focus, aperture, vignetting
 b = 𝔟(ds.scene.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
 light0 = VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
-mat0 = Material(; 𝛂_ink = 0.15, 𝛂_noink = 0.4, 𝛈_ink = 1.6, 𝛈_noink = 1.33, μ = 0.5)
+mat0 = Material(; roughness_ink = 0.15, roughness_paper = 0.4, refractive_index_ink = 1.6, refractive_index_paper = 1.33, diffuse_weight = 0.5)
 st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 @printf("f %.2f mm, d_s %.3f mm, r %.2f mm, light sphere r_SH %.2f m around 𝔟 = (%.2f, %.2f, %.2f) m\n", 1e3f_m, 1e3d_s, 1e3r0, r_SH, b...)
 
@@ -120,10 +120,10 @@ end
 # vignetting gauge V(𝐜) = 1 is exact (the centre's free direction eliminated, `gauge_basis`), no geometric prior.
 
 solve_linear_blocks!(s; light = true, vignetting = true, mu = true); c1, rms1 = cost(s)
-@printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, s.mat.μ, s.camera.vignetting(VgtkCore.center(s.camera.vignetting) + SVector(0.4W, 0.0)))
+@printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, s.mat.diffuse_weight, s.camera.vignetting(VgtkCore.center(s.camera.vignetting) + SVector(0.4W, 0.0)))
 trace = NamedTuple[]
 monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", it, cst,
-                                                               1e3 * camera.aperture_radius, mat.μ, mat.𝛂_noink, mat.𝛂_ink)
+                                                               1e3 * camera.aperture_radius, mat.diffuse_weight, mat.roughness_paper, mat.roughness_ink)
 res = run_lm_grid!(s; maxiters = 3, trace, iter_callback = monitor, verbose = false)
 c2, rms2 = cost(s)
 @printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.rule)

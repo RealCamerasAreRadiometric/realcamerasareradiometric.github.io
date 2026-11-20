@@ -2,7 +2,8 @@
 # The kernels' record of one photograph: a radiometric camera at a pose.
 #
 # The radiometric camera (`RadiometricCameraModel`: geometric camera, focus surface, aperture radius, vignetting), its camera-frame
-# maps (`chief_dir`, `𝔣`, `t̂`, `π̂⁻¹`, `world_ray`) and the centre of projection 𝔭 are VisualRadiometryToolkitCore's. A `View` holds
+# maps (`chief_direction`, `𝔣`, `t̂`, `π̂⁻¹`, `world_ray`: the paper's symbols are its public aliases of `focus_point`,
+# `inverse_focus_distance` and VisualGeometryToolkitCore's `backproject`) and the centre of projection 𝔭 are VisualRadiometryToolkitCore's. A `View` holds
 # the camera's parts flattened into one element type with the pose; each map of a view is a one-line forward to
 # VisualRadiometryToolkitCore's implementation on the parts it reads — never a second body.
 #
@@ -59,13 +60,15 @@ Adapt.adapt_structure(to, v::View{T, N}) where {T, N} =
     (l = adapt(to, v.geometric); View{T, N, typeof(l)}(v.pose, l, v.focus, v.r))   # a grid lens carries an array
 
 # ---- the camera-frame maps of a view: VisualRadiometryToolkitCore's, on the view's parts (one-line forwards)
-@inline chief_dir(v::View, 𝐩::StaticVector{2}) = chief_dir(v.geometric, 𝐩)
+@inline chief_direction(v::View, 𝐩::StaticVector{2}) = chief_direction(v.geometric, 𝐩)
 @inline 𝔣(v::View, 𝐩::StaticVector{2}) = 𝔣(v.geometric, v.focus, 𝐩)
 @inline t̂(v::View, 𝐩::StaticVector{2}) = t̂(v.geometric, v.focus, 𝐩)
-@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = π̂⁻¹(v.geometric, v.focus, 𝐩, 𝐚)
+# (π̂⁻¹ is VisualGeometryToolkitCore's `backproject`: a view's method takes the aperture point as its third argument; the part-wise
+# implementation is VisualRadiometryToolkitCore's `aperture_direction`)
+@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = aperture_direction(v.geometric, v.focus, 𝐩, 𝐚)
 """As above with a hoisted `t̂(𝐩)` (evaluated once per sensor sample by `Φ_pixel`)."""
-@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = π̂⁻¹(v.geometric, 𝐩, 𝐚, t̂val)
+@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = aperture_direction(v.geometric, 𝐩, 𝐚, t̂val)
 @inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = world_ray(v.pose, 𝐚, π̂⁻¹(v, 𝐩, 𝐚))
 @inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, π̂⁻¹(v, 𝐩, 𝐚, t̂val))
-"""The view's ray of the aperture point 𝐚 with the UNIT chief direction `chief_dir(𝐩)` hoisted by the caller (once per sensor sample)."""
-@inline world_ray_dir(v::View, 𝐚::StaticVector{3}, dch::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, π̂⁻¹(dch, 𝐚, t̂val))
+"""The view's ray of the aperture point 𝐚 with the UNIT chief direction `chief_direction(𝐩)` hoisted by the caller (once per sensor sample)."""
+@inline world_ray_dir(v::View, 𝐚::StaticVector{3}, dch::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, aperture_direction(dch, 𝐚, t̂val))

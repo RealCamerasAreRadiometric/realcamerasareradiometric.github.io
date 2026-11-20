@@ -3,7 +3,7 @@
 The geometric chief-ray models, the kernels' view of the radiometric camera at a pose, and the vignetting's rules and gauge.
 
 The radiometric camera itself (`RadiometricCameraModel`: a geometric camera with its focus surface, aperture radius and
-vignetting), its back-projection from the aperture (`chief_dir`, `𝔣`, `π̂⁻¹`, `world_ray`), the focus surface (`Focus`), the
+vignetting), its back-projection from the aperture (`chief_direction`, `focus_point`, `backproject(camera, 𝐩, 𝐚)`, `world_ray`; the paper's `𝔣` and `π̂⁻¹` are aliases there), the focus surface (`Focus`), the
 vignetting fields, the sensor domain and the quadrature rules on the pixel and the aperture are
 VisualRadiometryToolkitCore's: its manual documents them, and they are reached through that package
 (`using VisualRadiometryToolkitCore: Focus`). `RadiometricCameraModel` alone is re-exported here. A camera composed from its

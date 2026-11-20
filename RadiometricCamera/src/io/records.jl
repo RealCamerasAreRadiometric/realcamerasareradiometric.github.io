@@ -149,8 +149,8 @@ JSON.lift(s::VgtkIO.VgioStyle, ::Type{CalibratedCamera}, r) =
     CalibratedCamera(_camera_from_body(s, r), JSON.lift(s, ObservationModel, r.observation_model), _settings_from_body(r.settings))
 
 # ---- the radiometric target ----------------------------------------------------------------------------------------------------
-_material_body(m::Material) = (alpha_ink = Float64(m.𝛂_ink), alpha_noink = Float64(m.𝛂_noink), eta_ink = Float64.(collect(m.𝛈_ink)),
-                               eta_noink = Float64.(collect(m.𝛈_noink)), mu = Float64(m.μ))
+_material_body(m::Material) = (alpha_ink = Float64(m.roughness_ink), alpha_noink = Float64(m.roughness_paper), eta_ink = Float64.(collect(m.refractive_index_ink)),
+                               eta_noink = Float64.(collect(m.refractive_index_paper)), mu = Float64(m.diffuse_weight))
 _material_from_body(b) = Material(Float64(b.alpha_ink::Real), Float64(b.alpha_noink::Real), _floats(b.eta_ink), _floats(b.eta_noink), Float64(b.mu::Real))
 
 function JSON.lower(s::VgtkIO.VgioStyle, t::RadiometricTarget)

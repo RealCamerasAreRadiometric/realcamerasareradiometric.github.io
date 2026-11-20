@@ -61,8 +61,8 @@ end
     @test Φ32 === RC._Φ_pixel(u, v, 1, v32, UnitField{Float32}(), c32(a.mat), c32(a.light), c32(a.scene), c32(a.st))
     # no Θ_v: the linear blocks' analytic rows of a pixel have no vignetting columns
     p = pixel_parts(u, v, 1, a.none, a.pose, a.mat, a.light, a.scene, a.st)
-    L, G, JP = RC._linear_rows(p, NoVignetting(), VrtkCore.coefficients(a.light), a.mat.μ)
-    Lf, Gf, JPf = RC._linear_rows(p, a.flat.vignetting, VrtkCore.coefficients(a.light), a.mat.μ)
+    L, G, JP = RC._linear_rows(p, NoVignetting(), VrtkCore.coefficients(a.light), a.mat.diffuse_weight)
+    Lf, Gf, JPf = RC._linear_rows(p, a.flat.vignetting, VrtkCore.coefficients(a.light), a.mat.diffuse_weight)
     @test size(JP) == (3, 0) && size(JPf) == (3, 16)
     @test L ≈ Lf rtol = 1e-13                                                         # (the flat spline is 1 to an ulp)
     @test G ≈ Gf rtol = 1e-13

@@ -22,7 +22,7 @@
         camera = RC.RadiometricCameraModel(glens, focus, 0.0386, vig)
         b = RC.𝔟(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))
-        mat = RC.Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+        mat = RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         rs = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         masks = [RC.compute_mask(camera, p, scene, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
         imgs = [RC.render_view(k, camera, poses[k], mat, light, scene, rs, masks[k]) for k in 1:2]

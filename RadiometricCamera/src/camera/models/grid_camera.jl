@@ -8,7 +8,7 @@
 # only the chief-ray interface of models/geometric.jl for Core's types and the builders from this package's cameras and samples.
 #
 #   chief_ray(m, 𝐩)  VisualRadiometryToolkitCore's: the raw backward spline at K⁻¹𝐩 (Core's `cam.lens.backward(x)`): the unit chief direction is
-#                    taken downstream (`chief_dir`); a control's norm is a weight, not a gauge
+#                    taken downstream (`chief_direction`); a control's norm is a weight, not a gauge
 #   in_domain        Core's bounded camera's (pixel_camera.jl): inside the lens coverage, and the lens images 𝐩 (its window present)
 # ---------------------------------------------------------------------------
 

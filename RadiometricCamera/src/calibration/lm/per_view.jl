@@ -156,7 +156,7 @@ NLLSsolver.update(v::ApertureVar, u, start = 1) = ApertureVar(v.r * exp(u[start]
 """
     MaterialVar(mat, surface, board = nothing; height = 0, inplane = false, fixed = (), mu_bounds = (0.0, 1.0))
 
-Θ_m block: the 8 nonlinear parameters (`𝛂_ink, 𝛂_noink, 𝛈_ink, 𝛈_noink`; boxed by `bounds`), μ ∈ [0, 1] and the scene's
+Θ_m block: the 8 nonlinear parameters (`roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper`; boxed by `bounds`), μ ∈ [0, 1] and the scene's
 `BoardSurface` (its printed edge, δ and σ_print, is never a parameter): with `height > 0` (`NH = height_nparams(height)`) the board warping h through its
 `HEIGHT_NFREE` free parameters (h += B y with `B = height_basis(board)`, the board's page: Core's TargetManifold of that
 warping's height field — the piston and the two tilts, the poses', are never parameters; dual-number columns), with `inplane = true`
@@ -209,7 +209,7 @@ function _tied_material_coordinates(u, start::Integer, n::Integer, c::Integer)
 end
 # The material and the surface finite.
 _finite_material(m::Material, s::BoardSurface) =
-    all(isfinite, Θ_m_nonlinear(m)) && isfinite(m.μ) && all(isfinite, s.h) && all(isfinite, s.edge) && all(isfinite, s.inplane)
+    all(isfinite, Θ_m_nonlinear(m)) && isfinite(m.diffuse_weight) && all(isfinite, s.h) && all(isfinite, s.edge) && all(isfinite, s.inplane)
 """Number of free height parameters of the block: `HEIGHT_NFREE` when the warping is free (dual columns), else 0."""
 n_height_free(::MaterialVar{T, NH}) where {T, NH} = NH > 0 ? HEIGHT_NFREE : 0
 NLLSsolver.nvars(v::MaterialVar) = static(1 + n_material_nonlinear(v) + n_height_free(v) + n_inplane(v))
@@ -223,7 +223,7 @@ function _material_update(v::MaterialVar, u, start)
     θ = Θ_m_nonlinear(v.mat)
     θ′ = SVector(ntuple(i -> i <= 2 ? θ[i] * exp(u[start + i - 1]) : 1 + max(θ[i] - 1, 1e-9) * exp(u[start + i - 1]), Val(8)))
     lo, hi = v.mu_bounds
-    return with_μ(with_nonlinear(v.mat, θ′), _μ_chart(v.mat.μ, u[start + 8], lo, hi))
+    return with_μ(with_nonlinear(v.mat, θ′), _μ_chart(v.mat.diffuse_weight, u[start + 8], lo, hi))
 end
 _material_update(v::MaterialVar{T, NH, NI, HB, CH, true}, u, start) where {T, NH, NI, HB, CH} = v.mat
 function NLLSsolver.update(v::MaterialVar{T, NH, NI, HB, CH, HM}, u, start = 1) where {T, NH, NI, HB, CH, HM}
@@ -256,7 +256,7 @@ return of a Jacobian, beside `_log_r_column!`."""
         Jm[:, lay.μ_col - 9 + i] .*= (i <= 2 ? θ[i] : θ[i] - 1)
     end
     lo, hi = m.mu_bounds
-    Jm[:, lay.μ_col] .*= _μ_chart_scale(m.mat.μ, lo, hi)
+    Jm[:, lay.μ_col] .*= _μ_chart_scale(m.mat.diffuse_weight, lo, hi)
     return Jm
 end
 
@@ -432,7 +432,7 @@ function _material_dual(m::Material, surf::BoardSurface, sd, off_m::Integer, ::T
     θm = Θ_m_nonlinear(m)
     mat_d = Material(sd(θm[1], off_m + 1), sd(θm[2], off_m + 2),
                      SVector{3, D}(ntuple(i -> sd(θm[2 + i], off_m + 2 + i), Val(3))),
-                     SVector{3, D}(ntuple(i -> sd(θm[5 + i], off_m + 5 + i), Val(3))), sd(m.μ, 0))
+                     SVector{3, D}(ntuple(i -> sd(θm[5 + i], off_m + 5 + i), Val(3))), sd(m.diffuse_weight, 0))
     surf_d = BoardSurface{D}(SVector{HEIGHT_NC, D}(ntuple(i -> sd(surf.h[i], off_h > 0 ? off_h + i : 0), Val(HEIGHT_NC))),
                              SVector{EDGE_NC, D}(ntuple(i -> sd(surf.edge[i], 0), Val(EDGE_NC))),
                              SVector{INPLANE_NC, D}(ntuple(i -> sd(surf.inplane[i], off_i > 0 ? off_i + i : 0), Val(INPLANE_NC))))

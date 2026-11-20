@@ -88,7 +88,7 @@ every ray (a ray from behind discards it)."""
 @inline function _ray_material(bd, surf, m, lt, 𝐛, 𝐱, ω)
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)
-    T = promote_type(eltype(ω_l), eltype(𝐱), eltype(m.𝛈_ink), eltype(coefficients(lt)))
+    T = promote_type(eltype(ω_l), eltype(𝐱), eltype(m.refractive_index_ink), eltype(coefficients(lt)))
     return ω_l, T, ω_l[3] > 0, _radiance_material(bd, surf, m, 𝐛)
 end
 """
@@ -122,14 +122,14 @@ end
     pdf_guard = eps(Tu) * Tu(10000)
     for i in 1:s.N
         u₁, u₂ = draws(s, Tu, h, i)
-        𝐧_h = sample_vndf_caps(α, ω_l, u₁, u₂)
+        𝐧_h = sample_visible_normal(α, ω_l, u₁, u₂)
         ω′ = reflect(ω_l, 𝐧_h)
         cosα′ = ω′[3]
         cosα′ <= 0 && continue
-        pdf = PDF_reflect(α, 𝐧_h, ω_l)
+        pdf = reflection_pdf(α, 𝐧_h, ω_l)
         ForwardDiff.value(pdf) <= pdf_guard && continue
         Lin = VrtkCore.radiance(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
-        acc += f_CT(m, ρ, α, η, ω_l, ω′, 𝐧_h) .* Lin * (cosα′ / pdf)
+        acc += cook_torrance(m, ρ, α, η, ω_l, ω′, 𝐧_h) .* Lin * (cosα′ / pdf)
     end
     return acc / s.N
 end
@@ -156,7 +156,7 @@ function radiance_parts(bd::PrintedTarget, surf::BoardSurface, m::Material, lt::
                         s::RadianceSampler, key::SampleKey, 𝐛::StaticVector{2}, 𝐱::StaticVector{3}, ω::StaticVector{3}) where {L, C, J}
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)                      # outgoing direction ω_o = −ω (ω: aperture point → board point)
-    T = promote_type(eltype(ω_l), eltype(m.𝛈_ink))
+    T = promote_type(eltype(ω_l), eltype(m.refractive_index_ink))
     Bd = zero(SMatrix{3, J, T, 3J}); Bs = zero(SMatrix{3, J, T, 3J})
     ω_l[3] <= 0 && return RadianceParts{J, T, 3J}(Bd, Bs)
     ρ = _albedo(bd, surf, design_chart(bd, surf.inplane, 𝐛))   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
@@ -167,14 +167,14 @@ function radiance_parts(bd::PrintedTarget, surf::BoardSurface, m::Material, lt::
     pdf_guard = eps(Tu) * Tu(10000)
     for i in 1:s.N
         u₁, u₂ = draws(s, Tu, h, i)
-        𝐧_h = sample_vndf_caps(α, ω_l, u₁, u₂)
+        𝐧_h = sample_visible_normal(α, ω_l, u₁, u₂)
         ω′ = reflect(ω_l, 𝐧_h)
         cosα′ = ω′[3]
         cosα′ <= 0 && continue
-        pdf = PDF_reflect(α, 𝐧_h, ω_l)
+        pdf = reflection_pdf(α, 𝐧_h, ω_l)
         ForwardDiff.value(pdf) <= pdf_guard && continue
         y = VrtkCore.coefficient_jacobian(lt, 𝐱, local_to_world(t, b, n, ω′[1], ω′[2], ω′[3]))
-        d, sp = f_CT_parts(ρ, α, η, ω_l, ω′, 𝐧_h)
+        d, sp = cook_torrance_terms(ρ, α, η, ω_l, ω′, 𝐧_h)
         w = cosα′ / pdf / s.N
         Bd += (w * d) * y'
         Bs += (w * sp) * y'

@@ -49,7 +49,7 @@
     vig_r = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wr, Hr); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     b_r = 𝔟(board_r); a_r = zeros(3, 9); a_r[:, 1] .= (2.0, 1.9, 1.8); a_r[:, 3] .= (0.4, 0.3, 0.2)
     light_r = EnvironmentLight(SphericalHarmonicMap(a_r, 2), b_r, sphere_radius(b_r, [p.t for p in poses_r]))
-    mat_r = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)      # strictly inside every box
+    mat_r = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)      # strictly inside every box
     st_r = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 42)
     kb_r = cam(VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), Wr, Hr)
     glens_r = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wr, Hr), 10, 10)

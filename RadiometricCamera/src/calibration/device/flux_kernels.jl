@@ -76,7 +76,7 @@ _row_type(f::_PartsAt{J, NV}) where {J, NV} = (F = _float_of(f.st); Tuple{SMatri
     id, lr = _pixel_and_rays(f.px, f.rays, i, f.st)
     u, v = _decode_px(id, f.H)
     p = _pixel_parts(u, v, Int(f.k), f.view, f.mat, f.light, f.scene, f.st, lr)
-    return _linear_rows(p, f.vig, coefficients(f.light), f.mat.μ)
+    return _linear_rows(p, f.vig, coefficients(f.light), f.mat.diffuse_weight)
 end
 
 """The [`PixelParts`](@ref) of a masked pixel id of view `k` (`pixel_parts`, in the float type of `st`): the closed-form solves'

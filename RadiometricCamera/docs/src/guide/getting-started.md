@@ -67,7 +67,7 @@ vignetting_true = VisualRadiometryToolkitCore.with_control_points(TensorProductV
 camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # geometric camera, focus surface, aperture radius (m), vignetting
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
-material_true = Material(; μ = 0.4)
+material_true = Material(; diffuse_weight = 0.4)
 masks = [compute_mask(camera_true, p, scene, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
 photos = [render_view(k, camera_true, poses[k], material_true, light_true, scene, settings, masks[k]) for k in 1:2]
 size(photos[1])
@@ -81,7 +81,7 @@ lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² 
 
 ```@example tutorial
 camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2))   # V ≡ 1
-s = CalibrationState(scene, settings, camera_start, poses, Material(; μ = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
+s = CalibrationState(scene, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
                      masks)
 cost(s)
 ```
@@ -94,7 +94,7 @@ parts) and reproduces the photographs exactly:
 
 ```@example tutorial
 solve_linear_blocks!(s; joint = true)
-cost(s)[2] < 1e-10, s.mat.μ ≈ 0.4
+cost(s)[2] < 1e-10, s.mat.diffuse_weight ≈ 0.4
 ```
 
 The vignetting and the lighting come back up to their common gauge: the state pins V = 1 at the sensor's centre, and the

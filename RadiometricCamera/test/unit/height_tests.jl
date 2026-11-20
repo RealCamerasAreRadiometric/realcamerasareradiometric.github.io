@@ -31,7 +31,7 @@
     vig_h = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wh, Hh); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     b_h = 𝔟(board_hs); a_h = zeros(3, 9); a_h[:, 1] .= (2.0, 1.9, 1.8); a_h[:, 3] .= (0.4, 0.3, 0.2)
     light_h = EnvironmentLight(SphericalHarmonicMap(a_h, 2), b_h, sphere_radius(b_h, [p.t for p in poses_h]))
-    mat_h = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
+    mat_h = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     st_h = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     camera_h = RadiometricCameraModel(glens_h, focus_h, 0.0386, vig_h)
     masks_h = [compute_mask(camera_h, p, scene_h, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]             # the mask is the plane's (the surface stays inside the padding)
@@ -295,12 +295,12 @@ end
         Z = hcat([[board_height(wp, SVector{HEIGHT_NC}(Bα[:, k]), p) for p in probes] for k in 1:HEIGHT_NFREE]...)
         @test rank(Z; rtol = 1e-10) == HEIGHT_NFREE
         # the material block takes its board's basis: a step of the free height parameters is pure bending of that page's spline
-        mv = RC.MaterialVar(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6), BoardSurface(), wp; height = HEIGHT_NC)
+        mv = RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), BoardSurface(), wp; height = HEIGHT_NC)
         @test mv.basis == RC.height_basis(wp)
         u = zeros(9 + HEIGHT_NFREE); u[10:end] .= 1e-3 .* y
         @test maximum(abs, Affα * RC.NLLSsolver.update(mv, u).surface.h) < 1e-15
     end
-    @test_throws ArgumentError RC.MaterialVar(Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6), BoardSurface(); height = HEIGHT_NC)
+    @test_throws ArgumentError RC.MaterialVar(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6), BoardSurface(); height = HEIGHT_NC)
 end
 
 @testitem "board warping: the spline is the page's physical bending, whatever its aspect" begin

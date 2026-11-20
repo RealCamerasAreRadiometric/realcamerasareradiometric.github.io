@@ -24,7 +24,7 @@ parts (`PrintedTarget`, `BoardSurface`, `TargetRadiometry`, …), the closed-for
 the paper's symbols (`𝔟`, `ρ_c`, `Φ_pixel`, …: owner D14, public, not exported). The list is `src/api.jl`'s `public` statement.
 
 The generic radiometric types and functions are VisualRadiometryToolkitCore's and are not public names of this package: the camera's
-parts and maps (`geometric`, `focus`, `aperture_radius`, `with_…`, `chief_dir`, `𝔣`, `𝔭`, `π̂⁻¹`, `world_ray`), the focus surface
+parts and maps (`geometric`, `focus`, `aperture_radius`, `with_…`, `chief_direction`, `focus_point`, `center_of_projection`, `backproject(camera, 𝐩, 𝐚)`, `world_ray`; the paper's symbols `𝔣`, `𝔭`, `π̂⁻¹`, `t̂`, … are its public aliases of the same functions), the focus surface
 (`Focus`, `FocusSpline`, `t̂`, `𝔱`), the vignetting fields, the sensor domain and quadrature (`𝐩_of_pixel`, `SensorQuadrature`,
-`ApertureQuadrature`, …), the light (`EnvironmentLight`) and the material (`Material`, `f_CT`, …). Import them from there:
+`ApertureQuadrature`, …), the light (`EnvironmentLight`) and the material (`Material`, `cook_torrance`, …). Import them from there:
 `using VisualRadiometryToolkitCore: Focus, Material`.

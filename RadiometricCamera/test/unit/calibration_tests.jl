@@ -25,7 +25,7 @@
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
-    mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+    mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks = [compute_mask(camera_t, p, scene, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene, st, masks[k]) for k in 1:2]
@@ -44,7 +44,7 @@
     P0 = Matrix(s.camera.vignetting.P); solve_Θ_v!(s); P1 = Matrix(s.camera.vignetting.P)
     @test P1 ≈ VgtkCore.extend_controls(rule, P1, P0) && P1[rule.interior] != P0[rule.interior]
     s = CalibrationState(scene, st, camera_t, poses, with_μ(mat_t, 0.8), light_t, targets; masks)
-    solve_μ!(s); @test s.mat.μ ≈ 0.4 atol = 1e-8
+    solve_μ!(s); @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-8
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
     s = CalibrationState(scene, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
@@ -52,7 +52,7 @@
     @test cj < 1e-16 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_j = [s.camera.vignetting(SVector(x, y)) / vig_t(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_j) / minimum(ratio_j) - 1 < 1e-6
-    @test s.mat.μ ≈ 0.4 atol = 1e-6
+    @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-6
     # Jacobian of the per-view residual vs finite differences (the pin V(𝐜) = 1 held exactly: the centre's direction is no column)
     # (the state's V is the truth's normalized to V(𝐜) = 1, the gauge: the truth's lighting carries the V(𝐜), so the residual vanishes)
     s = CalibrationState(scene, st, camera_t, poses, mat_t, with_coefficients(light_t, coefficients(light_t) .* vig_t(center(vig_t))), targets; masks)
@@ -107,9 +107,9 @@
     @test pinhole_θ(RC.geometric(s2))[4] ≈ pinhole_θ(lens_t)[4] atol = 1e-9 * H
     @test all(rad2deg(rotation_angle(RotMatrix{3}(s2.poses[k].R' * poses[k].R))) < 1e-8 for k in 1:2)
     @test maximum(abs, focus(s2).t̂_i - focus_t.t̂_i) < 1e-9
-    @test s2.mat.𝛂_ink ≈ 0.12 atol = 1e-9
-    @test s2.mat.𝛂_noink ≈ 0.35 atol = 1e-9
-    @test s2.mat.μ ≈ 0.4 atol = 1e-9
+    @test s2.mat.roughness_ink ≈ 0.12 atol = 1e-9
+    @test s2.mat.roughness_paper ≈ 0.35 atol = 1e-9
+    @test s2.mat.diffuse_weight ≈ 0.4 atol = 1e-9
     # V·L is recovered up to the gauge: the hard pin holds V(𝐜) = 1 exactly (the truth is not pinned)
     g_t = vig_t(center(vig_t)); g_2 = s2.camera.vignetting(center(s2.camera.vignetting))
     @test g_2 ≈ 1 atol = 1e-6
@@ -170,7 +170,7 @@
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_r = [s.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_r) / minimum(ratio_r) - 1 < 1e-5
-    @test s.mat.μ ≈ 0.4 atol = 1e-5
+    @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-5
     prob_r, idx_r = build_problem(s)
     vv_r = prob_r.variables[idx_r.vignetting]; @test Int(RC.NLLSsolver.nvars(vv_r)) == 3                # 5 coefficients, the first two tied and, under the hard pin, not a column (V(𝐜) = P_0 = 1)
     @test s.camera.vignetting(𝐜r) ≈ 1 atol = 1e-12
@@ -208,7 +208,7 @@ end
     b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
-    mat_t = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+    mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks = [compute_mask(camera_t, p, scene_t, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, scene_t, st, masks[k]) for k in 1:2]
@@ -270,16 +270,16 @@ end
     using StaticArrays, LinearAlgebra
     # 2026-10-31: the material block steps on charts — α = eᵘ, η = 1 + eᵘ, μ = lo + (hi − lo) σ(w) on the state's mu_bounds — instead of additive
     # steps clamped to a box; the Jacobian's nine material columns are scaled by the charts' derivatives (`_chart_material_columns!`)
-    m0 = Material(; 𝛂_ink = 0.2, 𝛂_noink = 0.5, 𝛈_ink = 1.5, 𝛈_noink = 1.2, μ = 0.3)
+    m0 = Material(; roughness_ink = 0.2, roughness_paper = 0.5, refractive_index_ink = 1.5, refractive_index_paper = 1.2, diffuse_weight = 0.3)
     v = RC.MaterialVar(m0, RC.BoardSurface(; h = zero(SVector{HEIGHT_NC, Float64})))
     n = Int(RC.NLLSsolver.nvars(v)); @test n == 9
     v2 = RC.NLLSsolver.update(v, unit_increment(n, 1, log(2.0)))
-    @test v2.mat.𝛂_ink ≈ 0.4 && v2.mat.𝛂_noink ≈ 0.5 && v2.mat.𝛈_ink == m0.𝛈_ink && v2.mat.μ ≈ 0.3
+    @test v2.mat.roughness_ink ≈ 0.4 && v2.mat.roughness_paper ≈ 0.5 && v2.mat.refractive_index_ink == m0.refractive_index_ink && v2.mat.diffuse_weight ≈ 0.3
     v3 = RC.NLLSsolver.update(v, unit_increment(n, 3, log(3.0)))
-    @test v3.mat.𝛈_ink[1] ≈ 1 + 3 * 0.5 && v3.mat.𝛈_ink[2] ≈ 1.5 && v3.mat.𝛈_noink == m0.𝛈_noink
-    @test RC.NLLSsolver.update(v, unit_increment(n, 1, -10.0)).mat.𝛂_ink > 0 && RC.NLLSsolver.update(v, unit_increment(n, 6, -10.0)).mat.𝛈_noink[1] > 1   # positive, > 1 by the charts
-    @test RC.NLLSsolver.update(v, unit_increment(n, 9, -log(0.3 / 0.7))).mat.μ ≈ 0.5                                                   # logit(0.3) + u = 0 → σ = 1/2
-    μ_big = RC.NLLSsolver.update(v, unit_increment(n, 9, 10.0)).mat.μ; @test 0.99 < μ_big < 1.0                                        # stays inside (0, 1)
+    @test v3.mat.refractive_index_ink[1] ≈ 1 + 3 * 0.5 && v3.mat.refractive_index_ink[2] ≈ 1.5 && v3.mat.refractive_index_paper == m0.refractive_index_paper
+    @test RC.NLLSsolver.update(v, unit_increment(n, 1, -10.0)).mat.roughness_ink > 0 && RC.NLLSsolver.update(v, unit_increment(n, 6, -10.0)).mat.refractive_index_paper[1] > 1   # positive, > 1 by the charts
+    @test RC.NLLSsolver.update(v, unit_increment(n, 9, -log(0.3 / 0.7))).mat.diffuse_weight ≈ 0.5                                                   # logit(0.3) + u = 0 → σ = 1/2
+    μ_big = RC.NLLSsolver.update(v, unit_increment(n, 9, 10.0)).mat.diffuse_weight; @test 0.99 < μ_big < 1.0                                        # stays inside (0, 1)
     # the column scaling: columns μ_col − 8 … μ_col − 1 by α, α, (η − 1) × 6, the μ column by μ(1 − μ); the others untouched
     J = ones(2, 12); lay = (; μ_col = 10)
     RC._chart_material_columns!(J, lay, v)

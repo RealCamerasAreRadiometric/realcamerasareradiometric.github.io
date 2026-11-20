@@ -28,7 +28,7 @@
         camera = RadiometricCameraModel(lens, focus, 0.0386, vig)
         b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
-        mat = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.4)
+        mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         sc = Scene(board, W, W)
         masks = [compute_mask(camera, p, sc, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]   # the scene's masks, made once on the CPU
@@ -117,7 +117,7 @@ end
         @test relerr(ng[1], nc_[1]) < 1e-10 && relerr(Vector(ng[2]), Vector(nc_[2])) < 1e-10 && relerr(Matrix(ng[3]), Matrix(nc_[3])) < 1e-10
         # the block sweep and the joint solve on the device land where the CPU's do
         for (s_, p_) in ((sc, pc), (sg, pg)); solve_linear_blocks!(s_; parts = p_, sweeps = 2); end
-        @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.μ - sc.mat.μ) < 1e-10
+        @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.diffuse_weight - sc.mat.diffuse_weight) < 1e-10
         rc = solve_radiometry_gn!(sc, pc; max_iter = 80); rg = solve_radiometry_gn!(sg, pg; max_iter = 80)
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success
         @test relerr(vec(Matrix(control_points(sg.camera.vignetting))), vec(Matrix(control_points(sc.camera.vignetting)))) < 1e-8

@@ -27,7 +27,7 @@ end
 
 const GOLD_TEX = RCg.VgtkFeatures.load_linear_image(joinpath(@__DIR__, "..", "fixtures", "blobboards_256", "blob_pattern_061_ce03e.png"))
 gold_h() = SVector{RCg.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RCg.HEIGHT_NODES])
-gold_mat() = Material(; 𝛂_ink = 0.12, 𝛂_noink = 0.35, 𝛈_ink = 1.65, 𝛈_noink = 1.33, μ = 0.6)
+gold_mat() = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
 
 """Board, scene (with the warping h and the edge parameters as the stack wants them) and the material."""
 function gold_scene(W, H; h = nothing, edge = nothing, sdf = nothing)
@@ -135,11 +135,11 @@ function gold_outputs()
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
     out["perview_residual"] = res; out["perview_jacobian"] = jac_summary(J)
     s2 = deepcopy(s); parts = all_parts(s2); solve_radiometry_gn!(s2, parts; max_iter = 20); c = RCg.parts_cost(s2, parts)
-    out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.camera.vignetting))), a = vec(Matrix(coefficients(s2.light))), μ = s2.mat.μ)
+    out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.camera.vignetting))), a = vec(Matrix(coefficients(s2.light))), μ = s2.mat.diffuse_weight)
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
     s3 = deepcopy(s); cost0 = cost(s3)[1]; run_lm!(s3; maxiters = 3, reldcost = 1e-12, xtol = 1e-14)
     out["lm3"] = (; cost = cost(s3)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3)))), t̂ = collect(focus(s3).t̂_i), r = aperture_radius(s3),
-                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.poses], mat = collect(RCg.Θ_m_nonlinear(s3.mat)), μ = s3.mat.μ)
+                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.poses], mat = collect(RCg.Θ_m_nonlinear(s3.mat)), μ = s3.mat.diffuse_weight)
     # 3. per-tile problem (grid model, warping free): the largest tile
     s = gold_state(gold_scene(W, H; h = 0.5 .* gold_h())..., glens)
     prob, _ = build_problem_grid(s; patch = (5, 5), height_degree = 1)

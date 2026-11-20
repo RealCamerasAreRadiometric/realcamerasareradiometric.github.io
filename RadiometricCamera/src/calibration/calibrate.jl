@@ -138,7 +138,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
                                  sweeps = max(opts.sweep.iterations, 1), verbose = true, joint = opts.sweep.joint,
                                  vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
             c1, rms1 = cost(s)
-            @printf("closed-form sweep on the resumed geometry (%.0f s): rel-RMS %.4f; μ %.4f; V(31/48/58°) %s\n", time() - tsw, rms1, s.mat.μ, _Vprof(s.camera.vignetting)); flush(stdout)
+            @printf("closed-form sweep on the resumed geometry (%.0f s): rel-RMS %.4f; μ %.4f; V(31/48/58°) %s\n", time() - tsw, rms1, s.mat.diffuse_weight, _Vprof(s.camera.vignetting)); flush(stdout)
         end
     end
     function monitor(it0, cst, camera, poses, mat, surf, light)
@@ -205,7 +205,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
                                  joint = opts.sweep.joint, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
             ca, rmsa = cost(s)
             if ca < cb
-                @printf("      sweep after it %d (%.0f s): cost %.4e → %.4e, rel-RMS %.4f → %.4f; μ %.4f; V(31/48/58°) %s → %s\n", it_done[] + opts.resume.iteration_offset, time() - ts, cb, ca, rmsb, rmsa, s.mat.μ, _Vprof(camera_b.vignetting), _Vprof(s.camera.vignetting))
+                @printf("      sweep after it %d (%.0f s): cost %.4e → %.4e, rel-RMS %.4f → %.4f; μ %.4f; V(31/48/58°) %s → %s\n", it_done[] + opts.resume.iteration_offset, time() - ts, cb, ca, rmsb, rmsa, s.mat.diffuse_weight, _Vprof(camera_b.vignetting), _Vprof(s.camera.vignetting))
                 push!(trace, (; ϕ², phase = :sweep, cost = ca, time = time(), snap = Θ̄_snapshot(s)))
             else
                 @printf("      sweep after it %d (%.0f s) REJECTED: cost %.4e ≥ %.4e — state kept\n", it_done[] + opts.resume.iteration_offset, time() - ts, ca, cb)
