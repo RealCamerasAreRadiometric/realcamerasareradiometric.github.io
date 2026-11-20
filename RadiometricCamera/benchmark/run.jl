@@ -227,7 +227,8 @@ end
 
 function device_name()
     BE isa KA.CPU && return "CPU ($(Sys.CPU_NAME), $(Threads.nthreads()) threads)"
-    return try string(Base.invokelatest(getfield(Main, :CUDA).name, Base.invokelatest(getfield(Main, :CUDA).device))) catch; string(typeof(BE)) end
+    cuda = get(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"), nothing)   # (loaded by rc_backend)
+    return cuda === nothing ? string(typeof(BE)) : string(Base.invokelatest(cuda.name, Base.invokelatest(cuda.device)))
 end
 
 function main()
