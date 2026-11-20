@@ -170,7 +170,7 @@ view_of(s::CalibrationState, k::Integer) = View(s.poses[k], s.camera)
 
 The geometric model π⁻¹ (Θ_d) the views share: Core's pixel camera or a grid model.
 """
-lens(s::CalibrationState) = s.camera.lens
+lens(s::CalibrationState) = lens(s.camera)
 """
     focus(s::CalibrationState) -> Focus
 
