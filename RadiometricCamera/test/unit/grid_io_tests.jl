@@ -3,7 +3,7 @@
 # through IO's migration, and synthetic Schöps intrinsics0.yaml files (VisualGeometryToolkitIO's readers) resampled into our grid lenses.
 @testitem "grid I/O (Schöps import)" setup = [RCFixtures] begin
     using RadiometricCamera: grid_dims, grid_model, initialization_region, load_camera, load_grid, load_lens, load_model,
-                             load_parametric_lens, load_start, pixel_of_𝐩, save_grid, save_initialization_region, save_lens,
+                             load_parametric_lens, load_start, save_grid, save_initialization_region, save_lens,
                              save_run_parameters, schoeps_gridlens, schoeps_start, stored_initialization_region, 𝐩_of_pixel
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -12,7 +12,7 @@
 
     @testset "Julia pixel ↔ COLMAP" begin
         @test 𝐩_of_pixel(1, 1) == SVector(0.5, 0.5)                                # colmap centre 0.5 = 1-based pixel 1
-        @test pixel_of_𝐩(SVector(320.0, 240.0)) == SVector(320.5, 240.5)
+        @test VrtkCore.pixel_of_𝐩(SVector(320.0, 240.0)) == SVector(320.5, 240.5)
     end
 
     @testset "the records: camera and grid camera round trips" begin

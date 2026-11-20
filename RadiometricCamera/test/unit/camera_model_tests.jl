@@ -30,7 +30,7 @@
     # what moved to VisualRadiometryToolkitCore is not a public name here; a moved name this package does not use is refused by name
     @test !Base.ispublic(RC, :geometric) && !Base.ispublic(RC, :Focus) && Base.ispublic(RC, :flat_vignetting) && Base.isexported(RC, :RadiometricCameraModel)
     @test RC.geometric === VrtkCore.geometric && RC.Focus === VrtkCore.Focus && RC.Material === VrtkCore.Material
-    for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx)
+    for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱)
         @test_throws "moved to VisualRadiometryToolkitCore" getfield(RC, n)(1)
     end
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it

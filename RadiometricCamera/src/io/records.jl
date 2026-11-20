@@ -21,7 +21,7 @@
 # The camera body: "camera" IO's bounded camera body (`camera_json(::BoundedCamera, frame; length_unit)`: the model's body — K in
 # COLMAP pixels and the lens record — the extent, the sensor's pitch and the lens coverage), "aperture" {"radius"} (a length),
 # "focus" the focus surface as a parametric record {"type", "nodes", "parameters", "unit": "1/m"} (the nodal inverse distances t̂ᵢ;
-# its nodes COLMAP pixels or direction-chart positions by its type), "vignetting" IO's vignetting body; a camera record also
+# its nodes COLMAP pixels or direction-chart positions by its type), "vignetting" VisualRadiometryToolkitIO's vignetting body (a camera without vignetting has none: saving it is refused there); a camera record also
 # "observation_model" and "settings" (a CalibratedCamera: below).
 # The observation model (observation_model.jl): {"sensor": {"type": "record", "sha256": <the characterisation file's sha256>} |
 # {"type": "none"}, "photos": {"kind": "photosites", "channel": "G"} | {"kind": "decoded", "channel": "RGB" | "R" | "G" | "B",
@@ -35,7 +35,7 @@
 # indices η per channel, the diffuse weight μ ∈ [0, 1]; IO's file-level declaration has no dimensionless form to state it in, the IO
 # units wave's), "ink_spread" (a length) and "print_blur" IO's blur block (a
 # blur on the print: its covariance a length²).
-# The state: "poses" IO's trajectory body (camera → world, `view:cam` → `world`, the photographs' names as its images), "light" IO's
+# The state: "poses" IO's trajectory body (camera → world, `view:cam` → `world`, the photographs' names as its images), "light" VisualRadiometryToolkitIO's
 # environment light body, "settings" the render settings' constructor arguments ({"sensor": {"nodes"}, "aperture":
 # {"radial_nodes", "angular_nodes"}, "sampler": {"samples", "seed", "hammersley"}}), "observation_model" its photographs', "page_flip"
 # the Schöps front end's ±y choice of the page rows. Lengths in the `units` object's `length` through
@@ -230,7 +230,7 @@ end
 
 A [`CalibratedCamera`](@ref) as an `rc/radiometric_camera/v3.1` record (VisualGeometryToolkitIO's file boundary; see the file
 header of `records.jl` for the record): its geometric camera as IO's camera or generic camera body, its aperture, focus surface
-and vignetting (IO's body), its observation model and its render settings. Lengths in `length_unit`.
+and vignetting (VisualRadiometryToolkitIO's body), its observation model and its render settings. Lengths in `length_unit`.
 """
 function save_radiometric_camera(path::AbstractString, c::CalibratedCamera; length_unit = VgtkCore.mm, provenance::NamedTuple = (;))
     s = _style(length_unit)
@@ -414,7 +414,7 @@ _poses_trajectory(poses, names) = VgtkCore.Trajectory(VgtkCore.ViewFrame{:cam}, 
     save_state(path, state::NamedTuple; length_unit = mm, provenance = (;))
 
 A refinement's state as an `rc/calibration_state/v3.1` record (VisualGeometryToolkitIO's file boundary; `records.jl`'s header): the
-radiometric camera, the radiometric target, the poses of the photographs (`names`, in order) as IO's trajectory body, the light as IO's
+radiometric camera, the radiometric target, the poses of the photographs (`names`, in order) as IO's trajectory body, the light as VisualRadiometryToolkitIO's
 environment light body, the render settings, the photographs' observation model (`observation_model(s)`) and the page's ±y choice
 (`page_flip`, the Schöps front end's; omitted when `nothing`). `state` holds the fields [`load_state`](@ref) returns (`camera, target,
 poses, names, light, settings, observation, page_flip`). A run's labels (the iteration, the costs) go in `provenance`.

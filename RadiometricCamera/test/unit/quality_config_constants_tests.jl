@@ -36,9 +36,6 @@
         "SENSOR_LENS_COVERAGE" => "the spelling of `camera.lens_coverage`'s whole-sensor value (the TOML states it)",
         "RETIRED_IMAGE_CIRCLE_INPUTS" => "the retired input's path, refused by name",
         "BOUNDARY_ORDERS" => "the legal values of `grid.boundary_order` / `vignetting.boundary_order` (the TOML picks one)",
-        "FOCUS_SENSOR" => "an enumeration value of the focus chart kinds",
-        "FOCUS_DIRECTION_CHART" => "an enumeration value of the focus chart kinds",
-        "FOCUS_SPHERE" => "an enumeration value of the focus chart kinds",
         # ---- driver paths and parsed CLI flags ----
         "DRIVER" => "a driver's own path (its records' provenance)",
         "IMAGE_REGIONS_DRIVER" => "a driver's path",

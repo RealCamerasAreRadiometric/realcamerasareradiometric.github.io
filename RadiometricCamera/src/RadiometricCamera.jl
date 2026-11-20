@@ -65,7 +65,6 @@ import StatsBase                                              # the photosite dr
 using Adapt: Adapt, adapt
 import LinearSolve
 import NLLSsolver
-using QuadGK: gauss
 using CoordinateTransformations: ComposedTransformation, LinearMap, Translation   # (Translation: a region moved by Core's SimilarityMap action); Core's composed lens (`Tilt ∘ Additive`: OpenCV's 14 coefficients)
 using PrecompileTools: @setup_workload, @compile_workload      # src/precompile.jl
 import VisualGeometryToolkitCore as VgtkCore
@@ -88,16 +87,17 @@ using VisualGeometryToolkitCore: hammersley                      # the radiance 
 # VisualRadiometryToolkitCore: the generic radiometric types this package's calibration method is written on (moved there from here and
 # from VisualGeometryToolkitCore; every name listed)
 import VisualRadiometryToolkitCore as VrtkCore
+import VisualRadiometryToolkitIO                  # the vignetting and environment-light bodies of RC's records: its methods of JSON.lower / JSON.lift on IO's style (records.jl)
 using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light: real SH on a sphere
 using VisualRadiometryToolkitCore: AbstractVignetting, NoVignetting, TensorProductVignetting, RadialVignetting, VIGNETTING_TAGS,
                                    coefficient_jacobian, control_points, with_control_points, n_control_points   # the vignetting fields (their centre is `VgtkCore.center`)
 using VisualRadiometryToolkitCore: RadiometricCameraModel, with_vignetting, chief_ray, 𝔭       # the radiometric camera, its geometric camera's chief ray
-using VisualRadiometryToolkitCore: Focus, FocusSpline, n_nodes, 𝔱, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE, ae_dir, t̂_dir,
+using VisualRadiometryToolkitCore: Focus, FocusSpline, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE, ae_dir, t̂_dir,
                                    focus_weights, polar_cap_nodes                                # the focus surface and its kinds
-using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, 𝐩_sample,
+using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, 𝐩_sample,
                                    𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border              # the sensor domain and the quadrature rules
-using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈, D_ggx, G2_ggx, F_dielectric,
-                                   sample_vndf_caps, D_v, PDF_reflect, reflect, f_CT_parts, f_CT   # the material: the Cook–Torrance BSDF
+using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈,
+                                   sample_vndf_caps, PDF_reflect, reflect, f_CT_parts, f_CT   # the material: the Cook–Torrance BSDF
 # its camera-frame maps and part accessors, which this package's records answer by forwarding (VisualRadiometryToolkitCore's
 # CONTRACT_GENERICS): the kernels' `View` (camera/view.jl) and the calibration state (calibration/state.jl)
 import VisualRadiometryToolkitCore: chief_dir, t̂, 𝔣, π̂⁻¹, world_ray, geometric, focus, aperture_radius

@@ -1,5 +1,5 @@
 @testitem "focus start" setup = [RCFixtures] begin
-    using RadiometricCamera: Focus, FocusSpline, in_domain, n_nodes, t̂, 𝔱
+    using RadiometricCamera: Focus, FocusSpline, in_domain, t̂
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 

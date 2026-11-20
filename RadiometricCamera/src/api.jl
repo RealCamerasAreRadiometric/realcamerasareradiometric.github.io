@@ -107,7 +107,7 @@ VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 _moved_to_radiometry(name::Symbol) = throw(ArgumentError(
     "RadiometricCamera.$name moved to VisualRadiometryToolkitCore, under the same name — `using VisualRadiometryToolkitCore: $name`"))
 for name in (:with_geometric, :with_focus, :with_aperture_radius, :ae_chart, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border,
-             :Λ_ggx, :G1_ggx)
+             :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱)
     @eval begin
         @doc $("Moved (owner 2026-11-20): `VisualRadiometryToolkitCore.$name`.")
         $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)))
