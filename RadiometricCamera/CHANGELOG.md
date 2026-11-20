@@ -16,6 +16,13 @@ number of a calibration changes: the moved code is the same arithmetic, and the 
   them from there (`using VisualRadiometryToolkitCore: Focus, Material`). `RadiometricCameraModel` stays exported here (a re-export: the
   headline's camera type). The moved names this package does not use itself (`with_geometric`, `with_focus`, `with_aperture_radius`,
   `pixel_of_𝐩`, `ℐ_𝐮`, `aperture_samples`, `aperture_border`, `Λ_ggx`, `G1_ggx`, `ae_chart`) are refused by name with the replacement.
+- **Added:** a RAW photograph is fitted at the photosites of any one colour filter: `io.channel = "R"`, `"G"` or `"B"` (it was
+  `"G"` alone), an `ObservationModel` of `Photosites` with the channel `:R`, `:G` or `:B` (`:RGB` stays refused: a photosite is ONE
+  observation). `photosite_mask(m, channel)` gives the usable photosites of one filter on the raw grid (Core's `photosite_colors`: 0
+  the red, 1 and 3 the greens, 2 the blue; censored at the ADC floor and the white level as before); `green_photosite_mask` is
+  retired by name in its favour (`photosite_mask(m, :G)`, the same mask bit for bit). The edge-selective draw (`masks.edge_fraction`
+  > 0) reads the diagonal neighbours of a photosite, which are of its own filter for the green photosites only: it is refused by
+  name for the red and the blue (the weighted draw, `masks.gradient_bias`, reads any one filter's photosites).
 - **Moved to VisualRadiometryToolkitCore (breaking): the board is its textured target.** `PrintedTarget` is `TexturedTarget` there
   (the same constructors), with its chart and geometry (`chart`, `world_point`, `corners`, `intersect_board`, `board_plane_hit`,
   `board_normal`, `inside`, `texture_size`, `with_sdf`, `has_sdf`, `posed_target`), its albedo (`ρ_c` is `albedo`, `𝔟` is

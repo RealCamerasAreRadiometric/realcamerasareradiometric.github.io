@@ -24,7 +24,7 @@
 # its nodes COLMAP pixels or direction-chart positions by its type), "vignetting" VisualRadiometryToolkitIO's vignetting body (a camera without vignetting has none: saving it is refused there); a camera record also
 # "observation_model" and "settings" (a CalibratedCamera: below).
 # The observation model (observation_model.jl): {"sensor": {"type": "record", "sha256": <the characterisation file's sha256>} |
-# {"type": "none"}, "photos": {"kind": "photosites", "channel": "G"} | {"kind": "decoded", "channel": "RGB" | "R" | "G" | "B",
+# {"type": "none"}, "photos": {"kind": "photosites", "channel": "R" | "G" | "B"} | {"kind": "decoded", "channel": "RGB" | "R" | "G" | "B",
 # "srgb": <bool>}}.
 # The target body: ["target" IO's target body,] "warping" (the HEIGHT_NC nodal heights, lengths), "warping_aspect" (the height / width
 # of the page the warping was learned on; required unless every nodal height is zero, a flat warping, which fits any page),

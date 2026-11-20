@@ -38,7 +38,7 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
        SENSOR_LENS_COVERAGE, GEOMETRY_IMAGES, check_geometry_image, raw_green_image, stored_initialization_region,
        save_state, load_state, save_radiometric_camera, load_radiometric_camera, save_radiometric_target,
        load_radiometric_target, initialization_region, in_initialization, selfcheck, settings_line, RAW_EXTENSIONS,
-       green_photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file, load_photo,
+       photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file, load_photo,
        sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe,
        SensorStatement, SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel,
        OffSensorModel, sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet,
@@ -150,3 +150,9 @@ Scene(args...; kwargs...) = throw(ArgumentError(
 """Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `with_state`."""
 with_surface(args...; kwargs...) = throw(ArgumentError(
     "with_surface is retired: the surface parameters are the board's own state — VisualRadiometryToolkitCore's `with_state(board, state)`"))
+
+# ---- retired name: the photosites of any one colour filter are read by one function
+"""Retired: `photosite_mask(m, :G)`."""
+green_photosite_mask(args...; kwargs...) = throw(ArgumentError(
+    "green_photosite_mask is retired: the usable photosites of one colour filter are `photosite_mask(m, channel)`, channel :R, :G or :B — " *
+    "the green photosites `photosite_mask(m, :G)`"))

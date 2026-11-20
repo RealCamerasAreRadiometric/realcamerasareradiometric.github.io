@@ -177,9 +177,13 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
         end
     end
     photosites = om.kind isa Photosites                                         # the rule of 2026-10-31 reads a RAW photograph's diagonal neighbours
+    photosites && om.channel !== :G && mo.edge_fraction > 0 &&                  # (a red or blue photosite's same-filter neighbours are two photosites along the axes)
+        throw(ArgumentError("`masks.edge_fraction` > 0 selects a RAW photograph's photosites by their diagonal neighbours, which are of the " *
+                            "same colour filter for the green photosites only: not with `io.channel = \"$(om.channel)\"` (the weighted draw, " *
+                            "`masks.gradient_bias` with `masks.edge_detector`, reads the photosites of any one filter)"))
     for k in (observations === nothing ? (1:K) : (1:0))                         # one decode per photo: the edge selection, the cap, the observations
-        # THE entry point (`observe`): what the photograph contributes, by the observation model's TYPE — a RAW mosaic its green photosites
-        # on the raw grid (both greens, uncensored, defects masked), a decoded image its pixels — never a flag (owner ruling 2026-11-13)
+        # THE entry point (`observe`): what the photograph contributes, by the observation model's TYPE — a RAW mosaic the photosites of its
+        # channel's colour filter on the raw grid (uncensored, defects masked), a decoded image its pixels — never a flag (owner ruling 2026-11-13)
         img, masks[k] = observe(pset::PhotoSet, k, masks[k]; name = names[k])   # the candidates the model keeps (a start record's: its samples)
         chs = ndims(img) == 2 ? (1,) : _fit_channels(ch)                   # the edge selection reads the measured channels
         start === nothing && (masks[k] = draw_samples(rng, BoardValidity(mask_views[k], board, st; δ = 0.01, backend), masks[k], img, N;

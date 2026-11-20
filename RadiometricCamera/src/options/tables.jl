@@ -65,7 +65,7 @@ Base.@kwdef struct IOOptions <: AbstractOptionsTable
     out::String = _option_default(IOOptions, :out)                                  # the output directory; required
     linearize::Bool = _option_default(IOOptions, :linearize)                           # decode sRGB photographs
     channel::String = _option_default(IOOptions, :channel)                           # one colour channel ("R" | "G" | "B") copied to all three; "RGB" = as photographed. A RAW
-                                                     #   photograph (by its file: `load_photo`) is read at its green photosites: "G"
+                                                     #   photograph (by its file: `load_photo`) is read at the photosites of one colour filter: "R", "G" or "B"
     views::Vector{String} = _option_default(IOOptions, :views)                  # image names (a subset; empty = all)
     init::String = _option_default(IOOptions, :init)                                 # grid:<json> | lens:<json> replaces the front-end's start model
     checkpoint_each::Bool = _option_default(IOOptions, :checkpoint_each)                     # per-iteration lens / poses / state files

@@ -37,8 +37,8 @@ struct NoSensorRecord <: SensorStatement end
 
 """The kind of the photographs a camera was calibrated on: [`Photosites`](@ref) or [`Decoded`](@ref)."""
 abstract type PhotoKind end
-"""RAW photographs: their green photosites on the raw grid (both greens, censored at the ADC floor and the white level, a sensor
-record's defects masked; `green_photosite_mask`)."""
+"""RAW photographs: the photosites of ONE colour filter on the raw grid — the observation model's channel, `:R`, `:G` (both greens)
+or `:B` — censored at the ADC floor and the white level, a sensor record's defects masked (`photosite_mask`)."""
 struct Photosites <: PhotoKind end
 """
     Decoded(srgb)
@@ -51,14 +51,14 @@ struct Decoded <: PhotoKind
 end
 
 """The channels an observation model measures: `:RGB` (the three, decoded images), `:R`, `:G`, `:B` (one; a RAW photograph's
-photosites are `:G`)."""
+photosites are those of one colour filter: one of the three)."""
 const OBSERVATION_CHANNELS = (:RGB, :R, :G, :B)
 
 """
     ObservationModel(sensor::SensorStatement, kind::PhotoKind, channel::Symbol)
 
 How a calibration's photographs were observed: the `sensor` statement, the photographs' `kind` and the `channel` measured
-(`OBSERVATION_CHANNELS`). RAW photosites are the green channel (`:G`); a sensor record describes RAW photosites only (a decoded image
+(`OBSERVATION_CHANNELS`). RAW photosites are those of one colour filter (`:R`, `:G` or `:B`, never `:RGB`); a sensor record describes RAW photosites only (a decoded image
 under a [`SensorRecord`](@ref) is refused).
 """
 struct ObservationModel{S <: SensorStatement, K <: PhotoKind}
@@ -68,8 +68,9 @@ struct ObservationModel{S <: SensorStatement, K <: PhotoKind}
     function ObservationModel(sensor::S, kind::K, channel::Symbol) where {S <: SensorStatement, K <: PhotoKind}
         channel in OBSERVATION_CHANNELS ||
             throw(ArgumentError("ObservationModel: the channel $(repr(channel)) is not one of $(join(OBSERVATION_CHANNELS, ", "))"))
-        kind isa Photosites && channel !== :G &&
-            throw(ArgumentError("ObservationModel: a RAW photograph's green photosites are ONE observation each, the channel :G (not $(repr(channel)))"))
+        kind isa Photosites && channel === :RGB &&
+            throw(ArgumentError("ObservationModel: a RAW photograph's photosites are ONE observation each, those of one colour filter: " *
+                                "the channel :R, :G or :B (not $(repr(channel)))"))
         sensor isa SensorRecord && kind isa Decoded &&
             throw(ArgumentError("ObservationModel: a sensor record describes RAW photosites; a decoded image has none"))
         return new{S, K}(sensor, kind, channel)
@@ -172,7 +173,8 @@ function observation_model(files::AbstractVector{<:AbstractString}, spec::Abstra
     end
     all(raw) || throw(ArgumentError("the photographs mix RAW files and decoded images ($(count(raw)) of $(length(raw)) RAW): one kind per run"))
     linearize && throw(ArgumentError("a RAW photograph is linear (Features' linearisation): `io.linearize` does not apply"))
-    ch === :G || throw(ArgumentError("the photographs are RAW: their green photosites are ONE observation each, `io.channel = \"G\"` (not $(repr(channel)))"))
+    ch === :RGB && throw(ArgumentError("the photographs are RAW: their photosites are ONE observation each, those of one colour filter — " *
+                                       "`io.channel = \"R\"`, \"G\" or \"B\" (not $(repr(channel)))"))
     return ObservationModel(_run_sensor(sensor_model, rec, stated), Photosites(), ch)
 end
 _run_sensor(::Union{AutoSensorModel, OnSensorModel}, rec::NamedTuple, _) = rec.record

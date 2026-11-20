@@ -148,16 +148,22 @@ function settings_line(cs::VgtkCore.CaptureSettings; lens_stated::Bool = false)
 end
 
 """
-    green_photosite_mask(m::RawMosaic) -> BitMatrix
+    photosite_mask(m::RawMosaic, channel::Symbol) -> BitMatrix
 
-The usable green photosites of the mosaic `m` on the raw grid (a RAW photograph's observations, `observe`; owner ruling 2026-11-12): both greens of every
-Bayer cell (Core's `photosite_colors`, 1 or 3), the censored photosites dropped at both ends — the ADC floor (raw = 0) and the
-white level (Core's `saturationview`, raw ≥ white); a value below the black level is noise, not censored, and stays.
+The usable photosites of ONE colour filter of the mosaic `m` on the raw grid (a RAW photograph's observations, `observe`): `channel`
+`:R`, `:G` or `:B` by Core's `photosite_colors` — 0 the red, 1 and 3 the two greens of every Bayer cell, 2 the blue — with the
+censored photosites dropped at both ends: the ADC floor (raw = 0) and the white level (Core's `saturationview`, raw ≥ white); a value
+below the black level is noise, not censored, and stays.
 """
-function green_photosite_mask(m::VgtkCore.RawMosaic)
+function photosite_mask(m::VgtkCore.RawMosaic, channel::Symbol)
     c = VgtkCore.photosite_colors(m)
-    return ((c .== 1) .| (c .== 3)) .& (m .> 0) .& .!VgtkCore.saturationview(m)
+    return _filter_photosites(c, Val(channel)) .& (m .> 0) .& .!VgtkCore.saturationview(m)
 end
+_filter_photosites(c, ::Val{:G}) = (c .== 1) .| (c .== 3)
+_filter_photosites(c, ::Val{:R}) = c .== 0
+_filter_photosites(c, ::Val{:B}) = c .== 2
+_filter_photosites(c, ::Val{C}) where {C} =
+    throw(ArgumentError("photosite_mask: the photosites of one colour filter are the channel :R, :G or :B (not $(repr(C)))"))
 
 """The geometry images, the one vocabulary of every geometry stage's `image` key (the chrome detect, the front ends' decode, the
 image-region measurement; owner 2026-11-16: ONE geometric image for every detector): `"raw_green"` a RAW photograph's
@@ -418,8 +424,8 @@ end
     observe(set::PhotoSet, k, mask; name = basename(set.files[k])) -> (values, mask)
 
 Photograph `k` of `set` ([`photo_set`](@ref)) under the compute `mask`, read once (`load_photo`) under its model:
-- RAW photosites: its green photosites on the raw grid — the mask restricted to the usable greens (`green_photosite_mask`: both
-  greens, uncensored at the ADC floor and the white level) that its sensor model does not list as defects (Core's defect mask:
+- RAW photosites: the photosites of the observation model's channel on the raw grid — the mask restricted to the usable photosites of
+  that colour filter (`photosite_mask`: uncensored at the ADC floor and the white level) that its sensor model does not list as defects (Core's defect mask:
   masked, never interpolated); the values its linear view under the model (Core's `linearview`: the model's black subtracted — the
   file's, a measured channel black or a dark frame's per photosite). Under a noise with a variance law (a gain: PoissonGaussian, or a
   RelativeNoise) Core's uncertain image, each value with its variance, whose rows are then whitened (`masked_observations`); plain
@@ -428,17 +434,17 @@ Photograph `k` of `set` ([`photo_set`](@ref)) under the compute `mask`, read onc
   the mask's is refused.
 """
 observe(set::PhotoSet, k::Integer, mask::AbstractMatrix{Bool}; name::AbstractString = basename(set.files[k])) =
-    _observe(set.observation.kind, set.files[k], mask, name, set.models[k])
+    _observe(set.observation.kind, set.files[k], mask, name, set.models[k], set.observation.channel)
 # the photograph read once (`load_photo`, by its file); `photo_set` checked that every file is of the model's kind
-_observe(k::Photosites, path::AbstractString, mask, name, model) = _observe(k, load_photo(path)::VgtkCore.RawMosaic, mask, name, model)
-_observe(k::Decoded, path::AbstractString, mask, name, model) = _observe(k, load_photo(path; linearize = k.srgb)::AbstractArray, mask, name, model)
-_observe(::Decoded, ::VgtkCore.RawMosaic, ::AbstractMatrix{Bool}, name::AbstractString, ::VgtkCore.SensorModel) =
+_observe(k::Photosites, path::AbstractString, mask, name, model, channel::Symbol) = _observe(k, load_photo(path)::VgtkCore.RawMosaic, mask, name, model, channel)
+_observe(k::Decoded, path::AbstractString, mask, name, model, channel::Symbol) = _observe(k, load_photo(path; linearize = k.srgb)::AbstractArray, mask, name, model, channel)
+_observe(::Decoded, ::VgtkCore.RawMosaic, ::AbstractMatrix{Bool}, name::AbstractString, ::VgtkCore.SensorModel, ::Symbol) =
     throw(ArgumentError("$name: a RAW mosaic under an observation model of decoded images: the camera predicts decoded images only"))
-function _observe(::Photosites, m::VgtkCore.RawMosaic, mask::AbstractMatrix{Bool}, name::AbstractString, model::VgtkCore.SensorModel)
+function _observe(::Photosites, m::VgtkCore.RawMosaic, mask::AbstractMatrix{Bool}, name::AbstractString, model::VgtkCore.SensorModel, channel::Symbol)
     size(m) == size(mask) || error("$name: the RAW mosaic is $(size(m, 2)) × $(size(m, 1)), the camera's sensor $(size(mask, 2)) × $(size(mask, 1))")
-    return VgtkCore.linearview(m; sensor_model = model), mask .& green_photosite_mask(m) .& _usable(_defect_photosites(model, m))
+    return VgtkCore.linearview(m; sensor_model = model), mask .& photosite_mask(m, channel) .& _usable(_defect_photosites(model, m))
 end
-function _observe(::Decoded, img::AbstractArray, mask::AbstractMatrix{Bool}, name::AbstractString, ::VgtkCore.SensorModel)
+function _observe(::Decoded, img::AbstractArray, mask::AbstractMatrix{Bool}, name::AbstractString, ::VgtkCore.SensorModel, ::Symbol)
     size(img)[1:2] == size(mask) ||
         error("$name: the photograph is $(size(img, 2)) × $(size(img, 1)) px, the start camera $(size(mask, 2)) × $(size(mask, 1)) px: refusing — the start is defined on the photographs' pixels")
     return img, mask

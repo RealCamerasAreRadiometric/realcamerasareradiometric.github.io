@@ -151,7 +151,7 @@ end
             @test set.models[1] == VgtkCore.sensor_model(c, capture, 1) && VgtkCore.component_sources(set.models[1]).reason == VgtkCore.Matched
             mosaic = Base.invokelatest(VgtkFeatures.load_raw_mosaic, p)
             vals, mask = Base.invokelatest(RC.observe, set, 1, trues(size(mosaic)))
-            @test vals == VgtkCore.linearview(mosaic; sensor_model = set.models[1]) && mask == RC.green_photosite_mask(mosaic)
+            @test vals == VgtkCore.linearview(mosaic; sensor_model = set.models[1]) && mask == RC.photosite_mask(mosaic, :G)
             # the same photograph under a record of another ISO: refused (sha first — another file — then the frame it does not describe)
             @test_throws "given sha256" Base.invokelatest(RC.photo_set, om, [p]; characterisation = other)
             om2 = RC.ObservationModel(RC.SensorRecord(open(VgtkCore.sha256_hex, other)), RC.Photosites(), :G)

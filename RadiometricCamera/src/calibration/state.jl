@@ -126,7 +126,7 @@ function CalibrationState(board::TexturedTarget, settings::RenderSettings, camer
                           quanta = fill(nothing, length(poses)), sensor::SensorStatement = NoSensorRecord(),
                           photo_kind::PhotoKind = Decoded(false)) where {N}
     0 <= channel <= 3 || throw(ArgumentError("CalibrationState: channel = $channel (0: the three channels, 1–3: that channel alone)"))
-    ObservationModel(sensor, photo_kind, _channel_symbol(channel))          # the three agree (a RAW photograph's photosites: channel G)
+    ObservationModel(sensor, photo_kind, _channel_symbol(channel))          # the three agree (a RAW photograph's photosites: one colour filter's, channel R, G or B)
     K = length(poses)
     length(targets) == K || throw(DimensionMismatch("$(K) views but $(length(targets)) targets"))
     poses = [_pose_eltype(Float64, p) for p in poses]

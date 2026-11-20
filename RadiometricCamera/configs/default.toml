@@ -12,8 +12,8 @@ images = ""              # the photographs (16-bit linear PNG unless `linearize`
 out = ""                 # the output directory; required
 linearize = "off"        # decode sRGB photographs
 channel = "RGB"          # "R" | "G" | "B": that channel replaces all three in every photograph, so the fit sees it alone; "RGB" = as photographed.
-                         #   RAW or decoded is the photograph's TYPE, by its file (load_photo): a RAW photograph is read at its green
-                         #   photosites on the raw grid (one measurement each: "G"), a decoded image as stored
+                         #   RAW or decoded is the photograph's TYPE, by its file (load_photo): a RAW photograph is read at the
+                         #   photosites of one colour filter on the raw grid (one measurement each: "R", "G" or "B"), a decoded image as stored
 views = []               # image names to use (a subset); empty = all
 init = ""                # "grid:<record>" | "lens:<record>": replaces the front-end's start model ("lens:" = a Core pixel camera record)
 checkpoint_each = "off"  # write lens_it<N>.json | grid_it<N>.json, poses_it<N>.json, state_it<N>.json after every iteration

@@ -180,12 +180,45 @@ end
     # the observation model's KIND decides (`_observe`, behind the entry point `observe`) — RAW photosites: a RawMosaic's green photosites (the
     # mask restricted, its linear view); decoded: the image itself, under the mask unchanged. Neither kind reads the other's photograph.
     m = mosaic_of(zeros(24, 24, 3) .+ 0.3, 1.0); a = VgtkCore.SensorModel()
-    vals, mask = RC._observe(RC.Photosites(), m, trues(24, 24), "raw", a)
-    @test mask == RC.green_photosite_mask(m) && vals == VgtkCore.linearview(m)
+    vals, mask = RC._observe(RC.Photosites(), m, trues(24, 24), "raw", a, :G)
+    @test mask == RC.photosite_mask(m, :G) && vals == VgtkCore.linearview(m)
     img = rand(Float32, 24, 24, 3); mk = rand(Bool, 24, 24)
-    vals2, mask2 = RC._observe(RC.Decoded(false), img, mk, "decoded", a)
+    vals2, mask2 = RC._observe(RC.Decoded(false), img, mk, "decoded", a, :RGB)
     @test vals2 === img && mask2 == mk
-    @test_throws MethodError RC._observe(RC.Photosites(), img, mk, "decoded", a)
-    @test_throws "the camera predicts decoded images only" RC._observe(RC.Decoded(false), m, trues(24, 24), "raw", a)
-    @test_throws "the RAW mosaic is" RC._observe(RC.Photosites(), m, trues(12, 12), "raw", a)       # the camera's sensor size, refused otherwise
+    @test_throws MethodError RC._observe(RC.Photosites(), img, mk, "decoded", a, :G)
+    @test_throws "the camera predicts decoded images only" RC._observe(RC.Decoded(false), m, trues(24, 24), "raw", a, :RGB)
+    @test_throws "the RAW mosaic is" RC._observe(RC.Photosites(), m, trues(12, 12), "raw", a, :G)       # the camera's sensor size, refused otherwise
+end
+
+@testitem "photosites: the photosites of any one colour filter" setup = [RCFixtures, PhotositeScene] begin
+    using Test
+    # a mosaic with a photosite at the ADC floor and one at the white level; its four Bayer phases as windows (an odd start shifts the phase)
+    m0 = mosaic_of(fill(0.3, 12, 14, 3), 1.0)
+    raw = copy(parent(m0)); raw[3, 3] = 0x0000; raw[4, 6] = UInt16(m0.white); raw[5, 5] = 0x0000; raw[6, 8] = UInt16(m0.white)
+    m = VgtkCore.RawMosaic(raw, m0.pattern, m0.black, m0.white, m0.visible_origin, m0.raw_size, m0.metadata)
+    for r0 in 1:2, c0 in 1:2
+        w = m[r0:12, c0:14]                                             # the pattern starts at each of the four Bayer positions in turn
+        c = VgtkCore.photosite_colors(w)
+        @test c[1, 1] == m.pattern[r0, c0]
+        usable = (w .> 0) .& .!VgtkCore.saturationview(w)
+        R = RC.photosite_mask(w, :R); G = RC.photosite_mask(w, :G); B = RC.photosite_mask(w, :B)
+        @test R == (c .== 0) .& usable && B == (c .== 2) .& usable
+        @test G == ((c .== 1) .| (c .== 3)) .& usable                   # both greens: the mask a green fit has always read, bit for bit
+        @test !any(R .& G) && !any(R .& B) && !any(G .& B) && (R .| G .| B) == usable   # every usable photosite is in exactly one filter's mask
+        @test count(c .== 0) == count(c .== 2) && count((c .== 1) .| (c .== 3)) == 2 * count(c .== 0)
+        @test count(usable) == length(w) - count(iszero, w) - count(VgtkCore.saturationview(w)) < length(w)   # the censored photosites are in none
+        # the entry point reads the observation model's channel
+        for ch in (:R, :G, :B)
+            vals, mask = RC._observe(RC.Photosites(), w, trues(size(w)), "raw", VgtkCore.SensorModel(), ch)
+            @test mask == RC.photosite_mask(w, ch) && vals == VgtkCore.linearview(w)
+        end
+    end
+    @test_throws "the channel :R, :G or :B (not :RGB)" RC.photosite_mask(m, :RGB)
+    @test_throws "`photosite_mask(m, :G)`" RC.green_photosite_mask(m)   # retired by name
+    @test Base.ispublic(RC, :photosite_mask) && !Base.ispublic(RC, :green_photosite_mask)
+    # the observation model: RAW photosites of one filter, any of the three; never the three channels at once
+    for ch in (:R, :G, :B)
+        @test RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), ch).channel === ch
+    end
+    @test_throws "ONE observation each" RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), :RGB)
 end
