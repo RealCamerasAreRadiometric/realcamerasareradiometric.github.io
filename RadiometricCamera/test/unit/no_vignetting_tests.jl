@@ -63,7 +63,9 @@ end
     p = pixel_parts(u, v, 1, a.none, a.pose, a.mat, a.light, a.scene, a.st)
     L, G, JP = RC._linear_rows(p, NoVignetting(), VrtkCore.coefficients(a.light), a.mat.μ)
     Lf, Gf, JPf = RC._linear_rows(p, a.flat.vignetting, VrtkCore.coefficients(a.light), a.mat.μ)
-    @test size(JP) == (3, 0) && size(JPf) == (3, 16) && L == Lf && G == Gf
+    @test size(JP) == (3, 0) && size(JPf) == (3, 16)
+    @test L ≈ Lf rtol = 1e-13                                                         # (the flat spline is 1 to an ulp)
+    @test G ≈ Gf rtol = 1e-13
     # the calibration estimates V (Θ_v under the gauge V(𝐜) = 1): a camera without vignetting is refused by name, with the start to give
     targets = [img_flat]
     @test_throws "the camera has no vignetting (`NoVignetting`" CalibrationState(a.scene, a.st, a.none, [a.pose], a.mat, a.light, targets; masks = [a.mask])
