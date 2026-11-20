@@ -31,7 +31,9 @@
 #   closed form    parts (all_parts), radiometry_normal_equations, linear_blocks (Θ_l → Θ_v → μ), linear_joint (the joint LM)
 #   per view       view_jacobian (record, dual chunks, parts, rows), view_products (JᵀJ, Jᵀr of that Jacobian),
 #                  view_normal_equations (the two), lm1_view, lm3_view (run_lm!, 1 and 3 iterations)
-#   per tile       tile_normal_equations (every tile of one view: the batch and the tiles' rows and products), lm1_grid
+#   per tile       tile_normal_equations (every tile of one view: the batch and the tiles' rows and products),
+#                  tile_rows_products (the tiles' rows and products alone, the view's batch memoized; its value the cost sum
+#                  plus the number of tiles), lm1_grid
 #   calibration    the joint closed form, then three LM iterations
 #
 # `inferred` lists the return type inference gives for the entry points (a non-concrete one is a type instability at the call).
@@ -100,14 +102,23 @@ checksum(x::AbstractArray{<:Real}) = Float64(sum(x; init = zero(eltype(x))))
 checksum(x::AbstractArray) = sum(checksum, x; init = 0.0)
 checksum(x) = NaN
 
+"A stage's result `value` with the seconds of the part of it that is the stage (the rest its preparation)."
+struct Span{V}
+    value::V
+    seconds::Float64
+end
+span(v, seconds) = v, seconds
+span(v::Span, seconds) = v.value, v.seconds
+
 function measure(f)
     GC.gc()
-    t0 = time_ns(); v = f(); first = (time_ns() - t0) / 1e9
+    t0 = time_ns(); v, first = span(f(), (time_ns() - t0) / 1e9)
     best = Inf; bytes = 0
     for _ in 1:REPS
         GC.gc(false)
         t = @timed f()
-        t.time < best && (best = t.time; bytes = t.bytes)
+        _, seconds = span(t.value, t.time)
+        seconds < best && (best = seconds; bytes = t.bytes)
     end
     return (; first, best, bytes, value = checksum(v))
 end
@@ -162,6 +173,16 @@ function stages(c)
         flags = 2^10 - 1
         () -> RC._with_registered(s, problem, idx) do
             sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
+        end
+    end)
+    add("tile_rows_products", () -> begin           # the same tiles again within one registration: the view's batch is its memoized one
+        s = grid_state(); problem, idx = RC.build_problem_grid(s)
+        tiles = [t for t in RC.tile_costs(problem) if t.k == k]
+        flags = 2^10 - 1
+        sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
+        () -> RC._with_registered(s, problem, idx) do
+            sweep()
+            t0 = time_ns(); v = sweep(); Span(v + length(tiles), (time_ns() - t0) / 1e9)
         end
     end)
     add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1); cost(s)[1]))
