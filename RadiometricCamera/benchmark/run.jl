@@ -235,4 +235,4 @@ function main()
     return nothing
 end
 
-main()
+(abspath(PROGRAM_FILE) == @__FILE__) && main()          # (benchmark/linearization.jl includes this file for its scene)
