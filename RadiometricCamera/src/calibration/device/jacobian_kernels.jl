@@ -111,7 +111,7 @@ end
     _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, ::Val{N}, sensor, lensw,
                    bases, P0, pxy, light_scale, Z)
 
-THE row kernel of the LM's Jacobian, both routes (`_launch_rows!` over a block's pixels): pixel `i` of the block (buffer pixel
+THE row kernel of the LM's Jacobian, both routes (`_launch_pixel_rows!` over a block's pixels): pixel `i` of the block (buffer pixel
 `bufidx[i]` of the kernels' outputs, its id in `ids`) writes the residual `r` and the Jacobian rows (`J`, columns × rows) of its
 measured channels `chs`, in the layout's full columns (`klay`, `_kernel_layout`): the AD scatter from the slots `S` (`_slot_rows`), the
 focus chain through the nodal weights `G[:, ks, gidx[i]]` (`_focus_chain!`), a tile's patch fan-out on its window lens `lensw` with
@@ -158,6 +158,21 @@ Base.@propagate_inbounds function _jacobian_row!(J, i, r, ids, bufidx, gidx, H, 
     heights === nothing || _height_row!(rows, heights, iv, hB, klay.height_cols)
     _whiten_rows!(J, r, ω, base, Val(NC))
     return nothing
+end
+
+"""
+    _launch_pixel_rows!(row!, out, n, args...) -> out
+
+`VgtkCore._launch_rows!` for a row function whose row is a pixel's work (the Jacobian's row kernel, `_jacobian_row!`): Core's row
+kernel on the per-pixel workgroup (`_pixel_workgroup`: on the CPU backend every thread works on a small block, where Core's launch
+gives a 1,728-pixel view's rows to two), followed by a synchronize. Core's launch takes no workgroup: an upstream candidate.
+"""
+function _launch_pixel_rows!(row!::F, out, n::Integer, args::Vararg{Any, N}) where {F, N}
+    n > 0 || return out
+    be = KA.get_backend(out)
+    VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, nothing))(VgtkCore._row_kernel!)((row!, out, args...); ndrange = n)
+    KA.synchronize(be)
+    return out
 end
 
 """
@@ -420,7 +435,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    VgtkCore._launch_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(s.scene.H), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
+    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(s.scene.H), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)

@@ -17,6 +17,11 @@ function = "_kernel_float"
 reason = "not a CPU/GPU twin of any computation: the same kernels run on every backend; only their float type is chosen per backend (Float64 on the CPU, Float32 on a device)"
 
 [[backend]]
+file = "src/calibration/device/flux_kernels.jl"
+function = "_pixel_workgroup"
+reason = "not a CPU/GPU twin of any computation: the same per-pixel kernels run on every backend; only their workgroup size is chosen per backend (16 pixels on the CPU so that every thread works on a small view, the kernel's register budget on a device)"
+
+[[backend]]
 file = "src/calibration/device/jacobian_kernels.jl"
 function = "_ensure_device!"
 reason = "a transfer skip, not a second implementation: on the CPU backend with the settings' float the kernels read the host scene itself instead of an adapted copy; every backend then runs the same kernels"
