@@ -1,0 +1,57 @@
+# RATIONALE
+#   question:   what shape do the refinements of record give the printed calibration boards — the height of each page above its
+#               plane — and does a board get a similar shape from the capture sets of the three lenses?
+#   hypothesis: a board of 1 m is bent by millimetres; the refinement estimates the bending as a property of the board, so it finds
+#               a similar shape from every lens that photographed the board
+#   decides:    the supplement's board-warping figure (fig:board-warping) and what its text says about the estimated heights
+#   evidence:   the spline refinements of RC 0.11.5's run of record (commit 16f7dcd9): the surfaces span −2.3 … +1.1 mm on the
+#               AprilGrid and −1.8 … +2.6 mm on the Siemens stars
+#   owner:      T. Harder
+#   date:       2026-11-19
+#
+# Config of record of the board-warping figure (scripts/board_warping.jl; src/board_warping.jl): fig:board-warping of the supplement,
+# the height of the printed calibration boards above their plane as the radiometric refinements of record estimated it. Nothing is
+# estimated here: every case is a case of [upstream] radiometric_refinement, as it is there, and the stage reads the calibrated
+# target its refinement wrote (radiometric_target.json: the page and the warping's 5 × 5 nodal heights). The surface between the
+# nodes is the package's own (VisualRadiometryToolkitCore's board_height). A supplement experiment: its products lie under
+# results_root()/supplement/board_warping/.
+#
+#   julia --project=experiments experiments/scripts/board_warping.jl [--plan] [--stage=figures] [--config=<toml>]
+
+[experiment]
+name = "board_warping"
+
+[inputs]
+# none of its own: the photographs, the starts and the targets are the upstream config's inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement.toml"   # the cases, as they are there (each refine product is read by its key)
+
+[heights]
+samples = 201                  # the surface is sampled at samples × samples page positions, the page's edges included: every 5 mm of a 1 m page (the panels' mesh takes every [figure] mesh_stride-th of them)
+
+[sets]
+# The capture sets the figure shows, each with the case of [upstream] whose refinement is read: the central spline's, the paper's
+# camera model. A set's name is its panel's (board-warping/<set>.tex); its case is named <set>_<camera model>_warped, one camera
+# model for all sets (the drawing code finds a set's files by that name, and its caption names the model).
+ag30   = "ag30_spline_warped"     # Sigma 14 mm, AprilGrid at 30 cm
+ag10fe = "ag10fe_spline_warped"   # fisheye, AprilGrid at 10 cm
+ag08ta = "ag08ta_spline_warped"   # Tamron 20 mm, AprilGrid
+si30   = "si30_spline_warped"     # Sigma 14 mm, Siemens stars at 30 cm
+si30fe = "si30fe_spline_warped"   # fisheye, Siemens stars at 30 cm
+si17ta = "si17ta_spline_warped"   # Tamron 20 mm, Siemens stars at 17 cm
+
+[figure]
+asset_dir = "board-warping"    # plotsdir("board-warping.tex", "board-warping/<set>.tex", "board-warping/key.tex"): the paper's fig/ layout; the name the drawing code (src/paper_figures/board_warping.jl) gives its files
+columns = ["Sigma 14\\,mm lens", "Fisheye lens", "Tamron 20\\,mm lens"]   # the lenses, left to right (LaTeX text)
+rows = [                       # the targets, top to bottom: a row's label (LaTeX text) and its sets, one per column
+    {label = "AprilGrid", sets = ["ag30", "ag10fe", "ag08ta"]},
+    {label = "Siemens stars", sets = ["si30", "si30fe", "si17ta"]},
+]
+# Every panel draws its set's height field as a surface over the page, a mesh whose patches are coloured in bands of height. All
+# panels share one box and one colour scale, symmetric about zero, so the bands' borders are the same contour lines in every panel.
+band_heights_mm = [0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0]   # the candidates of a band's height, ascending: the first that needs at most max_bands bands on each side of zero for the largest |height| of all panels is taken (0.5 mm for the refinements of record), the last when none does
+max_bands = 8                  # the most bands on each side of zero
+mesh_stride = 10               # every mesh_stride-th sample of [heights] is a mesh point (201 samples: 21 × 21 points, 400 patches per panel)
+view_azimuth_elevation_deg = [20, 38]   # the panels' view: its azimuth and elevation (PGFPlots' view; 0, 90 would look straight down on the page), each within 0 … 90
+height_exaggeration = 50       # heights are drawn this many times as large as lengths on the page

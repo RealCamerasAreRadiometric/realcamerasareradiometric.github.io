@@ -1,0 +1,62 @@
+# the estimated board warping per case; written by tools/board_warping.py tables (of its file, the six cases the figure shows)
+
+[cases.ag30_spline_warped]
+set = "ag30"
+model = "spline"
+refine_product = "cb974231c49f581c"
+page_mm = [979.000, 979.000]
+surface_min_mm = -2.2149
+surface_max_mm = 0.3968
+surface_rms_mm = 0.6364
+surface_rms_without_plane_mm = 0.4826
+
+[cases.ag10fe_spline_warped]
+set = "ag10fe"
+model = "spline"
+refine_product = "617ebc770ec951a8"
+page_mm = [979.000, 979.000]
+surface_min_mm = -2.2926
+surface_max_mm = 1.0779
+surface_rms_mm = 0.7272
+surface_rms_without_plane_mm = 0.6407
+
+[cases.ag08ta_spline_warped]
+set = "ag08ta"
+model = "spline"
+refine_product = "7c0de687842dffa5"
+page_mm = [979.000, 979.000]
+surface_min_mm = -1.9158
+surface_max_mm = 0.3563
+surface_rms_mm = 0.6827
+surface_rms_without_plane_mm = 0.4795
+
+[cases.si30_spline_warped]
+set = "si30"
+model = "spline"
+refine_product = "0c9917f6d6087128"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.5593
+surface_max_mm = 2.5529
+surface_rms_mm = 0.9202
+surface_rms_without_plane_mm = 0.7510
+
+[cases.si30fe_spline_warped]
+set = "si30fe"
+model = "spline"
+refine_product = "e0a14906d158b386"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.7806
+surface_max_mm = 1.5182
+surface_rms_mm = 0.6338
+surface_rms_without_plane_mm = 0.5662
+
+[cases.si17ta_spline_warped]
+set = "si17ta"
+model = "spline"
+refine_product = "41029cb4deae779e"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.7198
+surface_max_mm = 1.8045
+surface_rms_mm = 0.8416
+surface_rms_without_plane_mm = 0.5093
+

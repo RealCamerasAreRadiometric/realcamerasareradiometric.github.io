@@ -26,7 +26,8 @@ for n in names(@__MODULE__; all = true)                     # everything defined
 end
 
 "The figures' files beside this one, each with the name of the module it is loaded into, in the order they are loaded."
-const FIGURE_FILES = (:FocusSurfaces => "focus_surfaces.jl", :TextureLearned => "texture_learned.jl", :Vignetting => "vignetting.jl")
+const FIGURE_FILES = (:BoardWarping => "board_warping.jl", :FocusSurfaces => "focus_surfaces.jl", :TextureLearned => "texture_learned.jl",
+                      :Vignetting => "vignetting.jl")
 
 for (name, file) in FIGURE_FILES                            # a file that does not load is an error: no figure is silently missing
     path = joinpath(@__DIR__, file)

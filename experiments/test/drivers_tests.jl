@@ -9,7 +9,7 @@
     using DrWatson
 
     const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
-                     "image_regions", "distance_maps", "timing", "vignetting_figure")
+                     "image_regions", "distance_maps", "timing", "vignetting_figure", "board_warping")
     const DRIVER_STAGE_NAMES = Dict(
         "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
         "focus_surfaces" => ("panels", "figures"),
@@ -19,9 +19,10 @@
         "image_regions" => ("detect",),
         "distance_maps" => ("prepare",),
         "timing" => ("start", "time", "record"),
-        "vignetting_figure" => ("figures",))
+        "vignetting_figure" => ("figures",),
+        "board_warping" => ("figures",))
     experiment_config(d) = d == "texture_recovery" ? projectdir("configs", "experiments", "texture_recovery_14mm_small.toml") :
-                           d == "timing" ? projectdir("configs", "supplement", "timing.toml") : projectdir("configs", "experiments", "$d.toml")
+                           d in ("timing", "board_warping") ? projectdir("configs", "supplement", "$d.toml") : projectdir("configs", "experiments", "$d.toml")
     const DRIVER_THREADS = "2,1"
 
     # A driver in a fresh process with both trees bound; (succeeded, output).
@@ -152,7 +153,7 @@ end
               ["radiometric_refinement_ablation_lens_coverage_scale.toml", "radiometric_refinement_smoothness_si30fe.toml", "sampling_strategy.toml",
                "sampling_strategy_fe10_count.toml", "sampling_strategy_fe10_kb16384.toml", "sampling_strategy_kb_count.toml", "sampling_strategy_smoke.toml",
                "warping_ablation.toml"]
-        @test sort(readdir(projectdir("configs", "supplement"))) == ["timing.toml", "timing_smoke.toml"]
+        @test sort(readdir(projectdir("configs", "supplement"))) == ["board_warping.toml", "timing.toml", "timing_smoke.toml"]   # board_warping: the supplement's board-warping figure (scripts/board_warping.jl)
         # every case's [pipeline] table reads as PipelineOptions, and its paths stay inside data_root()
         for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
             cfg = TOML.parsefile(projectdir("configs", "experiments", f))

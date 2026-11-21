@@ -65,7 +65,8 @@
                  ("scripts/convergence.jl", "produce_upstream(convergence_product(CFG, case)"),               # figure ← record
                  ("scripts/texture_recovery.jl", "produce_upstream(texture_product()"),                       # report ← the page solve
                  ("scripts/texture_recovery.jl", "produce_upstream(report_product()"),                        # the paper's bands ← the report
-                 ("scripts/texture_recovery.jl", "produce_upstream(poses_product()")]                         # the paper's bands ← the poses
+                 ("scripts/texture_recovery.jl", "produce_upstream(poses_product()"),                         # the paper's bands ← the poses
+                 ("scripts/board_warping.jl", "refinement_upstream(RC_CFG, RC_PATH, case, \"refine\"")]          # the board warping's figure ← the refinements
         for (f, call) in pairs
             @test occursin(call, src(f))
         end
