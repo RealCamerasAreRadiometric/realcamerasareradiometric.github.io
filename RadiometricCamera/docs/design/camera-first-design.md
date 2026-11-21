@@ -629,7 +629,10 @@ A Float32 chunk is 1.0–1.4× its `main` self: the anchored lookup's Float64 ar
 | heights | — | — | 39.7 | 5.5 |
 | **view Jacobian** | **247.3** | **60.9** (4.1×) | **138.4** | **54.7** (2.5×) |
 
-There the anchored lookup doubles a Float32 chunk (2.4 → 5.1 ms), still far below `main`'s Float64 pose chunks. `benchmark/run.jl`,
+There the anchored lookup doubles a Float32 chunk (2.4 → 5.1 ms), still far below `main`'s Float64 pose chunks. `benchmark/run.jl`
+on the RTX Pro, 1280 × 960, 8 × 16,384 px, warped (s, `main` → branch): view Jacobian 0.168 → 0.059, LM 1 iteration per view
+1.85 → 0.92, LM 3 iterations per view 3.63 → 1.50, a view's 6 tiles 0.297 → 0.143, grid LM 1 iteration (20 × 15) 2.02 → 1.04,
+calibration 5.44 → 3.27. `benchmark/run.jl`,
 s, best of the reps (B200):
 
 | stage | 320 × 240, 3 views, flat: `main` | branch | 1280 × 960, 8 × 16,384 px, warped: `main` | branch |
