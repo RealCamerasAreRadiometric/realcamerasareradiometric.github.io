@@ -14,7 +14,8 @@ poseidon (one whole NVIDIA B200 per GPU job; CPU jobs 16 threads on Emerald Rapi
 `time_ns` around calls that return their values to the host (device kernels awaited); no vendor profiler was used
 except where a line says so. Records: `/cluster/projects/vgtk/logs/rc-perf/results/*.json`.
 
-Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the texture experiment · 5 performance · 6 decisions.
+Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the texture experiment · 5 performance · 6 decisions ·
+7 round 3 · 8 round 4 (the device Jacobian in Float32 at Float64 hits).
 
 ---
 
@@ -46,7 +47,8 @@ The kernels are **functors of a pixel id** (`_FluxAt`, `_RecordAt`, `_JacAt`, `_
 `_MaskAt`) run by Core's `pointwise!` on the state's backend value, plus row functions run by Core's row kernel
 (`_jacobian_row!`, `_design_row!`, `_radiometry_cost_row!`, `_radiometry_normal_row!`). One implementation on every
 backend: the CPU backend runs the same functors in Float64, a device in Float32 with the pose's chunks, the heights and
-the closed form in Float64 (`HIGH_FLOAT`). RC's source names no vendor outside `ext/RadiometricCameraCUDAExt.jl` and
+the closed form in Float64 (`HIGH_FLOAT`; round 4: Float32 at the radiance record's Float64 hits, only the record's geometry
+and the closed form in Float64, section 8). RC's source names no vendor outside `ext/RadiometricCameraCUDAExt.jl` and
 `rc_backend`.
 
 ### 1.2 The data flow
@@ -456,7 +458,7 @@ the same job as the branch where a table says so. Records: `/cluster/projects/vg
 
 | # (section 6) | Outcome |
 |---|---|
-| 2 (re-centred Float32 geometry) | **not started; needs VisualRadiometryToolkitCore.** The board point, the chart position `chart(board, 𝐱)` and the texture and edge-map lookups are VisualRadiometryToolkitCore's (`TexturedTarget`, `chart`, `printed_albedo`, the edge map); a re-centred evaluation needs their forms at a local origin (an anchor's chart position in Float64 and the Float32 offset's image under the chart's linear part; a texel base index plus a Float32 fraction). Writing those in RC would copy the board's chart. Proposed upstream: `chart_offset(board, 𝐱₀, δ)` and the albedo / edge lookups at `(𝐛₀, δ𝐛)`, then RC's kernels take `𝐱 = 𝐱₀ + δ` with `𝐱₀` each pixel's chief-ray hit in Float64. The gate (`experiments/test/pipeline/jacobian_parity.jl`, 0.4 % stacked and per tile; 0.44 % in a tile with Float64 rays and the Float32 estimator, 2026-11-11) is therefore not re-measured. |
+| 2 (re-centred Float32 geometry) | **Round 4: done (section 8; VisualRadiometryToolkitCore 0.1.2's `anchored_albedo`; the gate holds: ≤ 0.12 %).** Round 3: **not started; needs VisualRadiometryToolkitCore.** The board point, the chart position `chart(board, 𝐱)` and the texture and edge-map lookups are VisualRadiometryToolkitCore's (`TexturedTarget`, `chart`, `printed_albedo`, the edge map); a re-centred evaluation needs their forms at a local origin (an anchor's chart position in Float64 and the Float32 offset's image under the chart's linear part; a texel base index plus a Float32 fraction). Writing those in RC would copy the board's chart. Proposed upstream: `chart_offset(board, 𝐱₀, δ)` and the albedo / edge lookups at `(𝐛₀, δ𝐛)`, then RC's kernels take `𝐱 = 𝐱₀ + δ` with `𝐱₀` each pixel's chief-ray hit in Float64. The gate (`experiments/test/pipeline/jacobian_parity.jl`, 0.4 % stacked and per tile; 0.44 % in a tile with Float64 rays and the Float32 estimator, 2026-11-11) is therefore not re-measured. |
 | 3 (Core 3.3) | Core 0.12 carries b (`intersection_at`), d (`_launch_rows_on!` with `OnBackend(be; workgroupsize)`) and g (`_matvec!`, its CUDA one-column gemm). RC adopts d and g (`_launch_pixel_rows!` and the extension's `_rows_times` removed); b measured and not adopted (7.2: slower on the device). |
 | 4 (texture solve) | `page_solves` hands Core's `cgls` the Jacobi diagonal `diag(AᵀA) + λ diag(DᵀD)` for λ > 0 only (`column_sumsq`); the unregularised solve is ill-posed and stays unpreconditioned. 7.3. |
 | 5 (focus-ab) | done before this round (the sensor-grid thin plate spline; kinds C/D and B removed). The A/B's table is 7.5. |
@@ -574,7 +576,7 @@ its hit IS the anchor, and only the record's geometry stays Float64.
 The CPU backend is unchanged but for rounding (a chunk reads the albedo at the recorded hit instead of at its own tangent-plane
 point, the same value to 1e-16).
 
-### 8.3 The gate, re-measured: 0.44 % → passes at ≤ 0.12 %
+### 8.3 The gate, re-measured: 0.44 % → ≤ 0.12 %, within it
 
 `experiments/test/pipeline/jacobian_parity.jl`'s check (the device's Jacobian against the CPU backend's, tile by tile, at the
 start and after a 3-iteration grid LM; gates 0.4 % stacked and for the worst column of a tile with ≥ 300 px), run on the run of
@@ -595,7 +597,7 @@ tiles / worst column of a tile:
 | Θ_m (α, η, μ) | 1.7e-4 / 2.7e-4 | 1.6e-4 / 3.2e-4 | **1.2e-2 / 2.9e-2** | **1.4e-2 / 2.0e-2** |
 | vignetting, lighting (the parts) | 8.1e-6 / 4.3e-5 | 1.8e-5 / 9.5e-5 | 3.2e-6 / 4.8e-5 | 2.6e-6 / 4.5e-5 |
 
-The gate passes (`GATE PASS`, both states). Before the in-plane map and the density guard were fixed (8.1; the two together, not
+Both states are within the gate. Before the in-plane map and the density guard were fixed (8.1; the two together, not
 measured apart), the branch's pose stood at 1.3e-3 stacked and 4.1e-3 in a tile after the LM (the in-plane error and the heights
 estimated by then): a fail by 0.01 %. The columns after the LM (≈ 4e-4) stay 20–40× those at the start (≈ 1e-5); what of the
 Float32 estimator grows with the estimated state is not isolated (8.6).
@@ -604,3 +606,62 @@ the branch they are ≤ 0.1 % stacked. **One block got worse: Θ_m's nonlinear c
 1.7e-4 → 1.2–1.4e-2 stacked): they are the record's own partials ∂L/∂α, ∂L/∂η, which `main` took from its Float64 estimator and
 the branch from the Float32 one (`main`'s report of decision 2 measured "up to 0.4 %" of the Float32 estimator's α and η
 derivatives at an edge). Not in the gate; open (8.6).
+
+### 8.4 Performance (B200, `main` and the branch in one job: `results/ab1-*`)
+
+`benchmark/linearization.jl`, ms, min of 5 (the branch's script follows its `_view_jacobian`: one record, every chunk Float32):
+
+| | flat, 76,800 px: `main` | branch | warped, 16,384 px, free heights: `main` | branch |
+|---|---:|---:|---:|---:|
+| record (`main`: the Float64 record + its Float32 rounding) | 71.3 + 2.7 | 31.0 | 22.8 + 0.8 | 14.5 |
+| one chunk (`main`: Float32 / the pose's Float64) | 3.0 / 5.9 | 4.1 | 0.96 / 1.9 | 1.5 |
+| heights | — | — | 14.6 | 4.8 |
+| parts | 9.0 | 9.1 | 3.2 | 3.2 |
+| **view Jacobian** | **105.2** | **66.4** (1.58×) | **67.1** | **38.0** (1.76×) |
+
+A Float32 chunk is 1.0–1.4× its `main` self: the anchored lookup's Float64 arithmetic (8.6). `benchmark/run.jl`, s, best of the
+reps:
+
+| stage | 320 × 240, 3 views, flat: `main` | branch | 1280 × 960, 8 × 16,384 px, warped: `main` | branch |
+|---|---:|---:|---:|---:|
+| view Jacobian | 0.107 | 0.066 | 0.055 | 0.032 |
+| view normal equations | 0.108 | 0.068 | 0.058 | 0.036 |
+| LM, 1 iteration, per view | 1.12 | 0.80 | 1.13 | 0.80 |
+| LM, 3 iterations, per view | 1.70 | 1.17 | 2.06 | 1.32 |
+| a view's tiles: normal equations (6 tiles) | 0.236 | 0.159 | 0.128 | 0.076 |
+| LM, 1 iteration, grid (20 × 15) | 1.21 | 0.95 | 1.12 | 0.89 |
+| calibration (joint closed form + 3 LM iterations) | 1.60 | 1.39 | 2.93 | 2.39 |
+| the run's 65 × 50 lattice: a view's tiles' normal equations | | | 0.283 | 0.246 |
+| the run's 65 × 50 lattice: LM, 1 iteration, grid | | | 2.94 | 2.84 |
+
+The flux, the render, the cost and the closed form are the same numbers (their checksums to the digits printed); the LM's are
+the device's new path (`lm3_view` 0.0116510618 → 0.0116509345 flat). The grid route with the run's lattice gains least: its
+tile path is latency-bound (7.4; the grid batching is another branch's).
+
+### 8.5 Numbers that changed
+
+| Change | Where | Size | Why it is valid |
+|---|---|---|---|
+| the record's estimator in Float32 at Float64 hits | device: every Jacobian column read from the record | 8.3's table: the gated columns 2e-12 → ≤ 1.2e-3 in a tile; the other geometric columns 0.6–18 % → ≤ 0.5 %; Θ_m's nonlinear columns 1.7e-4 → 1.4e-2 | the gate's tolerance (0.4 %); Θ_m open (8.6) |
+| `_pdf_guard`: Float64's density guard on every float | device: the flux (the residual), the record, the parts | the grazing reflection samples the Float32 estimator dropped are kept | the CPU's estimator, the same value; the device's moves towards it |
+| the albedo of a chunk at the recorded hit | CPU: Jacobian columns | rounding (the tangent-plane point and the recorded hit agree to 1e-16) | the same derivative |
+
+The CPU backend's residuals and the goldens (rtol 1e-10) do not move. **A run of record made on a device would move** on re-run: its
+Jacobians (the LM's path) and its flux (the density guard) are the device's; none was re-run here.
+
+### 8.6 Open
+
+- **Θ_m's nonlinear columns from the Float32 estimator** (1.2–1.4 % stacked on the Siemens case). The record's ∂L/∂α and ∂L/∂η
+  are the only columns that are the estimator's own partials; the fix is to evaluate those two slots in Float64 (a second, 2-slot
+  run of the estimator: a third of the removed Float64 record's work) or to find the Float32-sensitive term of the GGX sampling's
+  α derivative. The owner's call: the gate does not cover Θ_m.
+- **The columns' growth after the LM** (≈ 1e-5 → 4e-4, 8.3) and the 4-sample test scene's 1e-3 (`jacobian_backends_tests.jl`):
+  the Float32 estimator's partials in branches of the sampler (a reflection below the surface, the visible-normal cap's floor
+  `eps` of the float) — not isolated.
+- **The RTX Pro 6000s (Float64 at 1/64 rate)**: the record's geometry and every chunk's anchored lookup are Float64 arithmetic
+  (the lookup ≈ 100 Float64 operations a ray a chunk, the chunk's duals included). On a B200 (1/2) a chunk costs 1.0–1.4× its `main`
+  self (8.4). Cheaper there: the record also keeps the albedo's gradient at the hit (∂ρ/∂𝐱 and its state partials), so a chunk
+  needs no lookup at all — a wider record row.
+- **The decision's per-ray Float32 offsets** (the pixel's chief-ray hit as the anchor, the rays' hits as offsets): would take the
+  record's geometry to Float32 too (the warped page's root in a re-centred frame: VisualGeometryToolkitCore's height field), the
+  remaining Float64 of a linearization. Not needed for the gate.
