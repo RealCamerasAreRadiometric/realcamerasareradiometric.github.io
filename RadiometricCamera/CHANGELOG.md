@@ -5,14 +5,20 @@
 Performance and cleanup (rounds 3 and 4). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
 
 - **Changed (device numbers):** the device Jacobian is Float32 at Float64 hits. The radiance record's geometry — the rays, their
-  hits, the albedo there — is in `ANCHOR_FLOAT` (Float64) on every backend, its Monte Carlo estimator in the kernels' float; the
+  hits, the albedo there — is in `ANCHOR_FLOAT` (Float64) on every backend, its Monte Carlo estimator in the kernels' float but
+  for its roughness and refractive-index partials (a second, two-slot run in Float64, `_material_partials`); the
   record keeps each hit to Float64's precision (`RadianceJac` gains a column: the hit's remainder after rounding). Every Jacobian
   chunk (the pose's among them), the nodal heights' kernel and the parts kernel run in the kernels' float and read the albedo at the
   recorded hit through VisualRadiometryToolkitCore's `anchored_albedo` (the anchor's precision for the point and the map's read, the
   chunk's partials). Removed with it: `HIGH_FLOAT`, the Float64 pose chunks, the Float64 height path and its record, the rounded
   copy of the record (`_chunk_plan`, `_record_as`, `_height_inputs`, `_height_board`; `_anchor_inputs` and `_anchor_board` are the
   record's). The CPU backend's numbers move by rounding only (a chunk reads the albedo at the recorded hit). Needs VisualRadiometryToolkitCore's `physical_albedo` and `anchored_albedo`
-  (its next release): RC's compat floor on it moves with that release.
+  (its next release): RC's compat floor on it moves with that release. On the paper-like Siemens case the device's gated columns
+  (pose, nodal heights) are ≤ 5.7e-4 of the CPU's in a tile (the gate 0.4 %), every other column at or below `main`'s; the
+  view Jacobian 105 → 92 ms flat, 59 → 48 ms warped on a B200 (design report section 8). Device runs of record move on a re-run
+  within those tolerances; CPU runs do not.
+- **Changed (device numbers):** one reflection-sample density guard on every float (`_pdf_guard`, Float64's `10⁴ eps`): the
+  Float32 estimator kept dropping the grazing samples the Float64 one keeps. The CPU's numbers are unchanged.
 - **Changed:** the Jacobian's row kernel launches through VisualGeometryToolkitCore's `_launch_rows_on!` (`OnBackend` with the
   per-pixel workgroup, `_pixel_rows_exec`) and `J r` through its `_matvec!` (on CUDA its one-column matrix product): RC's
   `_launch_pixel_rows!` and the CUDA extension's `_rows_times` are removed.

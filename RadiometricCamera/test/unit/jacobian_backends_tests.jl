@@ -95,11 +95,11 @@ end
         colrel(Jc, Jg, cols) = maximum(c -> norm(Jg[:, c] .- Jc[:, c]) / norm(Jc[:, c]), cols)
 
         # 1. the one implementation on the two backends: every column in the device's Float32 at the record's Float64 hits
-        # (`ANCHOR_FLOAT`: the albedo looked up at the anchored point). Here the columns are the Float32 estimator's: its partials
-        # in a 4-sample estimate on a warped board, 3.5e-3 (the heights), 1.3e-3 (the pose) and 7.8e-3 (the focus) off the CPU's
-        # (B200, 2026-11-21; the record's geometry and the board point are Float64's). The precision gate is the paper-like Siemens
-        # case's (experiments/test/pipeline/jacobian_parity.jl: ≤ 0.12 % in a tile, design report 8.3); the anchored lookup's own
-        # precision is VisualRadiometryToolkitCore's test of `anchored_albedo`.
+        # (`ANCHOR_FLOAT`: the albedo looked up at the anchored point; the estimator's α and η partials in it too, `_material_partials`).
+        # Measured 1.2e-5 (the heights), 1.7e-4 (the pose), 3.5e-4 (the focus) here (B200, 2026-11-21; with the α and η partials in
+        # Float32 they were 3.5e-3, 1.3e-3 and 7.8e-3: the albedo's slope reaches every column through α and η's ink blend). The
+        # precision gate is the paper-like Siemens case's (experiments/test/pipeline/jacobian_parity.jl, design report 8.3); the
+        # anchored lookup's own precision is VisualRadiometryToolkitCore's test of `anchored_albedo`.
         s_c, s_g = pair()
         rc, vc, rg, vg = tile_pair(s_c, s_g)
         rjc, Jc = RC.NLLSsolver.computeresjac(RC.static(1023), rc, vc...)
@@ -107,8 +107,8 @@ end
         @test rjg == RC.NLLSsolver.computeresidual(rg, vg...)                     # bitwise: both from the flux kernel
         @test maximum(abs, rjg .- rjc) < 2e-3 * max(1.0, maximum(abs, rjc))
         hc = (6 + 200 + 9 + 1 + 9) .+ (1:RC.HEIGHT_NFREE)
-        @test colrel(Jc, Jg, hc) < 5e-3
-        @test colrel(Jc, Jg, 1:6) < 3e-3                                           # the pose
-        @test colrel(Jc, Jg, 6 + 200 .+ (1:9)) < 1e-2                              # the focus
+        @test colrel(Jc, Jg, hc) < 1e-4
+        @test colrel(Jc, Jg, 1:6) < 1e-3                                           # the pose
+        @test colrel(Jc, Jg, 6 + 200 .+ (1:9)) < 3e-3                              # the focus
     end
 end
