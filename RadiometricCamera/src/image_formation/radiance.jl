@@ -92,6 +92,15 @@ chunk's anchored lookup). Type-stable in the kernels: the material is evaluated 
     return ω_l, T, ω_l[3] > 0, _radiance_material(m, ρ)
 end
 """
+    _pdf_guard(T) -> T
+
+The density below which a reflection sample is skipped (a visible-normal sample at grazing incidence: its weight is 0/0), the same
+on every float: Float64's `10⁴ eps` (2.2e-12), in `T`. A guard of the float's own `10⁴ eps` was 1.2e-3 in Float32 — a different
+estimator, not a rounding of the Float64 one: it dropped the grazing samples Float64 keeps (the device's radiance and its record
+1e-3 off the CPU's on a warped board, 2026-11-21).
+"""
+@inline _pdf_guard(::Type{T}) where {T} = T(eps(Float64) * 10000)
+"""
     L_c(board, mat, light, sampler, key, 𝐛, 𝐱, ω) -> SVector{3}
 
 Monte-Carlo estimate of the per-channel radiance of the point 𝐱 (chart 𝐛) of the board (a `TexturedTarget`, under its state:
@@ -120,7 +129,7 @@ end
     acc = zero(SVector{3, Tz})
     h = key_hash(s, key)
     Tu = typeof(ForwardDiff.value(zero(Tz)))
-    pdf_guard = eps(Tu) * Tu(10000)
+    pdf_guard = _pdf_guard(Tu)
     for i in 1:s.N
         u₁, u₂ = draws(s, Tu, h, i)
         𝐧_h = sample_visible_normal(α, ω_l, u₁, u₂)
@@ -166,7 +175,7 @@ function _radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<
     _, α, η = _radiance_material(m, ρ)
     h = key_hash(s, key)
     Tu = typeof(ForwardDiff.value(zero(T)))
-    pdf_guard = eps(Tu) * Tu(10000)
+    pdf_guard = _pdf_guard(Tu)
     for i in 1:s.N
         u₁, u₂ = draws(s, Tu, h, i)
         𝐧_h = sample_visible_normal(α, ω_l, u₁, u₂)

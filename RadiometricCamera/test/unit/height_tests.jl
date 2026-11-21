@@ -444,9 +444,9 @@ end
     @test count(reached) > length(reached) ÷ 2 && reached == [!iszero(G[:, RC.RAD_NL + 3]) for G in r32.J]
     @test all(iszero(G[:, RC.RAD_NL + 4]) for G in r64.J)                                     # Float64: no remainder
     @test maximum(i -> norm(RC._recorded_anchor(a32, i) - RC._recorded_anchor(a64, i)), findall(reached)) < 1e-12
-    # the radiance and its local partials: Float32's rounding of the estimator, but for the rare ray whose Monte Carlo sample falls
-    # on the other side of a branch of the GGX sampling in Float32 (a sample skipped or kept: a step of 1/N of the ray's estimate)
+    # the radiance and its local partials: Float32's rounding of the estimator (the same estimator: `_pdf_guard`)
     scale = maximum(G -> maximum(abs, G[:, 1:(1 + RC.RAD_NL)]), r64.J)
     err = [maximum(abs, Float64.(r32.J[i][:, 1:(1 + RC.RAD_NL)]) - r64.J[i][:, 1:(1 + RC.RAD_NL)]) / scale for i in findall(reached)]
-    @test count(<(1e-5), err) >= 0.99 * length(err)
+    @test count(<(1e-5), err) >= 0.999 * length(err)
+    @test maximum(err) < 1e-3
 end
