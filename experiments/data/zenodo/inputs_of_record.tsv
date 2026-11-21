@@ -1,0 +1,76 @@
+# Inputs of the reproduce graph (configs/reproduce.toml, every stage but the studies; run_of_record = in configs/run_of_record.toml [launch] stages),
+# enumerated by VisualGeometryToolkitEval Reproduce.missing_inputs against an EMPTY data root (2026-11-21), sized on the run-of-record data root
+# (poseidon rc-vgtk-root, symlinks followed). packed = the 2026-10-29 artifacts of Artifacts.toml whose filter matches; unpacked = the
+# [[unpacked.<tier>]] entries of configs/data_artifacts.toml that name it. A directory input counts every file below it.
+# NOTE: sensor_characterisation/…alldarks.json carries 42 rasters beside it (+0.64 GB) that IO reads by name; the golden stage
+# reads geometric_accuracy/detector_bias/data/fisheye_full (534 files, 37 MB) through its pipeline config, which the input check does not see.
+path	tier	run_of_record	files	bytes	kind	action	in_packed_2026_10_29	in_unpacked	proposed_record	proposed_tarball
+frontends/inputs/blobboard_a4/board_a4.json	rc_baselines	true	1	76648	design input (BlobBoards board JSON)	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm	rc_calibration	true	5	246167940	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/sdf.f32	rc_calibration	false	1	245360896	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/sdf.json	rc_calibration	false	1	247	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/blobboard_a4_6eb	rc_calibration	true	3	569157	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	[]	['rc_calibration']	D	rc_targets
+geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml	rc_calibration	true	1	395	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/siemens_1m/board	rc_calibration	true	5	263183088	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/siemens_1m/board/sdf.f32	rc_calibration	false	1	256000000	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/siemens_1m/board/sdf.json	rc_calibration	false	1	399	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_calibration_20261029']	[]	D	rc_targets
+geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json	rc_thorlabs	true	1	22110	target record / generator output (sdf.f32), NOT rebuilt by the graph	ship	['rc_thorlabs_20261029']	[]	D	rc_targets
+geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/schoeps_dense_green	rc_baselines	true	17	15333485	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/schoeps_green	rc_baselines	true	17	18385996	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-14mm-texcal-20261109-g7/schoeps_green_w25	rc_baselines	true	17	33822919	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/board_srgb	rc_baselines	true	106	2028460015	derived (8-bit sRGB copies by a deleted rawpy tool), NOT rebuilt	ship	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-10cm-all/schoeps_dense_aruco_green	rc_baselines	true	17	9789316	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-tamron-aprilgrid-20261108-all/schoeps_dense_green	rc_baselines	true	17	15318908	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-tamron-siemens-17cm-all/schoeps_green_w40	rc_baselines	true	17	18086343	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/night_stars/data/fx3-tamron-siemens-largeaperture-all-g4/schoeps_green_w40	rc_baselines	true	17	20642446	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	['rc_baselines_20261029']	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ds_kalibr.json	rc_baselines	true	1	820	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_bc5_fit.json	rc_baselines	true	1	1506	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_kb_fit.json	rc_baselines	true	1	1137	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_ocv14_fit.json	rc_baselines	true	1	2676	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_bc5_fit.json	rc_baselines	true	1	1499	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_ocv14_fit.json	rc_baselines	true	1	2672	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/central30cm_all/14mm_central30cm_si_ds_start.json	rc_baselines	true	1	1207	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/central30cm_all/14mm_central30cm_si_kb_start.json	rc_baselines	true	1	1402	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_bc5_cv2.json	rc_baselines	true	1	1449	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_ds_kalibr.json	rc_baselines	true	1	825	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_kb_cv2.json	rc_baselines	true	1	1143	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/fisheye10cm_all/fisheye10cm_all_green_ocv14_cv2.json	rc_baselines	true	1	2660	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/fisheye30cm_si_all/fisheye30cm_si_all_green_ocv14_cv2.json	rc_baselines	true	1	3427	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron17cm_ag_all/tamron17cm_ag_all_green_bc5_cv2.json	rc_baselines	true	1	1449	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	[]	D	rc_derived
+geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_all_green_bc5_cv2.json	rc_baselines	true	1	1450	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_all_green_kb_cv2.json	rc_baselines	true	1	1140	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_all_green_ocv14_cv2.json	rc_baselines	true	1	2656	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_ds_start.json	rc_baselines	true	1	1220	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_bc5_cv2.json	rc_baselines	true	1	1457	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ds_kalibr.json	rc_baselines	true	1	838	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_kb_cv2.json	rc_baselines	true	1	1148	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ocv14_cv2.json	rc_baselines	true	1	2666	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/tamron_largeaperture_all/tamronla_all_green_kb_cv2.json	rc_baselines	true	1	1147	derived, frozen reference read only by frontends_evaluate (the graph rebuilds these starts)	ship-as-reference	[]	['rc_baselines']	D	rc_derived
+geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json	rc_baselines	true	1	2198	derived by external tools (OpenCV/Kalibr/Schoeps/fits), NOT rebuilt	ship	[]	['rc_baselines']	D	rc_derived
+paper-data/defocus/14mm/calibration	rc_raw_photos	true	479	12395204608	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_14mm_calibration
+paper-data/defocus/14mm/texture-learning	rc_raw_photos	true	106	2674421760	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_14mm_texture_learning
+paper-data/defocus/tamron/chrome	rc_raw_photos	true	190	4724207616	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_tamron_chrome
+paper-data/defocus/tamron/siemens-stars	rc_raw_photos	true	340	8864350208	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_tamron_siemens_stars
+paper-data/defocus/zoom-lens/chrome	rc_raw_photos	true	54	1342038016	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_zoom_lens_chrome
+paper-data/defocus/zoom-lens/siemens-stars	rc_raw_photos	true	171	4468740096	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	C	rc_raw_defocus_zoom_lens_siemens_stars
+paper-data/geometric-accuracy/14mm/april-grid	rc_raw_photos	true	408	10345054208	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_14mm_april_grid
+paper-data/geometric-accuracy/14mm/chrome	rc_raw_photos	true	142	3532079104	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_14mm_chrome
+paper-data/geometric-accuracy/14mm/siemens-stars	rc_raw_photos	true	168	4451868672	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_14mm_siemens_stars
+paper-data/geometric-accuracy/fisheye/april-grid	rc_raw_photos	true	407	10329395200	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	B	rc_raw_ga_fisheye_april_grid
+paper-data/geometric-accuracy/fisheye/chrome-april	rc_raw_photos	true	154	3830616064	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	B	rc_raw_ga_fisheye_chrome_april
+paper-data/geometric-accuracy/fisheye/siemens-stars	rc_raw_photos	true	150	3846205440	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	B	rc_raw_ga_fisheye_siemens_stars
+paper-data/geometric-accuracy/fisheye_30cm/chrome	rc_raw_photos	true	254	6314676224	raw	ship	['rc_raw_photos_20261029']	[]	B	rc_raw_ga_fisheye_30cm_chrome
+paper-data/geometric-accuracy/fisheye_30cm/siemens-stars	rc_raw_photos	true	301	7791955968	raw	ship	['rc_raw_photos_20261029']	[]	B	rc_raw_ga_fisheye_30cm_siemens_stars
+paper-data/geometric-accuracy/tamron/april-grid	rc_raw_photos	true	411	10430808064	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_tamron_april_grid
+paper-data/geometric-accuracy/tamron/chrome-april	rc_raw_photos	true	142	3528728576	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_tamron_chrome_april
+paper-data/geometric-accuracy/tamron/chrome-siemens	rc_raw_photos	true	112	2786783232	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_tamron_chrome_siemens
+paper-data/geometric-accuracy/tamron/siemens-stars	rc_raw_photos	true	267	6991470592	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	A	rc_raw_ga_tamron_siemens_stars
+paper-data/vignetting/14mm/diffuser	rc_raw_photos	true	1	24809472	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	D	rc_raw_vignetting_14mm_diffuser
+paper-data/vignetting/14mm/siemens-stars	rc_raw_photos	true	174	4533227520	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	D	rc_raw_vignetting_14mm_siemens_stars
+paper-data/vignetting/fisheye/siemens-stars	rc_raw_photos	true	160	4080410624	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	D	rc_raw_vignetting_fisheye_siemens_stars
+paper-data/vignetting/tamron/siemens-stars	rc_raw_photos	true	163	4242952192	raw	ship	['rc_raw_photos_20261029']	['rc_raw_photos']	D	rc_raw_vignetting_tamron_siemens_stars
+rc_sensor_characterisation_20261113/E1_E2	unpublished	false	0	0	raw (sensor campaign; stage sensor_characterisation, default=false)	optional	[]	[]	D (optional)	rc_sensor_frames
+rc_sensor_characterisation_20261113/E4	unpublished	false	0	0	raw (sensor campaign; stage sensor_characterisation, default=false)	optional	[]	[]	D (optional)	rc_sensor_frames
+rc_sensor_characterisation_20261113/MANIFEST.tsv	unpublished	false	0	0	raw (sensor campaign; stage sensor_characterisation, default=false)	optional	[]	[]	D (optional)	rc_sensor_frames
+schoeps-camera_calibration-00ef4de-sm100.sqsh	unpublished	true	0	0	tool image (Schöps camera_calibration, enroot sqsh, sha256-pinned)	decide	[]	[]	D (decide)	rc_container_schoeps
+sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json	unpublished	true	1	3386086	derived, NOT rebuilt by the graph (record + 42 dark rasters)	ship	[]	[]	D	rc_sensor_model

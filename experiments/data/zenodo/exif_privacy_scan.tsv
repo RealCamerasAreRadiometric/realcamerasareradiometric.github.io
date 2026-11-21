@@ -1,0 +1,19 @@
+# exiftool 12.76 -G1 -s (maker notes included) over every ARW of the poseidon paper-data tree (6191 files; the cluster-only
+# folders read from each file's first 256 KiB). Count of files carrying the tag, distinct values, the most common value.
+# files with ANY GPS-group tag: 0
+tag	files	distinct	most_common
+GPS:GPSLatitude	0	0	
+GPS:GPSLongitude	0	0	
+GPS:GPSPosition	0	0	
+IFD0:Artist	0	0	
+IFD0:Copyright	0	0	
+ExifIFD:OwnerName	0	0	
+ExifIFD:SerialNumber	0	0	
+ExifIFD:LensSerialNumber	0	0	
+Sony:InternalSerialNumber	6191	1	(one value; withheld here)
+IFD0:Software	6191	1	ILME-FX3 v5.00
+IFD0:Model	6191	1	ILME-FX3
+ExifIFD:LensModel	6191	4	E 20mm F2.8 F050
+ExifIFD:DateTimeOriginal	6191	5533	2026:11:13 12:07:59
+ExifIFD:UserComment	6191	1	
+IFD0:ImageDescription	6191	1	

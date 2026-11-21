@@ -1,0 +1,66 @@
+# PROPOSAL (2026-11-21, not bound, nothing uploaded): the Zenodo layout of the paper's INPUT data, from
+# data/zenodo/inputs_of_record.tsv (the inputs the reproduce graph reads, enumerated against an empty data root).
+# The run-of-record results are NOT published: everything is rebuilt from these inputs and the released code.
+#
+# Zenodo's defaults: 50 GB and 100 files per record. Layout 1 (below) keeps every record under both; layout 2 is ONE record
+# of the same tarballs after a quota increase (owner's request to Zenodo support). Bytes are decimal GB of the payload;
+# the tarballs add < 0.1 % (ARW does not compress: pack with gzip -1 or plain tar, DataArtifacts needs .tar.gz).
+#
+# One catalog entry (configs/data_artifacts.toml, kind "tree") per tarball, dated by its pack day (<tier>_<yyyymmdd>), each
+# entry's `record` the group below; Artifacts.toml binds each by tree hash + sha256 with the URL
+#   https://zenodo.org/records/<id>/files/<entry>.tar.gz?download=1      (DataArtifacts.zenodo_url)
+# once the record ids exist (reserve them on the drafts, then `make_artifacts.jl --record=<group>=<id>` per group, publish,
+# then fetch_data.jl --all on a clean machine: a draft's file URLs are not live).
+
+[records.rc_ga_a]
+title = "Real Cameras are Radiometric — input data I: calibration accuracy, Sigma 14 mm and Tamron 20 mm (Sony FX3 RAW)"
+tarballs = ["rc_raw_ga_14mm_april_grid", "rc_raw_ga_14mm_chrome", "rc_raw_ga_14mm_siemens_stars",
+            "rc_raw_ga_tamron_april_grid", "rc_raw_ga_tamron_chrome_april", "rc_raw_ga_tamron_chrome_siemens", "rc_raw_ga_tamron_siemens_stars"]
+gb = 42.07
+files = 7           # + README.md, MANIFEST.tsv, MD5SUMS
+
+[records.rc_ga_b]
+title = "Real Cameras are Radiometric — input data II: calibration accuracy, Sigma 8 mm fisheye (Sony FX3 RAW)"
+tarballs = ["rc_raw_ga_fisheye_april_grid", "rc_raw_ga_fisheye_chrome_april", "rc_raw_ga_fisheye_siemens_stars",
+            "rc_raw_ga_fisheye_30cm_siemens_stars", "rc_raw_ga_fisheye_30cm_chrome"]
+gb = 32.11
+files = 5
+
+[records.rc_defocus]
+title = "Real Cameras are Radiometric — input data III: defocus (14 mm texture, Tamron f/8, zoom 48 mm) (Sony FX3 RAW)"
+tarballs = ["rc_raw_defocus_14mm_calibration", "rc_raw_defocus_14mm_texture_learning", "rc_raw_defocus_tamron_siemens_stars",
+            "rc_raw_defocus_tamron_chrome", "rc_raw_defocus_zoom_lens_siemens_stars", "rc_raw_defocus_zoom_lens_chrome"]
+gb = 34.47
+files = 6
+
+[records.rc_vig_derived]
+title = "Real Cameras are Radiometric — input data IV: vignetting RAW, targets, sensor model and the external tools' starts"
+tarballs = ["rc_raw_vignetting_14mm_siemens_stars", "rc_raw_vignetting_14mm_diffuser", "rc_raw_vignetting_fisheye_siemens_stars",
+            "rc_raw_vignetting_tamron_siemens_stars",
+            "rc_targets",            # siemens_1m board (+ sdf.f32), 30x30 pattern yaml, aprilgrid board_sdf_8ppm, blobboard_a4_6eb, thorlabs target.json (0.51 GB)
+            "rc_derived",            # the AprilGrid Schöps dense runs, the OpenCV/Kalibr/fit records, board_srgb (2.03 GB), board_a4.json (2.07 GB)
+            "rc_reference",          # the frozen Siemens Schöps starts frontends_evaluate compares against (0.09 GB)
+            "rc_sensor_model"]       # fx3 …alldarks.json + its 42 dark rasters (0.64 GB)
+gb = 16.2
+files = 8
+# optional, owner's decision (fits this record: 43.3 GB with both):
+#   rc_container_schoeps  11.14 GB  the sha256-pinned enroot image of T. Schöps's camera_calibration (frontends detect)
+#   rc_sensor_frames      15.91 GB  rc_sensor_characterisation_20261113 (E1_E2, E4, E5): the frames the sensor model came from
+
+# NOT published (read by no stage of the graph, or duplicates): blacklevel_sensor_noise/ (10.12 GB, byte-identical to
+# rc_sensor_characterisation_20261113/E1_E2 less 1_8000), defocus/fisheye/siemens-stars (4.08 GB, = vignetting/fisheye/siemens-stars),
+# geometric-accuracy/fisheye/chrome-siemens (2.93 GB, its chrome set excluded 2026-11-15), vignetting/*/panorama (2.72 GB) and the
+# fisheye/tamron diffusers; the 2026-10-29 artifacts (rc_raw_photos/rc_synthetic/rc_baselines/rc_calibration/rc_thorlabs photos and
+# camera/rc_fx3_14mm); the derived tree's retired files (chrome/*.photos 16.5 GB, vignetting/{flat,image_circle,maps,data,results},
+# detector_bias/, macro_defocus/, old records and night_stars sets).
+
+[layout_single_record]
+title = "Real Cameras are Radiometric — input data (Sony FX3 RAW, targets, sensor model, external starts)"
+gb = 124.9          # 4 groups above; 151.9 with the container image and the sensor frames
+files = 26          # 28 with both optional tarballs
+
+[code]
+# The code record: GitHub–Zenodo integration on a tagged release of RealCamerasAreRadiometric/realcamerasareradiometric.github.io
+# (RadiometricCamera/ + experiments/), PLUS the resolved Manifest of the run as a file of that record (Manifest*.toml is git-ignored
+# by rule), or a tarball code record made by hand (git archive of the tag + Manifest.toml + the registry commits the Manifest
+# resolved against). Either way the data records cite it (related identifier "isSupplementTo") and the paper cites both.
