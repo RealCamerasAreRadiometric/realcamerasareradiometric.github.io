@@ -619,8 +619,18 @@ derivatives at an edge). Not in the gate; open (8.6).
 | parts | 9.0 | 9.1 | 3.2 | 3.2 |
 | **view Jacobian** | **105.2** | **66.4** (1.58×) | **67.1** | **38.0** (1.76×) |
 
-A Float32 chunk is 1.0–1.4× its `main` self: the anchored lookup's Float64 arithmetic (8.6). `benchmark/run.jl`, s, best of the
-reps:
+A Float32 chunk is 1.0–1.4× its `main` self: the anchored lookup's Float64 arithmetic (8.6). On an **RTX Pro 6000** (Float64 at
+1/64 rate; nereus, `results/rtx-*`, the same scripts):
+
+| | flat: `main` | branch | warped: `main` | branch |
+|---|---:|---:|---:|---:|
+| record | 201.2 + 3.3 | 21.3 | 80.4 + 0.7 | 31.9 |
+| one chunk (`main`: Float32 / the pose's Float64) | 2.4 / 19.1 | 5.1 | 0.94 / 5.3 | 1.8 |
+| heights | — | — | 39.7 | 5.5 |
+| **view Jacobian** | **247.3** | **60.9** (4.1×) | **138.4** | **54.7** (2.5×) |
+
+There the anchored lookup doubles a Float32 chunk (2.4 → 5.1 ms), still far below `main`'s Float64 pose chunks. `benchmark/run.jl`,
+s, best of the reps (B200):
 
 | stage | 320 × 240, 3 views, flat: `main` | branch | 1280 × 960, 8 × 16,384 px, warped: `main` | branch |
 |---|---:|---:|---:|---:|
@@ -658,10 +668,9 @@ Jacobians (the LM's path) and its flux (the density guard) are the device's; non
 - **The columns' growth after the LM** (≈ 1e-5 → 4e-4, 8.3) and the 4-sample test scene's 1e-3 (`jacobian_backends_tests.jl`):
   the Float32 estimator's partials in branches of the sampler (a reflection below the surface, the visible-normal cap's floor
   `eps` of the float) — not isolated.
-- **The RTX Pro 6000s (Float64 at 1/64 rate)**: the record's geometry and every chunk's anchored lookup are Float64 arithmetic
-  (the lookup ≈ 100 Float64 operations a ray a chunk, the chunk's duals included). On a B200 (1/2) a chunk costs 1.0–1.4× its `main`
-  self (8.4). Cheaper there: the record also keeps the albedo's gradient at the hit (∂ρ/∂𝐱 and its state partials), so a chunk
-  needs no lookup at all — a wider record row.
+- **The anchored lookup's Float64 in every chunk**: ≈ 100 Float64 operations a ray a chunk, the chunk's duals included — a
+  chunk 1.0–1.4× its `main` self on a B200, 2.1× on an RTX Pro 6000 (8.4). Cheaper: the record also keeps the albedo's gradient at
+  the hit (∂ρ/∂𝐱 and its state partials), so a chunk needs no lookup at all — a wider record row.
 - **The decision's per-ray Float32 offsets** (the pixel's chief-ray hit as the anchor, the rays' hits as offsets): would take the
   record's geometry to Float32 too (the warped page's root in a re-centred frame: VisualGeometryToolkitCore's height field), the
   remaining Float64 of a linearization. Not needed for the gate.
