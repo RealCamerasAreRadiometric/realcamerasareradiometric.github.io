@@ -160,6 +160,36 @@ Base.@propagate_inbounds function _jacobian_row!(J, i, r, ids, bufidx, gidx, H, 
 end
 
 """
+    _tiles_row!(J, i, Mx, npx, lenses, bases, P0s, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G,
+                ::Val{N}, sensor, pxy, light_scale, Z)
+
+The row kernel of a view's tiles in ONE launch (`_tiles_normal_equations`): row `i` of the zero-padded batch — tile
+`t = ⌈i / Mx⌉`'s pixel `i − (t − 1) Mx`, a padding row past its `npx[t]` pixels writes nothing — is [`_jacobian_row!`](@ref) at
+that position with the tile's own window lens `lenses[t]`, its tangent bases `bases[:, :, t]` and patch origin `P0s[t]`
+(`lenses === nothing`: no patch column is free, no fan-out). The per-row arrays (`bufidx`, `gidx`, `ϕ`, `ω`, `r`, `J`'s columns)
+are padded to `Mx` pixels a tile, so a tile's rows are `_jacobian_row!`'s for it alone, value for value.
+"""
+Base.@propagate_inbounds function _tiles_row!(J, i, Mx, npx, lenses, bases, P0s, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay,
+                                              parts, pdims, heights, hB, G, vN::Val, sensor, pxy, light_scale, Z)
+    t = (i - 1) ÷ Mx + 1
+    i - (t - 1) * Mx <= npx[t] || return nothing
+    lensw = lenses === nothing ? nothing : lenses[t]
+    bw = bases === nothing ? nothing : view(bases, :, :, t)
+    _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, vN, sensor, lensw, bw, P0s[t],
+                   pxy, light_scale, Z)
+    return nothing
+end
+
+"""
+    _device_elements(be, xs) -> array of xs's elements a kernel can index
+
+The vector `xs` of structs that hold backend arrays (a tile's window lens, `_lens32`) as an array a kernel on `be` indexes: `xs`
+itself on the CPU backend; RC's CUDA extension uploads the elements' device forms (`cudaconvert`). The caller keeps `xs` alive
+(`GC.@preserve`) while a kernel reads the result: the device forms point into its arrays.
+"""
+_device_elements(be, xs::AbstractVector) = xs
+
+"""
     _focus_weights(s, k, tps, vix_d) -> (G, gidx)
 
 The focus chain's nodal weights of view `k`'s pixels on the backend (`G[n, ks, ·]`: node `n`'s weight at sensor sample `ks`,
@@ -250,16 +280,33 @@ on the device as a dense matrix, `T` was an upload and three small dense product
 products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
-    products() = (Array(VgtkCore._matvec!(similar(r, size(J, 1)), J, r)), Array(J * J'))   # J r: Core's (its CUDA method a one-column gemm)
-    g, H = products()
-    if !(all(isfinite, g) && all(isfinite, H))
-        # a non-finite Jacobian entry makes its column's diagonal of J Jᵀ non-finite: scrubbed (`_scrub_entries!`) and formed again —
-        # the blocks of the scrubbed Jacobian; a finite Jacobian (every block but a defect's) skips the scrub's sweep over it
-        _scrub!(J, lay, run)
-        g, H = products()
-    end
+    g, H = _finite_products(J, r, _block_products(J, r), lay, run)
     return _in_problem_coordinates(SparseArrays.sparse(T), g, H)
 end
+"""`J r` and `J Jᵀ` of a block's device Jacobian (columns × rows) and residual on the host: `J r` Core's `_matvec!` (its CUDA method a
+one-column gemm), `J Jᵀ` the backend's product."""
+_block_products(J, r) = (Array(VgtkCore._matvec!(similar(r, size(J, 1)), J, r)), Array(J * J'))
+"""
+    _finite_products(J, r, (g, H), lay, run) -> (g, H)
+
+The products `(g, H)` of the block `J`, `r` when finite; else the block's non-finite Jacobian entries scrubbed (`_scrub_entries!`)
+and its products formed again (`_block_products`). A non-finite entry makes its column's diagonal of `J Jᵀ` non-finite, so a finite
+Jacobian (every block but a defect's) skips the scrub's sweep over it.
+"""
+function _finite_products(J, r, gH, lay, run::_LmRun)
+    g, H = gH
+    all(isfinite, g) && all(isfinite, H) && return g, H
+    _scrub!(J, lay, run)
+    return _block_products(J, r)
+end
+"""
+    _batched_products(J3, r2, ms) -> [(gₜ, Hₜ) for each tile t]
+
+The products `J r`, `J Jᵀ` of a batch of blocks on the host (`_tiles_normal_equations`): block `t` the first `ms[t]` rows of
+`J3[:, :, t]` (columns × rows, zero past them) and of `r2[:, t]`. Here one block at a time (`_block_products` of each, the per-tile
+products' arithmetic); RC's CUDA extension forms all of them as two strided batched products over the zero-padded rows.
+"""
+_batched_products(J3, r2, ms) = [_block_products(view(J3, :, 1:ms[t], t), view(r2, 1:ms[t], t)) for t in eachindex(ms)]
 """
     _in_problem_coordinates(T, g, H) -> (Tᵀg, TᵀHT)
 

@@ -30,4 +30,19 @@ function RadiometricCamera._shared_read_only!(::CUDA.CUDABackend, x)
     return x
 end
 
+# The tiles of a view in one launch (`_tiles_normal_equations`): their window lenses as one device array of their device forms (the
+# caller preserves the host lenses, whose arrays those forms point into), and their Gauss–Newton products as two strided batched
+# gemms over the zero-padded rows (the padding rows are zero in J and r, so they add nothing) — one product each for all the tiles
+# instead of two per tile.
+RadiometricCamera._device_elements(::CUDA.CUDABackend, xs::AbstractVector) = CUDA.CuArray(map(CUDA.cudaconvert, xs))
+
+function RadiometricCamera._batched_products(J3::CUDA.CuArray{Float64, 3}, r2::CUDA.CuMatrix{Float64}, ms)
+    n, M, nt = size(J3)
+    H = similar(J3, n, n, nt); g = similar(J3, n, 1, nt)
+    CUDA.CUBLAS.gemm_strided_batched!('N', 'T', 1.0, J3, J3, 0.0, H)
+    CUDA.CUBLAS.gemm_strided_batched!('N', 'N', 1.0, J3, reshape(r2, M, 1, nt), 0.0, g)
+    Hh = Array(H); gh = Array(g)
+    return [(gh[:, 1, t], Hh[:, :, t]) for t in 1:nt]
+end
+
 end # module

@@ -275,10 +275,60 @@ end
         RC.NLLSsolver.computeresidual(r2, vars2n...)
         @test s_g.run.device_calls[:flux] > calls0
         RC._unregister_grid_problem!(s_g)
+        # a view's tiles in one batch (`_tile_blocks!`): the residuals' cost bit for bit, the blocks the per-tile path's to the products'
+        # summation order (two strided batched gemms over the zero-padded rows); no tile forms its own Jacobian
+        let ts = RC.tile_costs(prob_g)
+            blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(1023), t, RC.NLLSsolver.getvars(t, prob_g.variables)...) for t in ts]
+            per_tile = blocks()
+            jac0 = s_g.run.device_calls[:jac]
+            batched = RC._with_registered(blocks, s_g, prob_g, idx_g; concurrent = false)
+            @test s_g.run.device_calls[:jac] == jac0
+            for (x, y) in zip(per_tile, batched)
+                @test x[1] == y[1]
+                @test norm(y[2] - x[2]) <= 1e-12 * norm(x[2]) && norm(y[3] - x[3]) <= 1e-12 * norm(x[3])
+            end
+        end
         s2g = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
         c0g = cost(s2g)[1]
         run_lm_grid!(s2g; patch = (5, 5), maxiters = 15)
         @test cost(s2g)[1] < 0.05 * c0g
         @test grid_angular_error(s2g.camera.geometric, glens_t) < 2e-3
+    end
+end
+
+# A view's tiles' Gauss–Newton blocks in one batch (`_tile_blocks!`, decision 6): every tile's (cost, Jᵀr, JᵀJ) at the varflags the
+# problem gives it, the batch's and the per-tile path's bit for bit on the CPU backend — with a dependent patch (its neighbours' tiles a
+# batch of other varflags) and with a held block (the aperture) — and the batch formed once per view (no per-tile Jacobian).
+@testitem "grid lens / a view's tiles in one batch" setup = [RCFixtures, GridTilesScene] begin
+    using RadiometricCamera: build_problem_grid, render_view
+    import VisualGeometryToolkitCore as VgtkCore
+    # a 15 × 15 lattice (3 × 3 patch blocks, 2 × 2 tile windows) whose patch (0, 0) holds no present node: a dependent patch, so the
+    # tiles of the window at (0, 0) have other varflags than their view's other tiles
+    glens15 = RC.grid_model(src_t, 15, 15)
+    free = trues(15, 15); free[1:5, 1:5] .= false
+    lens_m = RC.VgtkCore.with_present(glens15, permutedims(free))
+    reads_held(u, v) = all(p -> all(isfinite, VgtkCore.backproject(lens_m, first(p))), RC.sensor_samples(st.sensor, u, v))
+    masks_m = [BitMatrix([mk[v, u] && reads_held(u, v) for v in axes(mk, 1), u in axes(mk, 2)]) for mk in masks]
+    targets_m = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks_m[k]) for k in 1:2]
+    camera_m = RadiometricCameraModel(lens_m, focus_t, r_t, vig_t)
+    flags(free_vars, t) = sum(j -> free_vars[t.idx[j]] ? 1 << (j - 1) : 0, 1:10)     # NLLSsolver's `computevarflags` of the tile
+    for (cam_, msk, tgt, fixed) in ((camera_t, masks, targets, ()), (camera_m, masks_m, targets_m, ()), (camera_t, masks, targets, (:aperture,)))
+        s_b = CalibrationState(board, st, cam_, copy(poses), mat_t, light_t, tgt; masks = msk)
+        prob_b, idx_b = build_problem_grid(s_b; patch = (5, 5), fixed)
+        ts = RC.tile_costs(prob_b)
+        vfs = [flags(idx_b.free, t) for t in ts]
+        blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(vf), t, RC.NLLSsolver.getvars(t, prob_b.variables)...) for (t, vf) in zip(ts, vfs)]
+        per_tile = blocks()                                         # unregistered: every tile its own Jacobian
+        jac0 = s_b.run.device_calls[:jac]
+        batched, again = RC._with_registered(s_b, prob_b, idx_b; concurrent = false) do
+            b = blocks()
+            @test s_b.run.device_calls[:jac] == jac0                 # the batches: no tile formed its own Jacobian
+            b, blocks()                                               # a tile asked again at the trial: its own blocks (handed out once)
+        end
+        @test s_b.run.device_calls[:jac] == jac0 + length(ts)
+        @test all(((x, y),) -> x[1] == y[1] && x[2] == y[2] && x[3] == y[3], zip(per_tile, batched))
+        @test all(((x, y),) -> x[1] == y[1] && x[2] == y[2] && x[3] == y[3], zip(per_tile, again))
+        cam_ === camera_m && @test all(k -> length(unique(vfs[[t.k == k for t in ts]])) > 1, 1:2)   # tiles of several varflags in a view
+        :aperture in fixed && @test all(vf -> vf & 64 == 0, vfs)
     end
 end
