@@ -47,13 +47,11 @@ VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 # TEMPORARY, each until the named release is registered in General; then the line is deleted and the package resolves from the registry:
 # PanoramaStitching from its port branch (its registered 0.10.0 caps VisualGeometryToolkitCore at 0.11): waits for PanoramaStitching 0.11.0.
 PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "vrtk/port"}
-# BlobBoards from its cascade branch (compat on VisualGeometryToolkitCore 0.12): waits for BlobBoards 0.7.3.
-BlobBoards = {url = "https://github.com/VisualGeometryToolkit/BlobBoards.jl", rev = "cascade/vgtk-0.12"}
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
 Adapt = "4"
-BlobBoards = "0.7.2"
+BlobBoards = "0.7.3"
 CUDA = "5"
 CUDNN_jll = "9.28 - 9"
 CairoMakie = "0.15"
