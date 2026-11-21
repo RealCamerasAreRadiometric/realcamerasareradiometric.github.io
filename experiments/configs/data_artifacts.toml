@@ -75,7 +75,7 @@ dir = "paper-data/geometric-accuracy/14mm/april-grid"
 filter = ["paper-data/geometric-accuracy/14mm/april-grid/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 408
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -89,7 +89,7 @@ dir = "paper-data/geometric-accuracy/14mm/chrome"
 filter = ["paper-data/geometric-accuracy/14mm/chrome/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 142
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -103,7 +103,7 @@ dir = "paper-data/geometric-accuracy/14mm/siemens-stars"
 filter = ["paper-data/geometric-accuracy/14mm/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 168
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -117,7 +117,7 @@ dir = "paper-data/geometric-accuracy/tamron/april-grid"
 filter = ["paper-data/geometric-accuracy/tamron/april-grid/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 411
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -131,7 +131,7 @@ dir = "paper-data/geometric-accuracy/tamron/chrome-april"
 filter = ["paper-data/geometric-accuracy/tamron/chrome-april/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 142
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -145,7 +145,7 @@ dir = "paper-data/geometric-accuracy/tamron/chrome-siemens"
 filter = ["paper-data/geometric-accuracy/tamron/chrome-siemens/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 112
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -159,7 +159,7 @@ dir = "paper-data/geometric-accuracy/tamron/siemens-stars"
 filter = ["paper-data/geometric-accuracy/tamron/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 267
 mount = "data"
 record = "rc_ga_a"
 tier = "rc_raw_photos"
@@ -173,7 +173,7 @@ dir = "paper-data/geometric-accuracy/fisheye/april-grid"
 filter = ["paper-data/geometric-accuracy/fisheye/april-grid/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 407
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -187,7 +187,7 @@ dir = "paper-data/geometric-accuracy/fisheye/chrome-april"
 filter = ["paper-data/geometric-accuracy/fisheye/chrome-april/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 154
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -201,7 +201,7 @@ dir = "paper-data/geometric-accuracy/fisheye/siemens-stars"
 filter = ["paper-data/geometric-accuracy/fisheye/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 150
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -215,7 +215,7 @@ dir = "paper-data/geometric-accuracy/fisheye_30cm/siemens-stars"
 filter = ["paper-data/geometric-accuracy/fisheye_30cm/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 301
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -229,7 +229,7 @@ dir = "paper-data/geometric-accuracy/fisheye_30cm/chrome"
 filter = ["paper-data/geometric-accuracy/fisheye_30cm/chrome/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 254
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -243,7 +243,7 @@ dir = "paper-data/geometric-accuracy/fisheye/chrome-siemens"
 filter = ["paper-data/geometric-accuracy/fisheye/chrome-siemens/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 118
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_raw_photos"
@@ -257,7 +257,7 @@ dir = "paper-data/defocus/14mm/calibration"
 filter = ["paper-data/defocus/14mm/calibration/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 479
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -271,7 +271,7 @@ dir = "paper-data/defocus/14mm/texture-learning"
 filter = ["paper-data/defocus/14mm/texture-learning/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 106
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -285,7 +285,7 @@ dir = "paper-data/defocus/tamron/siemens-stars"
 filter = ["paper-data/defocus/tamron/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 340
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -299,7 +299,7 @@ dir = "paper-data/defocus/tamron/chrome"
 filter = ["paper-data/defocus/tamron/chrome/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 190
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -313,7 +313,7 @@ dir = "paper-data/defocus/zoom-lens/siemens-stars"
 filter = ["paper-data/defocus/zoom-lens/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 171
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -327,7 +327,7 @@ dir = "paper-data/defocus/zoom-lens/chrome"
 filter = ["paper-data/defocus/zoom-lens/chrome/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 54
 mount = "data"
 record = "rc_defocus"
 tier = "rc_raw_photos"
@@ -341,7 +341,7 @@ dir = "paper-data/vignetting/14mm/siemens-stars"
 filter = ["paper-data/vignetting/14mm/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 174
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_raw_photos"
@@ -355,7 +355,7 @@ dir = "paper-data/vignetting/14mm/diffuser"
 filter = ["paper-data/vignetting/14mm/diffuser/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 1
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_raw_photos"
@@ -369,7 +369,7 @@ dir = "paper-data/vignetting/fisheye/siemens-stars"
 filter = ["paper-data/vignetting/fisheye/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 160
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_raw_photos"
@@ -383,7 +383,7 @@ dir = "paper-data/vignetting/tamron/siemens-stars"
 filter = ["paper-data/vignetting/tamron/siemens-stars/**", "!**/*DSC06045*",
           "!**/*DSC06052*", "!**/*DSC06053*",
           "!**/*DSC06054*", "!**/*DSC06055*"]
-files = 0
+files = 163
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_raw_photos"
@@ -396,7 +396,7 @@ kind = "tree"
 dir = "geometric_accuracy/data/target"
 filter = ["geometric_accuracy/data/target/siemens_1m/board/**", "geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml",
           "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/**", "geometric_accuracy/data/target/blobboard_a4_6eb/**"]
-files = 0
+files = 14
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_calibration"
@@ -408,7 +408,7 @@ provenance = "the board generators (scripts/make_targets.jl and the generators o
 kind = "tree"
 dir = "geometric_accuracy/data/target/thorlabs_r3l3s7n1"
 filter = ["geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"]
-files = 0
+files = 1
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_thorlabs"
@@ -420,7 +420,7 @@ provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.tom
 kind = "tree"
 dir = "geometric_accuracy/detector_bias/data/fisheye_full"
 filter = ["geometric_accuracy/detector_bias/data/fisheye_full/**"]
-files = 0
+files = 534
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_calibration"
@@ -444,7 +444,7 @@ filter = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_bc5_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ds_kalibr.json",
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_kb_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ocv14_cv2.json",
           "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json"]
-files = 0
+files = 178
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_baselines"
@@ -459,7 +459,7 @@ filter = ["geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/schoeps_
           "geometric_accuracy/night_stars/data/fx3-tamron-siemens-17cm-all/schoeps_green_w40/**", "geometric_accuracy/night_stars/data/fx3-tamron-siemens-largeaperture-all-g4/schoeps_green_w40/**",
           "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_ds_start.json", "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_kb_start.json",
           "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_ds_start.json", "geometric_accuracy/records/tamron_largeaperture_all/tamronla_all_green_kb_cv2.json"]
-files = 0
+files = 72
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_baselines"
@@ -472,7 +472,7 @@ kind = "tree"
 dir = "geometric_accuracy/records"
 filter = ["geometric_accuracy/records/2710/fisheye_kb_fit.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_bc5_cv2.json",
           "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_kb_cv2.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_ocv14_cv2.json"]
-files = 0
+files = 4
 mount = "data"
 record = "rc_ga_b"
 tier = "rc_baselines"
@@ -484,7 +484,7 @@ provenance = "fit_lens_detections.jl (branch paper-finalization) and OpenCV on S
 kind = "tree"
 dir = "sensor_characterisation"
 filter = ["sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.*"]
-files = 0
+files = 43
 mount = "data"
 record = "rc_vig_derived"
 tier = "unpublished"
@@ -496,7 +496,7 @@ provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_fram
 kind = "tree"
 dir = "rc_sensor_characterisation_20261113"
 filter = ["rc_sensor_characterisation_20261113/**"]
-files = 0
+files = 645
 mount = "data"
 record = "rc_vig_derived"
 tier = "unpublished"
@@ -508,7 +508,7 @@ provenance = "captured on 2026-11-13 by D. Nakath's protocol (the notes beside t
 kind = "tree"
 dir = "."
 filter = ["schoeps-camera_calibration-00ef4de-sm100.sqsh"]
-files = 0
+files = 1
 mount = "data"
 record = "rc_tools"
 tier = "unpublished"
