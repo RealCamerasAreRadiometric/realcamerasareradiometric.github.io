@@ -798,7 +798,7 @@ The squared column norms of the operator whose transpose is the device operator 
 squares, one row kernel on `device`, so the diagonal of `CᵀC` (`page_solves`' Jacobi diagonal, `diag(AᵀA + λ DᵀD)`).
 """
 function column_sumsq(Ct::VgtkCore.CSRMatrix; device)
-    out = VgtkCore.KA.zeros(device, Float64, Ct.m)
+    out = VgtkCore.KA.allocate(device, Float64, Ct.m)                  # every entry written
     VgtkCore._launch_rows!(_row_sumsq!, out, Ct.m, Ct.rowptr, Ct.nzval)
     return out
 end

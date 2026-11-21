@@ -19,8 +19,12 @@ Performance and cleanup (round 3). No calibration number moves beyond the roundi
 
 - **Changed:** `page_solves` preconditions each regularised texture solve (λ > 0) by the normal matrix's diagonal
   `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; VisualGeometryToolkitCore's `cgls` `diagonal`); the unregularised solve stays
-  unpreconditioned (ill-posed: the scaling moves the texels the rows barely see by 10²–10³). The regularised textures move within the
-  solver's tolerance.
+  unpreconditioned (ill-posed: the scaling moves the texels the rows barely see by 10²–10³). **The regularised textures change**:
+  the stopping rule is Core's, in the scaled norm, and the preconditioned iterations get much further. On the texture benchmark
+  (B200, 10 photographs, 443,339 fit rows; `experiments/tools/texture_benchmark.jl`) the iterations of the weights 0.001 and 0.1
+  are 195, 76 → 89, 41 (the unregularised 245, unchanged); in `run_page` the learned model's 229, 114 → 95, 52 and the pinhole's
+  300 (not converged), 77 → 57, 21; the learned model's test SSE at weight 0.001 1.754e-4 → 2.571e-5, at 0.1 0.029939 → 0.029918
+  (the unregularised texture's bit for bit). `run_page` 1.18 → 1.05 s warm.
 - **Tests:** the sampling-strategy study's `focus_metrics` (a dome, a flat focus, a node at infinity).
 
 ## 0.2.0 (2026-11-21)

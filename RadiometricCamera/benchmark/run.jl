@@ -145,16 +145,6 @@ function first_block(problem, blocks)
 end
 view_blocks(problem) = (T = only(T for T in keys(problem.problem.costs) if T <: RC.PerViewResidual); get(problem.problem.costs, T))
 
-"""1000 calls of `Φ_pixel` at pixel `(u, v)` of view `k`, behind a function barrier: in the stage's closure the loop read the scene
-through the captured named tuple and boxed its parts (4.4 kB a call on 1.13.3 and 1.13.4; `Φ_pixel` itself allocates nothing)."""
-function pixel_fluxes(u, v, k, camera, pose, mat, light, board, settings)
-    s = zero(SVector{3, Float64})
-    for _ in 1:1000
-        s += RC.Φ_pixel(u, v, k, camera, pose, mat, light, board, settings)
-    end
-    return s
-end
-
 function stages(c)
     k = 1; u, v = W ÷ 2, H ÷ 3
     list = Pair{String, Any}[]
@@ -164,7 +154,8 @@ function stages(c)
     render(; kw...) = RC.render_view(k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]; kw...)
     on_backend = hasmethod(RC.render_view, Tuple{map(typeof, (k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]))...}, (:backend,))
     add("render", () -> () -> on_backend ? render(; backend = BE) : render())      # (before render_view took a backend: the CPU's)
-    add("pixel", () -> () -> pixel_fluxes(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings))
+    add("pixel", () -> () -> (s = zero(SVector{3, Float64});
+                              for i in 1:1000; s += RC.Φ_pixel(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings); end; s))
     add("flux", () -> (s = c.state(); () -> RC._flux_device(s, k, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light)))
     add("cost", () -> (s = c.state(); () -> cost(s)[1]))
     # closed form
@@ -202,7 +193,7 @@ function stages(c)
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
         () -> RC._with_registered(s, problem, idx) do
             sweep()
-            t0 = time_ns(); v = sweep(); Span(v + length(tiles), (time_ns() - t0) / 1e9)
+            t0 = time_ns(); x = sweep(); Span(x + length(tiles), (time_ns() - t0) / 1e9)   # (not `v`: that rebound the pixel's v, boxed it in every stage, 4.4 kB a Φ_pixel call)
         end
     end)
     add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))

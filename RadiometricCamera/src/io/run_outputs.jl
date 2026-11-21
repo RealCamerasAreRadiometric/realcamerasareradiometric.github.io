@@ -123,7 +123,7 @@ function _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, r
                boundary_order = opts.vignetting.boundary_order),
         # [focus.smoothness] as the run applied it: its type and weight β, and the row weight β Σϕ²/N of its bending rows
         # (`focus_smoothness!`); nothing without a focus smoothness
-        focus_options = smoothing(opts.focus.smoothness) ? (; smoothness = (; smoothness_record(opts.focus.smoothness)..., row_weight = meta.focus_row_weight)) : nothing,
+        focus_options = meta.focus_row_weight > 0 ? (; smoothness = (; smoothness_record(opts.focus.smoothness)..., row_weight = meta.focus_row_weight)) : nothing,
         resolution_used = [_image_width(s), _image_height(s)], samples = meta.samples, masked_pixels = meta.npx,
         sensor_width = m(_sensor_width(opts)), focal_length = m(_focal_length(opts)), nominal_focal = meta.fpx,
         aperture_start = meta.R0, focus_distance_start = meta.d_c, linearize = opts.io.linearize, material_fixed = "material" in opts.fixed,

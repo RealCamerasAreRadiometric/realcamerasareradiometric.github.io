@@ -65,9 +65,7 @@ parts kernel) — the record's hit of that ray (`_ray_hit`), so the height field
 reach (zeros: it misses the board, or meets it from behind, where its parts are zero) is skipped."""
 @inline _parts_hit(::Nothing, ri, rays, o, d) = intersect_board(rays, o, d)
 @inline function _parts_hit(lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
-    G = @inbounds lr.J[lr.base + ri]
-    𝐱 = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2])
-    reached = (G[1, RAD_NL + 3] != 0) | (G[2, RAD_NL + 3] != 0) | (G[3, RAD_NL + 3] != 0)       # 𝐧 ≠ 0
+    𝐱, _, reached = _recorded_hit(lr, ri)
     return ifelse(reached, dot(𝐱 - o, d), oftype(d[1], NaN)), 𝐱
 end
 

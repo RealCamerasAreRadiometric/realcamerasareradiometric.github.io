@@ -176,17 +176,21 @@ warped page): the ray's parameter `s`, the board point 𝐱, and — where a mod
     𝐧 = SVector{3, T}(ntuple(j -> (d[j] - (d[1] * ForwardDiff.partials(𝐱d[1], j) + d[2] * ForwardDiff.partials(𝐱d[2], j) + d[3] * ForwardDiff.partials(𝐱d[3], j))), Val(3)))
     return ForwardDiff.value(sd), SVector{3, T}(ntuple(c -> ForwardDiff.value(𝐱d[c]), Val(3))), 𝐧
 end
-@inline function _ray_hit(::Nothing, lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
+"""A record ray's hit `(𝐱, 𝐧, reached)` (`RadianceJac`'s last two columns): `reached` false where the record did not reach the ray
+(its zeros, 𝐧 = 0)."""
+@inline function _recorded_hit(lr::RadianceRays, ri)
     G = @inbounds lr.J[lr.base + ri]
-    𝐱₀ = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]); 𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
+    𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
+    return SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]), 𝐧, !iszero(𝐧)
+end
+@inline function _ray_hit(::Nothing, lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
+    𝐱₀, 𝐧, _ = _recorded_hit(lr, ri)
     s = dot(𝐧, 𝐱₀ - o) / dot(𝐧, d)
     return s, o + s * d, nothing
 end
 @inline function _ray_hit(::HeightRays, lr::RadianceRays, ri, rays::BoardRays, o::StaticVector{3}, d::StaticVector{3})
     rays.warped || return (intersect_board(rays, o, d)..., nothing)
-    G = @inbounds lr.J[lr.base + ri]
-    𝐱₀ = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2])
-    reached = !(iszero(G[1, RAD_NL + 3]) & iszero(G[2, RAD_NL + 3]) & iszero(G[3, RAD_NL + 3]))
+    𝐱₀, _, reached = _recorded_hit(lr, ri)
     nan = oftype(𝐱₀[1], NaN)
     𝐱₀ = ifelse(reached, 𝐱₀, SVector(nan, nan, nan))                  # a ray the record did not reach: Core's miss
     return (VgtkCore.intersection_at(rays.relief, o, d, 𝐱₀)..., nothing)
