@@ -13,6 +13,18 @@ Performance and cleanup (round 3). No calibration number moves beyond the roundi
 - **Fixed:** `benchmark/run.jl` named its scene's board twice (a syntax error since the port onto the textured target).
 - **Tests:** the focus columns of the sensor-grid thin plate spline against central differences of the tile residual (the check of
   the removed direction-chart focus had been the only one).
+- **Changed (round 4, decision 6):** the grid route forms a view's tiles' Gauss–Newton blocks in one batch (`_tile_blocks!`):
+  one row-kernel launch over the view's tiles (`_tiles_row!`), the products as two strided batched gemms on CUDA downloaded into a
+  pooled page-locked buffer, memoized per view, trial and varflags. The per-tile path is the same builder over one tile
+  (`_tile_rows`). The rows, the residual and the cost are bit for bit. The blocks are too on the CPU backend; on a B200 they differ
+  in the products' summation order, ≤ 1e-12 of a block's norm. One grid LM iteration ends at the same cost to every printed digit.
+  B200, 65 × 50 lattice, 8 × 16,384 px: a view's tiles' normal equations 0.261 → 0.187 s, the tiles' rows and products alone
+  0.152 → 0.029 s, one grid LM iteration 2.71 → 2.61 s (linearizations 1.03 → 0.74 s; the rest is the residual sweeps and
+  NLLSsolver's solve).
+- **Changed:** `benchmark/run.jl`'s `tile_rows_products` forms the tiles' batches again from the memoized view's batch (a tile's
+  blocks are handed out once a trial).
+- **Tests:** `grid lens / a view's tiles in one batch` checks the batched blocks of every tile against the per-tile path, bit for
+  bit on the CPU, with a dependent patch, several varflags in a view and a held aperture. The GPU item checks them to 1e-12.
 
 ### experiments
 

@@ -436,7 +436,7 @@ The owner's answers (2026-11-20) to the nine questions of this report's first ve
 | 3 | Core 3.3 a–g | DO ALL, pushed and released through the stack's release process (the owner posts the Registrator comment), then RC adopts | a: committed locally on the monorepo branch `perf/height-field-fused-jacobian` (ea3cc069), not pushed; b–g not started |
 | 4 | Texture solve | (a) Krylov.jl (LSMR or CGLS, Jacobi-preconditioned by diag(AᵀA)), the penalty stacked `[A; √λ D]`, cuSPARSE CSR for `A` and an explicit `Aᵀ` in the CUDA extension; benchmark against `cgls`, verify the textures within tolerance, delete the redundant custom solver / CSR code, re-run the texture records once. (b) the error scoring stays on the device | (b) done (36c9de9); (a) not started. The device construction of this branch (`page_footprints`, `fit_operator`) produces exactly the CSR arrays a `CuSparseMatrixCSR` holds, so it carries over. |
 | 5 | focus-ab | keep the parameterizations as a TYPE PARAMETER of `Focus` (no `kind` branch), moved out of `src/experiments/`; find the experiment's records and re-run it on the cluster | superseded (owner, after the A/B on real data: the sensor-grid thin plate spline fits best): the other parameterizations, `Focus`'s `kind` and `src/experiments/` are removed |
-| 6 | Grid route | one row-kernel launch and one batched product per view for all its tiles, on this branch, after 1, 3, 4 | not started; the measurements of section 5.2 (65 × 50) are its baseline |
+| 6 | Grid route | one row-kernel launch and one batched product per view for all its tiles, on this branch, after 1, 3, 4 | done in round 4 (branch `perf/round4-grid`, 7.4) |
 | 7 | Release | finish the round on the branch, merge, register 0.1.0 from that commit; no version bump | — |
 | 8 | Default vignetting | `NoVignetting()` (Core, 3 f): V ≡ 1 by dispatch, no parameters, no columns | needs 3 f; the branch's default is still the flat 4 × 4 surface |
 | 9 | CPU workgroup | keep 16, the measurement cited at the definition | done (`_pixel_workgroup`'s docstring) |
@@ -460,7 +460,7 @@ the same job as the branch where a table says so. Records: `/cluster/projects/vg
 | 3 (Core 3.3) | Core 0.12 carries b (`intersection_at`), d (`_launch_rows_on!` with `OnBackend(be; workgroupsize)`) and g (`_matvec!`, its CUDA one-column gemm). RC adopts d and g (`_launch_pixel_rows!` and the extension's `_rows_times` removed); b measured and not adopted (7.2: slower on the device). |
 | 4 (texture solve) | `page_solves` hands Core's `cgls` the Jacobi diagonal `diag(AᵀA) + λ diag(DᵀD)` for λ > 0 only (`column_sumsq`); the unregularised solve is ill-posed and stays unpreconditioned. 7.3. |
 | 5 (focus-ab) | done before this round (the sensor-grid thin plate spline; kinds C/D and B removed). The A/B's table is 7.5. |
-| 6 (grid batching) | **not done** (7.4). |
+| 6 (grid batching) | not done in round 3; done in round 4 (7.4). |
 | 8 (default vignetting) | done in 0.2.0 (`NoVignetting`). |
 
 ### 7.2 The heights kernel at the record's hit (`intersection_at`): measured, not adopted
@@ -498,15 +498,61 @@ saves (no profiler counters on the cluster; to profile on a local GPU). The devi
 scaled normal equations, and the preconditioned iteration reaches a much smaller error before it stops — at weight 0.001 the
 learned model's test SSE is 6.8× lower. The texture records of the runs of record were not re-run (7.6).
 
-### 7.4 Grid route batching (decision 6): not done
+### 7.4 Grid route batching (decision 6): round 4
 
-The tile path's cost is per-request latency: NLLSsolver asks for the tiles' blocks one at a time, and each request launches
-its row kernel, uploads the window lens and the tangent bases and forms `J r`, `J Jᵀ` with a synchronisation each. One launch
-per view needs the row kernel (`_jacobian_row!`, both routes) to read per-tile arguments by row (an array of window lenses,
-bases, `P0`, layouts) and to write ragged per-tile outputs, and the products as a strided batch on zero-padded tiles, the view's
-tiles' blocks memoized for the trial like the view's batch. That rewrites the one row kernel both routes share; with a 20-minute
-cluster round trip per GPU check it did not fit this round. Baseline (65 × 50 lattice, 8 × 16,384 px, B200): a view's tiles'
-normal equations 0.267 s, one grid LM iteration 2.82 s.
+Not done in round 3 (the 20-minute cluster round trip per GPU check). Done in round 4 (branch `perf/round4-grid` from `main`
+6b1916f). The tile path's cost was per-request latency: NLLSsolver asks for the tiles' blocks one at a time, and each request
+launched its row kernel over a few hundred pixels, uploaded its window lens and tangent bases and formed `J r`, `J Jᵀ` with a
+synchronisation each.
+
+Now the first request of a view's tiles at a trial forms all of them (`_tile_blocks!`), memoized like the view's batch and keyed by
+the trial's variable objects and the varflags (each tile's, from the problem's free variables at registration: a tile beside a
+dependent patch is in a batch of its own varflags):
+
+- ONE launch of the row kernel over the view's tiles' rows, each tile padded to the largest tile's pixels (`_tiles_row!`: per row its
+  tile's window lens, bases and patch origin around the unchanged `_jacobian_row!`);
+- the products as two strided batched gemms over the zero-padded rows (CUDA extension; the CPU backend forms each tile's as before),
+  downloaded once into a pooled page-locked buffer (into fresh pageable memory the 60 MB took 65–210 ms);
+- the problem's coordinates on the host's threads, the finiteness test on `g` and the diagonal of `H`.
+
+The per-tile path is the same builder over one tile (`_tile_rows`). It serves the tests, the stall postcondition, a tile asked again
+at a trial and a failed batch.
+
+**Identity.** The rows and the residual are the per-tile path's bit for bit: the same row kernel at the same inputs. On the CPU
+backend the blocks are too; the test `grid lens / a view's tiles in one batch` covers every tile, with a dependent patch and with a
+held aperture. On a B200 the blocks differ only in the products' summation order (the batched gemm over the padded rows):
+≤ 1e-12 of the block's norm, tested on every tile. The cost is bit for bit. One grid LM iteration ends at the same cost to every
+printed digit (7.74473219238; 7.744732192378656 in full), and the tile stages' checksums are the same.
+
+B200, 65 × 50 lattice, 8 × 16,384 px, warped board, free heights (`benchmark/run.jl`, best of 3, `main` 6b1916f and the branch in
+jobs of the same node):
+
+| stage | `main` | branch | |
+|---|---:|---:|---|
+| a view's tiles: normal equations (the view's batch included) | 0.261 s | 0.187 s | 1.4× |
+| the tiles' rows and products alone (the view's batch memoized) | 0.152 s | 0.029 s | 5.3× |
+| LM, 1 iteration, grid | 2.71 s | 2.61 s | |
+
+The batch's own phases, warm, for one view of 108 tiles (16,384 px, padded to 224 a tile):
+
+| phase | ms |
+|---|---:|
+| the windows' lenses and bases (108 small uploads) | 1.1–1.8 |
+| the row kernel | 0.85 |
+| the products and their download | 2–5 |
+| the problem's coordinates (16 threads) | 4–18 |
+
+The LM iteration gains little, because the tiles were not its critical path. The iteration's linearizations take 1.02–1.04 s on
+`main` and 0.73–0.75 s on the branch, measured on the calling task. The other ≈ 1.9–2.1 s is unchanged: the residual sweeps and
+NLLSsolver's assembly and sparse solve. On `main` the window's concurrent tile jobs already hid most of the tiles' latency behind the
+next view's batch, so the view batches' Jacobian kernels now bound the linearization. Records:
+`/cluster/projects/vgtk/logs/rc-round4-grid/results/` (`base-6b1916f-grid`, `br-b1189b4-grid`).
+
+Left as they are, with the measurement:
+- **The tiles' window still runs.** Its jobs only wait for the batch: the tile stage is 0.026 s with it and 0.021 s without, and one
+  LM iteration is within noise. Removing it changes the run record's `window_width` provenance for grid runs.
+- **The window lenses are uploaded per tile.** Packing them into one upload would save about 1 ms a view.
+- **`TᵀHT` stays on the host.** On the device it would be a third batched gemm, and the host copy keeps the CPU's blocks bit for bit.
 
 ### 7.5 The focus A/B on real data (the run of record's pipeline, f/4 fisheye; 2026-11-21)
 

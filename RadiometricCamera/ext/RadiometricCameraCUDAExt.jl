@@ -36,7 +36,8 @@ end
 # nothing) — instead of two products and a host transform per tile.
 RadiometricCamera._device_elements(::CUDA.CUDABackend, xs::AbstractVector) = CUDA.CuArray(map(CUDA.cudaconvert, xs))
 
-function RadiometricCamera._batched_blocks(J3::CUDA.CuArray{Float64, 3}, r2::CUDA.CuMatrix{Float64}, ms, T::Matrix{Float64}, lay, run)
+function RadiometricCamera._batched_blocks(J3::CUDA.CuArray{Float64, 3}, r2::CUDA.CuMatrix{Float64}, ms, T::Matrix{Float64}, lay,
+                                          run::RadiometricCamera._LmRun)
     ncol, M, nt = size(J3); n = size(T, 2)
     Jp = reshape(CUDA.CuArray(T)' * reshape(J3, ncol, M * nt), n, M, nt)   # TᵀJ: the rows in the problem's coordinates, one product
     nH = n * n * nt; nB = nH + n * nt
