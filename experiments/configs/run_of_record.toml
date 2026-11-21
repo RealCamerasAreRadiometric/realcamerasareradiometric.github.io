@@ -53,7 +53,7 @@ untimed = ["regenerate_paper"]
 [estimate]
 default = 60
 precompile = 2                                    # a stage's CPU precompile after setup compiled the tree: 0.1 min (markers, 20261115_130418), the load ×10
-"setup" = 15                                      # 2.9 min (markers, 20261115_130418, a warm depot); a NEW tree compiles RC, experiments and CUDA's extensions: ≈ 12–15 min at 12 CPUs (Eval's the B200 server precompile_time note)
+"setup" = 15                                      # 2.9 min (markers, 20261115_130418, a warm depot); a NEW tree compiles RC, experiments and CUDA's extensions: ≈ 12–15 min at 12 CPUs (the precompile_time note of Eval's profile of the B200 server)
 "distance_maps" = 10                              # the two maps' conversion (seconds each, the B200 server job 20478) and the driver's load: minutes; ×2 margin under its 30 min limit
 "image_regions" = 5                               # 0.3–0.9 min (markers, 2 launches); the full-resolution raw_green frames and the fisheye 30 cm step: ×5
 "frontends_prepare" = 10                          # 0.2–1.9 min (markers, 21 tasks); 6–10 min on a cold decode (2026-11-13: zoom 551 s, 14 mm 531 s)

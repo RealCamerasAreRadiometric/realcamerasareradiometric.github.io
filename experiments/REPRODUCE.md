@@ -73,7 +73,7 @@ product of a later run of record must reproduce.
 ### Adding your machine
 
 Copy VisualGeometryToolkitEval's `configs/sites/_template.toml` to `<machine>.toml` with its `[storage]` roots and artifact store
-(or set `VGTK_DATA_ROOT`, `VGTK_RESULTS_ROOT` and `VGTK_ARTIFACT_STORE`), run `scripts/fetch_data.jl` with `VGTK_SITE` naming it, and run
+(or set `VGTK_DATA_ROOT`, `VGTK_RESULTS_ROOT` and `VGTK_ARTIFACT_STORE`), run `scripts/fetch_data.jl` with `VGTK_SITE` naming it (unless its data root holds the inputs), and run
 `bash experiments/scripts/reproduce/reproduce.sh --site=path/to/<machine>.toml --dry-run`: the commands, the roots and the missing
 inputs, with nothing run.
 

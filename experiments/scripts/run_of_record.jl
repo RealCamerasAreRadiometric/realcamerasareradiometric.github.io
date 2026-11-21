@@ -40,7 +40,8 @@ function main(args)
     sitename === nothing && (println("run_of_record: name the site: --site=<site> or VGTK_SITE (VisualGeometryToolkitEval configs/sites/)"); return 2)
     site = load_site(sitename; dirs = isempty(g.sites_dir) ? String[] : [g.sites_dir])
     launch = cfg["launch"]
-    results = something(val("results-root"), joinpath(ror_results_base(g, site), ror_pattern(launch["results_dir"], version)))
+    r = val("results-root")      # given (the launcher passes it): no results base is resolved
+    results = r !== nothing ? r : joinpath(ror_results_base(g, site), ror_pattern(launch["results_dir"], version))
     sel = ror_stages(g, cfg)
     isempty(sel.dropped) || println("run of record: stage(s) absent from the graph, optional, left out: $(join(sel.dropped, ", "))")
     rg = ror_graph(g, cfg)

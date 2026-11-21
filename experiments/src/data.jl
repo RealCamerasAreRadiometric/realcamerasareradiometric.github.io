@@ -32,8 +32,10 @@ end
 DSC06052–DSC06055, show another person): no tier, tarball or record may hold one, under any directory, prefix or extension."""
 const PRIVATE_PHOTOGRAPHS = ("DSC06045", "DSC06052", "DSC06053", "DSC06054", "DSC06055")
 
-"The paths of `paths` whose file name names a photograph of [`PRIVATE_PHOTOGRAPHS`](@ref) (case-insensitive, any prefix or extension)."
-private_photographs(paths) = [String(p) for p in paths if any(x -> occursin(x, uppercase(basename(String(p)))), PRIVATE_PHOTOGRAPHS)]
+"The paths of `paths` with a component (a file or a directory name) that names a photograph of [`PRIVATE_PHOTOGRAPHS`](@ref)
+(case-insensitive, any prefix or extension)."
+private_photographs(paths) =
+    [String(p) for p in paths if any(c -> any(x -> occursin(x, uppercase(c)), PRIVATE_PHOTOGRAPHS), splitpath(String(p)))]
 
 """The catalog's `[[unpacked.<tier>]]` entries (files of the author's folders that no config reads and no tier holds; the catalog's
 header): `tier => [(; paths, configs, where, provenance)]`."""

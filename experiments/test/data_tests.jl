@@ -148,20 +148,20 @@ end
 
     @testset "the rule: every prefix, directory and extension variant" begin
         names = ["a/b/DSC06045.ARW", "DSC06052.png", "x/_DSC06053.ARW", "x/dsc06054.arw", "DSC06055.ARW.xmp", "y/DSC06055.JPG",
-                 "paper-data/geometric-accuracy/14mm/siemens-stars/DSC06045.ARW"]
+                 "paper-data/geometric-accuracy/14mm/siemens-stars/DSC06045.ARW", "set/DSC06053/features.png"]
         @test private_photographs(names) == names
-        @test isempty(private_photographs(["DSC06044.ARW", "DSC06046.ARW", "DSC06051.png", "DSC06056.ARW", "DSC060450/x.txt"]))
+        @test isempty(private_photographs(["DSC06044.ARW", "DSC06046.ARW", "DSC06051.png", "DSC06056.ARW", "DSC06044/x.txt"]))
     end
 
     @testset "no entry selects one (Eval's selection of a probe tree holding them in every entry's directory)" begin
         dirs = unique(CATALOG.artifacts[n]["dir"] for n in OF_RECORD)
-        sel = probe_selection([normpath(joinpath(d, x * ext)) for d in dirs for x in PRIVATE_PHOTOGRAPHS for ext in (".ARW", ".png", ".JPG")])
+        sel = probe_selection([normpath(joinpath(d, f)) for d in dirs for x in PRIVATE_PHOTOGRAPHS for f in (x * ".ARW", x * ".png", "a/_" * x * ".JPG", x * "/features.png")])
         for (n, files) in sel
             @test isempty(private_photographs(files))
         end
         # every entry of record also names the exclusion itself, so a widened include glob cannot let one in
         for n in OF_RECORD
-            @test all(x -> "!**/*$(x)*" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
+            @test all(x -> "!**/*$(x)*" in CATALOG.artifacts[n]["filter"] && "!**/*$(x)*/**" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
         end
     end
 
@@ -179,15 +179,18 @@ end
 # Where data_root() holds the inputs, every input is there. A :data item, its checks skipped (recorded) where it does not.
 @testitem "published data: the inputs under data_root()" default_imports = false tags = [:data] setup = [PublishedData] begin
     using Test
-    using .PublishedData: CATALOG, TIERS, OF_RECORD, config_inputs, files_under, data_root
+    using .PublishedData: CATALOG, TIERS, OF_RECORD, config_inputs, files_under, data_root, probe_selection, holds
 
     root = try data_root() catch; nothing end
     if root === nothing || !all(n -> ispath(joinpath(root, CATALOG.artifacts[n]["dir"])), filter(n -> CATALOG.artifacts[n]["required"], OF_RECORD))
         @info "published data: data_root() does not hold the required tiers (fetch them: scripts/fetch_data.jl); its checks are skipped"
     else
-        for (cfg, id, tier, p) in config_inputs()
-            haskey(TIERS, tier) || continue
-            any(n -> !CATALOG.artifacts[n]["required"], TIERS[tier]) && !ispath(joinpath(root, p)) && continue   # an optional entry not fetched
+        ins = [x for x in config_inputs() if haskey(TIERS, x[3])]
+        sel = probe_selection(unique(x[4] for x in ins))
+        for (cfg, id, tier, p) in ins
+            # an input only optional entries hold (not fetched by default) may be absent
+            all(n -> !CATALOG.artifacts[n]["required"], filter(n -> holds(get(sel, n, Set{String}()), p), TIERS[tier])) &&
+                !ispath(joinpath(root, p)) && continue
             ispath(joinpath(root, p)) || @info "an input is not under data_root()" cfg id p
             @test ispath(joinpath(root, p)) && (id == "[experiment] dataset" || !isempty(files_under(root, p)))
         end

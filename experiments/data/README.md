@@ -31,7 +31,8 @@ julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_golden_2
 
 `scripts/fetch_data.jl` installs each tree into the artifact store (sha256 and tree hash verified; a tree the store already holds is
 not downloaded again) and links it file by file into `data/exp_raw`, an artifact view. A binding of the data root (the variable,
-the author's own `data/exp_raw`, the site's data root) wins and is never written to. The author packs the tiers with
+the author's own `data/exp_raw`) wins and is never written to; on a site whose profile names an existing data root, that root
+is the inputs' and nothing is fetched there (a view would outrank it). The author packs the tiers with
 `scripts/make_artifacts.jl` (`--dry-run` lists them; `--check` lists every staged tarball against the privacy rule).
 
 **Privacy.** The photographs DSC06045, DSC06052, DSC06053, DSC06054 and DSC06055 of the 14 mm Siemens-star session show another

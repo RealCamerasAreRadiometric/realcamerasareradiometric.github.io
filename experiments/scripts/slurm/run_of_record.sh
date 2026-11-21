@@ -43,11 +43,12 @@ done
 [[ $V =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "run_of_record.sh: version $V is not X.Y.Z"; exit 2; }
 [ -n "$DRY" ] && { [ -n "$FROM" ] && [ -f "$SCRATCH_SOURCES" ] || { echo "--dry-run needs --from and --scratch-sources"; exit 2; }; }
 command -v sbatch > /dev/null || { echo "run_of_record.sh: no sbatch: run it on a Slurm site"; exit 2; }
+[ -n "${VGTK_SITE:-}" ] || { echo "run_of_record.sh: name the site: VGTK_SITE=<site> (VisualGeometryToolkitEval configs/sites/)"; exit 2; }
 [ -n "$BASE_ROOT" ] || { echo "run_of_record.sh: no results base: give --results-base=<dir> or VGTK_RESULTS_ROOT (the site profile's [storage] results_root)"; exit 2; }
 TOOL=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 CFG=$TOOL/experiments/configs/run_of_record.toml
 conf() { python3 -I -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["launch"][sys.argv[2]].replace("{version}", sys.argv[3]))' "$CFG" "$1" "$V"; }
-JL=${JULIA:-$(command -v julia)}; REPO=$(conf repository); REGISTRY=$(conf registry); BASE=$BASE_ROOT/$(conf tree_dir); RESULTS=$BASE_ROOT/$(conf results_dir)
+JL=${JULIA:-$(command -v julia || true)}; REPO=$(conf repository); REGISTRY=$(conf registry); BASE=$BASE_ROOT/$(conf tree_dir); RESULTS=$BASE_ROOT/$(conf results_dir)
 [ -x "$JL" ] || { echo "run_of_record.sh: no julia (the site's setup puts it on PATH, or set JULIA)"; exit 2; }
 export JULIA=$JL JULIA_PKG_USE_CLI_GIT=true JULIA_PKG_SERVER="" JULIA_PKG_PRECOMPILE_AUTO=0
 mkdir -p "$BASE"

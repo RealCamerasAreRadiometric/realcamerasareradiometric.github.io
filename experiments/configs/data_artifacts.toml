@@ -72,9 +72,9 @@ revision = "a387eddcb21b0db8e70cdab8696578c05db53f41"
 [artifacts.rc_raw_ga_14mm_april_grid_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/14mm/april-grid"
-filter = ["paper-data/geometric-accuracy/14mm/april-grid/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/14mm/april-grid/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 408
 mount = "data"
 record = "rc_ga_a"
@@ -86,9 +86,9 @@ provenance = "all 408 AprilGrid photographs (Sony FX3 ARW) of the 1 m AprilGrid 
 [artifacts.rc_raw_ga_14mm_chrome_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/14mm/chrome"
-filter = ["paper-data/geometric-accuracy/14mm/chrome/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/14mm/chrome/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 142
 mount = "data"
 record = "rc_ga_a"
@@ -100,9 +100,9 @@ provenance = "the 142 chrome photographs of the FX3 + Sigma 14 mm of 2026-11-03 
 [artifacts.rc_raw_ga_14mm_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/14mm/siemens-stars"
-filter = ["paper-data/geometric-accuracy/14mm/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/14mm/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 168
 mount = "data"
 record = "rc_ga_a"
@@ -114,9 +114,9 @@ provenance = "the Siemens-star photographs (Sony FX3 ARW) of the 1 m board with 
 [artifacts.rc_raw_ga_tamron_april_grid_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/tamron/april-grid"
-filter = ["paper-data/geometric-accuracy/tamron/april-grid/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/tamron/april-grid/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 411
 mount = "data"
 record = "rc_ga_a"
@@ -128,9 +128,9 @@ provenance = "2026-11-09 (the author's new Tamron sets of 2026-11-08, Dropbox; r
 [artifacts.rc_raw_ga_tamron_chrome_april_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/tamron/chrome-april"
-filter = ["paper-data/geometric-accuracy/tamron/chrome-april/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/tamron/chrome-april/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 142
 mount = "data"
 record = "rc_ga_a"
@@ -142,9 +142,9 @@ provenance = "the 142 chrome photographs of the FX3 + Tamron 20 mm at f/22, 1/60
 [artifacts.rc_raw_ga_tamron_chrome_siemens_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/tamron/chrome-siemens"
-filter = ["paper-data/geometric-accuracy/tamron/chrome-siemens/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/tamron/chrome-siemens/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 112
 mount = "data"
 record = "rc_ga_a"
@@ -156,9 +156,9 @@ provenance = "the 112 chrome photographs of the FX3 + Tamron 20 mm at f/22 of th
 [artifacts.rc_raw_ga_tamron_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/tamron/siemens-stars"
-filter = ["paper-data/geometric-accuracy/tamron/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/tamron/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 267
 mount = "data"
 record = "rc_ga_a"
@@ -170,9 +170,9 @@ provenance = "the 264 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 [artifacts.rc_raw_ga_fisheye_april_grid_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye/april-grid"
-filter = ["paper-data/geometric-accuracy/fisheye/april-grid/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye/april-grid/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 407
 mount = "data"
 record = "rc_ga_b"
@@ -184,9 +184,9 @@ provenance = "all 407 AprilGrid photographs (Sony FX3 ARW) of the 1 m AprilGrid 
 [artifacts.rc_raw_ga_fisheye_chrome_april_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye/chrome-april"
-filter = ["paper-data/geometric-accuracy/fisheye/chrome-april/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye/chrome-april/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 154
 mount = "data"
 record = "rc_ga_b"
@@ -198,9 +198,9 @@ provenance = "the 154 chrome photographs of the FX3 + the 8 mm fisheye (EXIF len
 [artifacts.rc_raw_ga_fisheye_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye/siemens-stars"
-filter = ["paper-data/geometric-accuracy/fisheye/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 150
 mount = "data"
 record = "rc_ga_b"
@@ -212,9 +212,9 @@ provenance = "the 150 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 [artifacts.rc_raw_ga_fisheye_30cm_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye_30cm/siemens-stars"
-filter = ["paper-data/geometric-accuracy/fisheye_30cm/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye_30cm/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 301
 mount = "data"
 record = "rc_ga_b"
@@ -226,9 +226,9 @@ provenance = "the Siemens-star photographs (Sony FX3 ARW) of the 1 m board with 
 [artifacts.rc_raw_ga_fisheye_30cm_chrome_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye_30cm/chrome"
-filter = ["paper-data/geometric-accuracy/fisheye_30cm/chrome/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye_30cm/chrome/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 254
 mount = "data"
 record = "rc_ga_b"
@@ -240,9 +240,9 @@ provenance = "the chrome photographs (Sony FX3 ARW) of the Thorlabs R3L3S7N1 boa
 [artifacts.rc_raw_ga_fisheye_chrome_siemens_20261121]
 kind = "tree"
 dir = "paper-data/geometric-accuracy/fisheye/chrome-siemens"
-filter = ["paper-data/geometric-accuracy/fisheye/chrome-siemens/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/geometric-accuracy/fisheye/chrome-siemens/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 118
 mount = "data"
 record = "rc_ga_b"
@@ -254,9 +254,9 @@ provenance = "the 118 chrome photographs of the FX3 + Sigma 8 mm fisheye of 2026
 [artifacts.rc_raw_defocus_14mm_calibration_20261121]
 kind = "tree"
 dir = "paper-data/defocus/14mm/calibration"
-filter = ["paper-data/defocus/14mm/calibration/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/14mm/calibration/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 479
 mount = "data"
 record = "rc_defocus"
@@ -268,9 +268,9 @@ provenance = "the 479 14 mm calibration photographs of the texture-learning expe
 [artifacts.rc_raw_defocus_14mm_texture_learning_20261121]
 kind = "tree"
 dir = "paper-data/defocus/14mm/texture-learning"
-filter = ["paper-data/defocus/14mm/texture-learning/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/14mm/texture-learning/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 106
 mount = "data"
 record = "rc_defocus"
@@ -282,9 +282,9 @@ provenance = "the 14 mm texture photographs of the A4 BlobBoards board 6eb with 
 [artifacts.rc_raw_defocus_tamron_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/defocus/tamron/siemens-stars"
-filter = ["paper-data/defocus/tamron/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/tamron/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 340
 mount = "data"
 record = "rc_defocus"
@@ -296,9 +296,9 @@ provenance = "all 340 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 [artifacts.rc_raw_defocus_tamron_chrome_20261121]
 kind = "tree"
 dir = "paper-data/defocus/tamron/chrome"
-filter = ["paper-data/defocus/tamron/chrome/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/tamron/chrome/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 190
 mount = "data"
 record = "rc_defocus"
@@ -310,9 +310,9 @@ provenance = "the 190 chrome photographs DSC09677.ARW … DSC09866.ARW (Sony FX3
 [artifacts.rc_raw_defocus_zoom_lens_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/defocus/zoom-lens/siemens-stars"
-filter = ["paper-data/defocus/zoom-lens/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/zoom-lens/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 171
 mount = "data"
 record = "rc_defocus"
@@ -324,9 +324,9 @@ provenance = "the Siemens-star photographs DSC03526.ARW … DSC03705.ARW (less D
 [artifacts.rc_raw_defocus_zoom_lens_chrome_20261121]
 kind = "tree"
 dir = "paper-data/defocus/zoom-lens/chrome"
-filter = ["paper-data/defocus/zoom-lens/chrome/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/defocus/zoom-lens/chrome/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 54
 mount = "data"
 record = "rc_defocus"
@@ -338,9 +338,9 @@ provenance = "the chrome photographs DSC03472.ARW … DSC03525.ARW (Sony ILME-FX
 [artifacts.rc_raw_vignetting_14mm_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/vignetting/14mm/siemens-stars"
-filter = ["paper-data/vignetting/14mm/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/vignetting/14mm/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 174
 mount = "data"
 record = "rc_vig_derived"
@@ -352,9 +352,9 @@ provenance = "the 174 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 [artifacts.rc_raw_vignetting_14mm_diffuser_20261121]
 kind = "tree"
 dir = "paper-data/vignetting/14mm/diffuser"
-filter = ["paper-data/vignetting/14mm/diffuser/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/vignetting/14mm/diffuser/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 1
 mount = "data"
 record = "rc_vig_derived"
@@ -366,9 +366,9 @@ provenance = "the diffuser flat-field photograph of the Sigma 14 mm at f/4 (2026
 [artifacts.rc_raw_vignetting_fisheye_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/vignetting/fisheye/siemens-stars"
-filter = ["paper-data/vignetting/fisheye/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/vignetting/fisheye/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 160
 mount = "data"
 record = "rc_vig_derived"
@@ -380,9 +380,9 @@ provenance = "the 160 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 [artifacts.rc_raw_vignetting_tamron_siemens_stars_20261121]
 kind = "tree"
 dir = "paper-data/vignetting/tamron/siemens-stars"
-filter = ["paper-data/vignetting/tamron/siemens-stars/**", "!**/*DSC06045*",
-          "!**/*DSC06052*", "!**/*DSC06053*",
-          "!**/*DSC06054*", "!**/*DSC06055*"]
+filter = ["paper-data/vignetting/tamron/siemens-stars/**", "!**/*DSC06045*", "!**/*DSC06045*/**",
+          "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**",
+          "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 163
 mount = "data"
 record = "rc_vig_derived"
@@ -396,7 +396,7 @@ kind = "tree"
 dir = "geometric_accuracy/data/target"
 filter = ["geometric_accuracy/data/target/siemens_1m/board/**", "geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml",
           "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/**", "geometric_accuracy/data/target/blobboard_a4_6eb/**",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 14
 mount = "data"
 record = "rc_vig_derived"
@@ -409,7 +409,7 @@ provenance = "the board generators (scripts/make_targets.jl and the generators o
 kind = "tree"
 dir = "geometric_accuracy/data/target/thorlabs_r3l3s7n1"
 filter = ["geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 1
 mount = "data"
 record = "rc_vig_derived"
@@ -422,7 +422,7 @@ provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.tom
 kind = "tree"
 dir = "geometric_accuracy/detector_bias/data/fisheye_full"
 filter = ["geometric_accuracy/detector_bias/data/fisheye_full/**",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 534
 mount = "data"
 record = "rc_vig_derived"
@@ -447,7 +447,7 @@ filter = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_bc5_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ds_kalibr.json",
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_kb_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ocv14_cv2.json",
           "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 178
 mount = "data"
 record = "rc_vig_derived"
@@ -463,7 +463,7 @@ filter = ["geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/schoeps_
           "geometric_accuracy/night_stars/data/fx3-tamron-siemens-17cm-all/schoeps_green_w40/**", "geometric_accuracy/night_stars/data/fx3-tamron-siemens-largeaperture-all-g4/schoeps_green_w40/**",
           "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_ds_start.json", "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_kb_start.json",
           "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_ds_start.json", "geometric_accuracy/records/tamron_largeaperture_all/tamronla_all_green_kb_cv2.json",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 72
 mount = "data"
 record = "rc_vig_derived"
@@ -477,7 +477,7 @@ kind = "tree"
 dir = "geometric_accuracy/records"
 filter = ["geometric_accuracy/records/2710/fisheye_kb_fit.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_bc5_cv2.json",
           "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_kb_cv2.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_ocv14_cv2.json",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 4
 mount = "data"
 record = "rc_ga_b"
@@ -490,7 +490,7 @@ provenance = "fit_lens_detections.jl (branch paper-finalization) and OpenCV on S
 kind = "tree"
 dir = "sensor_characterisation"
 filter = ["sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.*",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 43
 mount = "data"
 record = "rc_vig_derived"
@@ -503,7 +503,7 @@ provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_fram
 kind = "tree"
 dir = "rc_sensor_characterisation_20261113"
 filter = ["rc_sensor_characterisation_20261113/**",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 645
 mount = "data"
 record = "rc_vig_derived"
@@ -516,7 +516,7 @@ provenance = "captured on 2026-11-13 by D. Nakath's protocol (the notes beside t
 kind = "tree"
 dir = "."
 filter = ["schoeps-camera_calibration-00ef4de-sm100.sqsh",
-          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 1
 mount = "data"
 record = "rc_tools"

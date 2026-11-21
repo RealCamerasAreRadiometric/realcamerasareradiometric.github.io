@@ -11,7 +11,7 @@
 # DATA_ROOT: the data root of the experiments configs (its relative input paths); IMAGES: the decoded linear photographs of the set
 # (`[prepare.fx3_14mm_siemens_20261028]`'s run, <run>/fx3_14mm_siemens_20261028_linear). Needs a functional CUDA device. Exit 1 on
 # a gate's failure. Gates: the heights' columns stacked over the tiles AND the worst column of any tile with ≥ 300 px within 0.4 % of
-# the CPU's (the device's Float64 height path: ≤ 2.2e-12, the B200 server's B200, 2026-11-11); the pose's the same (its chunks in Float64,
+# the CPU's (the device's Float64 height path: ≤ 2.2e-12, on a B200, 2026-11-11); the pose's the same (its chunks in Float64,
 # `HIGH_FLOAT`: ≤ 1.8e-12; Float32 chunks were 0.37–0.67 % stacked and 1.6 % in a tile); the residuals bitwise the flux kernel's.
 using RadiometricCamera, CUDA, LinearAlgebra, TOML, Printf
 const RC = RadiometricCamera

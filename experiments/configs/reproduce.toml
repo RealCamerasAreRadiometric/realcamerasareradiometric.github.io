@@ -1,7 +1,7 @@
 # The stage graph of record of the paper: every result and figure from the published inputs, in one command
 # (VisualGeometryToolkitEval Reproduce, the runner: its docs, "One command: the runner"). This file is data only: which launcher
 # runs which driver on which config of record, after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's,
-# a machine profile shipped with VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml; _template.toml to add one);
+# a machine profile shipped with VisualGeometryToolkitEval (configs/sites/: the B200 server's, vcai.toml, desktop.toml; _template.toml to add one);
 # where this project's data and results are on each machine is [sites.<name>] below.
 #
 #   bash experiments/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
@@ -35,7 +35,7 @@ code = ["RadiometricCamera/Project.toml", "RadiometricCamera/src", "RadiometricC
 data_root = "experiments/data/exp_raw"
 results_root = "experiments/data/results"
 
-# Resources per stage (over the site profile's, VisualGeometryToolkitEval configs/sites/dgx01.toml: 2 CPUs for a stage that declares
+# Resources per stage (over the site profile's, the B200 server's VisualGeometryToolkitEval profile: 2 CPUs for a stage that declares
 # none since Eval 0.8; its 0.7 profile's 28 reserved the node at a load of ≈ 6, the B200 server 2026-11-13): CPUs by measured or stated need; memory per CPU
 # the node ratio, 8480M, always (owner rule; a stage that needs more memory gets more CPUs, its measured peak
 # stated); a GPU stage also gets the site's gres (1 GPU). A stage's CPUs are its drivers' thread count, which keys

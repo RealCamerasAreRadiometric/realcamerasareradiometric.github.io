@@ -79,7 +79,8 @@ decodes the photographs through Features, runs the external calibrator in its pi
    tools record only if the container's base-image licence allows), after `make_artifacts.jl --check` on the staged tarballs.
 3. Bind the records: `make_artifacts.jl --record=<record>=<Zenodo id>,…` rewrites `Artifacts.toml` (a URL per tarball); add each
    record's `id` to the catalog; commit both.
-4. Check a fresh fetch: `julia --project=experiments experiments/scripts/fetch_data.jl --all` on a clean machine, then the
+4. Check a fresh fetch: `julia --project=experiments experiments/scripts/fetch_data.jl` (the required entries; `--all` would also
+   take the retired private tiers and the container image, which is never uploaded) on a clean machine, then the
    package's golden gate (`experiments/test/pipeline/` of the repository root).
 5. Run the experiments on the GPU machine with the one command, `bash experiments/scripts/reproduce/reproduce_results_dgx.sh`
    (`--dry-run` first; REPRODUCE.md, One command): the GPU arrays, then `scripts/regenerate_paper.jl --gpu` at the arrays'

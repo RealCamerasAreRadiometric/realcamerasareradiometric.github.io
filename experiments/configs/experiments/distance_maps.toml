@@ -6,7 +6,7 @@
 #   decides:    the maps stop being inputs of record (the run-of-record dry run found them only in a scratch data root): each is ONE
 #               keyed step of this config, read through [runs] by every consumer and produced on demand when missing
 #   evidence:   the run-of-record dry run of RC 0.11.5 (2026-11-16): distance_map/ and distance_map_8ppm/ only in a scratch data
-#               root on the B200 server, not in the data root of record (configs/reproduce.toml [sites.dgx01] data_root)
+#               root on the B200 server, not in the data root of record
 #   owner:      J. Pritts
 #   date:       2026-11-16
 #   discussion: the owner's produce_or_load rule (every pipeline step's intermediate a keyed product, keyed by only its own inputs)

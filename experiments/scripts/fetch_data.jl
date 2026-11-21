@@ -13,8 +13,9 @@
 # Each tree is installed once into the artifact store (VisualGeometryToolkitCore's artifact_store: VGTK_ARTIFACT_STORE, else the
 # site profile VGTK_SITE names; never a cluster's depot), its sha256 and tree hash verified; a record not yet published (its
 # placeholder URL) is refused unless the store already holds the tree. The trees are linked file by file into data/exp_raw, made an
-# artifact view; an existing binding wins (VGTK_DATA_ROOT, the site profile's data root, or the author's own data/exp_raw) and is
-# never written to.
+# artifact view; an existing binding wins (VGTK_DATA_ROOT, or the author's own data/exp_raw) and is never written to. On a site
+# whose profile names a data root that exists, that root is the inputs' (data_root()): fetch only where it does not (the view then
+# outranks it).
 # =============================================================================
 using DrWatson
 @quickactivate "experiments"
