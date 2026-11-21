@@ -458,7 +458,7 @@ the same job as the branch where a table says so. Records: `/cluster/projects/vg
 |---|---|
 | 2 (re-centred Float32 geometry) | **not started; needs VisualRadiometryToolkitCore.** The board point, the chart position `chart(board, 𝐱)` and the texture and edge-map lookups are VisualRadiometryToolkitCore's (`TexturedTarget`, `chart`, `printed_albedo`, the edge map); a re-centred evaluation needs their forms at a local origin (an anchor's chart position in Float64 and the Float32 offset's image under the chart's linear part; a texel base index plus a Float32 fraction). Writing those in RC would copy the board's chart. Proposed upstream: `chart_offset(board, 𝐱₀, δ)` and the albedo / edge lookups at `(𝐛₀, δ𝐛)`, then RC's kernels take `𝐱 = 𝐱₀ + δ` with `𝐱₀` each pixel's chief-ray hit in Float64. The gate (`experiments/test/pipeline/jacobian_parity.jl`, 0.4 % stacked and per tile; 0.44 % in a tile with Float64 rays and the Float32 estimator, 2026-11-11) is therefore not re-measured. |
 | 3 (Core 3.3) | Core 0.12 carries b (`intersection_at`), d (`_launch_rows_on!` with `OnBackend(be; workgroupsize)`) and g (`_matvec!`, its CUDA one-column gemm). RC adopts d and g (`_launch_pixel_rows!` and the extension's `_rows_times` removed); b measured and not adopted (7.2: slower on the device). |
-| 4 (texture solve) | `page_solves` passes Core's `cgls` the Jacobi diagonal `diag(AᵀA) + λ diag(DᵀD)` for λ > 0 only (`column_sumsq`); the unregularised solve is ill-posed and stays unpreconditioned. 7.3. |
+| 4 (texture solve) | `page_solves` hands Core's `cgls` the Jacobi diagonal `diag(AᵀA) + λ diag(DᵀD)` for λ > 0 only (`column_sumsq`); the unregularised solve is ill-posed and stays unpreconditioned. 7.3. |
 | 5 (focus-ab) | done before this round (the sensor-grid thin plate spline; kinds C/D and B removed). The A/B's table is 7.5. |
 | 6 (grid batching) | **not done** (7.4). |
 | 8 (default vignetting) | done in 0.2.0 (`NoVignetting`). |
@@ -477,7 +477,7 @@ The correction to recommendation 3: on the CPU the root was 40 % of the kernel, 
 evaluation of the 25-node field) and the radiance. On the device the kernel with Core's step at a supplied hit is slower than the
 root followed by the same step, so the code generated for `intersection_at`'s design-point path costs more there than the Newton
 saves (no profiler counters on the cluster; to profile on a local GPU). The device is the production backend: RC keeps the root
-(`intersect_board`). The height columns were the same to rounding (the suite's checks passed with it). For Core: why
+(`intersect_board`). The height columns were the same to rounding (the suite's checks succeeded with it). For Core: why
 `intersection_at`'s Dual path is slower on a B200 than `intersection`'s root plus the same step.
 
 ### 7.3 The texture solve with the Jacobi diagonal
