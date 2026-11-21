@@ -26,7 +26,7 @@ code = ["RadiometricCamera/Project.toml", "RadiometricCamera/src", "RadiometricC
 # Where this project's data and results are on a machine is the machine's site profile's (VisualGeometryToolkitEval
 # configs/sites/<site>.toml, [storage] data_root / results_root / artifact_store; `{project}` is this graph's name), else the
 # environment (VGTK_DATA_ROOT, VGTK_RESULTS_ROOT, VGTK_DATA_ROOT_UNPUBLISHED for the tier the sensor model and the calibrator's
-# image are named by) or --data-root / --results-root. A profile without [storage] (dgx01's) takes the environment. No machine
+# image are named by) or --data-root / --results-root. A profile without [storage] (the B200 server's) takes the environment. No machine
 # path is written here: the one binding below is relative to the repository.
 
 [sites.desktop]
@@ -36,7 +36,7 @@ data_root = "experiments/data/exp_raw"
 results_root = "experiments/data/results"
 
 # Resources per stage (over the site profile's, VisualGeometryToolkitEval configs/sites/dgx01.toml: 2 CPUs for a stage that declares
-# none since Eval 0.8; its 0.7 profile's 28 reserved the node at a load of ≈ 6, dgx01 2026-11-13): CPUs by measured or stated need; memory per CPU
+# none since Eval 0.8; its 0.7 profile's 28 reserved the node at a load of ≈ 6, the B200 server 2026-11-13): CPUs by measured or stated need; memory per CPU
 # the node ratio, 8480M, always (owner rule; a stage that needs more memory gets more CPUs, its measured peak
 # stated); a GPU stage also gets the site's gres (1 GPU). A stage's CPUs are its drivers' thread count, which keys
 # their runs (src/drivers.jl execution_threads) and which the drivers that read another experiment's runs look them up by, so every
@@ -49,7 +49,7 @@ results_root = "experiments/data/results"
 name = "setup"
 what = "the experiments environment, inside the scheduler: Pkg.instantiate, precompile (experiments and the package, CUDA and the GPU extensions included), CPU only: GPU tasks never compile"
 time = "00:30:00"         # setup measured 3m19s (rehearsal 2026-11-13, 12 CPUs; 2.5 min of it the precompile): ≈ 2× with the registry update
-cpus_per_task = 12      # the prep: 12 CPUs (dgx01 2026-11-13: a 32-CPU precompile ran at ~5 cores; Pkg.precompile is bounded by the
+cpus_per_task = 12      # the prep: 12 CPUs (the B200 server 2026-11-13: a 32-CPU precompile ran at ~5 cores; Pkg.precompile is bounded by the
 mem_per_cpu = "8480M"   # dependency chain); the one compile of a launch, every later task only loads
 sbatch = "experiments/scripts/slurm/setup.sbatch"
 
@@ -126,7 +126,7 @@ driver = "experiments/scripts/texture_recovery.jl"
 config = "experiments/configs/experiments/texture_recovery_{item}.toml"
 gpu = true
 array = { items = ["14mm_small"], select_env = "TEXTURE_SETS" }
-# no GPU held through CPU work (the GPU split, dgx01 2026-11-13): the decode, the sheet and the poses (BlobBoards' find_boards through
+# no GPU held through CPU work (the GPU split, the B200 server 2026-11-13): the decode, the sheet and the poses (BlobBoards' find_boards through
 # the held camera) on the CPU, the page solves (GPU_STAGES refine, folds) on one GPU, the scores and the report on the CPU again
 phases = [
     { name = "poses", gpu = false, env = { TEXTURE_STAGES = "prepare,detect,sheet,init" }, time = "03:00:00" },   # 3 h: the run of record 2026-11-16 spent > 30 min in init alone (79 GB, 8 threads)   # the decode and the poses: minutes (the whole set 9.2 min, launch 20261115_032416)
@@ -138,7 +138,7 @@ phases = [
 [[stage]]
 name = "sampling_strategy_upstreams"
 what = "the sampling-strategy experiment's configs (the variants as overrides of the cases of record) and each case's prepare, front-end runs and image region, once before its arms"
-time = "01:00:00"         # the 14 mm's Schöps run 766 s (frontends_detect, 2026-11-13) and the decodes minutes; the fisheye 3 min (dgx01 2026-11-15): ≈ 2× the 14 mm's
+time = "01:00:00"         # the 14 mm's Schöps run 766 s (frontends_detect, 2026-11-13) and the decodes minutes; the fisheye 3 min (the B200 server 2026-11-15): ≈ 2× the 14 mm's
 cpus_per_task = 8       # GPU stage: the Schöps tool and the image region on the device; 8 host threads (the experiment's one thread count)
 mem_per_cpu = "8480M"
 # after the products of record it shares (the decodes, the front ends' runs, the image regions): reused by their keys, never made twice
@@ -173,7 +173,7 @@ default = false
 name = "sampling_strategy_score"
 what = "the sampling-strategy scores: the chrome evaluation of record on the arms (and with the context), the texture experiment on each 14 mm arm and its compare, the record, the figure and the table"
 time = "04:00:00"         # the chrome detect and index once per set (minutes on a GPU), each evaluate minutes; the texture page solve per arm 138–156 s on a B200 (cvpr-eff 2026-11-13) and its poses: ≈ 2×
-cpus_per_task = 28      # the memory of the texture page's host assembly (8 CPUs × 8480M ran out at the first page, dgx01 2026-11-15; the texture launcher's
+cpus_per_task = 28      # the memory of the texture page's host assembly (8 CPUs × 8480M ran out at the first page, the B200 server 2026-11-15; the texture launcher's
                         #   28); the threads stay 8 (sampling_strategy.sbatch: the thread count keys the refinements this stage reads)
 mem_per_cpu = "8480M"
 after = ["sampling_strategy", "chrome_evaluation", "texture_recovery"]   # the chrome detect and index and the texture of record: reused by their keys
@@ -351,7 +351,7 @@ sbatch = "experiments/scripts/slurm/sensor_characterisation.sbatch"
 job_name = "rc-sensor-char"
 driver = "experiments/scripts/sensor_characterisation.jl"
 config = "experiments/configs/experiments/sensor_characterisation.toml"
-time = "00:05:00"       # 2× the measured 87 s (dgx01 2026-11-14, 16 CPUs, warm depot: 569 frames decoded and the record written)
+time = "00:05:00"       # 2× the measured 87 s (the B200 server 2026-11-14, 16 CPUs, warm depot: 569 frames decoded and the record written)
 default = false
 
 [[stage]]

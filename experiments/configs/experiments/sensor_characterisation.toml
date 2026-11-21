@@ -45,7 +45,7 @@ provenance = "the campaign's photon transfer series (111 ARW: 5–7 frames of th
 [inputs.manifest]
 tier = "unpublished"
 path = "rc_sensor_characterisation_20261113/MANIFEST.tsv"
-sha256 = "27c8e821ff723ffeb36ddd53be789e70721339fdc3034676b4381ec8af8703af"   # sha256sum of the campaign's manifest (dgx01, 2026-11-14)
+sha256 = "27c8e821ff723ffeb36ddd53be789e70721339fdc3034676b4381ec8af8703af"   # sha256sum of the campaign's manifest (the B200 server, 2026-11-14)
 stage = "evaluate"
 provenance = "the campaign's manifest: bytes, sha256 and md5 per file, paths relative to the paper-data root (rsync from the share on 2026-11-13, every file verified against the share read through the desktop's mount); the record's provenance names each set it read by the SHA-256 of its rows"
 
@@ -54,4 +54,4 @@ tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # the configs of record's input fx3_sensor_characterisation
 stage = "evaluate"
-provenance = "the FX3's characterisation of record (the refinements' input fx3_sensor_characterisation, made on dgx01 2026-11-14 by the scratch recipe this driver codifies): the run compares the record it writes against it"
+provenance = "the FX3's characterisation of record (the refinements' input fx3_sensor_characterisation, made on the B200 server 2026-11-14 by the scratch recipe this driver codifies): the run compares the record it writes against it"

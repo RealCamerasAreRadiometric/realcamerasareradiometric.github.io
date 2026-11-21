@@ -6,7 +6,7 @@
 #   decides:    the maps stop being inputs of record (the run-of-record dry run found them only in a scratch data root): each is ONE
 #               keyed step of this config, read through [runs] by every consumer and produced on demand when missing
 #   evidence:   the run-of-record dry run of RC 0.11.5 (2026-11-16): distance_map/ and distance_map_8ppm/ only in a scratch data
-#               root on dgx01, not in the data root of record (configs/reproduce.toml [sites.dgx01] data_root)
+#               root on the B200 server, not in the data root of record (configs/reproduce.toml [sites.dgx01] data_root)
 #   owner:      J. Pritts
 #   date:       2026-11-16
 #   discussion: the owner's produce_or_load rule (every pipeline step's intermediate a keyed product, keyed by only its own inputs)
@@ -33,28 +33,28 @@ name = "distance_maps"
 [inputs.siemens_1m_sdf_values]
 tier = "rc_calibration"
 path = "geometric_accuracy/data/target/siemens_1m/board/sdf.f32"
-sha256 = "3e25b2943b93e091dc647188fcb9e9265592818df0aaee98f74e1c3a1efac91f"   # sha256sum on dgx01's data root of record (2026-11-16); = the scratch record's sdf_f32_sha256
+sha256 = "3e25b2943b93e091dc647188fcb9e9265592818df0aaee98f74e1c3a1efac91f"   # sha256sum on the B200 server's data root of record (2026-11-16); = the scratch record's sdf_f32_sha256
 stage = "prepare"
 provenance = "the 1 m Siemens-star print's printed-edge distance, the board generator's own output (siemens_board.py; data/target/make_sdf.sh, byte-identical on regeneration): 8000 × 8000 row-major float32, mm, + on paper, − in ink"
 
 [inputs.siemens_1m_sdf_header]
 tier = "rc_calibration"
 path = "geometric_accuracy/data/target/siemens_1m/board/sdf.json"
-sha256 = "e91e3673a849dac1d160191b4f8042bbf157591b27b82a503c873566165fec48"   # sha256sum on dgx01's data root of record (2026-11-16); = the scratch record's sdf_json_sha256
+sha256 = "e91e3673a849dac1d160191b4f8042bbf157591b27b82a503c873566165fec48"   # sha256sum on the B200 server's data root of record (2026-11-16); = the scratch record's sdf_json_sha256
 stage = "prepare"
 provenance = "the header of siemens_1m_sdf_values (width, height, page_mm 1000 × 1000, clip_mm, sign, unit, method), written with it by the board generator"
 
 [inputs.aprilgrid_sdf_8ppm_values]
 tier = "rc_calibration"
 path = "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/sdf.f32"
-sha256 = "9804346a3399f1d365213996d4d122c96932f272cd635793d06f610a1da5f88d"   # sha256sum on dgx01's data root of record (2026-11-16); = the scratch record's sdf_f32_sha256
+sha256 = "9804346a3399f1d365213996d4d122c96932f272cd635793d06f610a1da5f88d"   # sha256sum on the B200 server's data root of record (2026-11-16); = the scratch record's sdf_f32_sha256
 stage = "prepare"
 provenance = "the 1 m AprilGrid print's printed-edge distance at 8 px per mm, the board generator's own output (aprilgrid_board.py; data/target/make_sdf.sh): 7832 × 7832 row-major float32, mm, + on paper, − in ink"
 
 [inputs.aprilgrid_sdf_8ppm_header]
 tier = "rc_calibration"
 path = "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/sdf.json"
-sha256 = "8dd90d058baa90a426e294dd170e232dbf685f07487509b76f3ae80cee5bfc35"   # sha256sum on dgx01's data root of record (2026-11-16); = the scratch record's sdf_json_sha256
+sha256 = "8dd90d058baa90a426e294dd170e232dbf685f07487509b76f3ae80cee5bfc35"   # sha256sum on the B200 server's data root of record (2026-11-16); = the scratch record's sdf_json_sha256
 stage = "prepare"
 provenance = "the header of aprilgrid_sdf_8ppm_values (width, height, page_mm 979 × 979, px_per_mm 8, clip_mm, sign, unit), written with it by the board generator"
 

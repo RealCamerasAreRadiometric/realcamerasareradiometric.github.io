@@ -1,5 +1,5 @@
 # =============================================================================
-# run_of_record.jl — the run of record of the paper on a Slurm site (dgx01, vcai): every stage of configs/reproduce.toml the paper needs (the stages
+# run_of_record.jl — the run of record of the paper on a Slurm site (a site profile with backend slurm): every stage of configs/reproduce.toml the paper needs (the stages
 # configs/run_of_record.toml lists, and what they run after), submitted by VisualGeometryToolkitEval's runner (Reproduce) as ONE
 # launch, its jobs named `ror-<driver>-<stage>[-<phase>]`, and the GPU queue ordered longest-first; and its plan: the job graph with
 # its GPU and CPU counts, each job's runtime estimate (the config's, from the last good runs) against its Slurm limit, and the
@@ -120,7 +120,7 @@ ror_stage_minutes(cfg, s) = isempty(s.phases) ? ror_estimate(cfg, s.name)[1] :
 The run of record's view of the stage graph `g`: every job named [`ror_job_base`](@ref), and the stages in a dependency order
 that puts the paper first and then the longest remaining chain first (each stage's own estimate plus the longest chain after it),
 so the runner submits them in that order: the stages the paper's figures, tables and numbers need (the graph's default stages and
-everything they run after) before the experiments no paper asset reads, each tier longest-first. dgx01's jobs share one priority (multifactor with every weight 0: `--nice` changes nothing), so Slurm starts
+everything they run after) before the experiments no paper asset reads, each tier longest-first. the site's jobs share one priority (multifactor with every weight 0: `--nice` changes nothing), so Slurm starts
 the eligible jobs in submission order, and the longest first keeps the tail short. The graph's keys, items and commands are
 otherwise the graph's own.
 """
@@ -185,7 +185,7 @@ end
 """
     ror_schedule(jobs; gpus = 8, cpus = 224) -> NamedTuple
 
-A list schedule of the job graph on one node of `gpus` GPUs and `cpus` CPUs, as dgx01's backfill runs it: at every event, each
+A list schedule of the job graph on one node of `gpus` GPUs and `cpus` CPUs, as the B200 server's backfill runs it: at every event, each
 eligible task in submission order starts when its GPU (one per GPU task) and CPUs are free; a task is eligible once every job it
 waits on has ended (task k of a per-item phase once task k of the phase before it has). Returns `(; makespan, start, finish,
 gpu_minutes, cpu_minutes, busy_gpu)`: minutes from the launch, per job its first start and last finish, the GPU- and CPU-minutes,

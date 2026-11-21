@@ -3,7 +3,7 @@
 # products (test/fixtures/chrome_paper), the refinements' retcodes the fixture's — exactly the test's calls. Re-recorded 2026-11-15 (owner)
 # after the fisheye 27.10 Siemens set's exclusion (configs/excluded.toml [excluded.fisheye2710_siemens]: superseded by the fisheye
 # 30 cm recapture; Schöps's folded camera): the paper's tables drop its rows. Before, the golden was the pre-move driver's
-# (scripts/geometric_figures.jl, dgx01 job 17793), which this driver matched byte for byte.
+# (scripts/geometric_figures.jl, the B200 server job 17793), which this driver matched byte for byte.
 #
 #   julia --project=experiments experiments/test/fixtures/chrome_paper/golden/make_golden.jl      (from the repository root)
 using DrWatson

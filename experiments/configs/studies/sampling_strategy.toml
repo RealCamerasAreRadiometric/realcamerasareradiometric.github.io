@@ -102,7 +102,7 @@ texture = "configs/experiments/texture_recovery_14mm_small.toml"
 texture_crop_mm = [28.0, 239.0, 60.0, 33.0]   # [x0, y0, width, height] mm, the crop the variants' textures are compared on: the last five lines of the
                                               #   text from its left margin, no blobs (the texture config's former [figures.texture_large] crop, since retired)
 lattice = { subdivision = [1, 1], max_nodes = 900 }   # Schöps's own lattice (m = 1): the texcal run's 35 × 25 = 875 nodes (cell 155.7 × 164.5 px;
-                                                      #   its start, dgx01 2026-11-15) and the si30 context case's 35 × 25 (cell 156.8 × 166.4 px),
+                                                      #   its start, the B200 server 2026-11-15) and the si30 context case's 35 × 25 (cell 156.8 × 166.4 px),
                                                       #   against ≈ 8–9.6 k at the slow 40 px lattice; 900 admits 875, refuses any subdivision's
 [cases.texcal_14mm.variants.addon]
 "masks.addon_samples" = 8192          # samples_per_view / 2 = 16384 / 2 (the case's count of record, owner 2026-11-16)
@@ -113,7 +113,7 @@ case = "f4_fisheye_spline_warped"
 chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"   # the paper's fisheye chrome (the edge-sampling sweep's Thorlabs score)
 context = ["ag10fe_spline_start", "ag10fe_kb_start"]   # the set's Schöps baseline and Kannala–Brandt start (it has no pinhole-defocus row)
 lattice = { subdivision = [1, 1], max_nodes = 800 }   # Schöps's own lattice (m = 1) over the image circle: 20 × 20 = 400 nodes padded (cell
-                                                      #   163.7 × 164.5 px; its start, dgx01 2026-11-15); 800 refuses any subdivision's (m = 2: 1600)
+                                                      #   163.7 × 164.5 px; its start, the B200 server 2026-11-15); 800 refuses any subdivision's (m = 2: 1600)
 [cases.fisheye_f4.variants.addon]
 "masks.addon_samples" = 8192          # samples_per_view / 2 = 16384 / 2 (the case's count of record, owner 2026-11-16)
 

@@ -28,9 +28,9 @@ provenance = "the 1 m Siemens-star print's printed-edge distance map, a vgio/ras
 [inputs.fx3_sensor_characterisation]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
-sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "refine"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw_14mm_siemens_20261028]
 tier = "rc_raw_photos"
@@ -91,18 +91,18 @@ provenance = "the diffuser flat-field photographs of the Sigma 14 mm at f/4 in i
 # job 18294: centre ≈ (2132, 1426), semi-axes ≈ 1719 / 1717 px, cut by the frame).
 [image_regions.fx3_14mm_f4_20261028]
 input = "raw_14mm_diffuser_20261028"
-frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # sha256sum on dgx01 (2026-11-15)
+frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # sha256sum on the B200 server (2026-11-15)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
-outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, the B200 server rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
 seed = 1                       # the RANSAC ellipse fit's StableRNG seed: the cases' masks.seed, which seeded the in-run measurement before 2026-11-15
 
 # The fisheye's f/4 Siemens set of 2026-10-28: its image circle lies inside the frame; measured on five of the set's own photographs
 # (DSC04845–48, DSC04853: the frames of the runs of 2026-10-31, as RAW, the green cells).
 [image_regions.fx3_fisheye_siemens_20261028]
 input = "raw_fisheye_siemens_20261028"
-frames = { "DSC04845.ARW" = "c489a8df1c700b12c34f34466ad25375f8b22fb8d07eb8f29d11c9215cce5639", "DSC04846.ARW" = "fadcc183d874c1c6b7e2bddb3b93fd7c62639c4f048812e0f3752566d357e4f2", "DSC04847.ARW" = "651d8845ba8a645af944bea43e4f7db705bb75472dc6486414251e69e4469a59", "DSC04848.ARW" = "a8abfe3ad4315ca7d1a9fc3ff1cfd5d7aa9ecf8d675dad75faec38856406a023", "DSC04853.ARW" = "6f7168c0451410ea6d5b474ddf6fda2f1f8dd8f5bdead4201068a2036f101d4b" }   # sha256sum on dgx01 (2026-11-15)
+frames = { "DSC04845.ARW" = "c489a8df1c700b12c34f34466ad25375f8b22fb8d07eb8f29d11c9215cce5639", "DSC04846.ARW" = "fadcc183d874c1c6b7e2bddb3b93fd7c62639c4f048812e0f3752566d357e4f2", "DSC04847.ARW" = "651d8845ba8a645af944bea43e4f7db705bb75472dc6486414251e69e4469a59", "DSC04848.ARW" = "a8abfe3ad4315ca7d1a9fc3ff1cfd5d7aa9ecf8d675dad75faec38856406a023", "DSC04853.ARW" = "6f7168c0451410ea6d5b474ddf6fda2f1f8dd8f5bdead4201068a2036f101d4b" }   # sha256sum on the B200 server (2026-11-15)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
-outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, the B200 server rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
 seed = 1                       # as above
 
 [prepare.fx3_14mm_siemens_20261028]

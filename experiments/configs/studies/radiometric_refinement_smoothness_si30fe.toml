@@ -7,7 +7,7 @@
 #   decided:    the weight 0.1 kept: it does not bind (the three weights give the same per-iteration curves); the held-out RMS rise comes
 #               from ≈ 23 dots at the top rim of the image circle (ρ ≈ 0.98; the top 0.1 % of the dots carry 43 % of the squared error at
 #               iteration 30; the RMS without the worst 1 % falls 0.385 → 0.223 px), with a centre median drift 0.062 → 0.094 px
-#   evidence:   branch exp-convergence-si30fe, its scratch results root rc-results-exp-conv on dgx01 (reproduction
+#   evidence:   branch exp-convergence-si30fe, its scratch results root rc-results-exp-conv on the B200 server (reproduction
 #               43916ed01eaa82a8 of T. Harder's curves: held-out RMS 0.479 → 0.582 @12 → 0.502 @30, median 0.121 → 0.085 @9 → 0.101);
 #               each arm against its start: median −0.023 px *, p95 −0.52 px *, RMS n.s.; 25 vs 30 iterations: 25 better on the median
 #   owner:      J. Pritts (2026-11-17 ~09:45: "three runs, 25 iterations each, weight 0.1 / 0.01 / 0.001")

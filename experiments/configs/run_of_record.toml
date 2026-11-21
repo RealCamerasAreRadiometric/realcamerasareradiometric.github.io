@@ -37,8 +37,8 @@ repository = "https://github.com/RealCamerasAreRadiometric/realcamerasareradiome
 registry = "CauRegistry"
 
 [machine]
-gpus = 8      # dgx01: 8 × B200 (scontrol show node: Gres=gpu:8)
-cpus = 224    # dgx01: 224 CPUs, 1,900,000 MB (8480M per CPU, the node ratio)
+gpus = 8      # the B200 server: 8 × B200 (scontrol show node: Gres=gpu:8)
+cpus = 224    # the B200 server: 224 CPUs, 1,900,000 MB (8480M per CPU, the node ratio)
 
 [risk]
 tight_fraction = 0.75   # a job projected past 75 % of its --time is flagged: the slow-run rule acts before a time-out, not after
@@ -46,15 +46,15 @@ tight_fraction = 0.75   # a job projected past 75 % of its --time is flagged: th
 untimed = ["regenerate_paper"]
 
 # Minutes per task of each job: "<stage>" its own job (its last phase), "<stage>:<phase>" an earlier phase. The sources: the runner's
-# completion markers (start/end of every task of the launches under dgx01's rc-results-0.11/_reproduce, harvested 2026-11-16;
-# no sacct on dgx01: accounting storage is disabled), the GNU time -v lines of the logs, and the measured runtimes stated beside each
-# stage's limit in configs/reproduce.toml (the rehearsal of 2026-11-13, dgx01 2026-11-15). A job without an entry is planned at
+# completion markers (start/end of every task of the launches under the B200 server's rc-results-0.11/_reproduce, harvested 2026-11-16;
+# no sacct on the B200 server: accounting storage is disabled), the GNU time -v lines of the logs, and the measured runtimes stated beside each
+# stage's limit in configs/reproduce.toml (the rehearsal of 2026-11-13, the B200 server 2026-11-15). A job without an entry is planned at
 # `default` and flagged unmeasured.
 [estimate]
 default = 60
 precompile = 2                                    # a stage's CPU precompile after setup compiled the tree: 0.1 min (markers, 20261115_130418), the load ×10
-"setup" = 15                                      # 2.9 min (markers, 20261115_130418, a warm depot); a NEW tree compiles RC, experiments and CUDA's extensions: ≈ 12–15 min at 12 CPUs (Eval's dgx01 precompile_time note)
-"distance_maps" = 10                              # the two maps' conversion (seconds each, dgx01 job 20478) and the driver's load: minutes; ×2 margin under its 30 min limit
+"setup" = 15                                      # 2.9 min (markers, 20261115_130418, a warm depot); a NEW tree compiles RC, experiments and CUDA's extensions: ≈ 12–15 min at 12 CPUs (Eval's the B200 server precompile_time note)
+"distance_maps" = 10                              # the two maps' conversion (seconds each, the B200 server job 20478) and the driver's load: minutes; ×2 margin under its 30 min limit
 "image_regions" = 5                               # 0.3–0.9 min (markers, 2 launches); the full-resolution raw_green frames and the fisheye 30 cm step: ×5
 "frontends_prepare" = 10                          # 0.2–1.9 min (markers, 21 tasks); 6–10 min on a cold decode (2026-11-13: zoom 551 s, 14 mm 531 s)
 "frontends_detect" = 15                           # 2.1–14.6 min (markers, 21 tasks: the 14 mm's camera_calibration 766 s); the window study's fe30w runs 8–10 min (fe30-window logs, 2026-11-16)
@@ -67,7 +67,7 @@ precompile = 2                                    # a stage's CPU precompile aft
 "chrome_evaluation:decode" = 10                   # ≈ 250 RAW photographs a set, Features' load_raw threaded (the prepares above: minutes)
 "chrome_evaluation:detect" = 15                   # the chrome detect "minutes per set on a GPU" (chrome_index_grid's detect phase)
 "chrome_evaluation" = 16                          # the index: 18 set tasks in a 940 s span (the index grid, cvpr-eff 2026-11-13)
-"chrome_evaluation_score" = 10                    # each evaluate minutes (dgx01 2026-11-15)
+"chrome_evaluation_score" = 10                    # each evaluate minutes (the B200 server 2026-11-15)
 "texture_recovery:poses" = 3                      # the whole set 9.2 min (markers, 20261115_032416): the decode and the poses a third
 "texture_recovery:solve" = 13                     # 5 folds × the page solve 138–156 s on a B200 (cvpr-eff 2026-11-13)
 "texture_recovery" = 3                            # the scores, the fold report, the compare and summary.md: minutes

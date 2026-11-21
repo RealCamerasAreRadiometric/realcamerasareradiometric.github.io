@@ -39,7 +39,7 @@
         vcai = load_site("vcai")
         @test ror_results_base(vcai, g.name; env = Dict{String, String}()) == site_root(vcai, "results_root", g.name)
         @test ror_results_base(vcai, g.name; env = Dict("VGTK_RESULTS_ROOT" => "elsewhere")) == "elsewhere"
-        @test_throws ArgumentError ror_results_base(load_site("dgx01"), g.name; env = Dict{String, String}())   # dgx01's profile has no [storage]
+        @test_throws ArgumentError ror_results_base(load_site(chopprefix("--site=dgx01", "--site=")), g.name; env = Dict{String, String}())   # the B200 server's profile has no [storage]
     end
 
     @testset "job names: ror-<driver>-<stage>[-<phase>]" begin
@@ -64,7 +64,7 @@
     end
 
     rg = ror_graph(g, cfg)
-    site = load_site("dgx01")
+    site = load_site(chopprefix("--site=dgx01", "--site="))   # the B200 server's Slurm profile
     plan = plan_reproduction(rg, site; only = ror_stages(g, cfg).stages, data_root = mktempdir(), results_root = mktempdir(),
                              job_name_prefix = ROR_PREFIX, env = env0)
     jobs = ror_jobs(plan, cfg)

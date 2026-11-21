@@ -1,10 +1,10 @@
 # =============================================================================
 # run_of_record.jl — the run of record's launch (src/run_of_record.jl) through VisualGeometryToolkitEval's runner: the stages of
-# configs/run_of_record.toml (and what they run after) of the stage graph of record, configs/reproduce.toml, on the site VGTK_SITE names (else dgx01),
+# configs/run_of_record.toml (and what they run after) of the stage graph of record, configs/reproduce.toml, on the site --site or VGTK_SITE names,
 # into the release's results root, its jobs `ror-<driver>-<stage>[-<phase>]`, the GPU queue longest-first. Run from a bare julia
 # by experiments/scripts/slurm/run_of_record.sh (which first checks the registered version and makes its tree), from the tree's root:
 #
-#   julia --project=experiments experiments/scripts/run_of_record.jl --version=<v> [--plan] [--site=<site> (VGTK_SITE, else dgx01)] [--results-root=<dir>]
+#   julia --project=experiments experiments/scripts/run_of_record.jl --version=<v> [--plan] [--site=<site> (else VGTK_SITE)] [--results-root=<dir>]
 #         [--config=experiments/configs/run_of_record.toml] [--graph=experiments/configs/reproduce.toml] [--scratch]
 #
 #   --plan     the runner's job graph (stages, items, dependencies, sbatch lines, missing inputs) and the run of record's plan: the
@@ -36,7 +36,9 @@ function main(args)
     scratch && !plan_only && (println("run_of_record: --scratch is for the dry run only (--plan): a run of record runs the registered tree"); return 2)
     cfg = load_ror_config(val("config", "experiments/configs/run_of_record.toml"))
     g = load_stage_graph(val("graph", "experiments/configs/reproduce.toml"))
-    site = load_site(val("site", something(_nonempty(get(ENV, "VGTK_SITE", "")), "dgx01")); dirs = isempty(g.sites_dir) ? String[] : [g.sites_dir])
+    sitename = something(val("site"), _nonempty(get(ENV, "VGTK_SITE", "")), Some(nothing))
+    sitename === nothing && (println("run_of_record: name the site: --site=<site> or VGTK_SITE (VisualGeometryToolkitEval configs/sites/)"); return 2)
+    site = load_site(sitename; dirs = isempty(g.sites_dir) ? String[] : [g.sites_dir])
     launch = cfg["launch"]
     results = something(val("results-root"), joinpath(ror_results_base(site, g.name), ror_pattern(launch["results_dir"], version)))
     sel = ror_stages(g, cfg)

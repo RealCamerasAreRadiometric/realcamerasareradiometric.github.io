@@ -33,7 +33,7 @@ radiometric_refinement = "configs/experiments/radiometric_refinement.toml"   # t
 
 [timing]
 case = "si30_spline_warped"   # owner 2026-11-18: one typical calibration case (Sigma 14 mm, Siemens stars at 30 cm, the central spline: the paper's main model and Figure 4's case)
-replicates = 8                # owner 2026-11-18: one run per B200 of dgx01 (8 GPUs), all at once, one per GPU
+replicates = 8                # owner 2026-11-18: one run per B200 of the B200 server (8 GPUs), all at once, one per GPU
 warmup = 1                    # owner 2026-11-18: one untimed warm-up solve (compile) before the one timed solve; its time reported apart
 
 [overrides]

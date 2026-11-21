@@ -287,9 +287,9 @@
 end
 
 # The one command (configs/reproduce.toml on VisualGeometryToolkitEval's runner, scripts/reproduce/): the stage graph of record
-# and its --only subsets; the dry run on dgx01 (Slurm) and on the desktop (local), whose commands are the launchers of
+# and its --only subsets; the dry run on the B200 server's site (Slurm) and on the desktop (local), whose commands are the launchers of
 # scripts/slurm/ and nothing else; the missing-input report as data; the launchers' case selections are the graph's.
-@testitem "the one command: the stage graph of record on dgx01 and the desktop" default_imports = false begin
+@testitem "the one command: the stage graph of record on a Slurm site and the desktop" default_imports = false begin
     using Test
     using DrWatson
     using TOML: TOML
@@ -347,7 +347,7 @@ end
     @test join([ph["env"]["TEXTURE_STAGES"] for ph in tex.phases], ",") == "prepare,detect,sheet,init,refine,folds,evaluate,fold_report,compare,report"
     @test [ph["gpu"] for ph in tex.phases] == [false, true, false]
 
-    # the GPU split (dgx01, 2026-11-13): GPU tasks never compile and never hold a GPU through CPU work. setup (the one precompile) and
+    # the GPU split (the B200 server, 2026-11-13): GPU tasks never compile and never hold a GPU through CPU work. setup (the one precompile) and
     # every prepare (the RAW decode) are CPU stages; every GPU stage runs after setup, transitively, so it only loads
     stage(n) = only(filter(x -> x.name == n, g.stages))
     upstream(n) = setdiff(Set(select_stages(g; only = [n])), [n])       # every stage n runs after, transitively (Eval's select_stages)
@@ -357,13 +357,15 @@ end
         (s.gpu || !isempty(s.gres)) && @test "setup" in upstream(s.name)
     end
 
+    # the shipped Slurm profile of the B200 server, named as its --site= argument (no host name is written elsewhere)
+    slurm_site = chopprefix("--site=dgx01", "--site=")
     dry(site, more...) = (io = IOBuffer(); code = reproduce_main(["--graph=$graph", "--site=$site", "--dry-run", more...]; io, env = env0);
                           (code, String(take!(io))))
     data, results = mktempdir(), mktempdir()
 
-    @testset "the dry run on dgx01: sbatch of the existing launchers, chained with afterok" begin
-        code, out = dry("dgx01", "--data-root=$data", "--results-root=$results")
-        @test code == 0 && occursin("reproduce experiments on dgx01 (slurm): $(length(paper)) stage(s)", out)
+    @testset "the dry run on the Slurm site: sbatch of the existing launchers, chained with afterok" begin
+        code, out = dry(slurm_site, "--data-root=$data", "--results-root=$results")
+        @test code == 0 && occursin("reproduce experiments on $slurm_site (slurm): $(length(paper)) stage(s)", out)
         submits = [strip(l) for l in split(out, '\n') if startswith(strip(l), "submit")]
         @test length(submits) >= length(paper)                       # a stage with phases submits one job per phase (and the precompile)
         used = sort(unique([m.match for l in submits for m in eachmatch(r"experiments/scripts/slurm/[a-z_]+\.sbatch", l)]))
@@ -395,7 +397,7 @@ end
         vcai = load_site("vcai")
         @test occursin("data     $(site_root(vcai, "data_root", g.name))", out) &&
               occursin("results  $(site_root(vcai, "results_root", g.name))", out)
-        @test !haskey(g.site_roots, "dgx01") && !haskey(g.site_roots, "vcai")
+        @test !haskey(g.site_roots, slurm_site) && !haskey(g.site_roots, "vcai")
     end
 
     @testset "the dry run on the desktop: the same launchers under bash, device 0 only" begin

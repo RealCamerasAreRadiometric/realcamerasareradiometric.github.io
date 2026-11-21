@@ -68,7 +68,7 @@ case = "ag10fe_spline_warped"
 chrome = "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml"
 context = ["ag10fe_spline_start", "ag10fe_kb_start"]
 lattice = { subdivision = [1, 1], max_nodes = 800 }   # Schöps's own lattice (m = 1): this run of record's start of the case is 20 x 20 = 400
-                                                      #   nodes (dgx01 2026-11-16, start.json resample); 800 refuses any subdivision's
+                                                      #   nodes (the B200 server 2026-11-16, start.json resample); 800 refuses any subdivision's
 
 [runtime]
 reference_s_per_iteration = { fe10_bc5 = 60.0, fe10_ocv14 = 60.0, fe10_kb = 60.0, fe10_ds = 60.0, fe10_spline = 120.0 }   # derivation: order of
