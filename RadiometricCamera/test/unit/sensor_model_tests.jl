@@ -73,8 +73,8 @@ end
     s = VgtkCore.parse_unit("s")
     m = flat_mosaic(8, 8, 1512)
     f = VgtkCore.sensor_fixture(; black = (502.0, 492.0, 482.0, 472.0), defects = (; x = [2, 5], y = [1, 4], onset = [0.1s, 0.1s], size = (8, 8)))
-    vals0, mask0 = RC._observe(RC.Photosites(), m, trues(8, 8), "absent", VgtkCore.SensorModel())
-    vals, mask = RC._observe(RC.Photosites(), m, trues(8, 8), "measured", f.model)
+    vals0, mask0 = RC._observe(RC.Photosites(), m, trues(8, 8), "absent", VgtkCore.SensorModel(), :G)
+    vals, mask = RC._observe(RC.Photosites(), m, trues(8, 8), "measured", f.model, :G)
     col = VgtkCore.photosite_colors(m)
     @test vals0 == VgtkCore.linearview(m)                                                  # the absent model: the file's black, bit for bit
     @test vals == VgtkCore.linearview(m; sensor_model = f.model)                           # the model's black (Core's one linearisation)
@@ -109,7 +109,7 @@ end
     inband = dark(1.0s).model; outband = dark(4.0s).model
     @test VgtkCore.component_sources(inband).reason == VgtkCore.Matched && VgtkCore.component_sources(outband).reason == VgtkCore.DarkOutOfBand
     @test only(RC.sensor_record(["a"], [inband])).black_component == "Dark" && only(RC.sensor_record(["b"], [outband])).black_component == "ChannelBlack"
-    vi = RC._observe(RC.Photosites(), m, trues(8, 8), "a", inband)[1]; vo = RC._observe(RC.Photosites(), m, trues(8, 8), "b", outband)[1]
+    vi = RC._observe(RC.Photosites(), m, trues(8, 8), "a", inband, :G)[1]; vo = RC._observe(RC.Photosites(), m, trues(8, 8), "b", outband, :G)[1]
     @test vi == VgtkCore.linearview(m; sensor_model = inband) && vo == VgtkCore.linearview(m; sensor_model = outband)   # Core's one black rule
     @test vi[1, 1] != vi[3, 1] && vo[1, 1] == vo[3, 1]                     # per photosite inside the band; per colour outside it
 end
@@ -122,8 +122,8 @@ end
     mw = VgtkCore.RawMosaic(fill(UInt16(1512), 4, 4), UInt8[0 1; 3 2], (512.0, 512.0, 512.0, 512.0), 16383.0, (0, 0), (8, 8), md;
                             window_origin = (2, 2))
     f = VgtkCore.sensor_fixture(; black = (502.0, 492.0, 482.0, 472.0), defects = (; x = [4, 5], y = [3, 4], onset = [0.1s, 0.1s], size = (8, 8)))
-    _, mask0 = RC._observe(RC.Photosites(), mw, trues(4, 4), "absent", VgtkCore.SensorModel())
-    _, mask = RC._observe(RC.Photosites(), mw, trues(4, 4), "windowed", f.model)
+    _, mask0 = RC._observe(RC.Photosites(), mw, trues(4, 4), "absent", VgtkCore.SensorModel(), :G)
+    _, mask = RC._observe(RC.Photosites(), mw, trues(4, 4), "windowed", f.model, :G)
     expected = copy(mask0); expected[1, 2] = false; expected[2, 3] = false
     @test mask == expected
 end

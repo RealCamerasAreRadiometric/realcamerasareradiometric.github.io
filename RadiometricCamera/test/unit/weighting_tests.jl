@@ -87,7 +87,7 @@ end
     κ = 0.8 / maximum(maximum, f.renders)
     rng = Xoshiro(7)
     mosaics = [noisy_mosaic(rng, r, κ; gain = K, read_noise = σr) for r in f.renders]   # each photosite's black + Poisson + read noise, rounded
-    obs = [RC._observe(RC.Photosites(), m, f.masks[k], "v$k", model) for (k, m) in enumerate(mosaics)]
+    obs = [RC._observe(RC.Photosites(), m, f.masks[k], "v$k", model, :G) for (k, m) in enumerate(mosaics)]
     @test all(o -> eltype(o[1]) <: VgtkCore.Attributed, obs)                     # the uncertain image: values with their variances
     pxs = [RC.masked_pixels(o[2]) for o in obs]
     ϕw = [RC.masked_observations(obs[k][1], pxs[k]; channel = 2) for k in 1:2]
@@ -108,16 +108,16 @@ end
     # the same photographs under the same black without a variance law (a ReadNoise alone: the gain dropped): plain values, the rows
     # as measured — the same values (each uncertain value's value) and mask
     rn = VgtkCore.sensor_fixture(; read_noise = (σr, σr, σr, σr), black = Tuple(PhotositeScene.BLACK)).model
-    plain = [RC._observe(RC.Photosites(), mm, f.masks[k], "v$k", rn) for (k, mm) in enumerate(mosaics)]
+    plain = [RC._observe(RC.Photosites(), mm, f.masks[k], "v$k", rn, :G) for (k, mm) in enumerate(mosaics)]
     @test all(k -> eltype(plain[k][1]) === Float64 && plain[k][1] == VgtkCore.value_of.(obs[k][1]) && plain[k][2] == obs[k][2], 1:2)
     @test RC.masked_observations(plain[1][1], pxs[1]; channel = 2)[2] isa RC.Unweighted &&
           RC.masked_observations(plain[1][1], pxs[1]; channel = 2)[3] ≈ ϕw[1][3]                 # the code steps the same, unweighted
     @test RC.masked_observations(rand(32, 32), pxs[1]; channel = 2)[3] === nothing          # a decoded image: no RAW code
     # no characterisation (the absent model): today's photosite values bit for bit (Core's linearview of the mosaic), unweighted
-    v0, m0 = RC._observe(RC.Photosites(), mosaics[1], f.masks[1], "v1", VgtkCore.SensorModel())
+    v0, m0 = RC._observe(RC.Photosites(), mosaics[1], f.masks[1], "v1", VgtkCore.SensorModel(), :G)
     @test v0 == VgtkCore.linearview(mosaics[1]) && eltype(v0) === Float64 && RC.masked_observations(v0, pxs[1]; channel = 2)[2] isa RC.Unweighted
     # a decoded image: plain, whatever the model
-    @test RC._observe(RC.Decoded(false), rand(32, 32, 3), f.masks[1], "d", model)[1] isa Array{Float64, 3}
+    @test RC._observe(RC.Decoded(false), rand(32, 32, 3), f.masks[1], "d", model, :RGB)[1] isa Array{Float64, 3}
     # the retired option: refused by name, its migration the sensor model
     @test_throws "weighting follows the camera's sensor model" RC.pipeline_options(Dict("refine" => Dict("weighting" => "noise")))
 end

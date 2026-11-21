@@ -119,8 +119,8 @@ end
     sec = VgtkCore.parse_unit("s")
     rec = VgtkCore.sensor_fixture(; body = FX3, exposure = 1.0sec, black = (512.0, 512.0, 512.0, 512.0),
                                   dark = (; offset = fill(Float32(512 + δ), H, W), variance = fill(0.1f0, H, W), exposure_band = (0.5sec, 2.0sec), frames = 50)).model
-    under_record, mask = RC._observe(RC.Photosites(), m, trues(H, W), "rim", rec)
-    file_black, _ = RC._observe(RC.Photosites(), m, trues(H, W), "rim", VgtkCore.SensorModel())
+    under_record, mask = RC._observe(RC.Photosites(), m, trues(H, W), "rim", rec, :G)
+    file_black, _ = RC._observe(RC.Photosites(), m, trues(H, W), "rim", VgtkCore.SensorModel(), :G)
     g = findall(mask)
     @test !isempty(g) && sum(mask) == count(c -> c == 0x01 || c == 0x03, VgtkCore.photosite_colors(m))
     span_rec = 16383.0 - (512 + δ); span_file = 16383.0 - 512

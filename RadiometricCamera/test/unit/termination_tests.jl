@@ -75,7 +75,7 @@ end
     model = VgtkCore.sensor_fixture(; gain = K, read_noise = (σr, σr, σr, σr), black = Tuple(PhotositeScene.BLACK)).model
     κ = 0.8 / maximum(maximum, f.renders)
     rng = Xoshiro(11)
-    obs = [RC._observe(RC.Photosites(), noisy_mosaic(rng, r, κ; gain = K, read_noise = σr), f.masks[k], "v$k", model) for (k, r) in enumerate(f.renders)]
+    obs = [RC._observe(RC.Photosites(), noisy_mosaic(rng, r, κ; gain = K, read_noise = σr), f.masks[k], "v$k", model, :G) for (k, r) in enumerate(f.renders)]
     ϕw = [RC.masked_observations(o[1], RC.masked_pixels(o[2]); channel = 2) for o in obs]
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
     only_poses = (:distortion, :focus, :aperture, :material, :vignetting, :lighting)
