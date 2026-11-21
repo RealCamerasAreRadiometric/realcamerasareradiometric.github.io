@@ -16,7 +16,7 @@ function _launch_rows(f, be, px; workgroupsize = nothing)
     R = _row_type(f)
     F = _row_float(R)
     out = KA.allocate(be, F, (sizeof(R) ÷ sizeof(F)) * length(px))
-    VgtkCore.pointwise!(f, reinterpret(R, out), px; exec = VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, workgroupsize)))
+    VgtkCore.pointwise!(f, reinterpret(R, out), px; exec = _pixel_rows_exec(be, workgroupsize))
     return out
 end
 """
@@ -30,9 +30,9 @@ every thread works: the flux kernel of a 1,728-pixel view 49 ms → 5.5 ms on 32
 does not depend on its group).
 """
 _pixel_workgroup(be, requested) = be isa KA.CPU ? 16 : requested
-"""The launch policy of the Jacobian's row kernel (`_jacobian_row!`, a pixel's rows a row) on the backend `be`: Core's
-`_launch_rows_on!` on the per-pixel workgroup (`_pixel_workgroup`; the device's own choice)."""
-_pixel_rows_exec(be) = VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, nothing))
+"""The launch policy of a per-pixel kernel on the backend `be` (Core's `OnBackend` on `_pixel_workgroup`; `requested` the device's
+group, `nothing` its own choice): `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`, Core's `_launch_rows_on!`)."""
+_pixel_rows_exec(be, requested = nothing) = VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, requested))
 
 """The flux `Φ_pixel` of a masked pixel id of view `k` (image height `H`)."""
 struct _FluxAt{V, G, M, L, S, T}

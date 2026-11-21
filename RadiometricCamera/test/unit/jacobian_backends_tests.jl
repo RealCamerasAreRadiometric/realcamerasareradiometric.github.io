@@ -59,7 +59,7 @@
     # along each node. The step 1e-4: a step of 1e-3 crosses kinks of the residual on this scene, whose printed edge is σ_print wide
     # everywhere (the camera's blur removed); 1e-4 agreed to 2e-6 or better for the removed direction-chart focus (2026-11-14)
     fcols = 6 + 200 .+ (1:9)
-    upf(i, x) = ntuple(j -> j == 6 ? RC.NLLSsolver.update(vars[6], [k == i ? x : 0.0 for k in 1:9]) : vars[j], 10)
+    upf(i, x) = ntuple(j -> j == 6 ? RC.NLLSsolver.update(vars[6], unit_increment(9, i, x)) : vars[j], 10)
     seen = 0
     for i in 1:9
         fd = (RC.NLLSsolver.computeresidual(r, upf(i, 1e-4)...) .- RC.NLLSsolver.computeresidual(r, upf(i, -1e-4)...)) ./ 2e-4
