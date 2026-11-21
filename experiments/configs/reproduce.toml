@@ -454,6 +454,23 @@ gpu = true                    # the goldens' device of record (golden/RECORDED.t
 array = { items = ["siemens_coarse_full"], select_env = "GOLDEN_CASES" }
 default = false
 
+# ---- the detector bias on the rendered sets (fig:detector-bias; only with --only: its inputs are not in the data root of record yet) ----
+[[stage]]
+name = "detector_bias"
+what = "per case, its start, its radiometric refinement and their evaluation against the truth of the renders; one GPU per case. The paper's figure is the driver's stage figures (CPU), run once both cases are evaluated"
+time = "02:00:00"         # a case's start 8-9 min and its refinement 24 min (the AprilGrid case, 36 iterations) and 41 min (the Siemens-star case, 25 iterations) at 8 CPUs, 1 GPU, its evaluation seconds: ≈ 2× the longer case
+cpus_per_task = 8       # GPU stage at the launch's one thread count (8, above): the LM on the device, the evaluation's projections on the host
+mem_per_cpu = "8480M"
+after = ["setup", "image_regions", "distance_maps"]   # the Double Sphere renders' image disc; the Siemens-star board's distance map
+sbatch = "experiments/scripts/slurm/case_task.sbatch"
+env = { EXPERIMENT = "detector_bias", STAGES = "start,refine,evaluate" }
+job_name = "rc-detector-bias"
+driver = "experiments/scripts/detector_bias.jl"
+config = "experiments/configs/experiments/detector_bias.toml"
+gpu = true
+array = { from = "cases", select_env = "DETECTOR_BIAS_CASES" }
+default = false
+
 # ---- the convergence experiment: the bias of Schöps's method per LM iteration (no paper asset reads it yet: only with --only) ------
 [[stage]]
 name = "convergence"

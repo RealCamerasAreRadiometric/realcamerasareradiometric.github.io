@@ -73,7 +73,10 @@
                  ("src/panorama_stitching.jl", "produce_upstream(panoramas_product(cfg, up)"),                # a figure ← a lens's panoramas
                  ("scripts/panorama_figure.jl", "panoramas_upstream(SOURCES[k].config"),                      # the panoramas figure ← the lenses' panoramas
                  ("scripts/teaser.jl", "panoramas_upstream(PANORAMAS.config"),                                # the teaser ← the lens's panoramas
-                 ("scripts/teaser.jl", "produce_upstream(BANDS.product")]                                     # the teaser ← the learned-texture figure's tables
+                 ("scripts/teaser.jl", "produce_upstream(BANDS.product"),                                     # the teaser ← the learned-texture figure's tables
+                 ("scripts/detector_bias.jl", "produce_upstream(start_product(CFG, c)"),                      # the detector bias's evaluation ← its start
+                 ("scripts/detector_bias.jl", "produce_upstream(refine_product(CFG, c)"),                     # ← its refinement (GPU)
+                 ("scripts/detector_bias.jl", "produce_upstream(detector_bias_evaluate_product(CFG, c)")]     # the detector bias's figure ← the evaluations
         for (f, call) in pairs
             @test occursin(call, src(f))
         end

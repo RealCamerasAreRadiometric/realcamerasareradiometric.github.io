@@ -50,6 +50,7 @@ for n in names: print(n, round(cases[n].get("pipeline", {}).get("lm", {}).get("m
 #   radiometric_refinement             CHROME_CASES  default: every case
 #   radiometric_refinement_vignetting  VIG_CASES     default: every case (scripts/radiometric_refinement.jl on its own config: the f/4 runs)
 #   radiometric_refinement_board_warping  BW_CASES   default: every case (scripts/radiometric_refinement.jl on its own config: the board-warping session's six sets)
+#   detector_bias                      DETECTOR_BIAS_CASES  default: every case (the two rendered sets)
 experiment_driver() { case $1 in radiometric_refinement_vignetting|radiometric_refinement_board_warping) echo "experiments/scripts/radiometric_refinement.jl" ;; *) echo "experiments/scripts/$1.jl" ;; esac; }
 experiment_config() { echo "experiments/configs/experiments/$1.toml"; }
 experiment_cases() {
@@ -58,6 +59,7 @@ experiment_cases() {
     radiometric_refinement_vignetting) config_cases "$(experiment_config "$1")" "${VIG_CASES:-}" ;;
     radiometric_refinement_board_warping) config_cases "$(experiment_config "$1")" "${BW_CASES:-}" ;;
     convergence)       config_cases "$(experiment_config "$1")" "${CONVERGENCE_CASES:-}" ;;
+    detector_bias)     config_cases "$(experiment_config "$1")" "${DETECTOR_BIAS_CASES:-}" ;;
     *) echo "unknown per-case experiment $1" >&2; return 2 ;;
   esac
 }

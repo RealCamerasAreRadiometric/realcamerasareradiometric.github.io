@@ -23,4 +23,5 @@ configs = [
     "configs/experiments/radiometric_refinement_board_warping.toml",  # the board-warping session's two fisheye sets (the Siemens set's: the same key as the front end's)
     "configs/experiments/panorama_vignetting_fx3_14mm.toml",          # the 14 mm sweep: the f/4 session's step (the same key as the vignetting set's)
     "configs/experiments/panorama_vignetting_fx3_fisheye.toml",       # the fisheye sweep (its own frames)
+    "configs/experiments/detector_bias.toml",                         # the detector bias's Double Sphere renders: their image disc
 ]

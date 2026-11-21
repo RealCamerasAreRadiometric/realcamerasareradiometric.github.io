@@ -741,3 +741,39 @@ paths = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-21/<path> (packed on the author's cluster and copied to the share on 2026-11-21, with MANIFEST.tsv, MD5SUMS and README.md)"
 provenance = "the band \"training photograph\" of fig:texture-learned and the record of its cut: texture_learned_photograph.py (the photograph part of T. Harder's texture_learned.py; rawpy 0.27.1, OpenCV 5.0.0 SIFT + RANSAC) on the texture run of 2026-11-16 — the RAW photograph DSC03316.ARW, its first three text lines turned level by 3.84°, 573 × 76 px (sha256 ae5d0392…), and meta.toml (sha256 6f0c2833…); configs/inputs/texture_learned_photograph_20261121.toml"
 configs = ["configs/experiments/texture_recovery_14mm_small.toml"]
+
+# The detector bias on the rendered sets (fig:detector-bias; configs/experiments/detector_bias.toml): F. Seegräber's Mitsuba 3
+# renders are in the author's folder on the MDS share (detector_bias/, beside the photographs: no upload needed); what the
+# author-side preparation made of them for the two cases — the 200 views' truth, the detectors' outputs as front-end files, the
+# geometric calibrations, the renders' AprilGrid as a board — is in the data root of the paper's runs and not yet on the share.
+[[unpacked.rc_synthetic]]
+paths = ["paper-data/detector_bias/output_fov_april/images", "paper-data/detector_bias/output_fov_april/data.npy"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "10 001 files, 22.74 GB; the AprilGrid set of the detector bias: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB, 0.4–5.1 MB each; 22.66 GB) of a 1 m AprilGrid at random poses through a FOV-model camera, by F. Seegräber, and the render pipeline's record data.npy (80.8 MB, sha256 4603e567…: per render OpenCV's detected tag corners, their true projections and board points). The case reads 200 of the renders (457 MB: [views] mitsuba_fov), the figure's bias panel the whole record. The folder also holds mitsuba_cam_to_worlds.npy (the true poses, 1.3 MB), which no config reads"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_synthetic]]
+paths = ["paper-data/detector_bias/output_ds_siemens/images", "paper-data/detector_bias/output_ds_siemens/data.npy"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "10 001 files, 14.23 GB; the Siemens-star set of the detector bias: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB, 0.5–3.2 MB each; 14.02 GB) of the flat 1 m Siemens-star board at random poses through a Double Sphere fisheye, by F. Seegräber, and the render pipeline's record data.npy (214.4 MB, sha256 6f4d1ee9…: per render the star centres T. Schöps's detector found, their true projections and board points). The case reads 200 of the renders (247 MB: [views] mitsuba_siemens_fisheye), the figure's bias panel the whole record. The folder also holds features.bin (the detections as T. Schöps's feature file, 45.9 MB) and mitsuba_cam_to_worlds.npy (1.3 MB), which no config reads"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_synthetic]]
+paths = ["geometric_accuracy/detector_bias/data/mitsuba/fov/gt", "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/gt",
+         "geometric_accuracy/detector_bias/data/mitsuba/ds/circle_rgb"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_synthetic_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "7 files, 42.0 MB; the truth of the two cases' 200 views, written from the render pipeline's records by the author-side preparation — per case gt/poses.json (the board's points and per view the true pixels of the detected features; 9.5 MB the AprilGrid case, 32.2 MB the Siemens-star case), gt/trajectory.json (the true poses: Mitsuba's camera-to-world matrices in the board's page frame) and gt/camera.json (the true camera) — and ds/circle_rgb/F1.png (97 kB, sha256 26d4e2a1…), the image disc of the Double Sphere renders: the per-pixel maximum of 200 renders of that camera, on which the Siemens-star case's lens coverage is measured ([image_regions.mitsuba_fisheye_disc])"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/detector_bias/data/mitsuba/fov/frontend", "geometric_accuracy/detector_bias/data/mitsuba/fov/records/start_opencv.json",
+         "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/schoeps"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_baselines_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "18 files, 21.6 MB; the detectors' outputs and the geometric calibrations the two cases start from: fov/frontend/dataset.bin (OpenCV's AprilGrid corners of the 200 views as the front end's feature file, 0.5 MB), fov/records/start_opencv.json (plain OpenCV's calibration on them, OpenCV-14: cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL; a vgio/cameras record) and ds_siemens/schoeps/ (T. Schöps's camera_calibration, central-generic, cell 150 px, 4 pyramid levels, on his detector's star centres of the 200 views: intrinsics0.yaml, the poses, the pruned dataset.bin, its reports and run.log; 16 files, 21.0 MB)"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_calibration]]
+paths = ["geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board", "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/distance_map_10ppm"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_calibration_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "5 files, 138.0 MB; the renders' AprilGrid as a board, built by the author-side preparation from the render pipeline's own texture (11815 px at 300 dpi; 10 × 10 tags 36h11, tag 80.01 mm, spacing 18.203333 mm, on a page of 1016.3476 mm): board/ (texture.png, texture_features.bin, board.json; 1.2 MB) and distance_map_10ppm/ (its printed-edge distance map at 10 px per mm, a vgio/raster record: distance_map.json + distance_map.tiff, 136.9 MB)"
+configs = ["configs/experiments/detector_bias.toml"]

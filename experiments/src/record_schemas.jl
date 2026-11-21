@@ -11,6 +11,7 @@ const EXPERIMENT_RECORD_SCHEMAS = (
     chrome_index_photos = "experiments/chrome_index_photos/v1.0",
     conversion = "experiments/conversion/v1.0",
     convergence = "experiments/convergence/v1.0",
+    detector_bias_scores = "experiments/detector_bias_scores/v1.0",
     evaluation_fixture = "experiments/evaluation_fixture/v1.0",
     exif = "experiments/exif/v1.0",
     night_stars = "experiments/night_stars/v1.0",

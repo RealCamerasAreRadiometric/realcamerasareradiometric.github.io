@@ -19,7 +19,8 @@
 # when wanted, until ../paper reads its figure and its inputs of tier rc_baselines are on the share (data/DATA_LOCATIONS.md).
 # Not a paper result: golden (the package's gate), convergence (its stage `panels` makes fig:convergence-rms from the refinements
 # of record: named when wanted), chrome_index_grid (a measurement), sensor_characterisation (its record is an input of record),
-# paper_pdf (after accept_results).
+# paper_pdf (after accept_results). Not launched either: detector_bias (fig:detector-bias, on a co-author's renders: its inputs
+# are not in the data root of record yet; named when they are).
 stages = [
     "setup", "image_regions",
     "frontends_prepare", "frontends_detect", "frontends_init", "frontends_evaluate",

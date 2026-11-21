@@ -1,0 +1,369 @@
+# Config of record of the detector-bias experiment (scripts/detector_bias.jl; src/detector_bias.jl): fig:detector-bias (Sec. 5.1,
+# Fig. 4). How a feature detector's bias enters a geometric calibration, and what the radiometric refinement leaves of it, measured
+# against the truth: the photographs are Mitsuba 3 renders by F. Seegräber with a known camera at known poses (4256 × 2848, 8-bit
+# sRGB, 10 000 per set), two sets of them:
+#
+#   fov_aprilgrid   a 1 m AprilGrid seen by a FOV-model camera (f 2404.14 / 2404.10 px, c the image centre, ω 0.62468 rad). Detector:
+#                   OpenCV's AprilGrid corners. Geometric calibration: plain OpenCV, its 14-coefficient model (OpenCV-14)
+#   ds_siemens      our 1 m Siemens-star board seen by a Double Sphere fisheye (f 725.90 / 725.30 px, c (2139.74, 1441.50), ξ −0.2206,
+#                   α 0.6160). Detector: T. Schöps's star detector. Geometric calibration: his camera_calibration, central-generic
+#                   (the spline)
+#
+# Each case calibrates on 200 of its set's renders: the detector-based calibration is its start, the radiometric refinement (the
+# full method: radiometry, focus, aperture, board warping free) refines it, and both are evaluated against the truth — under the
+# calibrated poses, and under the true poses with one global rotation removed. The figure shows, per case, one render, the
+# detector's bias over all 10 000 renders of the set, and the two evaluations' error fields before and after the refinement.
+#
+#   julia --project=experiments experiments/scripts/detector_bias.jl [--plan] [--stage=NAME[,NAME]] [--case=a,b] [--force]
+#
+# The cases' settings are those of the refinements of record (configs/experiments/radiometric_refinement.toml) where the sets
+# allow it; what differs is what the sets are: sRGB renders read as they are (io.images, linearize = "on", all three channels),
+# no sensor record, the material of the renders, and each case's own start. Paths are relative to data_root() (VGTK_DATA_ROOT).
+
+[experiment]
+name = "detector_bias"
+
+# The samples per photograph are those of the refinements of record, stated there once per model kind (src/drivers.jl
+# inherit_kinds!): 8,192 for the global model, 16,384 for the spline. No case states them again.
+[kinds]
+source = "configs/experiments/radiometric_refinement.toml"
+
+# ---- the renders and their truth (tier rc_synthetic) -------------------------------------------------------------------------------
+[inputs.renders_fov_aprilgrid]
+tier = "rc_synthetic"
+path = "paper-data/detector_bias/output_fov_april/images"
+stage = "detect"
+provenance = "the AprilGrid set: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB) of a 1 m AprilGrid (10 × 10 tags 36h11) at random poses through a FOV-model camera, by F. Seegräber; the case reads the 200 of [views] mitsuba_fov"
+
+[inputs.renders_ds_siemens]
+tier = "rc_synthetic"
+path = "paper-data/detector_bias/output_ds_siemens/images"
+stage = "detect"
+provenance = "the Siemens-star set: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB) of the flat 1 m Siemens-star board at random poses through a Double Sphere fisheye, by F. Seegräber; the case reads the 200 of [views] mitsuba_siemens_fisheye"
+
+[inputs.detections_fov_aprilgrid]
+tier = "rc_synthetic"
+path = "paper-data/detector_bias/output_fov_april/data.npy"
+sha256 = "4603e567c6f06fbaba30c3634619ab12b5f587ff5d34b9b32e86389a4d3a5da7"
+stage = "figures"
+provenance = "the render pipeline's record of the AprilGrid set (NumPy's pickle of a dictionary): per render the corners OpenCV's AprilGrid detector found (detected), their true projections (projected) and their board points, the four corners of every tag; all 10 000 renders"
+
+[inputs.detections_ds_siemens]
+tier = "rc_synthetic"
+path = "paper-data/detector_bias/output_ds_siemens/data.npy"
+sha256 = "6f4d1ee9ec9157c257e18bdf0e94c0d28ac0c839c4b1567cb18574a804bca380"
+stage = "figures"
+provenance = "the render pipeline's record of the Siemens-star set (NumPy's pickle of a dictionary): per render the star centres T. Schöps's detector found (detected), their true projections (projected) and their board points; all 10 000 renders"
+
+[inputs.truth_fov_aprilgrid]
+tier = "rc_synthetic"
+path = "geometric_accuracy/detector_bias/data/mitsuba/fov/gt/poses.json"
+stage = "detect"
+provenance = "the truth of the 200 views of the AprilGrid case: the board's points and per view the true pixels of the detected tags' corners (poses.json), with the true poses beside it (trajectory.json: Mitsuba's camera-to-world matrices in the board's page frame) and the true camera (camera.json); written from the render pipeline's records by the author-side preparation"
+
+[inputs.truth_ds_siemens]
+tier = "rc_synthetic"
+path = "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/gt/poses.json"
+stage = "detect"
+provenance = "the truth of the 200 views of the Siemens-star case: the board's points and per view the true pixels of the detected stars (poses.json), with the true poses beside it (trajectory.json: Mitsuba's camera-to-world matrices in the board's page frame) and the true camera (camera.json); written from the render pipeline's records by the author-side preparation"
+
+[inputs.disc_ds]
+tier = "rc_synthetic"
+path = "geometric_accuracy/detector_bias/data/mitsuba/ds/circle_rgb"
+stage = "detect"
+provenance = "the image disc of the Double Sphere renders, a white disc on black (F1.png): the per-pixel maximum of 200 renders of the same camera (the render pipeline's Double Sphere AprilGrid set), made by the author-side preparation"
+
+# ---- the detectors' outputs and the geometric calibrations the cases start from (tier rc_baselines) ----------------------------------
+[inputs.corners_fov_aprilgrid]
+tier = "rc_baselines"
+path = "geometric_accuracy/detector_bias/data/mitsuba/fov/frontend"
+stage = "detect"
+provenance = "OpenCV's AprilGrid corners of the 200 views (the render pipeline's detections) as the front end's feature file (dataset.bin: feature id = 4 tag + corner), written by the author-side preparation"
+
+[inputs.start_fov_aprilgrid]
+tier = "rc_baselines"
+path = "geometric_accuracy/detector_bias/data/mitsuba/fov/records/start_opencv.json"
+stage = "detect"
+provenance = "plain OpenCV's calibration on those corners, a camera record (vgio/cameras): OpenCV-14, cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL from OpenCV's own start"
+
+[inputs.schoeps_ds_siemens]
+tier = "rc_baselines"
+path = "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/schoeps"
+stage = "detect"
+provenance = "T. Schöps's camera_calibration, central-generic (cell 150 px, 4 pyramid levels), on the star detections of the 200 views (the render pipeline's features.bin, his detector's): intrinsics0.yaml, the poses and the pruned dataset.bin"
+
+# ---- the boards (tier rc_calibration) -----------------------------------------------------------------------------------------------
+[inputs.aprilgrid_mitsuba_board]
+tier = "rc_calibration"
+path = "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board"
+stage = "detect"
+provenance = "the renders' AprilGrid as a board: 10 × 10 tags 36h11 (ids 0–99, 2-bit border), tag 80.01 mm, spacing 18.203333 mm, on a page of 1016.3476 mm; its design is the render pipeline's own texture (11815 px at 300 dpi): texture.png (the paper coverage of every texel), texture_features.bin (the 400 tag corners) and board.json, written by the author-side preparation"
+
+[inputs.siemens_1m_board]
+tier = "rc_calibration"
+path = "geometric_accuracy/data/target/siemens_1m/board"
+stage = "detect"
+provenance = "the 1 m Siemens-star print, the board of the refinements of record: texture, texture features, board record"
+
+[inputs.aprilgrid_mitsuba_distance_map]
+tier = "rc_calibration"
+path = "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/distance_map_10ppm"
+stage = "detect"
+provenance = "the printed-edge distance map of the renders' AprilGrid (10 px per mm), a vgio/raster record (distance_map.json + distance_map.tiff): the distances from the render pipeline's own texture, exact at its texel centres and read bilinearly on this raster; an input of record, written once by the author-side preparation"
+
+# The Siemens-star print's printed-edge distance map: a keyed step of configs/experiments/distance_maps.toml, produced on demand.
+[runs.siemens_1m_distance_map]
+config = "configs/experiments/distance_maps.toml"
+run = "maps.siemens_1m"
+path = "distance_map.json"
+stage = "refine"
+provenance = "the 1 m Siemens-star print's printed-edge distance map, a vgio/raster record (edge.sdf): the step [maps.siemens_1m] of distance_maps.toml, keyed by the board generator's sdf.f32 + sdf.json (each pinned by its sha256), produced on demand when missing"
+
+# The lens coverage of the Double Sphere renders (src/image_region.jl): their image disc lies inside the frame, measured on the
+# disc's frame. The FOV renders fill the frame ("sensor").
+[image_regions.mitsuba_fisheye_disc]
+input = "disc_ds"
+frames = { "F1.png" = "26d4e2a13ef43ee072798d5845f7b076ca5761368e34bf0622e7d31cfdc91dea" }
+image = "luma"                 # a decoded image: its Rec. 709 luma on the pixel grid (a render has no raw grid)
+outlier_halfwidth_px = 1000.0  # as the capture sets' regions of record (px)
+seed = 1                       # the RANSAC ellipse fit's StableRNG seed, as the capture sets'
+
+[views]
+# the AprilGrid case's 200 renders: a random sample of the set's renders with at least 40 detected corners
+mitsuba_fov = [
+    "image_0016.png", "image_0017.png", "image_0025.png", "image_0141.png", "image_0216.png", "image_0296.png", "image_0318.png", "image_0370.png",
+    "image_0487.png", "image_0508.png", "image_0541.png", "image_0656.png", "image_0671.png", "image_0681.png", "image_0730.png", "image_0757.png",
+    "image_0807.png", "image_0809.png", "image_0815.png", "image_0826.png", "image_0839.png", "image_0940.png", "image_1065.png", "image_1151.png",
+    "image_1156.png", "image_1233.png", "image_1276.png", "image_1278.png", "image_1300.png", "image_1549.png", "image_1592.png", "image_1605.png",
+    "image_1626.png", "image_1663.png", "image_1860.png", "image_2115.png", "image_2118.png", "image_2170.png", "image_2200.png", "image_2412.png",
+    "image_2443.png", "image_2564.png", "image_2582.png", "image_2653.png", "image_2709.png", "image_2752.png", "image_2777.png", "image_2812.png",
+    "image_2954.png", "image_3016.png", "image_3101.png", "image_3104.png", "image_3110.png", "image_3122.png", "image_3167.png", "image_3187.png",
+    "image_3214.png", "image_3284.png", "image_3388.png", "image_3525.png", "image_3528.png", "image_3591.png", "image_3681.png", "image_3743.png",
+    "image_3747.png", "image_3812.png", "image_3894.png", "image_3968.png", "image_3976.png", "image_4018.png", "image_4155.png", "image_4167.png",
+    "image_4229.png", "image_4232.png", "image_4307.png", "image_4353.png", "image_4424.png", "image_4504.png", "image_4550.png", "image_4585.png",
+    "image_4619.png", "image_4648.png", "image_4695.png", "image_4705.png", "image_4725.png", "image_4761.png", "image_4818.png", "image_4899.png",
+    "image_4951.png", "image_5055.png", "image_5061.png", "image_5091.png", "image_5171.png", "image_5238.png", "image_5250.png", "image_5301.png",
+    "image_5342.png", "image_5405.png", "image_5417.png", "image_5427.png", "image_5454.png", "image_5459.png", "image_5508.png", "image_5547.png",
+    "image_5704.png", "image_5903.png", "image_5925.png", "image_5958.png", "image_5980.png", "image_6023.png", "image_6073.png", "image_6287.png",
+    "image_6329.png", "image_6461.png", "image_6485.png", "image_6518.png", "image_6550.png", "image_6626.png", "image_6748.png", "image_6760.png",
+    "image_6770.png", "image_6772.png", "image_6780.png", "image_6802.png", "image_6845.png", "image_6948.png", "image_7039.png", "image_7042.png",
+    "image_7126.png", "image_7130.png", "image_7163.png", "image_7242.png", "image_7260.png", "image_7263.png", "image_7282.png", "image_7284.png",
+    "image_7299.png", "image_7309.png", "image_7361.png", "image_7364.png", "image_7390.png", "image_7627.png", "image_7645.png", "image_7653.png",
+    "image_7676.png", "image_7695.png", "image_7741.png", "image_7803.png", "image_7817.png", "image_7838.png", "image_7863.png", "image_7952.png",
+    "image_7991.png", "image_7993.png", "image_8008.png", "image_8028.png", "image_8035.png", "image_8038.png", "image_8068.png", "image_8197.png",
+    "image_8211.png", "image_8229.png", "image_8266.png", "image_8343.png", "image_8364.png", "image_8385.png", "image_8389.png", "image_8476.png",
+    "image_8557.png", "image_8651.png", "image_8664.png", "image_8669.png", "image_8781.png", "image_8850.png", "image_8851.png", "image_8898.png",
+    "image_8937.png", "image_8938.png", "image_8951.png", "image_9021.png", "image_9147.png", "image_9192.png", "image_9220.png", "image_9237.png",
+    "image_9286.png", "image_9294.png", "image_9302.png", "image_9363.png", "image_9364.png", "image_9469.png", "image_9488.png", "image_9535.png",
+    "image_9562.png", "image_9579.png", "image_9641.png", "image_9670.png", "image_9730.png", "image_9780.png", "image_9847.png", "image_9948.png",
+]
+# the Siemens-star case's 200 renders: a random sample of the set's renders with at least 20 detected stars
+mitsuba_siemens_fisheye = [
+    "image_0039.png", "image_0088.png", "image_0160.png", "image_0179.png", "image_0189.png", "image_0209.png", "image_0223.png", "image_0252.png",
+    "image_0270.png", "image_0277.png", "image_0323.png", "image_0336.png", "image_0417.png", "image_0554.png", "image_0624.png", "image_0676.png",
+    "image_0683.png", "image_0722.png", "image_0745.png", "image_0809.png", "image_0810.png", "image_0870.png", "image_0874.png", "image_0897.png",
+    "image_1034.png", "image_1212.png", "image_1224.png", "image_1229.png", "image_1230.png", "image_1262.png", "image_1282.png", "image_1309.png",
+    "image_1362.png", "image_1376.png", "image_1393.png", "image_1410.png", "image_1461.png", "image_1532.png", "image_1634.png", "image_1650.png",
+    "image_1653.png", "image_1837.png", "image_1838.png", "image_1888.png", "image_1920.png", "image_1930.png", "image_1939.png", "image_2086.png",
+    "image_2119.png", "image_2253.png", "image_2314.png", "image_2360.png", "image_2387.png", "image_2414.png", "image_2540.png", "image_2638.png",
+    "image_2679.png", "image_2838.png", "image_2890.png", "image_2905.png", "image_2960.png", "image_3008.png", "image_3026.png", "image_3033.png",
+    "image_3049.png", "image_3057.png", "image_3150.png", "image_3153.png", "image_3157.png", "image_3348.png", "image_3354.png", "image_3388.png",
+    "image_3409.png", "image_3411.png", "image_3453.png", "image_3598.png", "image_3601.png", "image_3678.png", "image_3878.png", "image_4024.png",
+    "image_4037.png", "image_4139.png", "image_4192.png", "image_4209.png", "image_4301.png", "image_4343.png", "image_4356.png", "image_4465.png",
+    "image_4525.png", "image_4555.png", "image_4600.png", "image_4608.png", "image_4675.png", "image_4696.png", "image_4738.png", "image_4794.png",
+    "image_4806.png", "image_4897.png", "image_4903.png", "image_4928.png", "image_4954.png", "image_4985.png", "image_5029.png", "image_5224.png",
+    "image_5239.png", "image_5284.png", "image_5297.png", "image_5317.png", "image_5362.png", "image_5432.png", "image_5492.png", "image_5563.png",
+    "image_5669.png", "image_5678.png", "image_5749.png", "image_5758.png", "image_5783.png", "image_5790.png", "image_5928.png", "image_5974.png",
+    "image_5996.png", "image_6114.png", "image_6248.png", "image_6355.png", "image_6395.png", "image_6460.png", "image_6476.png", "image_6563.png",
+    "image_6605.png", "image_6661.png", "image_6724.png", "image_6783.png", "image_6821.png", "image_6850.png", "image_6890.png", "image_6904.png",
+    "image_7008.png", "image_7113.png", "image_7211.png", "image_7291.png", "image_7306.png", "image_7322.png", "image_7327.png", "image_7404.png",
+    "image_7436.png", "image_7589.png", "image_7632.png", "image_7634.png", "image_7669.png", "image_7704.png", "image_7787.png", "image_7791.png",
+    "image_7895.png", "image_7950.png", "image_7974.png", "image_8018.png", "image_8095.png", "image_8242.png", "image_8246.png", "image_8284.png",
+    "image_8331.png", "image_8346.png", "image_8380.png", "image_8397.png", "image_8400.png", "image_8432.png", "image_8541.png", "image_8592.png",
+    "image_8694.png", "image_8695.png", "image_8701.png", "image_8755.png", "image_8777.png", "image_8835.png", "image_8850.png", "image_8927.png",
+    "image_8993.png", "image_9099.png", "image_9127.png", "image_9155.png", "image_9258.png", "image_9289.png", "image_9295.png", "image_9326.png",
+    "image_9361.png", "image_9379.png", "image_9427.png", "image_9466.png", "image_9501.png", "image_9516.png", "image_9542.png", "image_9611.png",
+    "image_9727.png", "image_9728.png", "image_9735.png", "image_9765.png", "image_9781.png", "image_9872.png", "image_9944.png", "image_9981.png",
+]
+
+# A case. kind: the model it refines ("lens": a global model, "grid": the spline); views: its renders, a [views] list; truth: the
+# [inputs] id of its truth report (poses.json, the true poses beside it); pipeline: its [pipeline] table, run by bin/refine.jl.
+
+# AprilGrid + plain OpenCV (OpenCV-14): the geometric start refined radiometrically
+[cases.db_ocv14_mitsuba_fov]
+kind = "lens"
+views = "mitsuba_fov"
+truth = "truth_fov_aprilgrid"
+[cases.db_ocv14_mitsuba_fov.pipeline.io]
+images = "paper-data/detector_bias/output_fov_april/images"
+linearize = "on"               # 8-bit sRGB renders, decoded on loading
+channel = "RGB"
+checkpoint_each = "on"         # a checkpoint per iteration: the evaluation reads the last one
+init = "lens:geometric_accuracy/detector_bias/data/mitsuba/fov/records/start_opencv.json"   # the start: OpenCV's calibration
+[cases.db_ocv14_mitsuba_fov.pipeline.frontend]
+type = "schoeps"
+schoeps = "geometric_accuracy/detector_bias/data/mitsuba/fov/frontend"
+texture = "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board/texture.png"
+texture_features = "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board/texture_features.bin"
+texture_features_size = [5081, 5081]
+page_mm = [1016.3476115376634, 1016.3476115376634]
+print_scale = 1.0
+[cases.db_ocv14_mitsuba_fov.pipeline.camera]
+sensor_mm = 35.6
+f_mm = 20.79                   # the renders' focal length on a 35.6 mm sensor (2485 px)
+fnumber = 32.0
+lens_coverage = "sensor"       # the renders fill the frame
+[cases.db_ocv14_mitsuba_fov.pipeline.masks]
+gradient_bias = 0.0            # the uniform draw, as the refinements of record
+seed = 1
+[cases.db_ocv14_mitsuba_fov.pipeline.rendering]
+N = 16
+n_p = 2
+hammersley = "on"
+n_rho = 3
+n_phi = 8
+[cases.db_ocv14_mitsuba_fov.pipeline.lighting]
+sh_order = 2
+[cases.db_ocv14_mitsuba_fov.pipeline.material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.7                  # the start of the paper's detector-bias runs (the refinements of record: 2.0)
+eta_noink = 1.3
+mu = 0.229                     # the start of the paper's detector-bias runs (the refinements of record: 0.244)
+mu_bounds = [0.0, 1.0]
+[cases.db_ocv14_mitsuba_fov.pipeline.vignetting]
+model = "radial"
+node_count = 19
+degree = 3
+support_min = 0.1
+[cases.db_ocv14_mitsuba_fov.pipeline.warping]
+degree = 1
+inplane = "aspect_skew"        # the board's in-plane aspect and skew are estimated,
+inplane_start = [0.0, 0.0]     # from the design as it is
+[cases.db_ocv14_mitsuba_fov.pipeline.edge]
+sdf = "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/distance_map_10ppm/distance_map.json"   # a record of the data root (input aprilgrid_mitsuba_distance_map)
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+[cases.db_ocv14_mitsuba_fov.pipeline.lm]
+max_iter = 36                  # the cap of the paper's run, which reached it (the refinements of record: 25)
+max_time = 36000.0
+[cases.db_ocv14_mitsuba_fov.pipeline.compute]
+backend = "gpu"
+jacobian_chunk = 4
+
+# Siemens stars + T. Schöps's central-generic calibration (the spline): the geometric start refined radiometrically
+[cases.db_spline_mitsuba_siemens_fisheye]
+kind = "grid"
+views = "mitsuba_siemens_fisheye"
+truth = "truth_ds_siemens"
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.io]
+images = "paper-data/detector_bias/output_ds_siemens/images"
+linearize = "on"               # 8-bit sRGB renders, decoded on loading
+channel = "RGB"
+checkpoint_each = "on"         # a checkpoint per iteration: the evaluation reads the last one
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.frontend]
+type = "schoeps"
+schoeps = "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/schoeps"
+texture = "geometric_accuracy/data/target/siemens_1m/board/texture.png"
+texture_features = "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"
+texture_features_size = [4000, 4000]
+page_mm = [1000.0, 1000.0]
+print_scale = 1.0
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.camera]
+sensor_mm = 35.6
+f_mm = 7.79                    # the renders' focal length on a 35.6 mm sensor (931 px at the centre)
+fnumber = 32.0
+lens_coverage = "image_region:mitsuba_fisheye_disc"   # the renders' image disc ([image_regions])
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.grid]
+lattice = "derived"            # T. Schöps's own lattice extended over the lens coverage, never subdivided, as the spline cases of record
+nodes = "interior"
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.grid.smoothness]
+type = "pspline"
+order = 3
+weight = 0.01                  # the paper's figure (the spline cases of record: 0.1)
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.masks]
+lens_coverage_scale = 0.9      # the photometric pixels are sampled inside the image disc scaled by 0.9: the paper's figure
+gradient_bias = 0.0            # the uniform draw, as the refinements of record
+seed = 1
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.rendering]
+N = 16
+n_p = 2
+hammersley = "on"
+n_rho = 3
+n_phi = 8
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.lighting]
+sh_order = 2
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.material]
+alpha_ink = 0.6
+alpha_noink = 0.6
+eta_ink = 2.7                  # the start of the paper's detector-bias runs (the refinements of record: 2.0)
+eta_noink = 1.3
+mu = 0.229                     # the start of the paper's detector-bias runs (the refinements of record: 0.244)
+mu_bounds = [0.0, 1.0]
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.vignetting]
+model = "radial"
+node_count = 19
+degree = 3
+support_min = 0.1
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.warping]
+degree = 1
+inplane = "aspect_skew"        # the board's in-plane aspect and skew are estimated,
+inplane_start = [0.0, 0.0]     # from the design as it is
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.edge]
+sdf = "run:siemens_1m_distance_map"
+print_sigma_mm = 0.0277
+ink_spread_mm = 0.0
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.lm]
+max_iter = 50                  # the cap of the paper's run, which ended on the cost decrease after 25 iterations (the fisheye refinements of record: 50)
+max_time = 36000.0
+[cases.db_spline_mitsuba_siemens_fisheye.pipeline.compute]
+backend = "gpu"
+jacobian_chunk = 4
+
+# The evaluation of a case, at its start and at the last checkpoint of its refinement: every true board point projected with the
+# camera under the run's own poses (learned_it<k>.json) and under the true poses (truepose_it<k>.json), minus its true pixel.
+[evaluate]
+gauge = "on"                   # under the true poses one global rotation of all rays is removed first (the camera frame's gauge: a generic camera has no frame of its own); "off" keeps the camera's frame
+
+# The paper's figure (src/paper_figures/detector_bias.jl): <asset_dir>.tex, its panels and keys in <asset_dir>/, <asset_dir>-caption.tex.
+[figure]
+asset_dir = "detector-bias-mitsuba"   # plotsdir("detector-bias-mitsuba.tex", "detector-bias-mitsuba/<files>-<panel>.{tex,png,jpg}", "detector-bias-mitsuba-caption.tex"): the paper's fig/ layout
+order = ["opencv_aprilgrid", "schoeps_siemens"]   # the rows from the top, each a [figure.<row>] table below
+bins = [26, 18]                # the sensor bins of every field, columns × rows (164 px squares of the 4256 × 2848 sensor, nearly)
+field_px = [532, 356]          # a field's image: the bin means interpolated bilinearly, on an eighth of the sensor's pixels
+render_px = [1064, 712]        # the shown render: the sensor's pixels reduced to a quarter (Lanczos)
+render_jpeg_quality = 90       # and stored as a JPEG of this quality
+bias_min_features = 100        # a bin of the bias panel is drawn with at least 100 detections
+calibration_min_points = 20    # a bin of a calibration panel with at least 20 board points
+# A row's table. case: the case whose evaluation its calibration panels show. detections: the [inputs] id of its set's record of
+# all detections (stage figures), the bias panel's. render: the view shown in the Render column, one of the case's views. files:
+# the name of its files, <asset_dir>/<files>-<panel>.{tex,png} and <files>-render.jpg. detector, target: its name at the left,
+# "<detector> + <target>"; model: the camera model, the head of its calibration pairs; camera: the camera of its renders, the
+# head of its render (all LaTeX text). features: what its detector finds, "corners" (the tag corners) or "stars" (the star
+# centres). key_quantile: the radius of its calibration pairs' keys is this quantile of the pair's bin vectors, rounded up to two
+# digits — 1.0: the largest vector; below 1 the longer vectors are drawn at full saturation and the key says so (a band, "≥").
+# notes: per panel named, a text set in light grey in its middle.
+[figure.opencv_aprilgrid]
+case = "db_ocv14_mitsuba_fov"
+detections = "detections_fov_aprilgrid"
+render = "image_7039.png"
+files = "opencv-aprilgrid-ocv14"
+detector = "OpenCV"
+target = "AprilGrid"
+model = "OpenCV-14"
+camera = "FOV"
+features = "corners"
+key_quantile = 1.0
+notes = { pose-radiometric = "error not visible", camera-radiometric = "error not visible" }   # the two panels are white at their pairs' keys (the Geometric panels' scale): the refinement leaves an error too small to be seen there
+[figure.schoeps_siemens]
+case = "db_spline_mitsuba_siemens_fisheye"
+detections = "detections_ds_siemens"
+render = "image_0270.png"
+files = "schops-siemensstars-spline-ds"
+detector = 'Sch\"ops'
+target = "Siemens stars"
+model = "Spline"
+camera = "Double Sphere"
+features = "stars"
+key_quantile = 0.98            # a few rim bins with very large vectors would set the radius and leave the rest pale
+notes = {}

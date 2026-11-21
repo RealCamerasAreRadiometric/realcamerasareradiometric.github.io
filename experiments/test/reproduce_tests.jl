@@ -310,7 +310,7 @@ end
              "radiometric_refinement_vignetting", "chrome_evaluation", "chrome_evaluation_score", "regenerate_paper",
              "results_branch"]
     env0 = filter(p -> !(first(p) in ("VGTK_DATA_ROOT", "VGTK_RESULTS_ROOT", "CASES", "CHROME_CASES", "VIG_CASES",
-                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
+                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "DETECTOR_BIAS_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
 
     @testset "--only: a subset with its prerequisites, or alone" begin
         @test select_stages(g) == paper                            # no flags: every paper stage, nothing else
@@ -323,6 +323,9 @@ end
         # the refinements' prepare (and the front ends it reads) and the image regions, never after the whole refinement array
         @test !("convergence" in select_stages(g)) && select_stages(g; only = ["convergence"]) ==
               ["setup", "distance_maps", "image_regions", "frontends_prepare", "frontends_detect", "frontends_init", "radiometric_refinement_prepare", "convergence"]
+        # the detector bias on the rendered sets (scripts/detector_bias.jl): only when named, after the image regions and the distance maps its cases read
+        @test !("detector_bias" in select_stages(g)) && select_stages(g; only = ["detector_bias"]) == ["setup", "distance_maps", "image_regions", "detector_bias"]
+        @test select_stages(g; only = ["detector_bias"], deps = false) == ["detector_bias"]
         # the warping ablation (scripts/warping_ablation.jl): only when named, after the same prerequisites (its mode "both" reuses the refinements of record by their keys)
         # (and after the refinements of record and the chrome sets' detect and index it shares: they are made once, upstream)
         @test !("warping_ablation" in select_stages(g)) && select_stages(g; only = ["warping_ablation"]) ==

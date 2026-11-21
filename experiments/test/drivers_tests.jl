@@ -9,7 +9,7 @@
     using DrWatson
 
     const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
-                     "image_regions", "distance_maps", "timing", "vignetting_figure", "board_warping",
+                     "image_regions", "distance_maps", "timing", "vignetting_figure", "board_warping", "detector_bias",
                      "panorama_vignetting", "panorama_stitching", "panorama_figure",
                      "teaser")
     const DRIVER_STAGE_NAMES = Dict(
@@ -26,7 +26,8 @@
         "panorama_vignetting" => ("evaluate",),
         "panorama_stitching" => ("refine", "evaluate", "rooftop", "panoramas"),
         "panorama_figure" => ("figures",),
-        "teaser" => ("teaser",))
+        "teaser" => ("teaser",),
+        "detector_bias" => ("detect", "start", "refine", "evaluate", "figures"))
     experiment_config(d) = d == "texture_recovery" ? projectdir("configs", "experiments", "texture_recovery_14mm_small.toml") :
                            d in ("panorama_vignetting", "panorama_stitching") ? projectdir("configs", "experiments", "$(d)_fx3_14mm.toml") :
                            d in ("timing", "board_warping", "panorama_figure") ? projectdir("configs", "supplement", "$d.toml") : projectdir("configs", "experiments", "$d.toml")
@@ -158,9 +159,9 @@ end
 
     @testset "the configs of record" begin
         # the paper's experiments: calibration accuracy (radiometric_refinement, its chrome evaluations chrome_evaluation_*, the figures
-        # focus_surfaces), the f/4 refinements (radiometric_refinement_vignetting) and the panoramas (panorama_vignetting_* —
-        # PanoramaStitching's example chain on the sweeps —, panorama_stitching_*); the macro defocus (2026-11-14) and the synthetic
-        # detector bias (rc-0116, 2026-11-18) left the project with their configs
+        # focus_surfaces), the f/4 refinements (radiometric_refinement_vignetting), the panoramas (panorama_vignetting_* —
+        # PanoramaStitching's example chain on the sweeps —, panorama_stitching_*) and the detector bias on the rendered sets
+        # (detector_bias); the macro defocus (2026-11-14) and the detector bias's synthetic sets (rc-0116, 2026-11-18) left the project with their configs
         lenses = ("14mm", "fisheye", "tamron")
         @test sort(readdir(projectdir("configs", "experiments"))) ==
               sort(vcat(["radiometric_refinement.toml", "radiometric_refinement_vignetting.toml",
@@ -176,6 +177,7 @@ end
                          "vignetting_figure.toml",   # the paper's vignetting figure from the f/4 refinements and the diffuser photographs (scripts/vignetting_figure.jl)
                          "radiometric_refinement_board_warping.toml",   # the board-warping session's refinements: two boards × three lenses, no chrome set (scripts/radiometric_refinement.jl)
                          "teaser.toml",   # the paper's teaser from the Tamron sweep's panoramas and the learned-texture figure's tables (scripts/teaser.jl)
+                         "detector_bias.toml",   # the detector bias on the rendered sets and the paper's figure of it (scripts/detector_bias.jl)
                          ],
                         ["panorama_vignetting_fx3_$l.toml" for l in lenses], ["panorama_stitching_fx3_$l.toml" for l in lenses],   # per lens its sweep's chain and its panoramas
                         # ONE chrome evaluation per chrome set, its models a list (2026-11-12; the 14 mm central_30cm's above)
