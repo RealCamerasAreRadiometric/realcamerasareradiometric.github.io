@@ -48,15 +48,15 @@ end
 ror_pattern(p::AbstractString, version::AbstractString) = replace(p, "{version}" => version)
 
 """
-    ror_results_base(g, site; env = ENV) -> String
+    ror_results_base(g, site; env) -> String
 
 The machine's results base, under which a release's results directory and tree are made: the project's results root on the site,
 as the runner resolves it (`resolve_roots`: the graph's results variable, VGTK_RESULTS_ROOT, else the site profile's `[storage]
 results_root`); an error when nothing names one (a profile without [storage]: set the variable). Machine paths are the site
-profiles' alone.
+profiles' alone. `env` (the runner's keyword) defaults to the process environment.
 """
-function ror_results_base(g, site; env = ENV)
-    r = last(resolve_roots(g, site; env))
+function ror_results_base(g, site; kw...)
+    r = last(resolve_roots(g, site; kw...))
     isempty(r) && throw(ArgumentError("site $(site.name) names no [storage] results_root: set $(g.results_env)"))
     return r
 end

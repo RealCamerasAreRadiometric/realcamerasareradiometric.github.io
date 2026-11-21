@@ -1,10 +1,10 @@
 # =============================================================================
 # run_of_record.jl — the run of record's launch (src/run_of_record.jl) through VisualGeometryToolkitEval's runner: the stages of
-# configs/run_of_record.toml (and what they run after) of the stage graph of record, configs/reproduce.toml, on the site --site or VGTK_SITE names,
+# configs/run_of_record.toml (and what they run after) of the stage graph of record, configs/reproduce.toml, on the site --site names,
 # into the release's results root, its jobs `ror-<driver>-<stage>[-<phase>]`, the GPU queue longest-first. Run from a bare julia
 # by experiments/scripts/slurm/run_of_record.sh (which first checks the registered version and makes its tree), from the tree's root:
 #
-#   julia --project=experiments experiments/scripts/run_of_record.jl --version=<v> [--plan] [--site=<site> (else VGTK_SITE)] [--results-root=<dir>]
+#   julia --project=experiments experiments/scripts/run_of_record.jl --version=<v> [--plan] --site=<site> [--results-root=<dir>]
 #         [--config=experiments/configs/run_of_record.toml] [--graph=experiments/configs/reproduce.toml] [--scratch]
 #
 #   --plan     the runner's job graph (stages, items, dependencies, sbatch lines, missing inputs) and the run of record's plan: the
@@ -26,8 +26,6 @@ include(joinpath(EVAL, "cli.jl"))
 include(joinpath(EVAL, "reproduce", "runner.jl"))
 include(joinpath(ROOT, "experiments", "src", "run_of_record.jl"))
 
-_nonempty(s) = (t = strip(s); isempty(t) ? nothing : String(t))
-
 function main(args)
     val(k, d = nothing) = something(_cli_value(args, k), Some(d))
     version = val("version")
@@ -36,8 +34,8 @@ function main(args)
     scratch && !plan_only && (println("run_of_record: --scratch is for the dry run only (--plan): a run of record runs the registered tree"); return 2)
     cfg = load_ror_config(val("config", "experiments/configs/run_of_record.toml"))
     g = load_stage_graph(val("graph", "experiments/configs/reproduce.toml"))
-    sitename = val("site", _nonempty(get(ENV, "VGTK_SITE", "")))
-    sitename === nothing && (println("run_of_record: name the site: --site=<site> or VGTK_SITE (VisualGeometryToolkitEval configs/sites/)"); return 2)
+    sitename = val("site")
+    sitename === nothing && (println("run_of_record: name the site: --site=<site> (VisualGeometryToolkitEval configs/sites/; run_of_record.sh passes VGTK_SITE)"); return 2)
     site = load_site(sitename; dirs = isempty(g.sites_dir) ? String[] : [g.sites_dir])
     launch = cfg["launch"]
     r = val("results-root")      # given (the launcher passes it): no results base is resolved

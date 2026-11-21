@@ -151,4 +151,4 @@ cd "$T"
 mkdir -p logs
 say "${PLAN:+plan of }the run of record: results $RESULTS"
 [ -n "$DRY" ] && export VGTK_SCRATCH=1                  # a scratch launch: never a run of record's key (the runner)
-exec "$JL" --startup-file=no --project=experiments experiments/scripts/run_of_record.jl --version="$V" --results-root="$RESULTS" $PLAN ${DRY:+--scratch}
+exec "$JL" --startup-file=no --project=experiments experiments/scripts/run_of_record.jl --version="$V" --site="$VGTK_SITE" --results-root="$RESULTS" $PLAN ${DRY:+--scratch}

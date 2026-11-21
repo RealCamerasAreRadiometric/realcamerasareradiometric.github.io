@@ -45,8 +45,9 @@ VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 
 [sources]
 # TEMPORARY, each until the named release is registered in General; then the line is deleted and the package resolves from the registry:
-# PanoramaStitching from its port branch (its registered 0.10.0 caps VisualGeometryToolkitCore at 0.11): waits for PanoramaStitching 0.11.0.
-PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "vrtk/port"}
+# PanoramaStitching from its port branch vrtk/port at the commit of its fresh-clone gate on VisualGeometryToolkitCore 0.13 (its registered 0.10.0 caps
+# VisualGeometryToolkitCore at 0.11): waits for PanoramaStitching 0.11.0.
+PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "83f9295af9601140715d01717529936d1ed9606b"}
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
@@ -80,10 +81,10 @@ StaticArrays = "1"
 Statistics = "1"
 StatsBase = "0.34"
 TOML = "1.0.3"
-VisualGeometryToolkitCore = "0.12"
+VisualGeometryToolkitCore = "0.13"
 VisualGeometryToolkitEstimation = "0.12.1"
-VisualGeometryToolkitEval = "0.9.3"
+VisualGeometryToolkitEval = "0.10"
 VisualGeometryToolkitFeatures = "0.9.9"
 VisualGeometryToolkitIO = "0.11"
-VisualRadiometryToolkitCore = "0.1"
+VisualRadiometryToolkitCore = "0.1.1"
 julia = "1.13"
