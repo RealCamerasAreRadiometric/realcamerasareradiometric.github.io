@@ -280,8 +280,11 @@ on the device as a dense matrix, `T` was an upload and three small dense product
 products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
+    return _gauss_newton_blocks(J, r, SparseArrays.sparse(T), lay, run)
+end
+function _gauss_newton_blocks(J, r, T::SparseArrays.SparseMatrixCSC{Float64}, lay, run::_LmRun)
     g, H = _finite_products(J, r, _block_products(J, r), lay, run)
-    return _in_problem_coordinates(SparseArrays.sparse(T), g, H)
+    return _in_problem_coordinates(T, g, H)
 end
 """`J r` and `J Jᵀ` of a block's device Jacobian (columns × rows) and residual on the host: `J r` Core's `_matvec!` (its CUDA method a
 one-column gemm), `J Jᵀ` the backend's product."""
@@ -302,19 +305,24 @@ end
 diagonal non-finite, and finite diagonals bound the rest, |Hᵢⱼ| ≤ √(Hᵢᵢ Hⱼⱼ)) — n checks of `H`, not n²."""
 _finite_blocks(g, H) = all(isfinite, g) && all(i -> isfinite(H[i, i]), axes(H, 1))
 """
-    _batched_products(J3, r2, ms) -> ([(gₜ, Hₜ) for each tile t], hold)
+    _batched_blocks(J3, r2, ms, T, lay, run) -> ([(Tᵀgₜ, TᵀHₜT) for each tile t], hold)
 
-The products `J r`, `J Jᵀ` of a batch of blocks on the host (`_tiles_normal_equations`): block `t` the first `ms[t]` rows of
-`J3[:, :, t]` (columns × rows, zero past them) and of `r2[:, t]`. Here one block at a time (`_block_products` of each, the per-tile
-products' arithmetic); RC's CUDA extension forms all of them as two strided batched products over the zero-padded rows, downloaded
-into a page-locked buffer `hold` of its pool: the blocks are views of it, valid until it is given back (`_release_host_buffer!`).
+The Gauss–Newton blocks of a batch of blocks in the problem's coordinates (`_tiles_normal_equations`): block `t` the first `ms[t]`
+rows of `J3[:, :, t]` (columns × rows, zero past them) and of `r2[:, t]`, all under the column map `T` (`_column_map`). Here one
+block at a time (`_gauss_newton_blocks` of each, the per-tile arithmetic; `hold` is `nothing`). RC's CUDA extension forms them all at
+once: `TᵀJ` as one product, its products as two strided batched ones over the zero-padded rows, downloaded into a page-locked buffer
+`hold` of its pool — the blocks are views of it, valid until it is given back (`_release_host_buffer!`); a block with a non-finite
+entry is scrubbed and formed alone (`_gauss_newton_blocks`).
 """
-_batched_products(J3, r2, ms) = ([_block_products(view(J3, :, 1:ms[t], t), view(r2, 1:ms[t], t)) for t in eachindex(ms)], nothing)
-"""Give back the host buffer `hold` that `_batched_products` downloaded into (its results are views of it): a no-op here; RC's CUDA
+function _batched_blocks(J3, r2, ms, T::Matrix{Float64}, lay, run::_LmRun)
+    Tsp = SparseArrays.sparse(T)
+    return [_gauss_newton_blocks(view(J3, :, 1:ms[t], t), view(r2, 1:ms[t], t), Tsp, lay, run) for t in eachindex(ms)], nothing
+end
+"""Give back the host buffer `hold` that `_batched_blocks` downloaded into (its results are views of it): a no-op here; RC's CUDA
 extension returns its page-locked buffer to its pool."""
 _release_host_buffer!(be, hold) = nothing
-"""Free the pooled host buffers of the batched products (`_batched_products`) when a grid problem is unregistered: a no-op here;
-RC's CUDA extension drops its page-locked pool (unpinned as it is collected)."""
+"""Free the pooled host buffers of the batched blocks (`_batched_blocks`) when a grid problem is unregistered: a no-op here; RC's
+CUDA extension drops its page-locked pool (unpinned as it is collected)."""
 _release_host_buffers!(be) = nothing
 """
     _in_problem_coordinates(T, g, H) -> (Tᵀg, TᵀHT)

@@ -884,7 +884,7 @@ end
 # request launched its row kernel over a few hundred pixels, uploaded its window lens and tangent bases and formed `J r`, `J Jᵀ` with a
 # synchronisation each: per-request latency, a view's 108 tiles 0.267 s on a B200 (65 × 50 lattice). The first request of a view's
 # tiles at a trial forms all of them: ONE row-kernel launch over the view's tiles' pixels (`_tiles_row!`: per row its tile's window
-# lens, bases and patch origin), the products as one batch (`_batched_products`), the problem's coordinates on the host — memoized
+# lens, bases and patch origin), the blocks in the problem's coordinates as one batch (`_batched_blocks`) — memoized
 # like the view's batch (`_view_batch!`), keyed by the trial's variable objects and the varflags, and each tile's blocks handed out
 # once. The rows and the residual are the per-tile path's bit for bit (the same row kernel at the same inputs); the products are the
 # backend's over the zero-padded rows (on the CPU backend the per-tile products themselves).
@@ -927,15 +927,21 @@ function _tile_blocks!(s::CalibrationState, r::PerTileResidual, vars, vf::Intege
         return nothing
     end
     blocks === nothing && return nothing                     # (no view batch at these variables)
-    return lock(() -> pop!(blocks, r, nothing), gb.lock)
+    return lock(gb.lock) do
+        b = pop!(blocks.blocks, r, nothing)
+        (b === nothing || blocks.hold === nothing) && return b
+        b = (Vector(b[1]), Matrix(b[2]), b[3])               # (owned: a block is held by the window's job until NLLSsolver reads it)
+        isempty(blocks.blocks) && _release_host_buffer!(s.backend, blocks.hold)   # (every block copied out: the buffer back to its pool)
+        b
+    end
 end
 """
     _tile_blocks_future!(s, gb, r, vars, vec, key, vf) -> Task
 
 Under the grid's lock: the future of the batch of view `r.k`'s tiles of the varflags `vf` at the trial `key` (`_view_key`), a new one
 (`_tiles_normal_equations` on a device worker, after the view's batch, which starts no other: the next view's is this one's
-`_tile_blocks!`'s) when none is kept for that key. Its value: an `IdDict` tile → `(Jᵀr, JᵀJ, flux)`, from which each tile's blocks
-are taken once (`_tile_blocks!`), or `nothing` when the view has no batch at the variables (`_view_batch!`). A batch at another trial
+`_tile_blocks!`'s) when none is kept for that key. Its value: `(; blocks, hold)`, the tiles' blocks from which each tile's are taken
+once (`_tile_blocks!`), or `nothing` when the view has no batch at the variables (`_view_batch!`). A batch at another trial
 it replaces is kept until the problem is unregistered (`retired`), which waits for it.
 """
 function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars, vec, key, vf::Int)
@@ -954,35 +960,19 @@ function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars,
 end
 
 """
-    _tiles_normal_equations(s, gb, tiles, tvars, ent, vf, rin) -> IdDict tile → (Jᵀr, JᵀJ, flux)
+    _tiles_normal_equations(s, gb, tiles, tvars, ent, vf, rin) -> (; blocks = IdDict tile → (Jᵀr, JᵀJ, flux), hold)
 
 The Gauss–Newton blocks of a view's `tiles` (their variables `tvars`, all of the varflags `vf`, their row inputs `rin`) from the
-view's batch `ent`: the rows of every tile in one launch (`_tile_rows`), the products `J r`, `J Jᵀ` of every tile at once
-(`_batched_products`), a tile with a non-finite entry scrubbed and formed again (`_finite_products`), and each tile's in the problem's
-coordinates (`_in_problem_coordinates`; one column map: every tile of the batch has the same layout).
+view's batch `ent`: the rows of every tile in one launch (`_tile_rows`) and every tile's blocks in the problem's coordinates at once
+(`_batched_blocks`; one column map: every tile of the batch has the same layout); `hold` the host buffer they are views of.
 """
 function _tiles_normal_equations(s::CalibrationState, gb, tiles, tvars, ent, vf::Int, rin)
     lay = _tile_layout_at(vf, first(tiles), first(tvars))
     Jd, rd = _tile_rows(s, tiles, tvars, ent, lay, rin, gb.layouts)
     nt = length(tiles); M = length(rd) ÷ nt
     J3 = reshape(Jd, lay.ncol, M, nt); r2 = reshape(rd, M, nt)
-    products, hold = _batched_products(J3, r2, rin.ms)
-    Tsp = SparseArrays.sparse(_column_map(lay, s.channel, first(tvars)[7], first(tvars)[8]))
-    blocks = Vector{Any}(undef, nt); finite = fill(true, nt)
-    Threads.@threads for q in 1:nt                           # (host arithmetic alone: the device's work is done)
-        g, H = products[q]
-        if _finite_blocks(g, H)
-            blocks[q] = (_in_problem_coordinates(Tsp, g, H)..., ent.flux)
-        else
-            finite[q] = false
-        end
-    end
-    for q in findall(!, finite)                              # a non-finite entry: that tile scrubbed and formed again (this task's queue)
-        gH = _finite_products(view(J3, :, 1:rin.ms[q], q), view(r2, 1:rin.ms[q], q), products[q], lay, s.run)
-        blocks[q] = (_in_problem_coordinates(Tsp, gH...)..., ent.flux)
-    end
-    _release_host_buffer!(s.backend, hold)                   # (the products read: their download buffer back to its pool)
-    return IdDict{Any, Any}(zip(tiles, blocks))
+    blocks, hold = _batched_blocks(J3, r2, rin.ms, _column_map(lay, s.channel, first(tvars)[7], first(tvars)[8]), lay, s.run)
+    return (; blocks = IdDict{Any, Any}(t => (b..., ent.flux) for (t, b) in zip(tiles, blocks)), hold)
 end
 
 # The final LM iteration's speculative linearization. NLLSsolver's LM computes the Jacobian at each iteration's first trial point
