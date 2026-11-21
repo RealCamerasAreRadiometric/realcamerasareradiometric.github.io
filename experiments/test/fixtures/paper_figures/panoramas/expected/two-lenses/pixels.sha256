@@ -1,0 +1,5 @@
+# SHA-256 of the decoded pixels (8-bit RGB, row by row, three bytes per pixel), the size (width x height) and the path of each panel's image
+85133fd325e15e9c301835d4db06a5b537e459bd84b7f8934248b23e6e6f7447  64x25  panoramas-james/sigma14-no-correction.png
+67d6e0baaa4e6a95a6ecf0f9f15ac4b25cd4f811294acff8e9b980aea45becf8  64x25  panoramas-james/sigma14-our-correction.png
+6af77048ba0282ea1ccb75059ad7515f527d7434b49cd6ec070184bf04c55fd5  64x16  panoramas-james/tamron20-no-correction.png
+dfb4af4fa4d4b1cb5a3a7c71dc334d3987ba0be483abbd8bc27cff9380ed05b4  64x16  panoramas-james/tamron20-our-correction.png

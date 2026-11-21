@@ -1,7 +1,7 @@
 # common.jl — what the PGFPlots / TikZ generators of the paper's figures share (from the figure folders' tools/common.py; included
 # by PaperFigures.jl). Every number is formatted as Python formatted it there, so that the files come out the same. Beside that it
-# holds what the generators need of NumPy and Pillow to get the same numbers and images: NumPy's order of summation (npsum) and
-# 8-bit grey PNG files as Pillow writes them (without colour chunks).
+# holds what the generators need of NumPy and Pillow to get the same numbers and images: NumPy's order of summation (npsum),
+# 8-bit PNG files as Pillow writes them (without colour chunks), Pillow's Lanczos resize, and the panel that shows an image.
 
 "Writes `lines` to `path` (its directory is made), one per line, with a final newline."
 function write_lines(path::AbstractString, lines)
@@ -135,3 +135,123 @@ function load_grey_png(path::AbstractString)
     eltype(a) == ColorTypes.Gray{ColorTypes.N0f8} || error("$path is not an 8-bit grey image (it holds $(eltype(a)))")
     return collect(reinterpret(UInt8, a))
 end
+
+"Writes an h × w × 3 UInt8 array (row 1 = top) as an 8-bit RGB PNG without the colour chunks, as Pillow writes it (the folder is made)."
+function save_png(path::AbstractString, img::AbstractArray{UInt8, 3})
+    mkpath(dirname(abspath(path)))
+    io = IOBuffer(); PNGFiles.save(io, permutedims(reinterpret(reshape, ColorTypes.RGB{ColorTypes.N0f8}, permutedims(img, (3, 1, 2))), (1, 2)))
+    write(path, png_without_chunks(take!(io)))
+    return path
+end
+"Reads a PNG as an h × w × 3 UInt8 array (row 1 = top); grey images get three equal channels, alpha is dropped."
+function load_png(path::AbstractString)
+    a = PNGFiles.load(path)
+    c = ColorTypes.RGB{ColorTypes.N0f8}.(a)
+    out = Array{UInt8}(undef, size(c, 1), size(c, 2), 3)
+    for j in axes(c, 1), i in axes(c, 2)
+        out[j, i, 1] = reinterpret(ColorTypes.red(c[j, i])); out[j, i, 2] = reinterpret(ColorTypes.green(c[j, i])); out[j, i, 3] = reinterpret(ColorTypes.blue(c[j, i]))
+    end
+    return out
+end
+
+# ---- images as Pillow resizes them ----------------------------------------------------------------------------------------------
+# The Python generators reduce their images with Pillow's Lanczos filter. It is done here with Pillow's own arithmetic, so that the
+# images come out the same, pixel for pixel.
+
+# Pillow's filter (Resample.c lanczos_filter): the sinc windowed by a sinc three times as wide, zero from three samples on.
+# sin(πx) is taken as C takes it, sin of the product in double precision, not sinpi, which would round differently.
+_pillow_sinc(x::Float64) = x == 0.0 ? 1.0 : (y = x * Float64(π); sin(y) / y)
+_pillow_lanczos(x::Float64) = -3.0 <= x < 3.0 ? _pillow_sinc(x) * _pillow_sinc(x / 3) : 0.0
+
+"""
+    pillow_lanczos_coefficients(insize, outsize) -> (first, weights)
+
+The weights Pillow resamples one axis of `insize` pixels to `outsize` pixels with (Resample.c precompute_coeffs and
+normalize_coeffs_8bpc, filter LANCZOS): output pixel k is the sum of `weights[k][t]` times the input pixels `first[k] + t - 1`.
+The weights of a pixel sum to one and are stored as integers in units of 2^-22, each rounded half away from zero, as Pillow
+stores them for 8-bit images.
+"""
+function pillow_lanczos_coefficients(insize::Integer, outsize::Integer)
+    scale = insize / outsize; filterscale = max(scale, 1.0)        # reducing: the filter is stretched by the scale (it then also smooths)
+    support = 3.0 * filterscale; ss = 1.0 / filterscale
+    first = Vector{Int}(undef, outsize); weights = Vector{Vector{Int32}}(undef, outsize)
+    for xx in 0:outsize-1
+        center = (xx + 0.5) * scale                                # the output pixel's centre in input coordinates
+        xmin = max(trunc(Int, center - support + 0.5), 0); n = min(trunc(Int, center + support + 0.5), insize) - xmin
+        w = [_pillow_lanczos((x + xmin - center + 0.5) * ss) for x in 0:n-1]
+        ww = 0.0
+        for v in w                                                 # summed in order, as C sums them (sum() adds in pairs)
+            ww += v
+        end
+        ww != 0.0 && (w ./= ww)
+        first[xx+1] = xmin + 1
+        weights[xx+1] = [trunc(Int32, (v < 0 ? -0.5 : 0.5) + v * 4194304.0) for v in w]   # 4194304 = 2^22
+    end
+    return first, weights
+end
+
+"""
+    pillow_resize_lanczos(img, w, h) -> Array{UInt8, 3}
+
+`Image.resize((w, h), Image.LANCZOS)` of Pillow for an 8-bit image `img` (rows × columns × channels; row 1 = top): first the
+columns are resampled to `w`, the result is rounded to 8 bit, then the rows are resampled to `h` (Resample.c
+ImagingResampleInner). The sums are integer sums in units of 2^-22 and are rounded half up, exactly as Pillow's; the channels are
+independent. An axis that keeps its size is not resampled.
+"""
+function pillow_resize_lanczos(img::AbstractArray{UInt8, 3}, w::Integer, h::Integer)
+    H, W, C = size(img)
+    half = 1 << 21                                                 # one half in units of 2^-22: the sums are rounded, not cut
+    a = img
+    if w != W
+        first, weights = pillow_lanczos_coefficients(W, w)
+        b = Array{UInt8}(undef, H, w, C)
+        for c in 1:C, i in 1:w
+            x0 = first[i] - 1; k = weights[i]
+            for j in 1:H
+                s = half
+                for t in eachindex(k)
+                    s += Int(a[j, x0+t, c]) * k[t]
+                end
+                b[j, i, c] = clamp(s >> 22, 0, 255) % UInt8
+            end
+        end
+        a = b
+    end
+    if h != H
+        first, weights = pillow_lanczos_coefficients(H, h)
+        b = Array{UInt8}(undef, h, size(a, 2), C)
+        for c in 1:C, i in axes(a, 2), j in 1:h
+            y0 = first[j] - 1; k = weights[j]
+            s = half
+            for t in eachindex(k)
+                s += Int(a[y0+t, i, c]) * k[t]
+            end
+            b[j, i, c] = clamp(s >> 22, 0, 255) % UInt8
+        end
+        a = b
+    end
+    return a === img ? copy(img) : a
+end
+
+# ---- a panel that is an image ---------------------------------------------------------------------------------------------------
+
+"""
+    image_panel(path, head, figure, image, W, H) -> path
+
+One panel that shows an image: one PGFPlots axis of `W` × `H` units holding `image` (a file of the figure's folder `figure`), its
+height `H / W` of its width. `head` are the comment lines at the top of the file. No frame: the gaps of the composition separate
+the panels.
+"""
+image_panel(path::AbstractString, head::AbstractString, figure::AbstractString, image::AbstractString, W::Real, H::Real) =
+    write_lines(path, [head,
+        "% One panel: one PGFPlots axis over the sensor with the panel's image. Its width is \\rcpanelwidth (\\linewidth when the",
+        "% host does not define it), the baseline the axis' centre; \\rcfigdir is the figure's folder as the host document sees it.",
+        "\\providecommand{\\rcfigdir}{src/fig}%", "\\providecommand{\\rcpanelwidth}{\\linewidth}%",
+        "\\begin{tikzpicture}[baseline=(current axis.center)]",
+        "\\begin{axis}[",
+        "  scale only axis, width=\\rcpanelwidth, height=$(fixed(H / W, 5))*\\rcpanelwidth,",
+        "  " * HOUSE_AXIS_COMMON * ",",
+        "  xmin=0, xmax=$(pystr(W)), ymin=0, ymax=$(pystr(H)), enlargelimits=false,",
+        "  xtick=\\empty, ytick=\\empty, axis on top, axis line style={draw=none}]",
+        "\\addplot graphics[xmin=0, xmax=$(pystr(W)), ymin=0, ymax=$(pystr(H))] {\\rcfigdir/$figure/$image};",
+        "\\end{axis}", "\\end{tikzpicture}%"])

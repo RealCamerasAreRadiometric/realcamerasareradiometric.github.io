@@ -328,6 +328,10 @@ end
         @test !("warping_ablation" in select_stages(g)) && select_stages(g; only = ["warping_ablation"]) ==
               ["setup", "distance_maps", "image_regions", "frontends_prepare", "frontends_detect", "frontends_init", "radiometric_refinement_prepare",
                "radiometric_refinement", "chrome_evaluation", "warping_ablation"]
+        # the panoramas (scripts/panorama_vignetting.jl, scripts/panorama_stitching.jl): only when named; a lens's panoramas after its
+        # sweep's chain (and the image regions it reads) and after the f/4 refinements
+        @test !("panorama_vignetting" in select_stages(g)) && select_stages(g; only = ["panorama_vignetting"]) == ["setup", "image_regions", "panorama_vignetting"]
+        @test !("panorama_stitching" in select_stages(g)) && issubset(["radiometric_refinement_vignetting", "panorama_vignetting"], select_stages(g; only = ["panorama_stitching"]))
     end
 
     # every launcher of scripts/slurm/ is a stage's, the chrome index grid's too (a stage since 2026-11-12, its private three-job
@@ -338,7 +342,7 @@ end
     @test !("chrome_index_grid" in select_stages(g)) && select_stages(g; only = ["chrome_index_grid"]) == ["setup", "chrome_index_grid"]
     # the case selections the graph exports are the ones the launchers read (common.sh, texture_recovery.sbatch)
     common = join(read(projectdir("scripts", "slurm", f), String) for f in ("common.sh", "texture_recovery.sbatch", "sampling_strategy.sbatch",
-                  "chrome_evaluation.sbatch", "warping_ablation.sbatch"))
+                  "chrome_evaluation.sbatch", "warping_ablation.sbatch", "panorama_stitching.sbatch"))
     for s in g.stages
         isempty(s.select_env) || @test occursin("\${$(s.select_env):-", common)
     end

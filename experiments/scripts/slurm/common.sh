@@ -97,5 +97,7 @@ print("\n".join(names))' "$1" "${WARP_MODES:-}"
 # The front ends' cases a launch runs (configs/experiments/frontends.toml [cases.<set>]): FE_SETS (comma-separated), else every case.
 frontends_cases() { config_cases experiments/configs/experiments/frontends.toml "${FE_SETS:-}"; }
 
+# The panorama-vignetting configs a launch runs: SETS (comma-separated <set> of configs/experiments/panorama_vignetting_<set>.toml).
+PANORAMA_SETS=${SETS:-fx3_14mm,fx3_fisheye,fx3_tamron}
 # The golden calibration cases (configs/calibration/<case>.toml; experiments/test/pipeline/golden/<case>/): GOLDEN_CASES, comma-separated.
 GOLDEN_CASES=${GOLDEN_CASES:-siemens_coarse_full}   # blob_kb and the non-central fisheye_nc_selfcheck are deleted (2026-11-14)

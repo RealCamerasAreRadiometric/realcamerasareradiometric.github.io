@@ -1,6 +1,6 @@
 # =============================================================================
 # src/return_codes.jl — the VisualGeometryToolkitCore ReturnCode a run record names. Included where it is read: inside module
-# Figures (src/figures.jl, the tables' records: a row's convergence, never printed).
+# Figures (src/figures.jl, the tables' records: a row's convergence, never printed) and by src/panorama_example.jl (the rotation bundle's [expected] record).
 # =============================================================================
 import VisualGeometryToolkitCore as VgtkCore
 

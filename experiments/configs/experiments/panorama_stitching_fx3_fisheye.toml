@@ -1,0 +1,41 @@
+# Config of record of the panoramas of the Sigma 8 mm F3.5 fisheye at f/4 (scripts/panorama_stitching.jl; the supplement's panoramas of the three lenses are
+# drawn from the three lenses' runs by scripts/panorama_figure.jl): the frames of the lens's pure-rotation sweep
+# (PanoramaStitching's chain, configs/experiments/panorama_vignetting_fx3_fisheye.toml) composed into a panorama twice — as they are, and
+# divided by the V the lens's large-aperture refinement learned (case f4_fisheye_spline_warped of
+# configs/experiments/radiometric_refinement_vignetting.toml, its final state). Every frame at one exposure (gains "none"), so a
+# brightness difference where two frames meet is the vignetting's alone.
+#
+#   julia --project=experiments experiments/scripts/panorama_stitching.jl --config=experiments/configs/experiments/panorama_stitching_fx3_fisheye.toml [--plan]
+
+[experiment]
+name = "panorama_stitching"
+
+[inputs]
+# none of its own: the sweep's frames, its camera and the sensor record are the inputs of [upstream] panorama_vignetting, the
+# Siemens-star photographs those of [upstream] refinement
+
+[upstream]
+refinement = "configs/experiments/radiometric_refinement_vignetting.toml"       # the refinement whose cases learn the maps (each refine product is read by its key)
+panorama_vignetting = "configs/experiments/panorama_vignetting_fx3_fisheye.toml"   # the sweep: its decoded frames, rotations and camera
+
+[maps.learned]
+case = "f4_fisheye_spline_warped"
+state = "state.json"           # the refinement's final state (rc/calibration_state)
+label = "learned V (radial B-spline)"
+
+[evaluate]
+spacing = 8                    # px between the samples of a learned map (sample centres at ((j − ½)·spacing, (i − ½)·spacing))
+size = [4256, 2848]            # the FX3's raw grid, which the maps are sampled on
+
+[lens]
+f_px = 933.2                  # the focal length the rings' equisolid field angle 2 asin(ρ / 2f) is measured with, px
+image_size = [4256, 2848]      # the sweep's frames in camera pixels (checked against them)
+
+[panoramas]
+gains = "none"                 # "none": every frame and colour plane at one exposure; "fit": per candidate the frames' gains fitted with its V held fixed
+unit_ring_deg = [0.0, 10.0]   # a learned map is divided by its mean over this ring of the field angle about the sweep's vignetting centre (the first 10°): 1 on the axis, as V ≡ 1
+seam_deg_per_pixel = 0.1       # the seam score's equirectangular raster, degrees per pixel
+chunk = 200000                 # the seam score samples its raster in chunks of this many pixels
+deg_per_pixel = 0.1            # the panoramas' equirectangular raster, degrees per pixel
+exposure_percentile = 99.5     # the PNGs as PanoramaStitching's example chain writes its own: one exposure for every candidate,
+exposure_candidate = "learned" # 1 / this percentile of the green plane of this corrected panorama

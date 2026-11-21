@@ -66,7 +66,12 @@
                  ("scripts/texture_recovery.jl", "produce_upstream(texture_product()"),                       # report ← the page solve
                  ("scripts/texture_recovery.jl", "produce_upstream(report_product()"),                        # the paper's bands ← the report
                  ("scripts/texture_recovery.jl", "produce_upstream(poses_product()"),                         # the paper's bands ← the poses
-                 ("scripts/board_warping.jl", "refinement_upstream(RC_CFG, RC_PATH, case, \"refine\"")]          # the board warping's figure ← the refinements
+                 ("scripts/board_warping.jl", "refinement_upstream(RC_CFG, RC_PATH, case, \"refine\""),          # the board warping's figure ← the refinements
+                 ("scripts/panorama_stitching.jl", "refinement_upstream(REFINEMENT, REFINEMENT_PATH, CFG[\"maps\"][m][\"case\"], \"refine\""),   # the learned maps ← the refinements
+                 ("scripts/panorama_stitching.jl", "produce_upstream(rooftop_product()"),                     # the panoramas ← the sweep's run (GPU)
+                 ("scripts/panorama_stitching.jl", "produce_upstream(evaluate_product()"),                    # the panoramas ← the learned maps
+                 ("src/panorama_stitching.jl", "produce_upstream(panoramas_product(cfg, up)"),                # a figure ← a lens's panoramas
+                 ("scripts/panorama_figure.jl", "panoramas_upstream(SOURCES[k].config")]                      # the panoramas figure ← the lenses' panoramas
         for (f, call) in pairs
             @test occursin(call, src(f))
         end

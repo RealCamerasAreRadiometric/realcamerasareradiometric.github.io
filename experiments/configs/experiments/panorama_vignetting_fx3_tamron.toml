@@ -1,0 +1,142 @@
+# Config of record of the pure-rotation sweep of the Sony ILME-FX3 with the Tamron 20 mm F2.8 at f/2.8, all 35 frames of an indoor
+# sweep, captured on 2026-10-29: scripts/panorama_vignetting.jl --config=configs/experiments/panorama_vignetting_fx3_tamron.toml.
+# Its camera is a parametric fit, a full-sensor BoundedCamera (the Tamron lights the whole sensor); its frames and rotations are what
+# configs/experiments/panorama_stitching_fx3_tamron.toml composes its panoramas from.
+# The chain is PanoramaStitching's example of record, examples/panorama_vignetting/run.jl (its `run_example`, called by the driver,
+# not copied): the RAW frames decoded by VisualGeometryToolkitFeatures' load_raw (bin2), the rotations (register_rotations), the
+# camera's vignetting from the frames alone, interpolation free (fit_vignetting: every pixel of every frame at its centre is
+# L(R_k·f)·V(u)), the seam scores before and after (score_seams) and the corrected and uncorrected panoramas (render_panorama).
+# [example] is that example's config less what the driver supplies from [inputs] below: the frames' folder, the camera and the
+# frames' sensor record (src/panorama_example.jl PANORAMA_EXAMPLE_INPUTS).
+#
+# Paths are relative to data_root() (VGTK_DATA_ROOT); each input's `tier` is a tier of configs/data_artifacts.toml.
+
+lens_coverage = "sensor"           # the Tamron 20 mm lights the whole sensor: the camera bounded by its rectangle (src/image_region.jl)
+
+[experiment]
+name = "panorama_vignetting"
+
+# ---- the inputs (data_root()-relative), each with the stage that requires it and how it was made -------------------------------
+[inputs.raw]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/tamron/panorama"
+frames = ["DSC05416.ARW", "DSC05417.ARW", "DSC05418.ARW", "DSC05419.ARW", "DSC05420.ARW", "DSC05421.ARW", "DSC05422.ARW", "DSC05423.ARW", "DSC05424.ARW", "DSC05425.ARW", "DSC05426.ARW", "DSC05427.ARW", "DSC05428.ARW", "DSC05429.ARW", "DSC05430.ARW", "DSC05431.ARW", "DSC05432.ARW", "DSC05433.ARW", "DSC05434.ARW", "DSC05435.ARW", "DSC05436.ARW", "DSC05437.ARW", "DSC05438.ARW", "DSC05439.ARW", "DSC05440.ARW", "DSC05441.ARW", "DSC05442.ARW", "DSC05443.ARW", "DSC05444.ARW", "DSC05445.ARW", "DSC05446.ARW", "DSC05447.ARW", "DSC05448.ARW", "DSC05449.ARW", "DSC05450.ARW"]   # all 35 of the folder: all 35 register and the ring closes
+stage = "evaluate"
+provenance = "the 35 raw frames of the indoor pure-rotation sweep (taken in overlapping order; DSC05416 … DSC05450), Sony ILME-FX3 + Tamron 20 mm at f/2.8, 14-bit ARW 4256 x 2848, captured on 2026-10-29; Hugging Face panorama_good/tamron"
+
+# The parametric lens, not the f/4 refinement's learned spline grid: the grid's forward spline extrapolates beyond the lens's field
+# of view, so directions outside it map into the sensor and a panorama fills ceiling and floor with smeared frames.
+[inputs.lens]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/2710/tamron_opencv5_fit.json"
+sha256 = "6acbb2854905d588095c2c9535c9e36b83346735d3e8ee17ba79127d2291c59d"
+stage = "evaluate"
+provenance = "the OpenCV-5 (Brown–Conrady) fit of the FX3 + Tamron 20 mm to Schöps's Siemens-star detections of the set of 2026-10-27 (vgio/cameras); read as it is, a full-sensor BoundedCamera: the domain of the sweep's fit is the sensor less [example.domain] rim_margin_px"
+
+[inputs.sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"
+stage = "evaluate"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation), the record the refinements of record read their photographs under ([inputs.fx3_sensor_characterisation] of configs/experiments/radiometric_refinement.toml states how it was made): the sweep's frames are decoded under it — its black, its defects —, as scripts/panorama_stitching.jl requires of the frames the learned V corrects"
+
+# ---- the example's chain (PanoramaStitching examples/panorama_vignetting/run.jl), every setting stated -----------------------------
+[example]
+name = "fx3_tamron_indoor"
+
+[example.inputs]
+raw_extension = ".ARW"
+lens_kind = "cameras"                              # "cameras": a parametric CameraModel store
+lens_camera = "cam"                                # the camera's name in the store
+
+[example.compute]
+device = "cuda"                                    # "cuda" (GPU 0: CUDA_VISIBLE_DEVICES=0) or "cpu": the same kernels
+
+[example.decode]
+mode = "bin2"                                      # Features' load_raw: 2 × 2 Bayer quads (R, mean G, B), the cell grid's map onto the raw ×2 (Features' raw_frame_map): the per-colour image of the sweep, never a geometry image
+gain = 1.0                                         # linear values, 1.0 = the white level
+cache = true                                       # the decoded-RAW cache of the example's set folder
+
+[example.registration]                             # register_rotations (every keyword stated)
+execution_provider = "cuda"                        # LoMa's ONNX Runtime provider: the GPU. "cuda" never falls back: an unavailable provider is an error (Features' resolve_execution_provider)
+tone_percentile = 99.5
+detector_margin_px = 30.0
+asift_tilts = "imas25"
+max_detections = 2048
+selection = "spread"                               # Features' spread_strongest: about max_detections spread over the frame
+detection_image = "tone"                           # sqrt(G / p) at tone_percentile of the decoded frames
+descriptor = "b"
+matcher = "b128"
+min_score = 0.0
+pairs = "all"
+min_inliers = 25
+seed = 1
+outlier_halfwidth_px = 2120.0                      # the pairs' RANSAC scorer is the Student-t + uniform: its outlier half-width, px
+local_optimization_strategy = { type = "irls", loss = "tls" }   # the pairs' RANSAC local optimization (Estimation's strategy table)
+max_trials = 10000
+min_trials = 100
+averaging_optimization_strategy = { type = "irls", loss = "huber", max_iter = 100 }   # the view graph's rotation averaging
+cycle_tol_deg = 2.0                                # the view-graph filters (Estimation's fit_filtered_rotation_averaging): a pair off a 3-cycle by more
+orientation_tol_deg = 5.0                          # than this removed, then a pair off the averaged rotations by more than this
+bundle_optimization_strategy = { type = "triggs", loss = "welsch", efficiency_constant = 2.5 }   # ONE LM run, Welsch at 2.5 × σ̂ (the pairs' pooled scale)
+bundle_max_iter = 300                              # the LM run's iteration cap: above what the sweeps' bundles need to stop on their tolerances (about a hundred iterations), so the cap does not end them
+bundle_ftol = 1.0e-10
+bundle_xtol = 1.0e-10
+near_duplicate_overlap = 0.90                      # a near-duplicate pair shares ≥ 90 % of the smaller footprint (Core's view_overlap); left out of the chaining
+check_tracks = true                                # after the bundle, observations beyond 3.035 σ̂ removed and re-solved, until none (cap 10)
+
+[example.domain]                                   # the pixels an observation may use (fit and seam score)
+saturation_margin_px = 13.0                        # the saturation masks' dilation (camera px) before they are made symmetric over the frames: about 3 × the sweep's rotation-bundle RMS (≈ 4.3 px)
+rim_margin_px = 24.0 
+fov_deg = 89.0
+plane = 2                                          # the GREEN plane
+
+[example.vignetting]
+# radial: on an 11-frame run of the 14 mm sweep the free 2-D tensor V put its maximum 522 px from the principal point, was 32 %
+# asymmetric (the radial 8.8 %) and left the seams worse (1.4826·MAD 0.163 against the radial's 0.107; uncorrected 0.183), although
+# it fitted the rows slightly better: two rows of frames 14° apart are not enough pitch diversity
+model = "radial"
+radial_center = [2128.0, 1424.0]                   # the sensor centre (4256 / 2, 2848 / 2): "circle_center" needs an image circle, and this camera has none
+radial_radius = "domain"
+radial_controls = 16
+tensor_box = "domain"
+tensor_controls = [16, 12]
+compare_models = ["tensor_product"]                # also fitted and reported, not used for the renders
+chart_spacing_deg = 1.0
+penalty_order = 3
+penalty_weight = 0.01
+vignetting_penalty_weight = 1.0e-6
+gain_correction = "channel"                        # the frames' exposure gains (g₁ = 1): "none", "frame" (one gain per frame) or "channel" (per frame and colour plane)
+observation_noise = "none"                         # the value's noise alone
+observation_noise_iterations = 1                   # "position" only: its reweight-and-solve cycles after the first solve
+solver = "cg"
+cg_tolerance = 1.0e-9
+cg_max_iter = 40000
+
+[example.seams]
+projection = "equirectangular"
+deg_per_pixel = 0.1
+extent = "coverage"
+chunk = 200000
+
+[example.render]
+up = "level"
+exposure_percentile = 99.5
+white_balance = "daylight"
+cylindrical_deg_per_pixel = 0.08
+cylindrical_max_lat_deg = 60.0
+equal_area_deg_per_pixel = 0.1
+extent = "coverage"
+rectilinear_size = [1920, 1080]
+rectilinear_hfov_deg = 100.0
+
+# ---- the registration's expected rotation-bundle termination (it keys nothing: a statement checked against the run) -------------
+# Every config states it (no default). The evaluate stage compares the bundle's termination — the name of its VisualGeometryToolkitCore
+# ReturnCode, the registration's bundle_return_code — with it and FAILS on a mismatch (src/panorama_example.jl check_registration):
+#   "Success"          the bundle converged;
+#   "MaxIters"         its iteration cap; also [example.registration] bundle_max_iter = 0 (no solve: the start's rotations);
+#   any other ReturnCode name ("Stalled", …) an expected failure, with its reason.
+# scripts/panorama_stitching.jl checks it again on the run it reads ([upstream] panorama_vignetting).
+[expected]
+bundle = "Success"
+reason = "a parametric OpenCV-5 (Brown–Conrady) lens: its domain is the whole image plane, so no start prediction falls outside it"

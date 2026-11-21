@@ -155,7 +155,7 @@ provenance = "the camera's raw files as captured on 2026-11-02 (EXIF: model, len
 # (dir sensor_characterisation/, its three files; a new binding in ../Artifacts.toml). Until it is packed each record is an input of
 # VisualGeometryToolkitEval's reserved tier "unpublished", pinned by its sha256 in every config that reads it ([inputs.fx3_sensor_characterisation]:
 # radiometric_refinement.toml, radiometric_refinement_vignetting.toml, chrome_evaluation_fx3_tamron_largeaperture.toml,
-# chrome_evaluation_fx3_zoom48_f10.toml), kept on dgx01 under the unpublished root (/raid/data/jpr/containers/sensor_characterisation,
+# chrome_evaluation_fx3_zoom48_f10.toml; [inputs.sensor_characterisation]: panorama_vignetting_fx3_<lens>.toml), kept on dgx01 under the unpublished root (/raid/data/jpr/containers/sensor_characterisation,
 # read only) and linked into the data root as sensor_characterisation/ (the refinements' [pipeline] camera.sensor_characterisation names it
 # there, data_root()-relative):
 #   sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json   sha256 add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737
@@ -247,13 +247,13 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/14mm/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Sigma 14 mm at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = ["configs/experiments/radiometric_refinement_vignetting.toml", "configs/experiments/vignetting_figure.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15); the flat field of fig:vignetting ([inputs.diffuser_14mm])
+configs = ["configs/experiments/radiometric_refinement_vignetting.toml", "configs/experiments/vignetting_figure.toml", "configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15); the flat field of fig:vignetting ([inputs.diffuser_14mm]); the 14 mm sweep reads the same coverage frame ([inputs.raw_14mm_diffuser_20261028])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/14mm/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "38 files; the frames of the Sony FX3 + Sigma 14 mm indoor pure-rotation sweep of 2026-10-29 as captured (14-bit ARW 4256 x 2848; the 11 of the 2026-11-04 run: two rows, pitch ≈ 0° and ≈ +14°, yaw over 360°, the frames of PanoramaStitching's examples/panorama_vignetting config_fx3_14mm.toml)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/fisheye/siemens-stars"]
@@ -271,7 +271,7 @@ configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of f
 paths = ["paper-data/vignetting/fisheye/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (Sony ILME-FX3, Sigma 8 mm F3.5 fisheye at f/4, 14-bit ARW 4256 x 2848), 2026-10-29; Hugging Face panorama_good/fisheye"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_fisheye.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/tamron/siemens-stars"]
@@ -289,7 +289,7 @@ configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of f
 paths = ["paper-data/vignetting/tamron/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (taken in overlapping order), Sony ILME-FX3 + Tamron 20 mm at f/2.8, 14-bit ARW 4256 x 2848, 2026-10-29; the config of record uses all 35 (`frames`)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_tamron.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/defocus/14mm/calibration"]
@@ -433,19 +433,19 @@ configs = []   # read by no config of record since 2026-11-16: the vignetting st
 paths = ["geometric_accuracy/records/2710/14mm_kb_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the Kannala–Brandt fit of the FX3 + 14 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/14mm_kb_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree (2026-11-08: the 14 mm panoramas' lens again, the learned grid's registration failed); since 2026-11-12 the source of the 14 mm panoramas' camera record with its lens coverage (configs/inputs/panorama_cameras.toml)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the camera the sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/fisheye_kb_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the Kannala–Brandt fit of the FX3 + 8 mm fisheye to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/fisheye_kb_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree"
-configs = ["configs/experiments/chrome_evaluation_fx3_fisheye_2710_si.toml"]
+configs = ["configs/experiments/chrome_evaluation_fx3_fisheye_2710_si.toml", "configs/experiments/panorama_vignetting_fx3_fisheye.toml"]   # the camera the fisheye sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/tamron_opencv5_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the OpenCV-5 fit of the FX3 + Tamron 20 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/tamron_opencv5_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree; the Tamron panoramas' camera as it is, a full-sensor BoundedCamera (the lens covers the whole sensor: no lens coverage beyond it, owner ruling 2026-11-12)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_tamron.toml"]   # the camera the sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/14mm_kb_fit_lens_coverage.json"]

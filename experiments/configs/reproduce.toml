@@ -270,6 +270,42 @@ driver = "experiments/scripts/board_warping.jl"
 config = "experiments/configs/supplement/board_warping_lenses.toml"
 default = false
 
+# ---- the panoramas: per lens its sweep's chain and its panoramas without and with the learned V (run when named: --only) ---------
+[[stage]]
+name = "panorama_vignetting"
+what = "PanoramaStitching's sweep chain per lens (the decode, the rotations, the sweep's own vignetting: the frames and rotations the panoramas are composed from), one GPU per lens"
+time = "01:00:00"         # ≈ 4 min a sweep on one GPU with LoMa on the device (35–38 frames: the decode, 600–700 pairs, the bundle, the fit and its renders); the margin for a cold decode cache and the first load
+cpus_per_task = 8       # GPU stage at the launch's one thread count (8, above): the registration (LoMa's ONNX Runtime CUDA provider) and
+mem_per_cpu = "8480M"   # the fit on the device, the decode on the host threads. 68 GB (a sweep's decoded frames: 1.3 GB)
+after = ["setup", "image_regions"]
+sbatch = "experiments/scripts/slurm/panorama_vignetting.sbatch"
+driver = "experiments/scripts/panorama_vignetting.jl"
+config = "experiments/configs/experiments/panorama_vignetting_{item}.toml"
+gpu = true
+array = { items = ["fx3_14mm", "fx3_fisheye", "fx3_tamron"], select_env = "SETS" }
+default = false         # run when named (--only=panorama_stitching runs it first): scripts/panorama_figure.jl draws from its lenses' panoramas
+
+[[stage]]
+name = "panorama_stitching"
+what = "per lens the learned V's export (CPU) and the panoramas without and with it, with their seam scores (the supplement's panoramas figure reads them)"
+time = "01:00:00"         # the panoramas of one sweep: two candidates' seam scores and renders on the host, ≈ 1 min each; the frames' read and the driver's load some minutes
+cpus_per_task = 8       # the launch's one thread count (8, above)
+mem_per_cpu = "8480M"
+after = ["radiometric_refinement_vignetting", "panorama_vignetting"]   # its refine and rooftop stages read them: made upstream
+sbatch = "experiments/scripts/slurm/panorama_stitching.sbatch"
+job_name = "rc-panorama-stitching"
+driver = "experiments/scripts/panorama_stitching.jl"
+config = "experiments/configs/experiments/panorama_stitching_{item}.toml"
+gpu = true
+array = { items = ["fx3_14mm", "fx3_fisheye", "fx3_tamron"], select_env = "PS_SETS" }
+# the panoramas stage reads the sweep's registration through PanoramaStitching's example, which resolves LoMa's CUDA provider first:
+# it runs in a GPU job although its seam scores and renders run on the host (GPU_STAGES of the driver)
+phases = [
+    { name = "export", gpu = false, env = { PS_STAGES = "refine,evaluate,rooftop" }, time = "00:30:00" },
+    { name = "panoramas", gpu = true, env = { PS_STAGES = "panoramas" } },
+]
+default = false         # run when named (--only=panorama_stitching)
+
 # ---- the chrome evaluations: every chrome set of the paper, the stages chrome_evaluation_paper's sets stage runs (reused there) ------
 
 [[stage]]
