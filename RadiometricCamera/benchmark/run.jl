@@ -92,7 +92,7 @@ function benchmark_board()
     # the timed states: a perturbed start on the benchmark's device
     state(lens_ = lens) = RC.CalibrationState(board, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
                                               RC.Material(; diffuse_weight = 0.7), start_light, photos; masks, backend = BE)
-    return (; board, board, settings, poses, light, mat, camera, masks, photos, state, lens)
+    return (; board, settings, poses, light, mat, camera, masks, photos, state, lens)
 end
 
 "The mask with every `n`-th of its pixels kept, about `PIXELS` of them."
