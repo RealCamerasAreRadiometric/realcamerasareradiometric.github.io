@@ -47,21 +47,15 @@ machine, or the artifact view of the packed tiers declared in `Artifacts.toml` a
 `configs/data_artifacts.toml`); results are written under `results_root()`
 (`data/exp_pro`), in directories keyed by run key, each with `_config.toml` and
 `_provenance.toml`. `data/` and `plots/` are not tracked. See `data/README.md`.
-The photographs the configs of record read are the author's published folder
-on the university's MDS share, bound under `data_root()` as `paper-data/`
-(`data/DATA_LOCATIONS.md`: the share, the binding, the subsets a config states
-beside a folder). The other inputs are tiers of `configs/data_artifacts.toml`
-(synthetic renders, baseline calibrations, targets and golden cases):
-`scripts/fetch_data.jl` fetches the packed ones, `scripts/make_artifacts.jl`
-packs them from an author's data root (`--dry-run` lists them). The baseline
-tier of the paper run (the geometric front ends' outputs, the decoded chrome
-photographs) is on the share beside the photographs as
-`derived/rc_baselines_2026-11-10/`; the front ends that made it — Schöps's
-camera_calibration, OpenCV, Kalibr, the parametric fits, run by hand on the
-cluster — are frozen as they ran in the tree `experiments/frontends_history/` of tag `v0.10.0` (removed from the working tree since: `git show v0.10.0:experiments/frontends_history/README.md`), also `frontends/` beside the tier on the share: the historical reference for the starts of record, run by
-nothing. The project's own front ends replace them: `scripts/frontends.jl` (config `configs/experiments/frontends.toml`) decodes the
-photographs through Features, runs the external calibrator in its pinned container and imports its run through IO. The synthetic
-renders and the targets of the paper run are not packed yet.
+Every input is a tier of record of `configs/data_artifacts.toml` (the photographs, the external tools' outputs, the targets,
+the golden set, the sensor model, the calibrator's image): `scripts/fetch_data.jl` installs them into the machine's artifact store
+and links them into the artifact view, `scripts/make_artifacts.jl` packs them from an author's data root (`--dry-run` lists them).
+The photographs are the author's published folder on the university's MDS share (`paper-data/` under `data_root()`; a config's
+subset of a folder is stated beside it). The front ends that made the starts of record — Schöps's camera_calibration, OpenCV,
+Kalibr, the parametric fits, run by hand on the cluster — are frozen as they ran in the tree `experiments/frontends_history/` of
+tag `v0.10.0` (`git show v0.10.0:experiments/frontends_history/README.md`): the historical reference for the starts of record, run
+by nothing. The project's own front ends replace them: `scripts/frontends.jl` (config `configs/experiments/frontends.toml`)
+decodes the photographs through Features, runs the external calibrator in its pinned container and imports its run through IO.
 
 ## The layout
 
@@ -78,14 +72,15 @@ renders and the targets of the paper run are not packed yet.
 
 ## Publishing and handover (the owner's steps)
 
-1. Pack the four data tiers from your data root: `julia --project=experiments experiments/scripts/make_artifacts.jl` (`--dry-run` lists
-   them); the tarballs land in `experiments/output/artifacts/tarballs`.
-2. Publish them beside the photographs (the author's folder on the MDS share, `data/DATA_LOCATIONS.md`; the baseline tier is there
-   since 2026-11-10 as plain files).
-3. Bind the record: `julia --project=experiments experiments/scripts/make_artifacts.jl --record=rc=<record id>` rewrites `Artifacts.toml`
-   and `configs/data_artifacts.toml` (a URL per tarball; the host is decided with the final run); commit both.
-4. Check a fresh fetch: `julia --project=experiments experiments/scripts/fetch_data.jl --all`, then the package's golden gate
-   (`experiments/test/pipeline/` of the repository root, Julia 1.13, `VGTK_DATA_ROOT` set).
+1. Pack the tiers of record from your data root: `VGTK_DATA_ROOT=<data root> julia --project=experiments
+   experiments/scripts/make_artifacts.jl` (`--dry-run` lists them; it refuses a tier holding an excluded photograph); the tarballs
+   land in `--stage` (default `experiments/output/artifacts/tarballs`), `--check` lists each against the privacy rule again.
+2. Publish each Zenodo record of the catalog with its tarballs (the catalog's `[records]`: four input records under 50 GB each, the
+   tools record only if the container's base-image licence allows), after `make_artifacts.jl --check` on the staged tarballs.
+3. Bind the records: `make_artifacts.jl --record=<record>=<Zenodo id>,…` rewrites `Artifacts.toml` (a URL per tarball); add each
+   record's `id` to the catalog; commit both.
+4. Check a fresh fetch: `julia --project=experiments experiments/scripts/fetch_data.jl --all` on a clean machine, then the
+   package's golden gate (`experiments/test/pipeline/` of the repository root).
 5. Run the experiments on the GPU machine with the one command, `bash experiments/scripts/reproduce/reproduce_results_dgx.sh`
    (`--dry-run` first; REPRODUCE.md, One command): the GPU arrays, then `scripts/regenerate_paper.jl --gpu` at the arrays'
    thread count (the thread count keys every run) and the results branch.

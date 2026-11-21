@@ -27,7 +27,7 @@ provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/senso
 tier = "rc_raw_photos"
 path = "paper-data/geometric-accuracy/tamron/chrome-april"
 stage = "prepare"
-provenance = "2026-11-09 (the author's new Tamron sets of 2026-11-08, Dropbox; rc-results paper_2026-11-07/tools/tam08_fe.sh → fe_ag.sh): the 142 chrome photographs of the FX3 + the Tamron 20 mm (EXIF lens \"E 20mm F2.8 F050\") at f/22, 1/60 s, of 2026-11-08 (DSC01495 … DSC01636), linear green copies (fe_chrome.sh); decoded from the raw chrome photographs paper-data/geometric-accuracy/tamron/chrome-april (the MDS share, data/DATA_LOCATIONS.md): the RAW photographs (.ARW) the retired decoded copies (rc_baselines chrome/*.photos, decoded by scripts/py/convert_raw.py) were made from (owner 2026-11-14: every chrome set read from its RAW through Features' raw module); on the cluster only"
+provenance = "2026-11-09 (the author's new Tamron sets of 2026-11-08, Dropbox; rc-results paper_2026-11-07/tools/tam08_fe.sh → fe_ag.sh): the 142 chrome photographs of the FX3 + the Tamron 20 mm (EXIF lens \"E 20mm F2.8 F050\") at f/22, 1/60 s, of 2026-11-08 (DSC01495 … DSC01636), linear green copies (fe_chrome.sh); decoded from the raw chrome photographs paper-data/geometric-accuracy/tamron/chrome-april (the MDS share): the RAW photographs (.ARW) the retired decoded copies (rc_baselines chrome/*.photos, decoded by scripts/py/convert_raw.py) were made from (owner 2026-11-14: every chrome set read from its RAW through Features' raw module); on the cluster only"
 
 [inputs.target]
 tier = "rc_thorlabs"
