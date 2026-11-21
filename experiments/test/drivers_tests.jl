@@ -10,7 +10,8 @@
 
     const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
                      "image_regions", "distance_maps", "timing", "vignetting_figure", "board_warping",
-                     "panorama_vignetting", "panorama_stitching", "panorama_figure")
+                     "panorama_vignetting", "panorama_stitching", "panorama_figure",
+                     "teaser")
     const DRIVER_STAGE_NAMES = Dict(
         "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
         "focus_surfaces" => ("panels", "figures"),
@@ -24,7 +25,8 @@
         "board_warping" => ("figures",),
         "panorama_vignetting" => ("evaluate",),
         "panorama_stitching" => ("refine", "evaluate", "rooftop", "panoramas"),
-        "panorama_figure" => ("figures",))
+        "panorama_figure" => ("figures",),
+        "teaser" => ("teaser",))
     experiment_config(d) = d == "texture_recovery" ? projectdir("configs", "experiments", "texture_recovery_14mm_small.toml") :
                            d in ("panorama_vignetting", "panorama_stitching") ? projectdir("configs", "experiments", "$(d)_fx3_14mm.toml") :
                            d in ("timing", "board_warping", "panorama_figure") ? projectdir("configs", "supplement", "$d.toml") : projectdir("configs", "experiments", "$d.toml")
@@ -173,6 +175,7 @@ end
                          "convergence.toml",   # the bias of Schöps's method per LM iteration (scripts/convergence.jl; 2026-11-15)
                          "vignetting_figure.toml",   # the paper's vignetting figure from the f/4 refinements and the diffuser photographs (scripts/vignetting_figure.jl)
                          "radiometric_refinement_board_warping.toml",   # the board-warping session's refinements: two boards × three lenses, no chrome set (scripts/radiometric_refinement.jl)
+                         "teaser.toml",   # the paper's teaser from the Tamron sweep's panoramas and the learned-texture figure's tables (scripts/teaser.jl)
                          ],
                         ["panorama_vignetting_fx3_$l.toml" for l in lenses], ["panorama_stitching_fx3_$l.toml" for l in lenses],   # per lens its sweep's chain and its panoramas
                         # ONE chrome evaluation per chrome set, its models a list (2026-11-12; the 14 mm central_30cm's above)

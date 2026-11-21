@@ -1,0 +1,47 @@
+# Config of record of the paper's teaser figure (scripts/teaser.jl; src/teaser.jl): fig:teaser. Row 1: the same part of one lens's
+# panorama twice, composed from the frames as they are and from the frames with the learned vignetting divided out. Row 2: one
+# strip of the first text lines of the printed page, cut into equal parts from left to right, each part from another band of the
+# learned-texture figure (fig:texture-learned), joined by hard cuts. The stage cuts the part out of the lens's panoramas and draws
+# the paper's PGFPlots files (src/paper_figures/teaser.jl): teaser.tex, teaser/<panel>.{tex,png}, teaser/texture-strip.{tex,png},
+# teaser-caption.tex ([teaser] asset_dir, panels).
+#
+# Nothing is estimated here: the panoramas are the panoramas product of [upstream] panorama_stitching (its stage panoramas), the
+# strip's bands the tables of the bands product of [upstream] texture_recovery (its stage bands), each read by its key.
+#
+#   julia --project=experiments experiments/scripts/teaser.jl [--plan] [--force]
+
+[experiment]
+name = "teaser"
+
+[inputs]
+# none of its own: the sweep's frames, the refinement and the texture photographs are the upstream configs' inputs
+
+[upstream]
+panorama_stitching = "configs/experiments/panorama_stitching_fx3_tamron.toml"   # the lens whose panorama is shown: the Tamron 20 mm's sweep
+texture_recovery = "configs/experiments/texture_recovery_14mm_small.toml"       # the learned-texture figure: its stage bands writes the strip's bands (tables/<band>.png)
+
+[teaser]
+asset_dir = "teaser"            # plotsdir("teaser.tex", "teaser/<panel>.{tex,png}", "teaser/texture-strip.{tex,png}", "teaser-caption.tex"): the paper's fig/ layout
+box = [500, 0, 960, 250]        # the part of the panorama shown, [x0, y0, x1, y1] in its pixels (first and past-last column and row): the window front at the left of the sweep, 460 × 250 px, not resampled
+gain = 1.2                      # both crops' 8-bit values times this factor (kept within 0 … 255): brightened alike for display; the caption states it
+lens = "Tamron 20\\,mm lens, $f/2.8$"   # the lens of [upstream] panorama_stitching as the caption names it (LaTeX)
+panels = [                      # row 1 from the left: a panel's files (<asset_dir>/<panel>.tex, .png), the candidate of the panorama stage it shows (panorama_<candidate>.png) and its title on the panel (LaTeX)
+    {panel = "pano-no-correction", candidate = "original", title = "no vignetting correction"},
+    {panel = "pano-our-correction", candidate = "learned", title = "our vignetting correction"},
+]
+segments = ["truth", "photograph", "pinhole", "ours"]   # the strip's parts from the left, each a band of the texture figure's tables (<band>.png: its [bands] order) with its table below; the strip is cut into as many equal parts
+texel_grid = "truth"            # the band whose image is on the page's texel grid, one pixel per texel: the strip's size; a band of another size (the photograph's own pixels) is scaled to it (Lanczos)
+pixels_per_texel = 5            # the strip's image shows each texel as 5 × 5 pixels, not interpolated
+# A part's table. label: its name under the strip (LaTeX). caption: the caption's words for it.
+[teaser.truth]
+label = "ground truth"
+caption = "the printed design (ground truth)"
+[teaser.photograph]
+label = "training photograph"
+caption = "one of the out-of-focus training photographs"
+[teaser.pinhole]
+label = "pinhole"
+caption = "the texture recovered with a pinhole camera"
+[teaser.ours]
+label = "ours"
+caption = "the texture recovered with our aperture and focus surface"

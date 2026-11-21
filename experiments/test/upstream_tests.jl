@@ -71,7 +71,9 @@
                  ("scripts/panorama_stitching.jl", "produce_upstream(rooftop_product()"),                     # the panoramas ← the sweep's run (GPU)
                  ("scripts/panorama_stitching.jl", "produce_upstream(evaluate_product()"),                    # the panoramas ← the learned maps
                  ("src/panorama_stitching.jl", "produce_upstream(panoramas_product(cfg, up)"),                # a figure ← a lens's panoramas
-                 ("scripts/panorama_figure.jl", "panoramas_upstream(SOURCES[k].config")]                      # the panoramas figure ← the lenses' panoramas
+                 ("scripts/panorama_figure.jl", "panoramas_upstream(SOURCES[k].config"),                      # the panoramas figure ← the lenses' panoramas
+                 ("scripts/teaser.jl", "panoramas_upstream(PANORAMAS.config"),                                # the teaser ← the lens's panoramas
+                 ("scripts/teaser.jl", "produce_upstream(BANDS.product")]                                     # the teaser ← the learned-texture figure's tables
         for (f, call) in pairs
             @test occursin(call, src(f))
         end
