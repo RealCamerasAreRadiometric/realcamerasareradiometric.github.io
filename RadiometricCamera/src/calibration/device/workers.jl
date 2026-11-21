@@ -26,8 +26,9 @@ estimator (its geometry is `ANCHOR_FLOAT`'s on every backend), the Jacobian chun
 implementation (functors of a pixel run by Core's `pointwise!` on `OnBackend(be)`); only their float type depends on the backend.
 """
 _kernel_float(be) = be isa KA.CPU ? Float64 : Float32
-"""The float type of a kernel's render settings (the kernels' rows are of it)."""
+"""The float type of a kernel's render settings (the kernels' rows are of it), or of a textured target's page and maps."""
 _float_of(::RenderSettings{T}) where {T} = T
+_float_of(::TexturedTarget{T}) where {T} = T
 """The scalar type of a kernel row type (a static array, or a tuple of them)."""
 _row_float(::Type{<:StaticArray{S, T}}) where {S, T} = T
 _row_float(::Type{T}) where {T <: Tuple} = _row_float(fieldtype(T, 1))

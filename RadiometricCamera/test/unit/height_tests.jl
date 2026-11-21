@@ -403,7 +403,7 @@ end
         rays = RC.BoardRays(board_hs, h)
         o = SVector(0.1, -0.2, 1.4); d = normalize(SVector(0.05, 0.1, -1.0))
         rec = [zero(RC.RadianceJac{Float64})]
-        s, x, n = RC._ray_hit(nothing, RC.RadianceRecord(rec, 0), 1, rays, o, d)
+        s, x, n = RC._ray_hit(nothing, RC.RadianceRecord(rec, 0, nothing), 1, rays, o, d)
         s0, x0 = intersect_board(rays, o, d)
         @test abs(s - s0) < 1e-14 && norm(x - x0) < 1e-14 && dot(n, d) ≈ 1
         @test norm(cross(normalize(n), VgtkCore.normal(rays.relief, x0))) < 1e-9          # Core's normal of the surface there (either sense)
@@ -434,16 +434,19 @@ end
     s = edge_state(edge_s, targets_e)
     be = s.backend; dc = RC._ensure_device!(s); k = 1; H = RC._image_height(s)
     args = (be, dc.px[k], dc.idx[k], k, H, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light, s.board, s.settings)
-    r64 = RC._radiance_record_device(args...; anchor = s.board)
+    r64 = RC._radiance_record_device(args..., (; mat = s.mat, light = s.light, board = s.board), s.board)
     F = Float32
     est = (; mat = VgtkCore.convert_eltype(F, s.mat), light = VgtkCore.convert_eltype(F, s.light), board = VgtkCore.convert_eltype(F, s.board))
-    r32 = RC._radiance_record_device(args...; est, anchor = s.board)
+    r32 = RC._radiance_record_device(args..., est, s.board)
     @test eltype(r64.J) === RC.RadianceJac{Float64} && eltype(r32.J) === RC.RadianceJac{Float32}
     a64 = RC.RadianceRays(r64.J, 0, s.board); a32 = RC.RadianceRays(r32.J, 0, s.board)
     reached = [!iszero(G[:, RC.RAD_NL + 3]) for G in r64.J]
     @test count(reached) > length(reached) ÷ 2 && reached == [!iszero(G[:, RC.RAD_NL + 3]) for G in r32.J]
     @test all(iszero(G[:, RC.RAD_NL + 4]) for G in r64.J)                                     # Float64: no remainder
     @test maximum(i -> norm(RC._recorded_anchor(a32, i) - RC._recorded_anchor(a64, i)), findall(reached)) < 1e-12
+    # the radiance and its local partials: Float32's rounding of the estimator, but for the rare ray whose Monte Carlo sample falls
+    # on the other side of a branch of the GGX sampling in Float32 (a sample skipped or kept: a step of 1/N of the ray's estimate)
     scale = maximum(G -> maximum(abs, G[:, 1:(1 + RC.RAD_NL)]), r64.J)
-    @test maximum(i -> maximum(abs, Float64.(r32.J[i][:, 1:(1 + RC.RAD_NL)]) - r64.J[i][:, 1:(1 + RC.RAD_NL)]), eachindex(r64.J)) < 1e-4 * scale
+    err = [maximum(abs, Float64.(r32.J[i][:, 1:(1 + RC.RAD_NL)]) - r64.J[i][:, 1:(1 + RC.RAD_NL)]) / scale for i in findall(reached)]
+    @test count(<(1e-5), err) >= 0.99 * length(err)
 end

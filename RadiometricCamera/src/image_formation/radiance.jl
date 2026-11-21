@@ -83,9 +83,8 @@ end
 
 """The common start of a ray's radiance (`L_c`, the radiance-Jacobian modes of `_ray_radiance`): the ray's direction ω_l in the board's local frame, the
 element type `T` of its radiance, whether the ray reaches the board from the front (`front`; from behind its radiance is zero) and
-the material `(ρ, α, η)` at the chart point 𝐛 (`_radiance_material`), or of the albedo `ρ` the caller looked up (a chunk's anchored
-lookup, `_ray_radiance`). Type-stable in the kernels: the material is evaluated for every ray (a ray from behind discards it)."""
-@inline _ray_material(bd, m, lt, 𝐛::StaticVector{2}, 𝐱, ω) = _ray_material(bd, m, lt, physical_albedo(bd, 𝐛), 𝐱, ω)
+the material `(ρ, α, η)` of the albedo `ρ` the caller looked up there (`_radiance_material`: the target's `physical_albedo`, or a
+chunk's anchored lookup). Type-stable in the kernels: the material is evaluated for every ray (a ray from behind discards it)."""
 @inline function _ray_material(bd, m, lt, ρ::StaticVector{3}, 𝐱, ω)
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)
@@ -102,7 +101,7 @@ The radiance leaves the board towards −ω.
 """
 @inline function L_c(bd::TexturedTarget, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey,
                      𝐛::StaticVector{2}, 𝐱::StaticVector{3}, ω::StaticVector{3})
-    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)   # ω_l: the outgoing direction ω_o = −ω; 𝐱 may be a dual board point (HeightRays)
+    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, physical_albedo(bd, 𝐛), 𝐱, ω)   # ω_l: the outgoing direction ω_o = −ω; 𝐱 may be a dual board point (HeightRays)
     front || return zero(SVector{3, Tz})
     return _radiance_mc(bd, m, lt, s, key, ρ, α, η, ω_l, 𝐱, Tz)
 end
@@ -154,16 +153,17 @@ end
 Same samples and direction convention as [`L_c`](@ref) (ω from the aperture point to the board point);
 used to build the design matrices of the linear solves.
 """
-function radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}},
-                        s::RadianceSampler, key::SampleKey, 𝐛::StaticVector{2}, 𝐱::StaticVector{3}, ω::StaticVector{3}) where {L, C, J}
+radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight, s::RadianceSampler, key::SampleKey, 𝐛::StaticVector{2},
+               𝐱::StaticVector{3}, ω::StaticVector{3}) = _radiance_parts(bd, m, lt, s, key, physical_albedo(bd, 𝐛), 𝐱, ω)
+"""`radiance_parts` at the albedo `ρ` the caller looked up (the parts kernel: the anchored lookup at a record's hit, `_sample_parts`)."""
+function _radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<:SphericalHarmonicMap{L, C, J}},
+                         s::RadianceSampler, key::SampleKey, ρ::StaticVector{3}, 𝐱::StaticVector{3}, ω::StaticVector{3}) where {L, C, J}
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)                      # outgoing direction ω_o = −ω (ω: aperture point → board point)
     T = promote_type(eltype(ω_l), eltype(m.refractive_index_ink))
     Bd = zero(SMatrix{3, J, T, 3J}); Bs = zero(SMatrix{3, J, T, 3J})
     ω_l[3] <= 0 && return RadianceParts{J, T, 3J}(Bd, Bs)
-    ρ = physical_albedo(bd, 𝐛)   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
-    wv = texture_weight(ρ)                                                # the texture value blends ink ↔ no ink
-    α = 𝛂(m, wv); η = 𝛈(m, wv)
+    _, α, η = _radiance_material(m, ρ)
     h = key_hash(s, key)
     Tu = typeof(ForwardDiff.value(zero(T)))
     pdf_guard = eps(Tu) * Tu(10000)

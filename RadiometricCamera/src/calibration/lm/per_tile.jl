@@ -717,7 +717,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         board32 = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
         # the estimator once per ray (`_launch_record`: its geometry in `ANCHOR_FLOAT`)
         recordf = _record_inputs(s, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light,
-                                 (v32, vig32j, m32, l32j, board32, st32), lensf)
+                                 (m32, l32j, board32), lensf)
         lay.NH > 0 && (heightf = (k, H, v32, vig32j, m32, l32j, board32, st32, m.surface.h))
         for c0 in _chunk_starts(P, C)
             push!(jacf, (c0, _tile_chunk(Val(F), c0, C, lay, pose, foc, ap, m, lens32, dc.board)))
@@ -729,7 +729,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
     vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
     return _on_worker() do
         fo = _launch_rows(fluxf, be, px)
-        rays = recordf === nothing ? nothing : _launch_record(be, px, idx, k, H, recordf.inputs...; recordf.kw...)
+        rays = recordf === nothing ? nothing : _launch_record(be, px, idx, k, H, recordf...)
         ho = heightf === nothing ? nothing : _launch_rows(_height_functor(heightf..., px, rays), be, idx; workgroupsize = 128)
         co = [(c0, _launch_rows(_JacAt(Int32(k), Int32(H), vd, vig32j, md, l32j, sd, st32, Val(C), fb, db, px, rays), be, idx; workgroupsize = 128))
               for (c0, (vd, md, sd, fb, db)) in jacf]
@@ -741,7 +741,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         # the batch's outputs are read by its tiles' row kernels on other queues (the main task's, the window's workers) and never
         # written again: out of the per-buffer queue tracking (`_shared_read_only!`), as the view's pixel lists
         foreach(a -> a === nothing || _shared_read_only!(be, a), (fo, S, po, ho))
-        bytes = _device_bytes(fo, rays === nothing ? nothing : rays.J, ho, po, S) + sum(x -> sizeof(x[2]), co; init = 0)
+        bytes = _device_bytes(fo, rays, ho, po, S) + sum(x -> sizeof(x[2]), co; init = 0)
         (; key, flux, flux_d = fo, px, C, S, parts = po, heights = ho, bytes)
     end
 end

@@ -210,32 +210,30 @@ _row_type(f::_RecordAt) = SVector{3, _float_of(f.st)}
                                        nothing, RadianceRecord(f.out, (Int(i) - 1) * nr, f.est)))
 end
 """
-    _radiance_record_device(be, px, idx, k, H, view, vig, mat, light, board, st; est = nothing, anchor) -> RecordedRays
+    _radiance_record_device(be, px, idx, k, H, view, vig, mat, light, board, st, est, anchor) -> RecordedRays
 
 The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (view, material,
 lighting, scene with its surface): per ray `[L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed
 where no ray reached, with the target `anchor` (`ANCHOR_FLOAT`) its readers look the albedo up on (`RecordedRays`). Its geometry is in
-the inputs' float (`ANCHOR_FLOAT` on a device: `_anchor_inputs`), its estimator and rows in the kernels' float on `est`
-(`(; mat, light, board)`; `nothing`: the inputs' own, one float). The chunks, the height kernel and the parts of the same parameters
-read it (`rays`) instead of carrying their partials through the estimator.
+the inputs' float (`ANCHOR_FLOAT`: `_anchor_inputs`), its estimator and rows in the kernels' float on `est` (`(; mat, light, board)`;
+`_record_inputs` gives the last eight arguments). The chunks, the height kernel and the parts of the same parameters read it (`rays`)
+instead of carrying their partials through the estimator.
 """
-function _radiance_record_device(be, args...; kw...)
-    out = _launch_record(be, args...; kw...)
+function _radiance_record_device(be, args...)
+    out = _launch_record(be, args...)
     KA.synchronize(be)
     return out
 end
 """`_radiance_record_device` without the wait (this task's device queue orders the kernels that read it after it)."""
-function _launch_record(be, px, idx, k, H, view, vig, mat, light, board, st; est = nothing, anchor)
+function _launch_record(be, px, idx, k, H, view, vig, mat, light, board, st, est, anchor)
     nr = length(st.sensor) * n_disc(st.aperture)
-    F = est === nothing ? _float_of(st) : _target_float(est.board)
+    F = _float_of(est.board)
     out = reinterpret(RadianceJac{F}, KA.zeros(be, F, length(RadianceJac{F}) * nr * length(px)))
     f = _RecordAt(Int32(k), Int32(H), view, vig, mat, light, board, st, px, out, est)
     haskey(_CAPACITY, typeof(be)) || _note_capacity!(be, f, idx, 128)   # the LM's heaviest kernel: its occupancy sizes the window
     _launch_rows(f, be, idx; workgroupsize = 128)
     return RecordedRays(out, anchor)
 end
-"""The float of a textured target's page and maps."""
-_target_float(::TexturedTarget{T}) where {T} = T
 
 """The resident threads of the radiance-record kernel by backend type (`_note_capacity!`): the capacity the blocks' window divides
 (`_window_width`); `nothing` on a backend without an occupancy query. Keyed by the backend, not one value: the package image's
@@ -262,7 +260,10 @@ function _note_capacity!(be, f, idx, workgroupsize)
     return nothing
 end
 """The device bytes of the arrays `xs` (`nothing`s skipped): a block's job's buffers, the window's memory bound (`_window_width`)."""
-_device_bytes(xs...) = sum(x -> x === nothing ? 0 : sizeof(x), xs; init = 0)
+_device_bytes(xs...) = sum(_device_bytes1, xs; init = 0)
+_device_bytes1(::Nothing) = 0
+_device_bytes1(x) = sizeof(x)
+_device_bytes1(r::RecordedRays) = sizeof(r.J)              # (the anchor is the state's scene, counted once with it)
 
 """The nodal-height partials `∂Φ/∂h` of a masked pixel id of view `k` (`Φ_pixel`'s height mode, `HeightRays`): `3 × HEIGHT_NC`
 in the kernel's float type, column-major. The device Jacobian's height columns come from this kernel, not from dual slots of the chunks (a height

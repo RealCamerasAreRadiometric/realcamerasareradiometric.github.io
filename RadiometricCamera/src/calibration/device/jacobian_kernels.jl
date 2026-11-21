@@ -431,8 +431,8 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     vk = adapt(be, VgtkCore.convert_eltype(F, view0))                 # adapt: a grid lens carries arrays
     mk = VgtkCore.convert_eltype(F, m.mat); boardk = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
     # the estimator once per ray, in the kernels' float; its geometry (the rays, the hits, the albedo there) in `ANCHOR_FLOAT`
-    rec = _record_inputs(s, view0, VgtkCore.model(vg), m, lt.light, (vk, vigk, mk, lk, boardk, stk))
-    rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), rec.inputs...; rec.kw...)   # complete: the chunks' queues read it
+    rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s),
+                                   _record_inputs(s, view0, VgtkCore.model(vg), m, lt.light, (mk, lk, boardk))...)   # complete: the chunks' queues read it
     _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
     hs = _each_chunk(be, c0s) do c0                                   # the chunks' launches overlap (one worker queue each)
         _view_chunk(Val(F), s, r, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, dc.board, stk, rays)
@@ -454,23 +454,20 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
-    _note_block_bytes!(s, _device_bytes(rays.J, S, hh, ph, flux, Jd, rd) +
+    _note_block_bytes!(s, _device_bytes(rays, S, hh, ph, flux, Jd, rd) +
                        sum(sizeof, hs; init = 0))
     return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, ap, m))
 end
 """
-    _record_inputs(s, view, vig, m::MaterialVar, light, kernel_inputs[, lens]) -> (; inputs, kw)
+    _record_inputs(s, view, vig, m::MaterialVar, light, (mat, light, board)[, lens]) -> Tuple
 
-The arguments of THE radiance record (`_launch_record(be, px, idx, k, H, inputs...; kw...)`) at the trial parameters: its geometry in
-`ANCHOR_FLOAT` (`_anchor_inputs` of the host `view`, `vig`, `m`, `light`; `lens` a tile batch's assembled grid), its estimator in the
-kernels' float on `kernel_inputs` = `(view, vig, mat, light, board, st)` (adapted), the anchor of its readers' lookups. On the CPU
-backend the two floats agree: the kernels' inputs alone.
+The last eight arguments of THE radiance record (`_launch_record(be, px, idx, k, H, _record_inputs(…)...)`) at the trial parameters:
+its geometry in `ANCHOR_FLOAT` (`_anchor_inputs` of the host `view`, `vig`, `m`, `light`; `lens` a tile batch's assembled grid), its
+estimator's inputs in the kernels' float (the material, the light and the board, adapted), the anchor of its readers' lookups.
 """
-function _record_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, kernel_inputs, lens = nothing)
-    _kernel_float(s.backend) === ANCHOR_FLOAT && return (; inputs = kernel_inputs, kw = (; anchor = _anchor_board(s)))
-    _, _, mk, lk, boardk, _ = kernel_inputs
+function _record_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, (mk, lk, boardk), lens = nothing)
     a = _anchor_inputs(s, view, vig, m, light, lens)
-    return (; inputs = (a.view, a.vig, a.mat, a.light, a.board, a.st), kw = (; est = (; mat = mk, light = lk, board = boardk), anchor = _anchor_board(s)))
+    return (a.view, a.vig, a.mat, a.light, a.board, a.st, (; mat = mk, light = lk, board = boardk), _anchor_board(s))
 end
 """The device layouts of the views' Jacobians, keyed by the layout (`_cached_layout`; every view of a state has the same layout for
 the same free blocks), kept in the device cache."""

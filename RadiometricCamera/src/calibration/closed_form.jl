@@ -49,10 +49,10 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
     for la in 1:n_disc(st.aperture)
         𝐚 = 𝐚_sample(st.aperture, la, rs)
         o, d = world_ray(view, 𝐩, 𝐚)
-        sray, 𝐱 = _parts_hit(lrays, (ks - 1) * n_disc(st.aperture) + la, rays, o, d)
+        ri = (ks - 1) * n_disc(st.aperture) + la
+        sray, 𝐱 = _parts_hit(lrays, ri, rays, o, d)
         (isfinite(sray) && sray > 0) || continue
-        𝐛 = chart(bd, 𝐱)
-        parts = radiance_parts(bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱, d)
+        parts = _radiance_parts(bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), _parts_albedo(lrays, ri, bd, 𝐱), 𝐱, d)
         w = 𝐚_weight(st.aperture, la, rs) * scale
         Bd += w * parts.Bd
         Bs += w * parts.Bs
@@ -60,6 +60,10 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
     return Bd, Bs
 end
 
+"""The albedo at a parts ray's hit `𝐱` (`_sample_parts`): the target's `physical_albedo` there, or — beside a radiance record (`lrays`)
+— its anchored lookup at the record's hit of the ray (`anchored_albedo`, `ANCHOR_FLOAT`), as the chunks read it."""
+@inline _parts_albedo(::Nothing, ri, bd, 𝐱) = physical_albedo(bd, chart(bd, 𝐱))
+@inline _parts_albedo(lr::RadianceRays, ri, bd, 𝐱) = anchored_albedo(with_state(lr.anchor, bd.state), _recorded_anchor(lr, ri), zero(𝐱))
 """The hit of a parts ray (`_sample_parts`): `intersect_board`, or — beside a radiance record of the same parameters (`lrays`, the LM's
 parts kernel) — the record's hit of that ray (`_ray_hit`), so the height field's root is not found again; a ray the record did not
 reach (zeros: it misses the board, or meets it from behind, where its parts are zero) is skipped."""
@@ -157,7 +161,7 @@ function all_parts(s::CalibrationState)
     be = s.backend
     dc = _ensure_device!(s)
     board = _anchor_board(s)                                                  # the Float64 scene on the backend
-    G = Float64
+    G = ANCHOR_FLOAT
     mat = VgtkCore.convert_eltype(G, s.mat); light = VgtkCore.convert_eltype(G, s.light); st = VgtkCore.convert_eltype(G, s.settings)
     R = _parts_type(light, st)
     bufs = [_launch_rows(_PixelPartsAt(Int32(k), Int32(_image_height(s)), adapt(be, VgtkCore.convert_eltype(G, view_of(s, k))), mat, light, board, st), be, dc.px[k])
