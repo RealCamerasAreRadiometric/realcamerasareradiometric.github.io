@@ -31,10 +31,12 @@ bash experiments/scripts/reproduce/reproduce_results_desktop.sh --only=texture_r
 
 The stage graph of record is `configs/reproduce.toml` (which launcher runs which driver on which config of record, after what);
 the runner is VisualGeometryToolkitEval's (Reproduce: `reproduce_main`, its docs' "One command: the runner"), and so are the
-machine profiles (`the B200 server`: one Slurm node, 8 × B200, partition `gpu`, one GPU per GPU task; `desktop`: one RTX 4090, no
-scheduler, `CUDA_VISIBLE_DEVICES=0`). Each stage's CPUs and memory are the graph's (`cpus_per_task`, `mem_per_cpu` per stage).
-Where this project's data and results are on each machine is `[sites.<name>]` of the graph — the one place the paths are written —
-and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_SITE` or `--data-root` / `--results-root` override them.
+machine profiles (the B200 server's: one Slurm node, 8 × B200, partition `gpu`, one GPU per GPU task; `vcai`: the Slurm cluster, its
+NFS project space; `desktop`: one RTX 4090, no scheduler, `CUDA_VISIBLE_DEVICES=0`). Each stage's CPUs and memory are the graph's (`cpus_per_task`, `mem_per_cpu` per stage).
+Where this project's data and results are on each machine is the site profile's `[storage]` (`data_root`, `results_root`,
+`artifact_store`) — the one place a machine's paths are written — and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_ARTIFACT_STORE`
+or `--data-root` / `--results-root` override them; a machine whose profile names no data root reads the artifact view of the
+store (`scripts/fetch_data.jl`).
 
 - **Hierarchical.** No flags: every stage of record — setup, the front ends, the image regions and distance maps, the chrome
   refinements (decode first), the chrome evaluations, the texture sets, the f/4 refinements, then `regenerate_paper`
@@ -70,8 +72,8 @@ product of a later run of record must reproduce.
 
 ### Adding your machine
 
-Copy VisualGeometryToolkitEval's `configs/sites/_template.toml` to `<machine>.toml`, add `[sites.<machine>]` `data_root` and
-`results_root` to `configs/reproduce.toml` (or set `VGTK_DATA_ROOT` and `VGTK_RESULTS_ROOT`), and run
+Copy VisualGeometryToolkitEval's `configs/sites/_template.toml` to `<machine>.toml` with its `[storage]` roots and artifact store
+(or set `VGTK_DATA_ROOT`, `VGTK_RESULTS_ROOT` and `VGTK_ARTIFACT_STORE`), run `scripts/fetch_data.jl` with `VGTK_SITE` naming it, and run
 `bash experiments/scripts/reproduce/reproduce.sh --site=path/to/<machine>.toml --dry-run`: the commands, the roots and the missing
 inputs, with nothing run.
 

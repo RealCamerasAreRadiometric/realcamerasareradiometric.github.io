@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- **Changed:** on VisualGeometryToolkitCore 0.13 (`[compat]` `"0.13"`; its removed spherical spline and dilogarithm were
+  never called here), in the package and every workspace member.
+
+### experiments (the storage design: VisualGeometryToolkitEval 0.10)
+
+- **Changed:** every input of record is a DataArtifacts tier of `configs/data_artifacts.toml`, one entry per tarball of the
+  paper's Zenodo records (four input records under 50 GB each, and the container image's own record), packed 2026-11-21 from
+  the data root of the run of record, tree hash and sha256 bound in `Artifacts.toml` (each record's placeholder until it is
+  published) and the trees installed in the vcai site's artifact store. Each entry names the tier its inputs' configs use
+  (`rc_raw_photos`, `rc_baselines`, `rc_calibration`, `rc_thorlabs`, `unpublished`), so no run is re-keyed. The tiers of
+  2026-10-29 on the private Hugging Face dataset are retired (optional, kept bound).
+- **Changed:** `scripts/fetch_data.jl` is DataArtifacts' `fetch_data!`: the trees install into the artifact store, never the
+  depot. Nothing under `data/` is tracked but its README (`DATA_LOCATIONS.md` removed).
+- **Changed:** no machine path or host name in a config, test, fixture or document: a machine's roots are its site profile's
+  (`VGTK_SITE`), else the environment; the stage graph's per-machine `[sites]` roots of the B200 server are removed; the run of record's
+  `[launch]` names `results_dir` and `tree_dir` under the machine's results base and takes julia and the depot from the
+  site's environment; `run_of_record.jl` takes its site from `--site` or `VGTK_SITE`.
+- **Added:** the privacy rule: the photographs DSC06045 and DSC06052–DSC06055 are in no tier, tree, tarball or record
+  (`src/data.jl` `PRIVATE_PHOTOGRAPHS`; `make_artifacts.jl` refuses them and `--check` lists staged tarballs; the suite checks
+  every entry and installed tree).
+
 Performance and cleanup (round 3). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
 
 - **Changed:** the Jacobian's row kernel launches through VisualGeometryToolkitCore's `_launch_rows_on!` (`OnBackend` with the
@@ -14,7 +35,7 @@ Performance and cleanup (round 3). No calibration number moves beyond the roundi
 - **Tests:** the focus columns of the sensor-grid thin plate spline against central differences of the tile residual (the check of
   the removed direction-chart focus had been the only one).
 
-### experiments
+### experiments (round 3)
 
 - **Changed:** `page_solves` preconditions each regularised texture solve (λ > 0) by the normal matrix's diagonal
   `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; VisualGeometryToolkitCore's `cgls` `diagonal`); the unregularised solve stays
