@@ -7,8 +7,11 @@ produced by a tracked driver under `scripts/` from a config of record under
 [paper-project conventions](https://visualgeometrytoolkit.github.io/VisualGeometryToolkitEval/stable/paper-projects/)
 (a [DrWatson](https://juliadynamics.github.io/DrWatson.jl/) project, not a
 package). The environment is this project's own (RadiometricCamera from
-`../RadiometricCamera`, its `[sources]`): its Manifest is not tracked, and the stack's 0.5 packages resolve from
-the registries (General; PanoramaStitching from CauRegistry).
+`../RadiometricCamera`, its `[sources]`): its Manifest is not tracked, and the stack's packages resolve from
+the registries (the Visual Geometry Toolkit from General; the Visual Radiometry Toolkit from
+[CauRegistry](https://github.com/prittjam/CauRegistry.jl), added once beside General). Until their next releases are
+registered, PanoramaStitching, BlobBoards and LocalOptimizationDoneRight come from the branches its `[sources]` name
+(each marked TEMPORARY there, with the release it waits for).
 
 Run from the repository root:
 

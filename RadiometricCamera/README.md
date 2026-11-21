@@ -12,14 +12,17 @@ Kalibr, OpenCV, any VisualGeometryToolkitCore lens), for researchers who need a 
 
 ## Installation
 
-Install the package from its repository, where it lives in the subdirectory `RadiometricCamera/` (registration in General is
-planned), and the stack package the example uses:
+RadiometricCamera and the Visual Radiometry Toolkit packages it builds on (VisualRadiometryToolkitCore,
+VisualRadiometryToolkitIO) are registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl); the Visual Geometry Toolkit
+packages are in General. Add that registry once, beside General, then the package and the two stack packages the example uses
+(registration in General is planned):
 
 ```julia-repl
-pkg> add https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io:RadiometricCamera VisualGeometryToolkitCore https://github.com/VisualRadiometryToolkit/visualradiometrytoolkit.github.io:VisualRadiometryToolkitCore
+pkg> registry add General https://github.com/prittjam/CauRegistry.jl
+pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore
 ```
 
-(`<repository URL>:RadiometricCamera` is Pkg's spelling of the subdirectory: `Pkg.add(url = …, subdir = "RadiometricCamera")`.)
+(`registry add` names General too, so that a new Julia installation gets both registries.)
 
 Julia 1.13 or later. A CUDA GPU is optional: the CPU backend runs everything, more slowly.
 
@@ -75,7 +78,9 @@ The paper's project page is <https://realcamerasareradiometric.github.io>; the p
 <https://realcamerasareradiometric.github.io/paper.pdf>.
 
 RadiometricCamera builds on the VisualGeometryToolkit stack: VisualGeometryToolkitCore's cameras, lenses, generic models and
-thin-plate splines, VisualGeometryToolkitIO's records and VisualGeometryToolkitFeatures' image readers. The experiments that reproduce the
+thin-plate splines, VisualGeometryToolkitIO's records and VisualGeometryToolkitFeatures' image readers. It builds on the Visual Radiometry Toolkit for the generic radiometric layer:
+VisualRadiometryToolkitCore's radiometric camera, focus surface, quadrature, material, textured target, vignetting models and light,
+and VisualRadiometryToolkitIO's records of the vignetting and the light. The experiments that reproduce the
 paper are `experiments/` beside this package in its repository: staged drivers with configs of record
 ([experiments/README.md](../experiments/README.md), [experiments/REPRODUCE.md](../experiments/REPRODUCE.md)).
 

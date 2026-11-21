@@ -20,10 +20,12 @@ Install the package (Julia 1.13 or later):
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io", subdir = "RadiometricCamera")
+Pkg.Registry.add([Pkg.RegistrySpec(name = "General"), Pkg.RegistrySpec(url = "https://github.com/prittjam/CauRegistry.jl")])   # once: the package's registry, beside General
+Pkg.add("RadiometricCamera")
 ```
 
-Registration in the General registry is planned. Only `RadiometricCamera/` is installed; the experiments and the manuscript are not downloaded with it. To run the experiments,
+The package and the Visual Radiometry Toolkit packages it builds on are registered in
+[CauRegistry](https://github.com/prittjam/CauRegistry.jl); registration in the General registry is planned. Only `RadiometricCamera/` is installed; the experiments and the manuscript are not downloaded with it. To run the experiments,
 clone the repository and instantiate both environments:
 
 ```sh

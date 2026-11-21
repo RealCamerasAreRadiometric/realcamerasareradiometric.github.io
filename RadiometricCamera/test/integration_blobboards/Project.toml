@@ -22,20 +22,12 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 
 [sources]
-# TEMPORARY (the migration of the generic radiometric types to VisualRadiometryToolkitCore, 2026-11-20): VisualRadiometryToolkitCore
-# from its repository's `migration` branch and the Visual Geometry Toolkit packages from the branch that retires those types, until
-# they are registered. Removed before a release: a released tree resolves from the registries alone.
-VisualRadiometryToolkitCore = {url = "https://github.com/VisualRadiometryToolkit/visualradiometrytoolkit.github.io", rev = "migration", subdir = "VisualRadiometryToolkitCore"}
-VisualGeometryToolkitCore = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitCore"}
-VisualGeometryToolkitIO = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitIO"}
-VisualGeometryToolkitEstimation = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitEstimation"}
-VisualGeometryToolkitFeatures = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitFeatures"}
 RadiometricCamera = {path = "../.."}
 
 [compat]
 julia = "1.13"
 VisualGeometryToolkitCore = "0.12"
-VisualGeometryToolkitEstimation = "0.12"
-VisualGeometryToolkitFeatures = "0.9.8"
+VisualGeometryToolkitEstimation = "0.12.1"
+VisualGeometryToolkitFeatures = "0.9.9"
 VisualGeometryToolkitIO = "0.11"
-VisualRadiometryToolkitCore = "0.0.1"
+VisualRadiometryToolkitCore = "0.1"

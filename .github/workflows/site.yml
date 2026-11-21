@@ -71,6 +71,7 @@ jobs:
           path: paper/build
       - name: Instantiate the site and the package docs environments
         run: |
+          julia -e 'using Pkg; Pkg.Registry.add([Pkg.RegistrySpec(name = "General"), Pkg.RegistrySpec(url = "https://github.com/prittjam/CauRegistry.jl")])'   # CauRegistry: the Visual Radiometry Toolkit packages
           julia --project=site -e 'using Pkg; Pkg.instantiate()'
           julia --project=RadiometricCamera/docs -e 'using Pkg; Pkg.instantiate()'
       # The landing page, the package docs (doctests, checkdocs, linkcheck; any warning fails) and the paper, in site/build.

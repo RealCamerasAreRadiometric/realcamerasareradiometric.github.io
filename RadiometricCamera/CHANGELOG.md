@@ -1,10 +1,38 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-21)
 
-The generic radiometric layer is VisualRadiometryToolkitCore's (branch `vrtk/port`, 2026-11-20). RadiometricCamera keeps the paper's
-calibration method and depends on VisualRadiometryToolkitCore (the Visual Radiometry Toolkit extends the Visual Geometry Toolkit). No
-number of a calibration changes: the moved code is the same arithmetic, and the goldens hold unmodified.
+The port onto the Visual Radiometry Toolkit, a breaking release. The generic radiometric layer is VisualRadiometryToolkitCore's
+(2026-11-20). RadiometricCamera keeps the paper's calibration method and depends on VisualRadiometryToolkitCore and
+VisualRadiometryToolkitIO (the Visual Radiometry Toolkit extends the Visual Geometry Toolkit). No number of a calibration changes:
+the moved code is the same arithmetic, and the goldens hold unmodified.
+
+The breaking changes in short (each is detailed below):
+
+- the radiometric camera, the focus surface, the sensor quadrature, the material and the vignetting models and light are
+  VisualRadiometryToolkitCore's: import them from there (`RadiometricCameraModel` stays exported here);
+- the board is VisualRadiometryToolkitCore's `TexturedTarget` (was `PrintedTarget`) and holds its own state (`TargetState`, was
+  `BoardSurface`); `Scene` and `with_surface` are gone, and the entry points take the camera, the pose and the board;
+- a camera composed from its geometric camera has `NoVignetting` unless a vignetting is given; a calibration asks for its flat
+  start, `flat_vignetting(geometric)`;
+- a radiometric camera's geometric camera is `geometric` (was `lens`);
+- the alternative focus parameterisations, their options (`focus.variant`, `focus.node_count`, `focus.perturb`) and the report
+  `focus_ab.json` are removed: the focus surface is the sensor-grid thin plate spline;
+- `green_photosite_mask` is `photosite_mask(m, :G)`;
+- the Visual Geometry Toolkit releases it runs on: VisualGeometryToolkitCore 0.12, VisualGeometryToolkitIO 0.11.
+
+The records are unchanged, except that a camera or state record of a removed focus surface type is refused by name.
+
+- **Installation:** RadiometricCamera, VisualRadiometryToolkitCore and VisualRadiometryToolkitIO are registered in CauRegistry
+  (<https://github.com/prittjam/CauRegistry.jl>): add that registry beside General, then `pkg> add RadiometricCamera` (the README's
+  install lines). The package resolves from the registries alone: its project files hold no `[sources]` but the workspace members'
+  path to the package.
+- **Dependencies:** VisualRadiometryToolkitCore 0.1 and VisualRadiometryToolkitIO 0.1 are new; compat VisualGeometryToolkitCore 0.12
+  (was 0.11), VisualGeometryToolkitIO 0.11 (was 0.10), VisualGeometryToolkitEstimation 0.12.1, VisualGeometryToolkitFeatures 0.9.9.
+  QuadGK is a test dependency only (the quadrature rules moved with the quadrature).
+- **Changed:** the vignetting and the light of a record (`rc/radiometric_camera`, `rc/calibration_state`) are written and read by
+  VisualRadiometryToolkitIO (its bodies of VisualRadiometryToolkitCore's types; were VisualGeometryToolkitIO's). The records'
+  schemas, keys and values are unchanged. A camera without vignetting has no vignetting body: saving it is refused by name.
 
 - **Moved to VisualRadiometryToolkitCore (breaking: no longer public names of RadiometricCamera):** the radiometric camera
   `RadiometricCameraModel` with `geometric`, `focus`, `aperture_radius`, `with_geometric`, `with_focus`, `with_aperture_radius`,
@@ -92,10 +120,10 @@ number of a calibration changes: the moved code is the same arithmetic, and the 
 - **Removed:** the refusal `lens(camera)` of a radiometric camera (the camera type is another package's: a method here would be type
   piracy); `lens(state)` is still refused by name. The record functions of a camera are RadiometricCamera's own (`_camera_body`), not
   methods of `JSON.lower` / `JSON.lift` on another package's type; the records are unchanged.
-- **Temporary:** `[sources]` in the project files point VisualRadiometryToolkitCore and the Visual Geometry Toolkit packages at their
-  migration branches until they are registered.
 
-Performance and composition (branch `perf/optimize-and-compose`, 2026-11-20). No number of a calibration changes beyond rounding:
+Performance and composition (2026-11-20; in this release too, and written before the port above: the names it adds —
+`Focus`, `with_geometric`, `with_focus`, `with_aperture_radius`, `geometric`, `focus`, `aperture_radius` — are
+VisualRadiometryToolkitCore's in 0.2.0, and the composed constructor's default vignetting is `NoVignetting`, as stated above). No number of a calibration changes beyond rounding:
 the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10).
 
 - **Added:** the radiometric camera composed from its geometric camera: `RadiometricCameraModel(geometric; focus, aperture_radius,

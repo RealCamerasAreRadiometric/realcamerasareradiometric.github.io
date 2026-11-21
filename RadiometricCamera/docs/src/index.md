@@ -14,11 +14,11 @@ identifiers.
 ## What it provides
 
 - **The radiometric camera** around any chief-ray model: `RadiometricCameraModel` (the geometric camera, the focus surface
-  `Focus`, the aperture radius and the vignetting — VisualGeometryToolkitCore's `TensorProductVignetting` and `RadialVignetting`,
+  `Focus`, the aperture radius and the vignetting — VisualRadiometryToolkitCore's `TensorProductVignetting` and `RadialVignetting`,
   with the calibration's gauge pin [`center_constraint`](@ref)) as one object, a photograph being the camera at a pose
   ([`render_view`](@ref)), and the radiometric back-projection `π̂⁻¹`.
 - **The board**: the printed board, VisualRadiometryToolkitCore's `TexturedTarget`, with its own state (its warping, printed edge and in-plane print error: `TargetState`), its radiometry
-  [`TargetRadiometry`](@ref) (the Cook–Torrance SVBSDF `Material` and the printed edge), and VisualGeometryToolkitCore's
+  [`TargetRadiometry`](@ref) (the Cook–Torrance SVBSDF `Material` and the printed edge), and VisualRadiometryToolkitCore's
   spherical-harmonics `EnvironmentLight`.
 - **Image formation**: the radiant flux of a pixel [`Φ_pixel`](@ref) and the render [`render_view`](@ref), by fixed quadrature
   rules on the pixel and the aperture and a Monte Carlo radiance with common random numbers.
@@ -37,14 +37,17 @@ symbol table, and the data conventions (COLMAP pixels, metres, the camera frame)
 
 ## Installation
 
-Install the package from its repository, where it lives in the subdirectory `RadiometricCamera/` (registration in General is
-planned), and the stack package the example uses:
+RadiometricCamera and the Visual Radiometry Toolkit packages it builds on (VisualRadiometryToolkitCore,
+VisualRadiometryToolkitIO) are registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl); the Visual Geometry Toolkit
+packages are in General. Add that registry once, beside General, then the package and the two stack packages the example uses
+(registration in General is planned):
 
 ```julia-repl
-pkg> add https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io:RadiometricCamera VisualGeometryToolkitCore https://github.com/VisualRadiometryToolkit/visualradiometrytoolkit.github.io:VisualRadiometryToolkitCore
+pkg> registry add General https://github.com/prittjam/CauRegistry.jl
+pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore
 ```
 
-(`<repository URL>:RadiometricCamera` is Pkg's spelling of the subdirectory: `Pkg.add(url = …, subdir = "RadiometricCamera")`.)
+(`registry add` names General too, so that a new Julia installation gets both registries.)
 
 Julia 1.13 or later. A CUDA GPU is optional: the CPU backend runs everything, more slowly.
 
@@ -104,7 +107,9 @@ count(mask)                     # 76800 = W × H: the board covers every pixel
 
 RadiometricCamera builds on the VisualGeometryToolkit stack: VisualGeometryToolkitCore's cameras, lenses, spline cameras
 (`SplineLens`) and thin-plate splines, VisualGeometryToolkitIO's records,
-VisualGeometryToolkitEstimation's fits and VisualGeometryToolkitFeatures' image readers. The experiments that reproduce the
+VisualGeometryToolkitEstimation's fits and VisualGeometryToolkitFeatures' image readers. It builds on the Visual Radiometry Toolkit for the generic radiometric layer:
+VisualRadiometryToolkitCore's radiometric camera, focus surface, quadrature, material, textured target, vignetting models and light,
+and VisualRadiometryToolkitIO's records of the vignetting and the light. The experiments that reproduce the
 paper are `experiments/` beside the package in its repository: staged drivers with configs of record, their inputs the published data tiers.
 
 ## Citing

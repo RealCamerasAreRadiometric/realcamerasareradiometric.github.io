@@ -47,6 +47,8 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: RadiometricCamera
+          # VisualRadiometryToolkitCore and VisualRadiometryToolkitIO are registered in CauRegistry (General is added with it)
+          localregistry: https://github.com/prittjam/CauRegistry.jl
       - uses: julia-actions/julia-runtest@v1
         with:
           project: RadiometricCamera
@@ -73,7 +75,9 @@ jobs:
       - uses: julia-actions/cache@v2
       # docs/ is a member of the package's workspace: instantiating it resolves the package and the docs together.
       - name: Instantiate the docs environment
-        run: julia --project=RadiometricCamera/docs -e 'using Pkg; Pkg.instantiate()'
+        run: |
+          julia -e 'using Pkg; Pkg.Registry.add([Pkg.RegistrySpec(name = "General"), Pkg.RegistrySpec(url = "https://github.com/prittjam/CauRegistry.jl")])'   # CauRegistry: the Visual Radiometry Toolkit packages
+          julia --project=RadiometricCamera/docs -e 'using Pkg; Pkg.instantiate()'
       # The doctests, the @example blocks, checkdocs = :public and the link check; any warning fails the build (no warnonly).
       - name: Build the documentation
         run: julia --color=yes --project=RadiometricCamera/docs --startup-file=no RadiometricCamera/docs/make.jl
