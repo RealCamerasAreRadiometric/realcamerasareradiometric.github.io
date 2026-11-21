@@ -42,7 +42,7 @@
 #
 # `inferred` lists the return type inference gives for the entry points (a non-concrete one is a type instability at the call).
 # =============================================================================
-using RadiometricCamera, VisualGeometryToolkitCore, StaticArrays, Printf
+using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore, StaticArrays, Printf   # (the README's three)
 using VisualGeometryToolkitCore: cost
 import JSON, NLLSsolver, Profile
 import KernelAbstractions as KA

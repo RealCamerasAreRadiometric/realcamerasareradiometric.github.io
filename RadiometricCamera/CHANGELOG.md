@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Performance and cleanup (round 3). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
+
+- **Changed:** the nodal-height kernel takes VisualGeometryToolkitCore's `intersection_at` at the radiance record's hit (the
+  implicit-function step alone; the height field's Newton is the record's). Its partials are the root's to rounding.
+- **Changed:** the Jacobian's row kernel launches through VisualGeometryToolkitCore's `_launch_rows_on!` (`OnBackend` with the
+  per-pixel workgroup, `_pixel_rows_exec`) and `J r` through its `_matvec!` (on CUDA its one-column matrix product): RC's
+  `_launch_pixel_rows!` and the CUDA extension's `_rows_times` are removed.
+- **Added:** the run record (`parameters.json`) carries `focus_options` beside `vignetting_options`: `[focus.smoothness]` as applied
+  and its row weight β Σϕ²/N (`focus_smoothness!`); `nothing` without a focus smoothness.
+- **Fixed:** `benchmark/run.jl` named its scene's board twice (a syntax error since the port onto the textured target).
+- **Tests:** the focus columns of the sensor-grid thin plate spline against central differences of the tile residual (the check of
+  the removed direction-chart focus had been the only one).
+
+### experiments
+
+- **Changed:** `page_solves` preconditions each regularised texture solve (λ > 0) by the normal matrix's diagonal
+  `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; VisualGeometryToolkitCore's `cgls` `diagonal`); the unregularised solve stays
+  unpreconditioned (ill-posed: the scaling moves the texels the rows barely see by 10²–10³). The regularised textures move within the
+  solver's tolerance.
+- **Tests:** the sampling-strategy study's `focus_metrics` (a dome, a flat focus, a node at infinity).
+
 ## 0.2.0 (2026-11-21)
 
 The port onto the Visual Radiometry Toolkit, a breaking release. The generic radiometric layer is VisualRadiometryToolkitCore's
