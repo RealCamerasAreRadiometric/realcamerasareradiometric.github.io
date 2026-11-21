@@ -6,7 +6,7 @@
 # reach a machine; a no-op where the data are already bound.
 #
 #   julia --project=experiments experiments/scripts/fetch_data.jl                 the required tiers
-#   julia --project=experiments experiments/scripts/fetch_data.jl --all           every tier
+#   julia --project=experiments experiments/scripts/fetch_data.jl --all           every tier (the retired ones too: the private dataset)
 #   julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_targets_20261121,rc_golden_20261121
 #   julia --project=experiments experiments/scripts/fetch_data.jl --list          the catalog, nothing fetched
 #

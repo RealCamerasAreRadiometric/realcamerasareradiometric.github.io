@@ -22,7 +22,7 @@ const _ROR_KEYS = Dict("launch" => ("stages", "optional", "results_dir", "tree_d
     load_ror_config(path) -> Dict
 
 The run of record's config (configs/run_of_record.toml): `[launch] stages` (the stages the launch names, with what they run after),
-`results_dir` and `tree_dir` (patterns with `{version}`, relative to the machine's results base: [`ror_results_base`](@ref)), `[machine]` gpus and cpus (the node the plan schedules on), `[estimate]`
+`results_dir` and `tree_dir` (patterns with `{version}`, under the machine's results base: [`ror_results_base`](@ref)), `[machine]` gpus and cpus (the node the plan schedules on), `[estimate]`
 (`"<stage>"` or `"<stage>:<phase>"` = minutes per task; `default` and `precompile`), `[[require]]` (`what`, `stage`, and an optional
 `item` regex: an experiment the paper needs, which the launch must hold) and `[risk] tight_fraction`. Unknown tables or keys are refused.
 """
@@ -48,17 +48,16 @@ end
 ror_pattern(p::AbstractString, version::AbstractString) = replace(p, "{version}" => version)
 
 """
-    ror_results_base(site, project; env = ENV) -> String
+    ror_results_base(g, site; env = ENV) -> String
 
-The machine's results base, under which a release's results directory and tree are made: `env["VGTK_RESULTS_ROOT"]`, else the
-site profile's `[storage] results_root` for `project` (the runner's `site_root`); an error when neither names one (a profile
-without [storage]: give `--results-root`). Machine paths are the site profiles' alone.
+The machine's results base, under which a release's results directory and tree are made: the project's results root on the site,
+as the runner resolves it (`resolve_roots`: the graph's results variable, VGTK_RESULTS_ROOT, else the site profile's `[storage]
+results_root`); an error when nothing names one (a profile without [storage]: set the variable). Machine paths are the site
+profiles' alone.
 """
-function ror_results_base(site, project::AbstractString; env = ENV)
-    v = strip(get(env, "VGTK_RESULTS_ROOT", ""))
-    isempty(v) || return String(v)
-    r = site_root(site, "results_root", project)
-    isempty(r) && throw(ArgumentError("site $(site.name) names no [storage] results_root: set VGTK_RESULTS_ROOT or give --results-root"))
+function ror_results_base(g, site; env = ENV)
+    r = last(resolve_roots(g, site; env))
+    isempty(r) && throw(ArgumentError("site $(site.name) names no [storage] results_root: set $(g.results_env)"))
     return r
 end
 

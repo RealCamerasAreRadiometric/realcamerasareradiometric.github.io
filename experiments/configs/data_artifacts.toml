@@ -17,7 +17,7 @@
 # store, installed there from the packed tarballs), never from the depot.
 #
 # PRIVACY: the photographs DSC06045, DSC06052, DSC06053, DSC06054 and DSC06055 (the 14 mm Siemens-star session of 2026-11-03) show
-# another person and are never in a tier or a record, under any prefix or extension. Every photograph entry excludes them by its
+# another person and are never in a tier or a record, under any prefix or extension. Every entry of record excludes them by its
 # `!` globs; src/data.jl `private_photographs` is the one rule; scripts/make_artifacts.jl refuses to pack, and its --check mode a
 # staged tarball, that holds one; test/data_tests.jl checks every entry.
 #
@@ -395,7 +395,8 @@ provenance = "the 163 Siemens-star photographs (Sony FX3 ARW) of the 1 m board w
 kind = "tree"
 dir = "geometric_accuracy/data/target"
 filter = ["geometric_accuracy/data/target/siemens_1m/board/**", "geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml",
-          "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/**", "geometric_accuracy/data/target/blobboard_a4_6eb/**"]
+          "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/**", "geometric_accuracy/data/target/blobboard_a4_6eb/**",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 14
 mount = "data"
 record = "rc_vig_derived"
@@ -407,7 +408,8 @@ provenance = "the board generators (scripts/make_targets.jl and the generators o
 [artifacts.rc_thorlabs_target_20261121]
 kind = "tree"
 dir = "geometric_accuracy/data/target/thorlabs_r3l3s7n1"
-filter = ["geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"]
+filter = ["geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 1
 mount = "data"
 record = "rc_vig_derived"
@@ -419,7 +421,8 @@ provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.tom
 [artifacts.rc_golden_20261121]
 kind = "tree"
 dir = "geometric_accuracy/detector_bias/data/fisheye_full"
-filter = ["geometric_accuracy/detector_bias/data/fisheye_full/**"]
+filter = ["geometric_accuracy/detector_bias/data/fisheye_full/**",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 534
 mount = "data"
 record = "rc_vig_derived"
@@ -443,7 +446,8 @@ filter = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7
           "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_all_green_kb_cv2.json", "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_all_green_ocv14_cv2.json",
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_bc5_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ds_kalibr.json",
           "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_kb_cv2.json", "geometric_accuracy/records/tamron20261108_ag_all/tamron20261108_ag_all_green_ocv14_cv2.json",
-          "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json"]
+          "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 178
 mount = "data"
 record = "rc_vig_derived"
@@ -458,7 +462,8 @@ dir = "."
 filter = ["geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/schoeps_green/**", "geometric_accuracy/night_stars/data/fx3-14mm-texcal-20261109-g7/schoeps_green_w25/**",
           "geometric_accuracy/night_stars/data/fx3-tamron-siemens-17cm-all/schoeps_green_w40/**", "geometric_accuracy/night_stars/data/fx3-tamron-siemens-largeaperture-all-g4/schoeps_green_w40/**",
           "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_ds_start.json", "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_kb_start.json",
-          "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_ds_start.json", "geometric_accuracy/records/tamron_largeaperture_all/tamronla_all_green_kb_cv2.json"]
+          "geometric_accuracy/records/tamron17cm_si_all/tamron17cm_si_ds_start.json", "geometric_accuracy/records/tamron_largeaperture_all/tamronla_all_green_kb_cv2.json",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 72
 mount = "data"
 record = "rc_vig_derived"
@@ -471,7 +476,8 @@ provenance = "the front ends as they ran (experiments/frontends_history/ of tag 
 kind = "tree"
 dir = "geometric_accuracy/records"
 filter = ["geometric_accuracy/records/2710/fisheye_kb_fit.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_bc5_cv2.json",
-          "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_kb_cv2.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_ocv14_cv2.json"]
+          "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_kb_cv2.json", "geometric_accuracy/records/fisheye2710_all/fisheye2710_all_green_ocv14_cv2.json",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 4
 mount = "data"
 record = "rc_ga_b"
@@ -483,7 +489,8 @@ provenance = "fit_lens_detections.jl (branch paper-finalization) and OpenCV on S
 [artifacts.rc_sensor_model_20261121]
 kind = "tree"
 dir = "sensor_characterisation"
-filter = ["sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.*"]
+filter = ["sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.*",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 43
 mount = "data"
 record = "rc_vig_derived"
@@ -495,7 +502,8 @@ provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_fram
 [artifacts.rc_sensor_frames_20261121]
 kind = "tree"
 dir = "rc_sensor_characterisation_20261113"
-filter = ["rc_sensor_characterisation_20261113/**"]
+filter = ["rc_sensor_characterisation_20261113/**",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 645
 mount = "data"
 record = "rc_vig_derived"
@@ -507,7 +515,8 @@ provenance = "captured on 2026-11-13 by D. Nakath's protocol (the notes beside t
 [artifacts.rc_container_schoeps_20261121]
 kind = "tree"
 dir = "."
-filter = ["schoeps-camera_calibration-00ef4de-sm100.sqsh"]
+filter = ["schoeps-camera_calibration-00ef4de-sm100.sqsh",
+          "!**/*DSC06045*", "!**/*DSC06052*", "!**/*DSC06053*", "!**/*DSC06054*", "!**/*DSC06055*"]
 files = 1
 mount = "data"
 record = "rc_tools"
@@ -526,6 +535,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_raw_photos"
 what = "the 248 raw photographs (Sony FX3 ARW, Canon CR2) of the night-sky, board, macro, rooftop and diffuser sequences, and their manifest rc_raw_photos.sha256 (sha256 per file, paths relative to data_root())"
 provenance = "the cameras' raw files as captured (2026-09/10); their checksums are the Git LFS ids the files had in radiometric-camera c3766d7a; kept until 2026-10-29 in the Hugging Face dataset radiometric-camera/radiometric-camera-data (revision cb9c70691063505205c07a1684c841d40e788ebb, scripts/py/fetch_raw_photos.sh)"
 
@@ -540,6 +550,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_synthetic"
 what = "the synthetic ground truth of the detector-bias experiment: per root (fisheye_full, aprilgrid_fisheye, blobs_fisheye, blobs_fisheye_fieldstop) gt/ — the true lens and poses (camera.json, trajectory*.json), the design report (poses*.json), the render state, the linear photographs — the true board datasets (board_true/), and the render inputs (the true lenses, the radiometry of the 3-view fit)"
 provenance = "scripts/detector_bias.jl stage prepare with [ground_truth] regenerate (src/ground_truth.jl, ported from render_gt_siemens.jl / render_gt.jl / render_gt_blobs.jl; GPU renders 2026-10); the design half reproduces every gt/poses.json, trajectory.json and camera.json of this tier to 1e-12 px (2026-10-29); blobs_fisheye_fieldstop is blobs_fisheye behind the field stop (2604, 1738, 1318.68) px, regenerated byte for byte"
 
@@ -562,6 +573,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_baselines"
 what = "the outputs of the external detectors and geometric calibrations the experiments start from or compare against (Schöps camera_calibration, Kalibr, BlobBoards sessions, the Kannala–Brandt fits, the detector biases, the star detections and identifications, the macro pools, the rooftop registration and cells, the diffuser flat), the star catalogues, and provenance/: the experiments' tool scripts that made them"
 provenance = "each input's `provenance` in the configs of record (configs/experiments/*.toml); the tools as they ran, archived under provenance/experiments-07b7a682/ (the Python, shell and Julia recipes of radiometric-camera's former experiments/, retired 2026-10-29)"
 
@@ -585,6 +597,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_calibration"
 what = "the printed targets (the 1 m Siemens-star and AprilGrid boards: textures, features, board records, printed-edge distance maps; the 188 mm blob board; the macro board) and every input of the three golden calibration cases blob_kb, siemens_coarse_full and fisheye_nc_selfcheck (configs/calibration/): enough on its own for the package's golden gate"
 provenance = "the board generators (siemens_board.py, aprilgrid_board.py, macro_board.py, writing through src/boards.jl; the distance maps by data/target/make_sdf.sh, byte-identical on regeneration) and BlobBoards' export of board 0fd; the case inputs as in rc_synthetic and rc_baselines"
 
@@ -597,6 +610,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_thorlabs"
 what = "the Thorlabs R3L3S7N1 negative grid distortion target — its target record (target.json: 17 x 17 dots at 5.000 mm, 0.500 mm dots on 90 mm soda-lime glass, the maker's dimensions to +/-0.005 mm, calibration Rigid) — and 17 photographs of it, backlit on a light panel and seen through the glass (photos/f8_exp400_iso80/: Sony DSC-HX400V, 4.3 mm, f/8, 1/400 s, ISO 80, 5184 x 3888 JPEG) — and the camera of record that photographed it (camera/cameras.json: vgio/cameras/v3, hx400v-4.3mm, with its run record _config.toml and _provenance.toml)"
 provenance = "target.json: scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024; invoice MI4665194), byte-identical on regeneration; the photographs as captured on 2026-10-21 (LightRigCalibration.jl data/thorlabs_target/f8_exp400_iso80, not under version control there); camera/: LightRigCalibration.jl thesis/data/exp_pro/calibrate/calibrate-e13bb6ffda7692bb (scripts/calibrate.jl, CaliBlobs on the BlobBoards of the 2026-10-20 light-rig capture, commit 30472a7), copied byte for byte"
 
@@ -609,6 +623,7 @@ mount = "data"
 record = "rc"
 required = false
 retired = true
+tier = "rc_fx3_14mm"
 what = "one capture session of 2026-11-02 with the Sony ILME-FX3 and the Sigma 14 mm lens (EXIF LensModel \"DT 14mm F2.8 SAM\") at f/22, ISO 100: 414 raw photographs (ARW, 14-bit, 4256 x 2848) of three targets — raw/thorlabs_r3l3s7n1/ (111, DSC05464-DSC05576, 1/4 s, 10:22-10:39: the Thorlabs R3L3S7N1 dot grid of rc_thorlabs, its brightest dot pixels at the sensor's white level), raw/siemens_stars/ (152, DSC05577-DSC05728, 2 s, 11:18-11:32) and raw/aprilgrid/ (151, DSC05729-DSC05879, 2 s, 11:34-11:50) — and their manifest raw.sha256 (sha256 per file, paths relative to data_root())"
 provenance = "the camera's raw files as captured on 2026-11-02 (EXIF: model, lens, f-number, exposure, ISO, time), uploaded to the Hugging Face dataset radiometric-camera/radiometric-camera-data as 02.11.26/14mm/{chrome,SiemensStars,AprilGrid}/ (revision 09d714b32fbaae894769ccaa92028f450a94224c) and placed here unchanged; raw.sha256 is the Git LFS sha256 of each file at that revision, every file verified against it. The setup (the light, the side of the glass facing the camera, the camera's motion between frames) is not recorded"
 

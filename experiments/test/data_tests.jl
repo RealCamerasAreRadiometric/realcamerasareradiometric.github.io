@@ -14,14 +14,14 @@
     include(srcdir("drivers.jl"))
     include(srcdir("calibration.jl"))
     include(srcdir("data.jl"))
-    using .DataTiers: DataTiers, tier_of, tier_entries, unpacked_entries, PRIVATE_PHOTOGRAPHS, private_photographs
+    using .DataTiers: tier_of, entries_of_record, tier_entries, unpacked_entries, PRIVATE_PHOTOGRAPHS, private_photographs
     using VisualGeometryToolkitEval.DataArtifacts: load_catalog, catalog_violations, artifact_files, required_artifacts
-    import VisualGeometryToolkitEval.DataArtifacts: _glob_regex      # Eval's glob rule (the catalog's `filter`), for the static coverage
+    using VisualGeometryToolkitCore: artifact_store
 
     const CATALOG = load_catalog(projectdir("configs", "data_artifacts.toml"))
     const TIERS = tier_entries(CATALOG)                                   # tier => [entry, …] (the entries of record)
-    const OF_RECORD = sort(reduce(vcat, values(TIERS)))
-    const RETIRED = sort([n for (n, a) in CATALOG.artifacts if get(a, "retired", false) === true])
+    const OF_RECORD = entries_of_record(CATALOG)
+    const RETIRED = sort(setdiff(keys(CATALOG.artifacts), OF_RECORD))
 
     """Every (config, input id, tier, path) of the configs of record: the experiments' [inputs] and the calibration cases' [pipeline]
     inputs (tier rc_calibration; a case's `io.images` as the photographs of its `io.views`, and its `[experiment] dataset`, the case's
@@ -48,13 +48,28 @@
         return out
     end
 
-    "Whether entry `n`'s `filter` selects the data_root()-relative path `p` (a file) or every file below it (a directory input)."
-    function selects(n, p)
-        globs = String.(CATALOG.artifacts[n]["filter"])
-        inc, exc = filter(g -> !startswith(g, "!"), globs), [g[2:end] for g in globs if startswith(g, "!")]
-        any(g -> occursin(_glob_regex(g), p), exc) && return false
-        return any(g -> occursin(_glob_regex(g), p) || g == p * "/**" ||
-                        (endswith(g, "/**") && startswith(p, chopsuffix(g, "**"))), inc)
+    """The files each entry of record selects (Eval's own `artifact_files`, its filter rule) from a PROBE data root: an empty file at
+    every path of `paths` (a path without an extension, a directory input, gets one file `_probe` below it). `entry => Set(files)`."""
+    function probe_selection(paths)
+        root = mktempdir()
+        for p in paths
+            f = isempty(splitext(p)[2]) ? joinpath(root, p, "_probe") : joinpath(root, p)
+            mkpath(dirname(f)); touch(f)
+        end
+        return withenv("VGTK_DATA_ROOT" => root) do
+            Dict(n => Set(artifact_files(CATALOG, n).files) for n in OF_RECORD if isdir(joinpath(root, CATALOG.artifacts[n]["dir"])))
+        end
+    end
+    "Whether `sel` (a [`probe_selection`](@ref) set) holds the probe of `p`: the file itself, or a file below a directory input."
+    holds(sel, p) = p in sel || any(f -> startswith(f, p * "/"), sel)
+
+    "The installed tree of entry `n` in the artifact store, or `nothing` where the store does not hold it (or none resolves)."
+    function installed_tree(n)
+        store = try artifact_store() catch; return nothing end
+        meta = TOML.parsefile(CATALOG.artifacts_toml)
+        haskey(meta, n) || return nothing
+        t = joinpath(store.path, meta[n]["git-tree-sha1"])
+        return isdir(t) ? t : nothing
     end
 
     const UNPACKED = unpacked_entries(projectdir("configs", "data_artifacts.toml"))
@@ -67,8 +82,8 @@ end
     using Test
     using DrWatson
     using TOML: TOML
-    using .PublishedData: CATALOG, TIERS, OF_RECORD, RETIRED, UNPACKED, config_inputs, selects, tier_of, catalog_violations,
-        required_artifacts
+    using .PublishedData: CATALOG, TIERS, OF_RECORD, RETIRED, UNPACKED, config_inputs, probe_selection, holds, tier_of,
+        catalog_violations, required_artifacts
 
     @testset "the catalog loads and agrees with Artifacts.toml (A1)" begin
         @test CATALOG.artifacts_toml == projectdir("Artifacts.toml")
@@ -88,12 +103,12 @@ end
         ins = config_inputs()
         @test length(ins) > 50
         @test issubset(Set(t for (_, _, t, _) in ins), keys(TIERS))       # the configs' tier names (they key the runs), every one held
+        inside(p) = !isabspath(p) && !startswith(p, "~") && !(".." in splitpath(p))
+        sel = probe_selection([p for (_, _, _, p) in ins if inside(p)])
         for (cfg, id, tier, p) in ins
-            inside = !isabspath(p) && !startswith(p, "~") && !(".." in splitpath(p))
-            held = id == "[experiment] dataset" ? any(n -> any(g -> startswith(g, p * "/"), CATALOG.artifacts[n]["filter"]), get(TIERS, tier, String[])) :
-                   any(n -> selects(n, p), get(TIERS, tier, String[]))
-            (inside && held) || @info "input outside data_root() or in no entry of its tier" cfg id tier p
-            @test inside && held
+            held = inside(p) && any(n -> holds(get(sel, n, Set{String}()), p), get(TIERS, tier, String[]))
+            held || @info "input outside data_root() or in no entry of its tier" cfg id tier p
+            @test held
         end
     end
 
@@ -126,68 +141,46 @@ end
     end
 end
 
-# The privacy rule: the excluded photographs are in no entry, no installed tree and no staged tarball.
+# The privacy rule: the excluded photographs are in no entry and no installed tree; and each installed tree has the catalog's file count.
 @testitem "published data: the excluded photographs are never published" default_imports = false setup = [PublishedData] begin
     using Test
-    using DrWatson
-    using TOML: TOML
-    using .PublishedData: CATALOG, TIERS, OF_RECORD, PRIVATE_PHOTOGRAPHS, private_photographs, selects
-    using VisualGeometryToolkitCore: artifact_store
+    using .PublishedData: CATALOG, OF_RECORD, PRIVATE_PHOTOGRAPHS, private_photographs, probe_selection, installed_tree
 
     @testset "the rule: every prefix, directory and extension variant" begin
-        @test PRIVATE_PHOTOGRAPHS == ("DSC06045", "DSC06052", "DSC06053", "DSC06054", "DSC06055")
         names = ["a/b/DSC06045.ARW", "DSC06052.png", "x/_DSC06053.ARW", "x/dsc06054.arw", "DSC06055.ARW.xmp", "y/DSC06055.JPG",
                  "paper-data/geometric-accuracy/14mm/siemens-stars/DSC06045.ARW"]
         @test private_photographs(names) == names
         @test isempty(private_photographs(["DSC06044.ARW", "DSC06046.ARW", "DSC06051.png", "DSC06056.ARW", "DSC060450/x.txt"]))
     end
 
-    @testset "no entry selects one: every photograph entry excludes them, by name in every directory" begin
+    @testset "no entry selects one (Eval's selection of a probe tree holding them in every entry's directory)" begin
+        dirs = unique(CATALOG.artifacts[n]["dir"] for n in OF_RECORD)
+        sel = probe_selection([normpath(joinpath(d, x * ext)) for d in dirs for x in PRIVATE_PHOTOGRAPHS for ext in (".ARW", ".png", ".JPG")])
+        for (n, files) in sel
+            @test isempty(private_photographs(files))
+        end
+        # every entry of record also names the exclusion itself, so a widened include glob cannot let one in
         for n in OF_RECORD
-            excl = [g for g in CATALOG.artifacts[n]["filter"] if startswith(g, "!")]
-            tier = CATALOG.artifacts[n]["tier"]
-            tier == "rc_raw_photos" && @test all(x -> "!**/*$(x)*" in excl, PRIVATE_PHOTOGRAPHS)
-            d = CATALOG.artifacts[n]["dir"]
-            for x in PRIVATE_PHOTOGRAPHS, ext in (".ARW", ".png", ".JPG")
-                p = (d == "." ? "" : d * "/") * x * ext
-                tier == "rc_raw_photos" && @test !selects(n, p)
-            end
-            @test isempty(private_photographs(CATALOG.artifacts[n]["filter"]))  # no include glob names one
+            @test all(x -> "!**/*$(x)*" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
         end
     end
 
-    @testset "no installed tree holds one (the artifact store, where it holds the trees)" begin
-        store = try artifact_store() catch; nothing end
-        meta = TOML.parsefile(CATALOG.artifacts_toml)
-        trees = store === nothing ? String[] :
-                filter(isdir, [joinpath(store.source === :depot ? joinpath(first(DEPOT_PATH), "artifacts") : store.path,
-                                        meta[n]["git-tree-sha1"]) for n in keys(CATALOG.artifacts) if haskey(meta, n)])
-        isempty(trees) && @info "privacy: the artifact store holds no tree of the catalog here; the installed-tree check is skipped"
-        for t in trees
+    @testset "no installed tree holds one, and each has the catalog's file count (where the artifact store holds the trees)" begin
+        trees = filter(x -> last(x) !== nothing, [n => installed_tree(n) for n in OF_RECORD])
+        isempty(trees) && @info "privacy: the artifact store holds no tree of record here; the installed-tree checks are skipped"
+        for (n, t) in trees
             files = [relpath(joinpath(r, f), t) for (r, _, fs) in walkdir(t) for f in fs]
             @test isempty(private_photographs(files))
+            @test length(files) == CATALOG.artifacts[n]["files"]
         end
     end
 end
 
-# Where the artifact store holds a tree of record, its file count is the catalog's; where data_root() holds the inputs, every input
-# is there and lies in its tier. A :data item, its checks skipped (recorded) where neither is bound.
-@testitem "published data: the trees and data_root()" default_imports = false tags = [:data] setup = [PublishedData] begin
+# Where data_root() holds the inputs, every input is there. A :data item, its checks skipped (recorded) where it does not.
+@testitem "published data: the inputs under data_root()" default_imports = false tags = [:data] setup = [PublishedData] begin
     using Test
-    using DrWatson
-    using TOML: TOML
     using .PublishedData: CATALOG, TIERS, OF_RECORD, config_inputs, files_under, data_root
-    using VisualGeometryToolkitCore: artifact_store
 
-    store = try artifact_store() catch; nothing end
-    meta = TOML.parsefile(CATALOG.artifacts_toml)
-    if store !== nothing && store.source !== :depot
-        for n in OF_RECORD
-            t = joinpath(store.path, meta[n]["git-tree-sha1"])
-            isdir(t) || continue
-            @test count(_ -> true, (f for (_, _, fs) in walkdir(t) for f in fs)) == CATALOG.artifacts[n]["files"]
-        end
-    end
     root = try data_root() catch; nothing end
     if root === nothing || !all(n -> ispath(joinpath(root, CATALOG.artifacts[n]["dir"])), filter(n -> CATALOG.artifacts[n]["required"], OF_RECORD))
         @info "published data: data_root() does not hold the required tiers (fetch them: scripts/fetch_data.jl); its checks are skipped"

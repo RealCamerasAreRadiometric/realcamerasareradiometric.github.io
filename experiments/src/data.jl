@@ -11,20 +11,20 @@ module DataTiers
 using VisualGeometryToolkitEval.DataArtifacts: DataCatalog
 using TOML: TOML
 
-export tier_of, tier_entries, unpacked_entries, is_unpacked, is_cache_dir, PRIVATE_PHOTOGRAPHS, private_photographs
+export tier_of, entries_of_record, tier_entries, unpacked_entries, is_unpacked, is_cache_dir, PRIVATE_PHOTOGRAPHS, private_photographs
 
-"The tier an entry's files' inputs name (its `tier`); a retired entry's is its name without the pack date."
-tier_of(cat::DataCatalog, entry::AbstractString) =
-    String(get(cat.artifacts[entry], "tier", replace(entry, r"_[0-9]{8}$" => "")))
+"The tier an entry's files' inputs name in the configs (its `tier`)."
+tier_of(cat::DataCatalog, entry::AbstractString) = String(cat.artifacts[entry]["tier"])
 
-"The tiers of record: `tier => [entry, …]` (sorted), over the entries that are not retired."
+"The entries of record (sorted): every entry but the retired ones (`retired = true`)."
+entries_of_record(cat::DataCatalog) = sort([n for (n, a) in cat.artifacts if get(a, "retired", false) !== true])
+
+"The tiers of record: `tier => [entry, …]` (sorted), over [`entries_of_record`](@ref)."
 function tier_entries(cat::DataCatalog)
     out = Dict{String,Vector{String}}()
-    for (n, a) in cat.artifacts
-        get(a, "retired", false) === true && continue
+    for n in entries_of_record(cat)
         push!(get!(out, tier_of(cat, n), String[]), n)
     end
-    foreach(sort!, values(out))
     return out
 end
 
@@ -43,13 +43,9 @@ function unpacked_entries(catalog_toml::AbstractString)
                        provenance = String(e["provenance"])) for e in es] for (t, es) in u)
 end
 
-"""Whether the data_root()-relative path `p` lies at or below a path of `unpacked` (`unpacked_entries`): of `tier`'s entries, or
-of any tier's when `tier === nothing`."""
-function is_unpacked(unpacked, tier, p::AbstractString)
-    under(q) = p == q || startswith(p, q * "/")
-    tiers = tier === nothing ? keys(unpacked) : (tier,)
-    return any(t -> haskey(unpacked, t) && any(e -> any(under, e.paths), unpacked[t]), tiers)
-end
+"Whether the data_root()-relative path `p` lies at or below a path of `unpacked` (`unpacked_entries`)."
+is_unpacked(unpacked, p::AbstractString) =
+    any(e -> any(q -> p == q || startswith(p, q * "/"), e.paths), Iterators.flatten(values(unpacked)))
 
 """Whether the directory `dir` is a cache by the Cache Directory Tagging Standard (https://bford.info/cachedir/): it holds a
 `CACHEDIR.TAG` that begins with the standard's signature — as the Hugging Face CLI's `.cache/huggingface/` of a `--local-dir`

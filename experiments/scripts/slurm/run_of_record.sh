@@ -22,8 +22,8 @@
 #    every finished product, so nothing runs twice. A GPU-bound refinement gets one GPU; every CPU phase runs with no GPU
 #    (configs/reproduce.toml phases); 8480M per CPU (the node ratio); the GPU queue in longest-first order (src/run_of_record.jl).
 # The machine is the site profile's (VGTK_SITE; VisualGeometryToolkitEval configs/sites/): its setup puts julia on PATH
-# (or JULIA) and sets JULIA_DEPOT_PATH; the results base is --results-base, else VGTK_RESULTS_ROOT (the site profile's [storage]
-# results_root: the value to give). Run where sbatch is on PATH, from any checkout of the tooling; release jobs are never touched.
+# (or JULIA) and sets JULIA_DEPOT_PATH; the results base is the project's results root on the machine: --results-base, else
+# VGTK_RESULTS_ROOT (the site profile's [storage] results_root, the value to give: run_of_record.jl ror_results_base resolves the same). Run where sbatch is on PATH, from any checkout of the tooling; release jobs are never touched.
 # =============================================================================
 set -euo pipefail
 V=${1:?usage: run_of_record.sh <version> [--plan] [--ref=<rev>] | <version> --dry-run=<rev> --from=<git> --scratch-sources=<file>}
