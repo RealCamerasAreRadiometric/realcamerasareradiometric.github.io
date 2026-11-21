@@ -220,12 +220,14 @@ c. **The Newton's iteration count.** `_HEIGHT_NEWTON_ITERATIONS = 4` uncondition
    more evaluation to test convergence: ≥ 5 evaluations where a gently warped board converges in 2. Testing
    convergence from the first iteration would roughly halve the root again — but changes last bits (owner's call).
 d. **`_launch_rows!(…; workgroupsize)`.** RC's `_launch_pixel_rows!` re-states Core's three-line launch to set the
-   CPU workgroup; a keyword on Core's launch removes it.
+   CPU workgroup; a keyword on Core's launch removes it. (Round 3: done — Core 0.12's `_launch_rows_on!(OnBackend(be;
+   workgroupsize))`; `_launch_pixel_rows!` removed.)
 e. **A device constructor and transpose for `CSRMatrix`** (`CSRMatrix` from device arrays, `transpose` on the device):
    section 4's `csr_rows`/`csr_transpose` are generic and belong beside `CSRMatrix`.
 f. **`NoVignetting`** (section 2.3).
 g. **CUBLAS wide gemv**: Core's device LM helpers that form `Jᵀr` by `*` on a CUDA matrix have the same 100× penalty
-   (finding D); worth a grep in Estimation's `refine_camera` path.
+   (finding D); worth a grep in Estimation's `refine_camera` path. (Round 3: Core 0.12's `_matvec!` and its CUDA method;
+   RC's `_rows_times` and its extension method removed.)
 
 ---
 

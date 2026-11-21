@@ -295,7 +295,8 @@ end
 """The height partials of every pixel of the device list `px` at the plain view `v32` (the kernel's float type, device-capable),
 material `m32`, vignetting and lighting, on the scene `board32` (plain surface) at the nodal heights `h`, seeded here: `3 HEIGHT_NC`
 floats per pixel, pixel-major, on the device (queued on this task's queue: `KA.synchronize` before another task reads it). Workgroups of
-128 (the Jacobian kernel's register budget)."""
+128 (the Jacobian kernel's register budget). `rays` must be the radiance record of these very inputs (the heights' `HIGH_FLOAT`
+record, never one rounded or of another trial): the rays' hits are its (Core's `intersection_at` trusts the point it is given)."""
 _heights_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32, h::StaticVector{HEIGHT_NC}; rays) =
     _launch_rows(_height_functor(k, H, v32, vig32, m32, l32, board32, st32, h, px, rays), be, idx; workgroupsize = 128)
 """The height functor (`_HeightAt`): the nodal heights `h` seeded as `HEIGHT_NC`-slot duals."""
