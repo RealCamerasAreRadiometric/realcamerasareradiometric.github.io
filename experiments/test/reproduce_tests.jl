@@ -257,7 +257,9 @@
         @test gpu_stages(:start => [cpu], :refine => [cpu, gpu], :evaluate => []) == [:refine]
         expected = Dict("texture_recovery" => [:refine, :folds],         # the page solves (the split of record and its rotations) on one GPU
                         "chrome_evaluation_paper" => [:sets],             # the paper config's sets: each set's detect on the GPU ([detect] device = "gpu")
-                        "focus_surfaces" => Symbol[])                  # the focus surfaces read the refinements' records
+                        "focus_surfaces" => Symbol[],                  # the focus surfaces read the refinements' records
+                        "vignetting_figure" => Symbol[],               # the vignetting figure reads the f/4 refinements' records and the diffuser photographs, on the host
+                        "board_warping" => Symbol[])                   # the board-warping figure reads the spline refinements' records
         for c in load_config_tables(projectdir("configs", "figures", "numbers.toml"), NUMBERS_CONFIG_KEYS)["runs"]["experiments"]
             name = TOML.parsefile(projectdir(c))["experiment"]["name"]
             m = withenv("VGTK_DATA_ROOT" => mktempdir(), "VGTK_RESULTS_ROOT" => mktempdir()) do
@@ -279,7 +281,7 @@
         txt = String(take!(out))
         ok || @info txt
         @test ok
-        for st in ("chrome_evaluation_paper", "focus_surfaces", "texture_recovery_14mm_small", "numbers", "verify", "deploy")
+        for st in ("chrome_evaluation_paper", "focus_surfaces", "texture_recovery_14mm_small", "vignetting_figure", "board_warping", "numbers", "verify", "deploy")
             @test occursin(Regex("^\\s+$st\\s+(check|\\d+/\\d+ produced)", "m"), txt)
         end
         @test occursin("plan only", txt)

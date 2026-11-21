@@ -12,11 +12,16 @@ generator = "scripts/numbers.jl"
 # In dependency order (scripts/regenerate_paper.jl runs each driver's pending stages, reusing complete runs by key):
 # chrome_evaluation_paper scores every chrome set (scripts/chrome_evaluation_paper.jl, its sets stage: scripts/chrome_evaluation.jl on each set's config) before its tables
 # and figures; focus_surfaces draws the focus surfaces from the refinements (scripts/reproduce/reproduce_results_dgx.sh, configs/reproduce.toml,
-# runs the refinements of radiometric_refinement.toml and radiometric_refinement_vignetting.toml on the GPU before it).
+# runs the refinements of radiometric_refinement.toml and radiometric_refinement_vignetting.toml on the GPU before it);
+# vignetting_figure draws the vignetting figure from the f/4 refinements and the diffuser photographs, board_warping the supplement's
+# board-warping figure from the spline refinements of radiometric_refinement.toml (both on the host: every refinement they read is
+# upstream, and their numbers.tex fragments hold no number).
 experiments = [
     "configs/experiments/chrome_evaluation_paper.toml",
     "configs/experiments/focus_surfaces.toml",
     "configs/experiments/texture_recovery_14mm_small.toml",
+    "configs/experiments/vignetting_figure.toml",
+    "configs/supplement/board_warping.toml",
 ]
 
 [deploy]
