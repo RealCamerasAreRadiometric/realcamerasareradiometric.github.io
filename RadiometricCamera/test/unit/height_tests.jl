@@ -451,4 +451,9 @@ end
     err = [maximum(abs, Float64.(r32.J[i][:, 1:(1 + RC.RAD_NL)]) - r64.J[i][:, 1:(1 + RC.RAD_NL)]) / scale for i in findall(reached)]
     @test count(<(1e-5), err) >= 0.999 * length(err)
     @test maximum(err) < 5e-2
+    # the roughness and refractive-index partials (columns 3 and 4) are the geometry's float's, rounded (`_material_partials`)
+    for col in (3, 4)
+        sc = maximum(G -> maximum(abs, G[:, col]), r64.J)
+        @test maximum(i -> maximum(abs, Float64.(r32.J[i][:, col]) - r64.J[i][:, col]), findall(reached)) <= 1e-6 * sc
+    end
 end

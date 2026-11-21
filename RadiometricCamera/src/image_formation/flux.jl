@@ -233,11 +233,30 @@ end
     e1, e2 = _seed_tangents(ω_lE)
     L = _radiance_mc(lr.est.board, lr.est.mat, lr.est.light, sm, key, SVector{3, E}(ρ) .+ ε(1), E(α) + ε(2), SVector{3, E}(η) .+ ε(3),
                      ω_lE + ε(4) * e1 + ε(5) * e2, SVector(𝐱E[1] + ε(6), 𝐱E[2] + ε(7), 𝐱E[3] + ε(8)), D)
+    gα, gη = _material_partials(E, L, bd, m, lt, sm, key, ρ, α, η, ω_l, 𝐱)
     @inbounds lr.out[lr.base + ri] = eltype(lr.out)(ntuple(q -> (c = (q - 1) % 3 + 1; j = (q - 1) ÷ 3;
-                                                              j == 0 ? ForwardDiff.value(L[c]) : j <= RAD_NL ? ForwardDiff.partials(L[c], j) :
+                                                              j == 0 ? ForwardDiff.value(L[c]) : j == 2 ? gα[c] : j == 3 ? gη[c] :
+                                                              j <= RAD_NL ? ForwardDiff.partials(L[c], j) :
                                                               j == RAD_NL + 1 ? 𝐱E[c] : j == RAD_NL + 2 ? 𝐧E[c] : δE[c]),
                                                        Val(3 * (RAD_NL + 4))))   # [L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃]
     return SVector(ntuple(c -> T(ForwardDiff.value(L[c])), Val(3)))
+end
+"""
+    _material_partials(E, L, bd, m, lt, sm, key, ρ, α, η, ω_l, 𝐱) -> (∂L/∂α, ∂L/∂η) in `E`
+
+The record's roughness and refractive-index partials (`RadianceRecord`'s slots 2 and 3), in the precision of the record's geometry:
+`L`'s own where the estimator ran in it (one float: the CPU backend); else a second run of the estimator with those two slots alone in
+the geometry's float (`bd`, `m`, `lt`: `ANCHOR_FLOAT`), its value discarded. They are the only columns that are the estimator's own
+partials (the material block's α and η), and the Float32 estimator's were 1.2–1.4 % off the CPU's on the Siemens case (design report
+8.3); the other slots enter the Jacobian through the geometry's partials, where the Float32 estimator is within the gate.
+"""
+@inline function _material_partials(::Type{E}, L, bd, m, lt, sm, key, ρ, α, η, ω_l::StaticVector{3, T}, 𝐱) where {E, T}
+    E === T && return (SVector(ntuple(c -> ForwardDiff.partials(L[c], 2), Val(3))), SVector(ntuple(c -> ForwardDiff.partials(L[c], 3), Val(3))))
+    D = ForwardDiff.Dual{RadianceTag, T, 2}
+    εα = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials((one(T), zero(T))))
+    εη = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials((zero(T), one(T))))
+    L2 = _radiance_mc(bd, m, lt, sm, key, ρ, α + εα, η .+ εη, ω_l, 𝐱, D)
+    return (SVector{3, E}(ntuple(c -> ForwardDiff.partials(L2[c], 1), Val(3))), SVector{3, E}(ntuple(c -> ForwardDiff.partials(L2[c], 2), Val(3))))
 end
 @inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
 @inline _δ(x::Real) = zero(x)
