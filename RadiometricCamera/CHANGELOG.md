@@ -160,7 +160,7 @@ the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 
 
 ## 0.1.0
 
-First public release, the first version registered in Julia's General registry. Its code is that of 0.11.6, the last version of the
+First public release, the first version registered in CauRegistry (not in Julia's General registry). Its code is that of 0.11.6, the last version of the
 earlier private registry; the sections below are the history of those private versions (0.2.0–0.11.6).
 
 ## 0.11.6
