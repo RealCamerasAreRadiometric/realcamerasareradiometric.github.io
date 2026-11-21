@@ -1,12 +1,14 @@
 #!/usr/bin/env julia
 # reproduce: reads configs/experiments/radiometric_refinement.toml
 # reproduce: reads configs/experiments/radiometric_refinement_vignetting.toml
+# reproduce: reads configs/experiments/radiometric_refinement_board_warping.toml
 # provenance: every product writes _config.toml and _provenance.toml (VisualGeometryToolkitEval produce) beside its results.
 # =============================================================================
 # scripts/radiometric_refinement.jl — the radiometric refinements of the paper's real photographs: per case a geometric start model
 # refined on the board photographs by bin/refine.jl. Configs of record: configs/experiments/radiometric_refinement.toml (the geometric-
 # accuracy experiment: tab:refinement-chrome, tab:defocus) and configs/experiments/radiometric_refinement_vignetting.toml
-# (the large-aperture refinements; fig:focus-surfaces reads the fisheye's). Every case refines the
+# (the large-aperture refinements; fig:focus-surfaces reads the fisheye's) and configs/experiments/radiometric_refinement_board_warping.toml
+# (the board-warping session's six sets: the supplement's board warping across lenses). Every case refines the
 # printed board's in-plane print error (aspect and skew) beside its heights (owner ruling 2026-11-13).
 # The refined models of the first are scored on the Thorlabs R3L3S7N1 chrome board by scripts/chrome_evaluation.jl (one config
 # per chrome set whose [evaluate] models name these cases: configs/experiments/chrome_evaluation_fx3_<set>.toml).

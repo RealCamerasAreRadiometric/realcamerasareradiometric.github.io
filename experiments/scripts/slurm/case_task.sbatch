@@ -16,11 +16,11 @@ source experiments/scripts/slurm/common.sh
 
 # =============================================================================
 # case_task.sbatch — one array task of a per-case experiment (common.sh experiment_driver, experiment_config, experiment_cases):
-# EXPERIMENT one of radiometric_refinement, radiometric_refinement_vignetting, convergence; STAGES its driver's stages of the one case (configs/reproduce.toml: start,refine for the
+# EXPERIMENT one of radiometric_refinement, radiometric_refinement_vignetting, radiometric_refinement_board_warping, convergence; STAGES its driver's stages of the one case (configs/reproduce.toml: start,refine for the
 # refinements). One GPU per task.
 #
 # Task i runs case i of the selection, resolved from the config at run time (common.sh run_case_task): the experiment's selection
-# variable (CASES, CHROME_CASES, VIG_CASES; names, comma-separated) when set, else every case, in the
+# variable (CASES, CHROME_CASES, VIG_CASES, BW_CASES; names, comma-separated) when set, else every case, in the
 # driver's order. A further case becomes a [cases.<name>] of the config, never an edit here.
 #
 # Never --force: a complete keyed run under the results root is reused. Never prepare or detect where the experiment has a
@@ -39,6 +39,6 @@ source experiments/scripts/slurm/common.sh
 # cpus_per_task, mem_per_cpu and gpu, the one source; a launcher submitted by hand states them on its sbatch line.
 # =============================================================================
 
-: "${EXPERIMENT:?set EXPERIMENT (radiometric_refinement, radiometric_refinement_vignetting, convergence)}"
+: "${EXPERIMENT:?set EXPERIMENT (radiometric_refinement, radiometric_refinement_vignetting, radiometric_refinement_board_warping, convergence)}"
 : "${STAGES:?set STAGES (the driver stages of the one case, comma-separated: configs/reproduce.toml)}"
 run_case_task "$EXPERIMENT" "$STAGES"

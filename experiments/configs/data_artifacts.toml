@@ -679,6 +679,58 @@ where = "the author's folder on the MDS share: radiometric-camera-paper-data/der
 provenance = "OpenCV's raw calibration.json and the run logs of the two starts above (opencv_calibrate_schoeps.py's outputs, before ocv_record.jl)"
 configs = []                      # no config reads them: the records above are the inputs; kept as the step's raw outputs
 
+# The board-warping session (2026-11-19): both printed boards photographed with the three lenses, each board in place for its three
+# sets — the share's folder board-warping, one entry per set (1,246 ARW, 30.0 GiB; the folder's macOS side files, ._* and .DS_Store,
+# are no photographs and no data: the stack's listing leaves them out). The folder is not yet in the share's README.md, MANIFEST.tsv
+# and MD5SUMS. The fisheye AprilGrid set's file numbers run through numbers the 14 mm Siemens-star session of 2026-11-03 used (the
+# camera's counter came round): the two sets are told apart by their folders, never by a file name.
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/14mm"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "235 files, 5.58 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Sigma 14 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/14mm)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/fisheye"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "184 files, 4.35 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/fisheye), less the five photographs DSC06045 and DSC06052–DSC06055 the author excluded (not in the published set, not in the view list of record)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/tamron"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "206 files, 4.88 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Tamron 20 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/tamron)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/14mm"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "214 files, 5.27 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Sigma 14 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/14mm)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/fisheye"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "204 files, 4.92 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/fisheye)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/tamron"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "203 files, 5.03 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Tamron 20 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/tamron)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+# The AprilGrid starts of the board-warping session: inputs of record of tier rc_baselines as the AprilGrid starts of record are, made
+# on 2026-11-20 by the chain that made those (experiments/frontends_history/ of tag v0.10.0: the sRGB and green copies, the tag
+# corners, T. Schöps's central-generic on the dense dataset). NOT YET ON THE SHARE: three folders of 17 files each (43.4 MB together),
+# to be packed with MANIFEST.tsv, MD5SUMS and a README and copied to derived/rc_baselines_<date>/ in the data root's layout.
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid-bw20261119/schoeps_dense_green", "geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-bw20261119/schoeps_dense_aruco_green", "geometric_accuracy/night_stars/data/fx3-tamron-aprilgrid-bw20261119/schoeps_dense_green"]
+where = "the author's cluster (the front-end chain's output folders of 2026-11-20); to be copied to the author's folder on the MDS share, radiometric-camera-paper-data/derived/rc_baselines_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "T. Schöps's central-generic (cell 150 px, 4 pyramid levels) on the dense AprilGrid dataset of each lens's AprilGrid set of the board-warping session — the corners of OpenCV ArUco + cornerSubPix on the green sRGB copies (the 14 mm, the Tamron), of OpenCV's ArucoDetector (the fisheye) — 2026-11-20: 17 files per folder (the dataset, the intrinsics, the poses and points, the tool's report images, run.log, views.txt), 15.4 MB, 13.4 MB and 14.6 MB"
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
 # rc_baselines_2026-11-21: an ADDITION to rc_baselines_2026-11-10 / -17, laid over the data root beside them — the band "training
 # photograph" of fig:texture-learned, the author-side step configs/inputs/texture_learned_photograph_20261121.toml records
 # (experiments/tools/texture_learned_photograph.py: rawpy 0.27.1, OpenCV 5.0.0). Packed with MANIFEST.tsv, MD5SUMS and README.md

@@ -25,6 +25,17 @@ read it and its provenance.
 VGTK_DATA_ROOT=<data root> …           # with <data root>/paper-data → the share's folder
 ```
 
+## The board-warping session: `board-warping` on the share
+
+| | |
+|---|---|
+| where | the same folder of the share, `radiometric-camera-paper-data/board-warping/` (the photographs of 2026-11-19): `siemens-board/{14mm,fisheye,tamron}` (214, 204, 203 ARW; 5.27, 4.92, 5.03 GiB) and `april-board/{14mm,fisheye,tamron}` (235, 184, 206 ARW; 5.58, 4.35, 4.88 GiB) — 1,246 Sony FX3 ARW, 30.0 GiB, every one at f/10, 0.625 s, ISO 100; each board stayed in place for its three sets |
+| excluded | five photographs of the fisheye AprilGrid set (DSC06045, DSC06052–DSC06055) are not in the published set and not in the view list of record |
+| binding | under the data root as `paper-data/board-warping/…`, as every folder of the share; the folder's macOS side files (`._*`, `.DS_Store`) are no photographs (the stack's listing leaves them out) |
+| in the configs | `configs/experiments/radiometric_refinement_board_warping.toml` (the six sets) and `configs/experiments/frontends.toml` (the three Siemens-star sets, whose starts the front ends make); the figure: `configs/supplement/board_warping_lenses.toml` |
+| open | the folder is not yet in the share's `README.md`, `MANIFEST.tsv` and `MD5SUMS` (4362 photographs without it). The three AprilGrid starts the refinements read (tier `rc_baselines`: `geometric_accuracy/night_stars/data/fx3-{14mm,tamron}-aprilgrid-bw20261119/schoeps_dense_green`, `fx3-fisheye-aprilgrid-bw20261119/schoeps_dense_aruco_green`; 17 files each, 43.4 MB together) are not yet on the share: they go to `derived/rc_baselines_<date>/` in the data root's layout, with `MANIFEST.tsv` and `MD5SUMS` |
+| file names | the fisheye AprilGrid set's file numbers run through numbers the 14 mm Siemens-star session of 2026-11-03 also used (the camera's counter came round), the five excluded ones among them: the sets are told apart by their folders, never by a file name |
+
 ## The derived inputs: `derived/rc_baselines_2026-11-10` on the share
 
 | | |

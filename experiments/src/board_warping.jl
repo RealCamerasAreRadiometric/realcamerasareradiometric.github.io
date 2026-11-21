@@ -4,6 +4,11 @@
 # fig:board-warping. Included after src/drivers.jl, src/radiometric_refinement.jl and src/paper_figures/PaperFigures.jl (the drawing
 # code: T. Harder's figure generators, ported; board_warping.py is src/paper_figures/board_warping.jl).
 #
+# A second config of record of the driver, configs/supplement/board_warping_lenses.toml, draws the sets of ONE session, in which
+# each board stayed in place while it was photographed with the three lenses: the same heights, lattice and panels, and tables that
+# also state how far the lenses' surfaces of a board differ (its drawing code: board_warping_lenses.py, ported as
+# src/paper_figures/board_warping_lenses.jl). A config names its drawing code (`[figure] drawing`).
+#
 # Nothing is estimated here. A refinement writes its calibrated target as radiometric_target.json (RadiometricCamera's
 # `load_radiometric_target`): the geometric target with its printed page and the warping's nodal heights. The surface over the page
 # is VisualRadiometryToolkitCore's `board_height` — VisualGeometryToolkitCore's height field (a thin-plate spline through the
@@ -17,7 +22,8 @@
 #   cases.tsv                one line per case: case, set, model, refine_product (the directory of the refinement's product)
 #   dump/<case>.f64          the height field on a lattice over the page
 #   dump/<case>_nodes.tsv    the warping's nodes: where they lie, their stored heights and the surface there
-#   meta.toml                per case the page's size and the surface's range and RMS
+#   meta.toml                per case the page's size and the surface's range and RMS (the sets of one session: also the in-plane
+#                            aspect and skew, and per board how far the lenses' surfaces differ)
 # and the drawing itself: assets/<asset_dir>.tex with its panels in assets/<asset_dir>/ (published to plotsdir()), the generated
 # caption and source.toml beside them in the product (the paper's caption is written by hand).
 # =============================================================================
@@ -29,11 +35,15 @@ using StaticArrays: SVector
 const BOARD_WARPING_TABLES = ("experiment", "inputs", "upstream", "heights", "sets", "figure")
 "The keys of `[heights]`, every one required: the number of samples per page axis."
 const BOARD_WARPING_HEIGHTS_KEYS = ("samples",)
-"""The keys of `[figure]`, every one required: the name of the figure's files under plotsdir() (`asset_dir`), the layout — the
-columns' labels and, per row, its label and its sets — and what the panels draw: the candidates of a colour band's height and the
-most bands on each side of zero, the mesh's stride, the view and the heights' exaggeration."""
-const BOARD_WARPING_FIGURE_KEYS = ("asset_dir", "columns", "rows", "band_heights_mm", "max_bands", "mesh_stride", "view_azimuth_elevation_deg",
+"""The keys of `[figure]`, every one required: the drawing code (`drawing`), the name of the figure's files under plotsdir()
+(`asset_dir`), the layout — the columns' labels and, per row, its label and its sets — and what the panels draw: the candidates of
+a colour band's height and the most bands on each side of zero, the mesh's stride, the view and the heights' exaggeration."""
+const BOARD_WARPING_FIGURE_KEYS = ("drawing", "asset_dir", "columns", "rows", "band_heights_mm", "max_bands", "mesh_stride", "view_azimuth_elevation_deg",
                                    "height_exaggeration")
+"""The drawing codes a config may name (`[figure] drawing`, each a generator of src/paper_figures: `PaperFigures.FIGURES`): the
+boards' surfaces from capture sets of any sessions, and the surfaces of ONE session's sets, whose tables also compare the sets of a
+row (the lenses that photographed the board in place)."""
+const BOARD_WARPING_DRAWINGS = ("board-warping", "board-warping-lenses")
 "The keys of one entry of `[figure] rows`: the row's label and its sets, one per column."
 const BOARD_WARPING_ROW_KEYS = ("label", "sets")
 
@@ -64,9 +74,9 @@ board_warping_refinements(cfg::AbstractDict) = load_radiometric_refinement_confi
 
 The config of record of the board-warping figure, every table and key checked: `[upstream] radiometric_refinement` a refinement
 config of record; `[heights] samples` an integer ≥ 2; `[sets]` per capture set its case of the upstream config, the cases distinct
-and of one camera model (`board_warping_model`); `[figure]` a name for the files, a layout whose rows name one set per column and
-every set of `[sets]` once, and what the panels draw: ascending positive band heights, a positive band count, mesh stride and height
-exaggeration, a view within 0 … 90° of azimuth and of elevation.
+and of one camera model (`board_warping_model`); `[figure]` a drawing code of `BOARD_WARPING_DRAWINGS`, a name for the files, a
+layout whose rows name one set per column and every set of `[sets]` once, and what the panels draw: ascending positive band
+heights, a positive band count, mesh stride and height exaggeration, a view within 0 … 90° of azimuth and of elevation.
 """
 function load_board_warping_config(path::AbstractString)
     c = load_driver_config(path, "board_warping"; tables = BOARD_WARPING_TABLES)
@@ -87,6 +97,8 @@ function load_board_warping_config(path::AbstractString)
     board_warping_model(c["sets"]; where = "$path [sets]")
     f = c["figure"]; where = "$path [figure]"
     check_required_keys(f, BOARD_WARPING_FIGURE_KEYS, where)
+    f["drawing"] in BOARD_WARPING_DRAWINGS && haskey(PaperFigures.FIGURES, f["drawing"]) ||
+        throw(ArgumentError("$where drawing must name the figure's drawing code, one of $(join(BOARD_WARPING_DRAWINGS, ", ")), got $(repr(f["drawing"]))"))
     f["asset_dir"] isa AbstractString && !isempty(f["asset_dir"]) || throw(ArgumentError("$where asset_dir must be a non-empty string, got $(repr(f["asset_dir"]))"))
     f["columns"] isa AbstractVector && !isempty(f["columns"]) && all(x -> x isa AbstractString && !isempty(x), f["columns"]) ||
         throw(ArgumentError("$where columns must be a non-empty array of labels"))
@@ -231,14 +243,17 @@ function write_board_warping_data(dir::AbstractString, cases; samples::Integer)
 end
 
 """
-    board_warping_tables(data, out; writer = nothing) -> paths
+    board_warping_tables(data, out, figure; writer = nothing) -> paths
 
-The tables of the drawing code (src/paper_figures/board_warping.jl) from the data folder `data` into `out`: meta.toml, per case the
-page's size and the surface's range and RMS. `writer` is what the file names as its writer (a driver's stage names itself;
-`nothing`: the drawing code's own file).
+The tables of the drawing code of `[figure]` `figure` (its `drawing`) from the data folder `data` into `out`: meta.toml, per case
+the page's size and the surface's range and RMS — and, for the sets of one session ("board-warping-lenses", whose tables take the
+layout's rows: the boards and their sets), each case's in-plane aspect and skew and per board how far the lenses' surfaces differ.
+`writer` is what the file names as its writer (a driver's stage names itself; `nothing`: the drawing code's own file).
 """
-board_warping_tables(data::AbstractString, out::AbstractString; writer::Union{Nothing, AbstractString} = nothing) =
-    PaperFigures.generate("board-warping"; data, out, part = "tables", named_writer(writer)...)
+function board_warping_tables(data::AbstractString, out::AbstractString, figure::AbstractDict; writer::Union{Nothing, AbstractString} = nothing)
+    compared = figure["drawing"] == "board-warping-lenses" ? (; rows = board_warping_layout(figure).rows) : (;)   # the sets its tables compare, row by row
+    return PaperFigures.generate(String(figure["drawing"]); data, out, part = "tables", compared..., named_writer(writer)...)
+end
 
 "The drawing code's option that names the files' generator, when a caller names one (`writer`); none for `nothing`: the code's default."
 named_writer(writer::Union{Nothing, AbstractString}) = writer === nothing ? (;) : (; generator = String(writer))
@@ -246,15 +261,15 @@ named_writer(writer::Union{Nothing, AbstractString}) = writer === nothing ? (;) 
 """
     board_warping_drawing(data, out, figure; model, writer = nothing) -> paths
 
-The figure of the drawing code (src/paper_figures/board_warping.jl) under `[figure]` `figure`, from the data folder `data` into
-`out`: `<asset_dir>.tex`, its panels (each the height field as a surface over the page) and colour key in `<asset_dir>/`,
+The figure of the drawing code of `[figure]` `figure` (its `drawing`: src/paper_figures/board_warping.jl, or
+board_warping_lenses.jl with the same panels and its own caption), from the data folder `data` into `out`: `<asset_dir>.tex`, its panels (each the height field as a surface over the page) and colour key in `<asset_dir>/`,
 `<asset_dir>-caption.tex` and source.toml — the refinements of the camera model `model` (`board_warping_model`), laid out in the
 table's rows and columns (`board_warping_layout`), with its bands, mesh, view and exaggeration. `writer` is what the files' first
 lines name as their generator (a driver's stage names itself; `nothing`: the drawing code's own file).
 """
 function board_warping_drawing(data::AbstractString, out::AbstractString, figure::AbstractDict; model::AbstractString,
                                writer::Union{Nothing, AbstractString} = nothing)
-    return PaperFigures.generate("board-warping"; data, out, part = "figure3d", asset_dir = String(figure["asset_dir"]), model, board_warping_layout(figure)...,
+    return PaperFigures.generate(String(figure["drawing"]); data, out, part = "figure3d", asset_dir = String(figure["asset_dir"]), model, board_warping_layout(figure)...,
                                  band_heights_mm = figure["band_heights_mm"], max_bands = figure["max_bands"], mesh_stride = figure["mesh_stride"],
                                  view_azimuth_elevation_deg = figure["view_azimuth_elevation_deg"], height_exaggeration = figure["height_exaggeration"],
                                  named_writer(writer)...)
@@ -274,7 +289,7 @@ by hand, and source.toml is a name every generator uses).
 function board_warping_figure(dir::AbstractString, cases, cfg::AbstractDict; writer::Union{Nothing, AbstractString} = nothing)
     f = cfg["figure"]
     write_board_warping_data(dir, cases; samples = Int(cfg["heights"]["samples"]))
-    board_warping_tables(dir, dir; writer)
+    board_warping_tables(dir, dir, f; writer)
     assets = joinpath(dir, "assets")
     board_warping_drawing(dir, assets, f; model = board_warping_model(cfg["sets"]), writer)
     for name in ("$(f["asset_dir"])-caption.tex", "source.toml")

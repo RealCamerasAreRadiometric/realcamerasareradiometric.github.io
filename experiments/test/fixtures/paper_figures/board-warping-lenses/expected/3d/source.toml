@@ -1,0 +1,14 @@
+# what board-warping-lenses was drawn from; written by tools/board_warping.py figure
+model = "spline"
+band_mm = 0.5
+limit_mm = 3
+panels = "3-D surfaces"
+view_azimuth_elevation_deg = [20, 38]
+height_exaggeration = 50
+mesh_stride = 10
+bw_ag_14mm = "products/7ac8910486894d01"
+bw_ag_fisheye = "products/a5e6f046cb30cffd"
+bw_ag_tamron = "products/1613c14e5a386dd0"
+bw_si_14mm = "products/0d17e0c3a2fdbd97"
+bw_si_fisheye = "products/3ca456c8d4327789"
+bw_si_tamron = "products/2ddf016ec88be607"

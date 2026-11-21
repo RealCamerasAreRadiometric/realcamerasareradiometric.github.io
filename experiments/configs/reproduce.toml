@@ -12,7 +12,7 @@
 # under <results root>/_reproduce); --no-deps those alone. Each stage's launcher (scripts/slurm/*.sbatch, common.sh; the per-case
 # experiments' one case_task.sbatch, its EXPERIMENT and STAGES the stage's env) and its driver
 # (julia --project=experiments experiments/scripts/<driver>.jl --config=<config>) stay callable on their own. The case selections the
-# launchers read (CASES, CHROME_CASES, VIG_CASES, TEXTURE_SETS, SETS) select here too.
+# launchers read (CASES, CHROME_CASES, VIG_CASES, BW_CASES, TEXTURE_SETS, SETS) select here too.
 # Paths are relative to the repository root, where the jobs are submitted from.
 
 [project]
@@ -223,6 +223,52 @@ driver = "experiments/scripts/radiometric_refinement.jl"
 config = "experiments/configs/experiments/radiometric_refinement_vignetting.toml"
 gpu = true
 array = { from = "cases", select_env = "VIG_CASES" }
+
+# ---- the supplement's board warping across lenses: the session of two boards × three lenses (no asset of ../paper reads it yet: only
+# with --only=board_warping_lenses, which runs the front ends, the six refinements and the figure) ---------------------------------------
+[[stage]]
+name = "radiometric_refinement_board_warping_prepare"
+what = "the board-warping session's sets' decode and detect, once before the array (CPU: the RAW decode, and detect, which only checks the inputs of record)"
+time = "00:30:00"         # as radiometric_refinement_prepare
+cpus_per_task = 8       # CPU only: the decode (Features' load_raw, LibRaw, threaded over photographs); detect checks inputs (no device work)
+mem_per_cpu = "8480M"   # keep LibRaw busy without reserving 28; 68 GB
+after = ["setup", "frontends_init"]   # its detect reads the front-end runs ([runs]: Schöps's of the three Siemens sets), which the front ends' stages produce
+sbatch = "experiments/scripts/slurm/prepare.sbatch"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement_board_warping.toml"
+env = { EXPERIMENT = "radiometric_refinement_board_warping" }
+job_name = "rc-prepare-radiometric_refinement_board_warping"
+default = false
+
+[[stage]]
+name = "radiometric_refinement_board_warping"
+what = "the board-warping session's refinements (the central spline on each of two boards × three lenses), one GPU per case"
+time = "04:00:00"         # as radiometric_refinement (the same LM): not yet measured on this stack; with RC 0.11.5 a case took 20–66 min on one GPU of another site
+cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM and the closed-form blocks run on the device; the host threads
+mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB
+after = ["radiometric_refinement_board_warping_prepare", "image_regions", "distance_maps"]
+sbatch = "experiments/scripts/slurm/case_task.sbatch"
+env = { EXPERIMENT = "radiometric_refinement_board_warping", STAGES = "start,refine" }
+job_name = "rc-refinement-board-warping"
+driver = "experiments/scripts/radiometric_refinement.jl"
+config = "experiments/configs/experiments/radiometric_refinement_board_warping.toml"
+gpu = true
+array = { from = "cases", select_env = "BW_CASES" }
+default = false
+
+[[stage]]
+name = "board_warping_lenses"
+what = "the supplement's board warping across lenses: the six refinements' height fields, their tables (each page and surface, the lenses' agreement per board) and the figure into plots/"
+time = "00:10:00"         # the six fields at 201 × 201 samples, the tables and the drawing: 80 s with the load (2 threads, another site): with margin
+cpus_per_task = 8       # CPU only, at the launch's one thread count (8, above): it finds the six refinements by their keys, thread count included
+mem_per_cpu = "8480M"
+after = ["radiometric_refinement_board_warping"]
+sbatch = "experiments/scripts/slurm/board_warping.sbatch"
+env = { BOARD_WARPING_CONFIG = "experiments/configs/supplement/board_warping_lenses.toml" }
+job_name = "rc-board-warping-lenses"
+driver = "experiments/scripts/board_warping.jl"
+config = "experiments/configs/supplement/board_warping_lenses.toml"
+default = false
 
 # ---- the chrome evaluations: every chrome set of the paper, the stages chrome_evaluation_paper's sets stage runs (reused there) ------
 

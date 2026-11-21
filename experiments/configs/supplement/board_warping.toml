@@ -42,6 +42,7 @@ si30fe = "si30fe_spline_warped"   # fisheye, Siemens stars at 30 cm
 si17ta = "si17ta_spline_warped"   # Tamron 20 mm, Siemens stars at 17 cm
 
 [figure]
+drawing = "board-warping"      # the drawing code (src/paper_figures/board_warping.jl): the boards' surfaces from capture sets of any sessions
 asset_dir = "board-warping"    # plotsdir("board-warping.tex", "board-warping/<set>.tex", "board-warping/key.tex"): the paper's fig/ layout; the name the drawing code (src/paper_figures/board_warping.jl) gives its files
 columns = ["Sigma 14\\,mm lens", "Fisheye lens", "Tamron 20\\,mm lens"]   # the lenses, left to right (LaTeX text)
 rows = [                       # the targets, top to bottom: a row's label (LaTeX text) and its sets, one per column

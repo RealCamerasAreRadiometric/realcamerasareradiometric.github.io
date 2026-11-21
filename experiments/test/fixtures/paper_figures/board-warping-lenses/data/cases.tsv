@@ -1,0 +1,7 @@
+case	set	model	refine_product
+bw_si_14mm_spline_warped	bw_si_14mm	spline	products/0d17e0c3a2fdbd97
+bw_si_fisheye_spline_warped	bw_si_fisheye	spline	products/3ca456c8d4327789
+bw_si_tamron_spline_warped	bw_si_tamron	spline	products/2ddf016ec88be607
+bw_ag_14mm_spline_warped	bw_ag_14mm	spline	products/7ac8910486894d01
+bw_ag_fisheye_spline_warped	bw_ag_fisheye	spline	products/a5e6f046cb30cffd
+bw_ag_tamron_spline_warped	bw_ag_tamron	spline	products/1613c14e5a386dd0

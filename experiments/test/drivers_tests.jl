@@ -145,6 +145,7 @@ end
                          "distance_maps.toml",   # the printed boards' edge distance maps, read through [runs] (scripts/distance_maps.jl; 2026-11-16)
                          "convergence.toml",   # the bias of Schöps's method per LM iteration (scripts/convergence.jl; 2026-11-15)
                          "vignetting_figure.toml",   # the paper's vignetting figure from the f/4 refinements and the diffuser photographs (scripts/vignetting_figure.jl)
+                         "radiometric_refinement_board_warping.toml",   # the board-warping session's refinements: two boards × three lenses, no chrome set (scripts/radiometric_refinement.jl)
                          ],
                         # ONE chrome evaluation per chrome set, its models a list (2026-11-12; the 14 mm central_30cm's above)
                         ["chrome_evaluation_fx3_$s.toml" for s in ("fisheye_10cm_ag", "fisheye_2710_si", "tamron_17cm_si", "tamron_20261108_ag", "tamron_largeaperture", "zoom48_f10")]))
@@ -153,9 +154,9 @@ end
               ["radiometric_refinement_ablation_lens_coverage_scale.toml", "radiometric_refinement_smoothness_si30fe.toml", "sampling_strategy.toml",
                "sampling_strategy_fe10_count.toml", "sampling_strategy_fe10_kb16384.toml", "sampling_strategy_kb_count.toml", "sampling_strategy_smoke.toml",
                "warping_ablation.toml"]
-        @test sort(readdir(projectdir("configs", "supplement"))) == ["board_warping.toml", "timing.toml", "timing_smoke.toml"]   # board_warping: the supplement's board-warping figure (scripts/board_warping.jl)
+        @test sort(readdir(projectdir("configs", "supplement"))) == ["board_warping.toml", "board_warping_lenses.toml", "timing.toml", "timing_smoke.toml"]   # board_warping, board_warping_lenses: the supplement's board-warping figures (scripts/board_warping.jl)
         # every case's [pipeline] table reads as PipelineOptions, and its paths stay inside data_root()
-        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
+        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml", "radiometric_refinement_board_warping.toml")
             cfg = TOML.parsefile(projectdir("configs", "experiments", f))
             for (c, t) in get(cfg, "cases", Dict()), (tb, kv) in get(t, "pipeline", Dict()), (k, v) in kv
                 v isa AbstractString || continue
@@ -172,7 +173,7 @@ end
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)
         isfisheye(n) = occursin(r"^(ag10fe_|si27fe_|si30fe_)|fisheye", n)   # si30fe: the fisheye 30 cm set (2026-11-16)
-        for x in ("radiometric_refinement", "radiometric_refinement_vignetting"), (n, t) in load_radiometric_refinement_config(experiment_config(x))["cases"]
+        for x in ("radiometric_refinement", "radiometric_refinement_vignetting", "radiometric_refinement_board_warping"), (n, t) in load_radiometric_refinement_config(experiment_config(x))["cases"]
             @test RadiometricCamera.pipeline_options(t["pipeline"]).lm.max_iter == (isfisheye(n) ? 50 : 25)
         end
         # the non-central spline is out of the paper (owner, 2026-11-11): no case, no chrome evaluation, no table row and no input of it
@@ -191,10 +192,14 @@ end
         # heights as each case states them. The former <base>_warped_print_error cases (radiometric_refinement_warping.toml) were
         # these cases verbatim once the in-plane block was on everywhere: deleted, no copy left.
         @test all(c -> endswith(c, "_warped"), keys(rc["cases"])) && all(c -> endswith(c, "_warped"), keys(rv["cases"]))
+        # the board-warping session's refinements (the supplement's board warping across lenses): the central spline on each of its six sets
+        rb = load_radiometric_refinement_config(projectdir("configs", "experiments", "radiometric_refinement_board_warping.toml"))
+        @test sort(collect(keys(rb["cases"]))) == sort(["bw_$(b)_$(l)_spline_warped" for b in ("ag", "si") for l in lenses])
+        @test all(t -> RadiometricCamera.pipeline_options(t["pipeline"]).camera.fnumber == 10.0, values(rb["cases"]))
         @test !isfile(projectdir("configs", "experiments", "radiometric_refinement_warping.toml"))
         # The global models of the refinements of record (kind = "lens") the heights alone (owner decision 2026-11-16: "heights only for
         # the global models", the warping ablation's `heights` mode): inplane "none", no inplane_start stated.
-        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
+        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml", "radiometric_refinement_board_warping.toml")
             for (n, t) in TOML.parsefile(projectdir("configs", "experiments", f))["cases"]
                 w = t["pipeline"]["warping"]
                 o = RadiometricCamera.pipeline_options(t["pipeline"])

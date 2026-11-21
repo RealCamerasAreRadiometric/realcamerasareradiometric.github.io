@@ -1,17 +1,22 @@
 #!/usr/bin/env julia
 # reproduce: reads configs/supplement/board_warping.toml
+# reproduce: reads configs/supplement/board_warping_lenses.toml
 # reproduce: writes ../paper/fig/board-warping.tex
+# reproduce: writes ../paper/fig/board-warping-lenses.tex
 # provenance: every product writes _config.toml and _provenance.toml (VisualGeometryToolkitEval produce) beside its results.
 # =============================================================================
 # scripts/board_warping.jl — the supplement's board-warping figure (fig:board-warping): the height of the printed calibration
 # boards above their plane as the radiometric refinements of record estimated it, the targets in rows and the lenses in columns.
 # Config of record: configs/supplement/board_warping.toml (a supplement experiment: its products under
 # results_root()/supplement/board_warping/) (src/board_warping.jl; the drawing code src/paper_figures/board_warping.jl).
+# With --config=configs/supplement/board_warping_lenses.toml: the boards as the three lenses' refinements estimated them from the
+# photographs of ONE session, each board in place for its three sets (board-warping-lenses.tex; the drawing code
+# src/paper_figures/board_warping_lenses.jl), and how far the lenses' surfaces of a board differ (meta.toml).
 #
 # STAGES (each a product keyed by its config record and the keys of the products it reads; <results>/supplement/board_warping/<stage>/<key>/)
 #   figures   per set of [sets] the height field over the page and the warping's nodes, from the calibrated target of its case's
-#             refinement (cases.tsv, dump/); each page's size and surface's range (meta.toml); the paper's figure → plotsdir();
-#             numbers.tex (empty: the figure cites no number)
+#             refinement (cases.tsv, dump/); each page's size and surface's range (meta.toml; the sets of one session: also the
+#             lenses' agreement per board); the paper's figure → plotsdir(); numbers.tex (empty: the figure cites no number)
 #
 #   julia --project=experiments experiments/scripts/board_warping.jl [--config=<toml>] [--plan] [--force]
 #
@@ -45,7 +50,7 @@ The figure's files name this stage as their generator, and whose generator it ru
 figures(p) = produce_figures(p, String[]; driver = DRIVER, config_path = CFG_PATH,
                              inputs = [product_dir(refine_product(RC_CFG, c.case)) for c in CASES]) do dir
     board_warping_figure(dir, [(; c..., product = refine_dir(c.case)) for c in CASES], CFG;
-                         writer = "experiments/$DRIVER (stage figures; T. Harder's board_warping.py)")
+                         writer = "experiments/$DRIVER (stage figures; T. Harder's $(replace(CFG["figure"]["drawing"], "-" => "_")).py)")
     Reproduce.write_numbers(joinpath(dir, "numbers.tex"), driver_numbers(CFG_PATH, DRIVER, p.key))   # no number: an empty fragment
     println(">> $(CFG["figure"]["asset_dir"]) → ", joinpath(dir, "assets"))
 end

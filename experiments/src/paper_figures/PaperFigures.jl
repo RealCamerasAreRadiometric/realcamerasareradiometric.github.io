@@ -8,7 +8,8 @@
 #     FIGURES["<figure>"] = figure_<name>          # figure_<name>(; data, out, settings...) -> the files it wrote
 # A generator is run by a stage of its figure's driver through `generate`. common.jl is what they share. Each figure's file is
 # loaded into a module of its own (<name>.jl -> PaperFigures.<Name>), so that two generators may use the same helper names; what
-# common.jl defines is visible in each. The files are listed in FIGURE_FILES: a new figure's file is added there.
+# common.jl defines is visible in each. The files are listed in FIGURE_FILES: a new figure's file is added there. A figure whose
+# drawing is another figure's names that figure's module, loaded before it (board_warping_lenses.jl draws board_warping.jl's panels).
 module PaperFigures
 
 import ColorTypes, PNGFiles, Printf
@@ -26,8 +27,8 @@ for n in names(@__MODULE__; all = true)                     # everything defined
 end
 
 "The figures' files beside this one, each with the name of the module it is loaded into, in the order they are loaded."
-const FIGURE_FILES = (:BoardWarping => "board_warping.jl", :FocusSurfaces => "focus_surfaces.jl", :TextureLearned => "texture_learned.jl",
-                      :Vignetting => "vignetting.jl")
+const FIGURE_FILES = (:BoardWarping => "board_warping.jl", :BoardWarpingLenses => "board_warping_lenses.jl", :FocusSurfaces => "focus_surfaces.jl",
+                      :TextureLearned => "texture_learned.jl", :Vignetting => "vignetting.jl")
 
 for (name, file) in FIGURE_FILES                            # a file that does not load is an error: no figure is silently missing
     path = joinpath(@__DIR__, file)
