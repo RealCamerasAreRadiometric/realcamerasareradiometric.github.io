@@ -1,5 +1,5 @@
 # =============================================================================
-# run_of_record.jl — the run of record of the paper on dgx01: every stage of configs/reproduce.toml the paper needs (the stages
+# run_of_record.jl — the run of record of the paper on a Slurm site (dgx01, vcai): every stage of configs/reproduce.toml the paper needs (the stages
 # configs/run_of_record.toml lists, and what they run after), submitted by VisualGeometryToolkitEval's runner (Reproduce) as ONE
 # launch, its jobs named `ror-<driver>-<stage>[-<phase>]`, and the GPU queue ordered longest-first; and its plan: the job graph with
 # its GPU and CPU counts, each job's runtime estimate (the config's, from the last good runs) against its Slurm limit, and the
@@ -15,14 +15,14 @@ using TOML: TOML
 "The job-name prefix of the run of record (not in the gate-first watcher's list of experiment names: never held)."
 const ROR_PREFIX = "ror-"
 
-const _ROR_KEYS = Dict("launch" => ("stages", "optional", "results_root", "tree_root", "repository", "registry", "julia", "depot"), "machine" => ("gpus", "cpus"),
+const _ROR_KEYS = Dict("launch" => ("stages", "optional", "results_dir", "tree_dir", "repository", "registry"), "machine" => ("gpus", "cpus"),
                        "estimate" => nothing, "require" => nothing, "risk" => ("tight_fraction", "untimed"))
 
 """
     load_ror_config(path) -> Dict
 
 The run of record's config (configs/run_of_record.toml): `[launch] stages` (the stages the launch names, with what they run after),
-`results_root` and `tree_root` (patterns with `{version}`), `[machine]` gpus and cpus (the node the plan schedules on), `[estimate]`
+`results_dir` and `tree_dir` (patterns with `{version}`, relative to the machine's results base: [`ror_results_base`](@ref)), `[machine]` gpus and cpus (the node the plan schedules on), `[estimate]`
 (`"<stage>"` or `"<stage>:<phase>"` = minutes per task; `default` and `precompile`), `[[require]]` (`what`, `stage`, and an optional
 `item` regex: an experiment the paper needs, which the launch must hold) and `[risk] tight_fraction`. Unknown tables or keys are refused.
 """
@@ -46,6 +46,21 @@ function load_ror_config(path::AbstractString)
 end
 
 ror_pattern(p::AbstractString, version::AbstractString) = replace(p, "{version}" => version)
+
+"""
+    ror_results_base(site, project; env = ENV) -> String
+
+The machine's results base, under which a release's results directory and tree are made: `env["VGTK_RESULTS_ROOT"]`, else the
+site profile's `[storage] results_root` for `project` (the runner's `site_root`); an error when neither names one (a profile
+without [storage]: give `--results-root`). Machine paths are the site profiles' alone.
+"""
+function ror_results_base(site, project::AbstractString; env = ENV)
+    v = strip(get(env, "VGTK_RESULTS_ROOT", ""))
+    isempty(v) || return String(v)
+    r = site_root(site, "results_root", project)
+    isempty(r) && throw(ArgumentError("site $(site.name) names no [storage] results_root: set VGTK_RESULTS_ROOT or give --results-root"))
+    return r
+end
 
 # A copy of an immutable struct with some fields replaced (the runner's StageSpec and StageGraph: by field name, so a field
 # the runner adds later is carried over).

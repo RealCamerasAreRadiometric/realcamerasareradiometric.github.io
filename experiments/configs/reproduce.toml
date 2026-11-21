@@ -23,15 +23,11 @@ julia_project = "experiments"
 # a change elsewhere (the paper's text, the docs) reuses the finished stages
 code = ["RadiometricCamera/Project.toml", "RadiometricCamera/src", "RadiometricCamera/bin", "experiments/Project.toml", "experiments/src", "experiments/scripts"]
 
-[sites.dgx01]
-# the paper data root of record on dgx01 (REPRODUCE.md); the results base of the runner's launches beside it, never
-# experiments/data/exp_pro (the runs of record)
-data_root = "/raid/data/jpr/rc-vgtk-root"
-results_root = "/raid/data/jpr/rc-results-0.9"
-# data of record no artifact publishes (VisualGeometryToolkitEval's tier `unpublished`, each input pinned by its sha256): the
-# external calibrators' container images (configs/experiments/frontends.toml): the directory of the images (its README holds the digests),
-# never a parent of the results root (Eval refuses a write under an input tier's root)
-tiers = { unpublished = "/raid/data/jpr/containers" }
+# Where this project's data and results are on a machine is the machine's site profile's (VisualGeometryToolkitEval
+# configs/sites/<site>.toml, [storage] data_root / results_root / artifact_store; `{project}` is this graph's name), else the
+# environment (VGTK_DATA_ROOT, VGTK_RESULTS_ROOT, VGTK_DATA_ROOT_UNPUBLISHED for the tier the sensor model and the calibrator's
+# image are named by) or --data-root / --results-root. A profile without [storage] (dgx01's) takes the environment. No machine
+# path is written here: the one binding below is relative to the repository.
 
 [sites.desktop]
 # the owner's workstation: the data ladder's own binding (experiments/data/exp_raw: a link, or the artifact view that

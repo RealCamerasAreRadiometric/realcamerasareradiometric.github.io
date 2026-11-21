@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# run_of_record.sh — the run of record of the paper, in ONE command on dgx01, the moment RadiometricCamera <version> is registered:
+# run_of_record.sh — the run of record of the paper, in ONE command on a Slurm site, the moment RadiometricCamera <version> is registered:
 #
-#   bash experiments/scripts/slurm/run_of_record.sh <version> --plan        # verify, make the tree, print the job graph; nothing submitted
+#   VGTK_SITE=<site> bash experiments/scripts/slurm/run_of_record.sh <version> [--results-base=<dir>] --plan   # nothing submitted
 #   bash experiments/scripts/slurm/run_of_record.sh <version>               # verify, make the tree, submit every stage
 #   bash experiments/scripts/slurm/run_of_record.sh <version> --ref=<rev>   # the tree at <rev> (default v<version>): the registered tag
 #                                                                         # plus tooling commits, its package code the tag's
@@ -13,20 +13,22 @@
 # 1. the registry: RadiometricCamera <version> is in the registry of record (configs/run_of_record.toml [launch] registry) after a
 #    registry update, and resolves in a FRESH environment from the registries alone (no [sources], no dev path, no repo-url) — a CPU
 #    job (srun --gres=none). Anything else FAILS LOUDLY (exit 10): no experiment runs on an unregistered version.
-# 2. the tree: one clean clone of the repository of record ([launch] tree_root/tree), at v<version> (or --ref, whose package code —
+# 2. the tree: one clean clone of the repository of record (<results base>/[launch] tree_dir/tree), at v<version> (or --ref, whose package code —
 #    RadiometricCamera/{src, bin, ext, Project.toml} — must be the tag's), the tag's RadiometricCamera/ tree the registry's git-tree-sha1, every [sources] a path inside
 #    the tree; instantiated from the registries in a CPU job (no precompile: the graph's setup stage compiles inside the scheduler).
 # 3. the launch: scripts/run_of_record.jl from a bare julia in the tree (VisualGeometryToolkitEval's runner on configs/reproduce.toml,
 #    the stages of configs/run_of_record.toml): every stage an sbatch job chained upstream → downstream (afterok, aftercorr per item),
-#    named ror-<driver>-<stage>[-<phase>], into the NEW results root [launch] results_root; each driver's produce_or_load keys reuse
+#    named ror-<driver>-<stage>[-<phase>], into the NEW results root <results base>/[launch] results_dir; each driver's produce_or_load keys reuse
 #    every finished product, so nothing runs twice. A GPU-bound refinement gets one GPU; every CPU phase runs with no GPU
 #    (configs/reproduce.toml phases); 8480M per CPU (the node ratio); the GPU queue in longest-first order (src/run_of_record.jl).
-# Run on dgx01 (sbatch on PATH), from any checkout of the tooling; release jobs are never touched.
+# The machine is the site profile's (VGTK_SITE, else dgx01; VisualGeometryToolkitEval configs/sites/): its setup puts julia on PATH
+# (or JULIA) and sets JULIA_DEPOT_PATH; the results base is --results-base, else VGTK_RESULTS_ROOT (the site profile's [storage]
+# results_root: the value to give). Run where sbatch is on PATH, from any checkout of the tooling; release jobs are never touched.
 # =============================================================================
 set -euo pipefail
 V=${1:?usage: run_of_record.sh <version> [--plan] [--ref=<rev>] | <version> --dry-run=<rev> --from=<git> --scratch-sources=<file>}
 shift
-PLAN=""; REF=""; DRY=""; FROM=""; SCRATCH_SOURCES=""
+PLAN=""; REF=""; DRY=""; FROM=""; SCRATCH_SOURCES=""; BASE_ROOT=${VGTK_RESULTS_ROOT:-}
 for a in "$@"; do
   case $a in
     --plan) PLAN=--plan ;;
@@ -34,19 +36,22 @@ for a in "$@"; do
     --dry-run=*) DRY=${a#--dry-run=}; PLAN=--plan ;;
     --from=*) FROM=${a#--from=} ;;
     --scratch-sources=*) SCRATCH_SOURCES=${a#--scratch-sources=} ;;
+    --results-base=*) BASE_ROOT=${a#--results-base=} ;;
     *) echo "run_of_record.sh: unknown option $a"; exit 2 ;;
   esac
 done
 [[ $V =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "run_of_record.sh: version $V is not X.Y.Z"; exit 2; }
 [ -n "$DRY" ] && { [ -n "$FROM" ] && [ -f "$SCRATCH_SOURCES" ] || { echo "--dry-run needs --from and --scratch-sources"; exit 2; }; }
-command -v sbatch > /dev/null || { echo "run_of_record.sh: no sbatch: run it on dgx01"; exit 2; }
+command -v sbatch > /dev/null || { echo "run_of_record.sh: no sbatch: run it on a Slurm site"; exit 2; }
+[ -n "$BASE_ROOT" ] || { echo "run_of_record.sh: no results base: give --results-base=<dir> or VGTK_RESULTS_ROOT (the site profile's [storage] results_root)"; exit 2; }
 TOOL=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 CFG=$TOOL/experiments/configs/run_of_record.toml
 conf() { python3 -I -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["launch"][sys.argv[2]].replace("{version}", sys.argv[3]))' "$CFG" "$1" "$V"; }
-JL=$(conf julia); REPO=$(conf repository); REGISTRY=$(conf registry); BASE=$(conf tree_root); RESULTS=$(conf results_root)
-export JULIA=$JL JULIA_DEPOT_PATH=$(conf depot) JULIA_PKG_USE_CLI_GIT=true JULIA_PKG_SERVER="" JULIA_PKG_PRECOMPILE_AUTO=0
-mkdir -p "${JULIA_DEPOT_PATH%%:*}" "$BASE"
-CPUJOB=(srun --partition=gpu --gres=none --cpus-per-task=4 --mem-per-cpu=8480M --time=01:00:00)
+JL=${JULIA:-$(command -v julia)}; REPO=$(conf repository); REGISTRY=$(conf registry); BASE=$BASE_ROOT/$(conf tree_dir); RESULTS=$BASE_ROOT/$(conf results_dir)
+[ -x "$JL" ] || { echo "run_of_record.sh: no julia (the site's setup puts it on PATH, or set JULIA)"; exit 2; }
+export JULIA=$JL JULIA_PKG_USE_CLI_GIT=true JULIA_PKG_SERVER="" JULIA_PKG_PRECOMPILE_AUTO=0
+mkdir -p "$BASE"
+CPUJOB=(srun --gres=none --cpus-per-task=4 --mem-per-cpu=8480M --time=01:00:00)
 say() { echo "[$(date +%T)] $*"; }
 die() { echo; echo "!! run of record REFUSED: $*"; exit "${CODE:-10}"; }
 

@@ -13,7 +13,7 @@
 #   question    does Schöps's start of the fisheye 30 cm set hold on held-out chrome dots, and at which refinement window?
 #   hypothesis  the window of record scores the lower held-out median (the chrome evaluation's scorer, paired photograph bootstrap)
 #   decides     the fisheye Siemens rows of the paper's chrome evaluation (in place of the 27.10 set) and frontends.toml's window
-#   evidence    the window study on branch schoeps-window (dgx01 /raid/data/jpr/schoeps-window; the report beside it)
+#   evidence    the window study on branch schoeps-window (its scratch root on dgx01, schoeps-window/, with the report beside it)
 #   owner       J. Pritts (2026-11-16: raw_green for Schöps and the Thorlabs detect; the 30 cm set replaces the 27.10 set)
 #   date        2026-11-16
 #   discussion  the excluded 27.10 set had 40 usable views; the 30 cm set has 301 Siemens and 254 chrome photographs

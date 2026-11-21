@@ -7,7 +7,7 @@
     using Test
     using DrWatson
     using TOML: TOML
-    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, load_site, plan_reproduction, select_stages
+    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, load_site, plan_reproduction, select_stages, site_root
     include(srcdir("run_of_record.jl"))
 
     cfg = load_ror_config(projectdir("configs", "run_of_record.toml"))
@@ -34,7 +34,12 @@
         @test isempty(intersect(["golden", "convergence", "chrome_index_grid", "paper_pdf"], select_stages(g; only = sel.stages)))
         # a launch stage the graph lacks is refused (no stage is optional)
         @test_throws ArgumentError ror_stages(_with(g; stages = filter(s -> s.name != "texture_recovery", g.stages)), cfg)
-        @test ror_pattern(cfg["launch"]["results_root"], "0.11.5") == "/raid/data/jpr/rc-results-0.11.5"
+        # the release's results directory under the machine's results base: the site profile's, else VGTK_RESULTS_ROOT; no path here
+        @test ror_pattern(cfg["launch"]["results_dir"], "0.11.5") == "rc-results-0.11.5" && !isabspath(cfg["launch"]["tree_dir"])
+        vcai = load_site("vcai")
+        @test ror_results_base(vcai, g.name; env = Dict{String, String}()) == site_root(vcai, "results_root", g.name)
+        @test ror_results_base(vcai, g.name; env = Dict("VGTK_RESULTS_ROOT" => "elsewhere")) == "elsewhere"
+        @test_throws ArgumentError ror_results_base(load_site("dgx01"), g.name; env = Dict{String, String}())   # dgx01's profile has no [storage]
     end
 
     @testset "job names: ror-<driver>-<stage>[-<phase>]" begin

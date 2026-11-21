@@ -15,9 +15,9 @@
 #
 # THE BODY: EXIF states no body serial (Sony's InternalSerialNumber is in the makernotes only, which Features does not read): the
 # record names the body by make and model, as every FX3 photograph's EXIF does. No sensor temperature is recorded.
-# The inputs are of VisualGeometryToolkitEval's tier "unpublished" (dgx01: /raid/data/jpr/containers, the campaign's tier
-# rc_sensor_characterisation_20261113 linked there from the paper-data mirror; configs/data_artifacts.toml's SENSOR MODELS block): the
-# frames' tree is pinned by its MANIFEST.tsv (sha256 per file), the record of record by its sha256.
+# The inputs name the tier "unpublished" (a name their run keys carry; the files are the tiers of record rc_sensor_frames_20261121, the
+# campaign rc_sensor_characterisation_20261113, and rc_sensor_model_20261121 of configs/data_artifacts.toml): the frames' tree is pinned by
+# its MANIFEST.tsv (sha256 per file), the record of record by its sha256.
 
 [experiment]
 name = "sensor_characterisation"

@@ -257,7 +257,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the 14 mm central_30cm start of record?
 #   hypothesis  the frozen default 10 or its double scores the lower held-out Thorlabs median
 #   decides     [schoeps.central30cm_14mm_siemens_w20] and, by the same-lens rule, the 14 mm sets without a Thorlabs pair (texcal_14mm, vig14mm_f4)
-#   evidence    dgx01 window study (/raid/data/jpr/schoeps-window, chrome_evaluation_sw_central30cm: evaluate e60875c16fcdb04e)
+#   evidence    dgx01 window study (its scratch root schoeps-window/, chrome_evaluation_sw_central30cm: evaluate e60875c16fcdb04e)
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  both cover 98.1 % of the sensor lattice; the edge gains most (Δ −0.230 px)

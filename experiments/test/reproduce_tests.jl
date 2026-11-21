@@ -293,7 +293,7 @@ end
     using Test
     using DrWatson
     using TOML: TOML
-    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, select_stages, missing_inputs, reproduce_main
+    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, select_stages, missing_inputs, reproduce_main, load_site, site_root
 
     graph = projectdir("configs", "reproduce.toml")
     g = load_stage_graph(graph)
@@ -308,7 +308,7 @@ end
              "radiometric_refinement_vignetting", "chrome_evaluation", "chrome_evaluation_score", "regenerate_paper",
              "results_branch"]
     env0 = filter(p -> !(first(p) in ("VGTK_DATA_ROOT", "VGTK_RESULTS_ROOT", "CASES", "CHROME_CASES", "VIG_CASES",
-                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
+                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED", "VGTK_SITE", "VGTK_ARTIFACT_STORE")), Dict(ENV))   # hermetic: no machine tier root
 
     @testset "--only: a subset with its prerequisites, or alone" begin
         @test select_stages(g) == paper                            # no flags: every paper stage, nothing else
@@ -389,9 +389,13 @@ end
         @test occursin("results_branch_of_run", out) && occursin("--dependency=afterok:\$regenerate_paper", out)
         @test occursin("driver   julia --project=experiments experiments/scripts/radiometric_refinement.jl --config=experiments/configs/experiments/radiometric_refinement.toml", out)
         @test !isdir(joinpath(results, "_reproduce"))                   # a dry run writes nothing
-        # the site's own roots when none is given
-        code, out = dry("dgx01")
-        @test occursin("data     /raid/data/jpr/rc-vgtk-root", out) && occursin("results  /raid/data/jpr/rc-results", out)
+        # a site profile's own roots when none is given: the shipped vcai profile's [storage] (machine paths live in the site
+        # profiles alone; the project's graph names none)
+        code, out = dry("vcai")
+        vcai = load_site("vcai")
+        @test occursin("data     $(site_root(vcai, "data_root", g.name))", out) &&
+              occursin("results  $(site_root(vcai, "results_root", g.name))", out)
+        @test !haskey(g.site_roots, "dgx01") && !haskey(g.site_roots, "vcai")
     end
 
     @testset "the dry run on the desktop: the same launchers under bash, device 0 only" begin

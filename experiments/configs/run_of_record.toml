@@ -26,16 +26,15 @@ stages = [
     "texture_recovery",
     "regenerate_paper", "results_branch",
 ]
-# a NEW results root per release (never a dated one: a run is found by its key); the tree is the registered version's clone
-results_root = "/raid/data/jpr/rc-results-{version}"
-tree_root = "/raid/data/jpr/ror-{version}"
-# where the tree comes from and how it resolves: the repository of record, the registry RadiometricCamera is registered in, and on
-# dgx01 the julia of the release gates (1.13.3, the gates' JL) and a depot of the launch's own before the shared one (the gates'
-# layout: the shared depot's registries, General and CauRegistry, and its packages; the launch's compile caches its own)
+# a NEW results directory per release (never a dated one: a run is found by its key) and the registered version's clone beside it,
+# both under the machine's results base: the site profile's [storage] results_root (VisualGeometryToolkitEval configs/sites/,
+# VGTK_SITE), else VGTK_RESULTS_ROOT, else the launcher's --results-base (no machine path here)
+results_dir = "rc-results-{version}"
+tree_dir = "ror-{version}"
+# where the tree comes from and how it resolves: the repository of record and the registry RadiometricCamera is registered in. The
+# julia and the depot are the machine's (the site profile's setup: `julia` on PATH, or JULIA; JULIA_DEPOT_PATH)
 repository = "https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git"   # the package in its subdirectory RadiometricCamera/
 registry = "CauRegistry"
-julia = "/raid/data/jpr/julia-depot/juliaup/julia-1.13.3+0.x64.linux.gnu/bin/julia"
-depot = "/raid/data/jpr/depot-ror-{version}:/raid/data/jpr/julia-depot:"
 
 [machine]
 gpus = 8      # dgx01: 8 × B200 (scontrol show node: Gres=gpu:8)
@@ -47,7 +46,7 @@ tight_fraction = 0.75   # a job projected past 75 % of its --time is flagged: th
 untimed = ["regenerate_paper"]
 
 # Minutes per task of each job: "<stage>" its own job (its last phase), "<stage>:<phase>" an earlier phase. The sources: the runner's
-# completion markers (start/end of every task of the launches under /raid/data/jpr/rc-results-0.11/_reproduce, harvested 2026-11-16;
+# completion markers (start/end of every task of the launches under dgx01's rc-results-0.11/_reproduce, harvested 2026-11-16;
 # no sacct on dgx01: accounting storage is disabled), the GNU time -v lines of the logs, and the measured runtimes stated beside each
 # stage's limit in configs/reproduce.toml (the rehearsal of 2026-11-13, dgx01 2026-11-15). A job without an entry is planned at
 # `default` and flagged unmeasured.
