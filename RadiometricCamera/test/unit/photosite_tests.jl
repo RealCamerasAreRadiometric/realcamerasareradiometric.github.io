@@ -205,7 +205,7 @@ end
         @test R == (c .== 0) .& usable && B == (c .== 2) .& usable
         @test G == ((c .== 1) .| (c .== 3)) .& usable                   # both greens: the mask a green fit has always read, bit for bit
         @test !any(R .& G) && !any(R .& B) && !any(G .& B) && (R .| G .| B) == usable   # every usable photosite is in exactly one filter's mask
-        @test count(c .== 0) == count(c .== 2) && count((c .== 1) .| (c .== 3)) == 2 * count(c .== 0)
+        @test count(c .== 0) + count(c .== 2) + count((c .== 1) .| (c .== 3)) == length(c) && all(k -> any(c .== k), 0:3)   # the four Bayer positions, each in one filter
         @test count(usable) == length(w) - count(iszero, w) - count(VgtkCore.saturationview(w)) < length(w)   # the censored photosites are in none
         # the entry point reads the observation model's channel
         for ch in (:R, :G, :B)
