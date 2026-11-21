@@ -215,7 +215,7 @@ end
 The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (view, material,
 lighting, scene with its surface): per ray `[L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed
 where no ray reached, with the target `anchor` (`ANCHOR_FLOAT`) its readers look the albedo up on (`RecordedRays`). Its geometry is in
-the inputs' float (`ANCHOR_FLOAT`: `_anchor_inputs`), its estimator and rows in the kernels' float on `est` (`(; mat, light, board)`;
+the inputs' float (`ANCHOR_FLOAT`: `_anchor_inputs`), its estimator and rows in the kernels' float on `est` (the α and η partials in `ANCHOR_FLOAT`: `_material_partials`; `(; mat, light, board)`;
 `_record_inputs` gives the last eight arguments). The chunks, the height kernel and the parts of the same parameters read it (`rays`)
 instead of carrying their partials through the estimator.
 """

@@ -130,7 +130,8 @@ reads ρ and η only through ρ_c and η_c, so `RAD_NL` = 8 local slots carry it
 `RadianceRecord`: at the plain parameters, each ray's `[L | ∂L/∂ℓ]` and its hit (`RadianceJac`, `_ray_hit`) are written to `out[base + ray]` (ray
 `(ks − 1) NA + la` of the pixel) and its value used. The record's geometry — the rays, their hits, the albedo looked up there — is in
 the numbers of the `Φ_pixel` call (`ANCHOR_FLOAT` on a device), its estimator in the record's float (`eltype` of `out`'s rows), on the
-inputs `est` (`(; mat, light, board)` in that float). `RadianceRays`: the ray's ℓ, dual in the
+inputs `est` (`(; mat, light, board)` in that float), but for its roughness and refractive-index partials: a second run in the
+geometry's numbers (`_material_partials`). `RadianceRays`: the ray's ℓ, dual in the
 chunk's (or the height mode's) slots, replaces the estimator by its linearisation at the record, `L⁰ + J (ℓ − value(ℓ))` — the chain
 rule (∂L/∂θ = ∂L/∂ℓ · ∂ℓ/∂θ), so a chunk's partials skip the estimator; its albedo is VisualRadiometryToolkitCore's anchored lookup at
 the recorded hit (`anchored_albedo` on `anchor`, the target in `ANCHOR_FLOAT`: the hit's value, the chunk's partials). A ray the record
@@ -168,7 +169,8 @@ and so of the ANCHOR at which every reader of the record looks the albedo up aga
 `anchored_albedo`, the recorded hit plus the reader's Float32 offset). A Float32 board point is ≈ 0.06 µm coarse a metre from the
 origin (≈ 0.1 µm after a ray's arithmetic), and on a printed edge (the Siemens print's σ 0.03 mm) the radiance's slope moves by ≈ 1 % with it (dgx01, 2026-11-11: the
 pose's columns 0.37–0.82 % off the CPU's, the gate 0.4 %): the point must be Float64. Its arithmetic is not: the estimator, the
-Jacobian chunks and the height kernel run in the kernels' float (`_kernel_float`) at the anchored point.
+Jacobian chunks and the height kernel run in the kernels' float (`_kernel_float`) at the anchored point — but for the estimator's
+own α and η partials, the material block's columns, which the record takes in this float too (`_material_partials`).
 """
 const ANCHOR_FLOAT = Float64
 """A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧 | 𝐱 − 𝐱̃]` in the record's float `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend):
@@ -248,7 +250,10 @@ The record's roughness and refractive-index partials (`RadianceRecord`'s slots 2
 `L`'s own where the estimator ran in it (one float: the CPU backend); else a second run of the estimator with those two slots alone in
 the geometry's float (`bd`, `m`, `lt`: `ANCHOR_FLOAT`), its value discarded. They are the only columns that are the estimator's own
 partials (the material block's α and η), and the Float32 estimator's were 1.2–1.4 % off the CPU's on the Siemens case (design report
-8.3); the other slots enter the Jacobian through the geometry's partials, where the Float32 estimator is within the gate.
+8.3); the other slots enter the Jacobian through the geometry's partials, where the Float32 estimator is within the gate. The two
+runs draw the same samples in two floats, so for the rare sample on one side of a branch of the sampler in one float and on the
+other in the other (`_radiance_mc`'s reflection below the surface), the row's α and η partials and its value disagree by that
+sample's share: the same order as the Float32 estimator's own such steps (`height_tests.jl`).
 """
 @inline function _material_partials(::Type{E}, L, bd, m, lt, sm, key, ρ, α, η, ω_l::StaticVector{3, T}, 𝐱) where {E, T}
     E === T && return (SVector(ntuple(c -> ForwardDiff.partials(L[c], 2), Val(3))), SVector(ntuple(c -> ForwardDiff.partials(L[c], 3), Val(3))))
