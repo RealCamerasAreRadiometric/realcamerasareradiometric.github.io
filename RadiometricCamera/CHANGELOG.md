@@ -2,8 +2,17 @@
 
 ## Unreleased
 
-Performance and cleanup (round 3). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
+Performance and cleanup (rounds 3 and 4). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
 
+- **Changed (device numbers):** the device Jacobian is Float32 at Float64 hits. The radiance record's geometry — the rays, their
+  hits, the albedo there — is in `ANCHOR_FLOAT` (Float64) on every backend, its Monte Carlo estimator in the kernels' float; the
+  record keeps each hit to Float64's precision (`RadianceJac` gains a column: the hit's remainder after rounding). Every Jacobian
+  chunk (the pose's among them), the nodal heights' kernel and the parts kernel run in the kernels' float and read the albedo at the
+  recorded hit through VisualRadiometryToolkitCore's `anchored_albedo` (the anchor's precision for the point and the map's read, the
+  chunk's partials). Removed with it: `HIGH_FLOAT`, the Float64 pose chunks, the Float64 height path and its record, the rounded
+  copy of the record (`_chunk_plan`, `_record_as`, `_height_inputs`, `_height_board`; `_anchor_inputs` and `_anchor_board` are the
+  record's). The CPU backend's numbers move by rounding only (a chunk reads the albedo at the recorded hit). Needs VisualRadiometryToolkitCore's `physical_albedo` and `anchored_albedo`
+  (its next release): RC's compat floor on it moves with that release.
 - **Changed:** the Jacobian's row kernel launches through VisualGeometryToolkitCore's `_launch_rows_on!` (`OnBackend` with the
   per-pixel workgroup, `_pixel_rows_exec`) and `J r` through its `_matvec!` (on CUDA its one-column matrix product): RC's
   `_launch_pixel_rows!` and the CUDA extension's `_rows_times` are removed.

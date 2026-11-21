@@ -103,7 +103,7 @@ using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, wit
 using VisualRadiometryToolkitCore: TexturedTarget, TargetState, with_state, with_h, with_edge, with_inplane, height_on, inplane_on,
                                    EDGE_NC, HEIGHT_NC, HEIGHT_NODES, INPLANE_NC, with_sdf, board_normal, world_point, 𝔟, corners,
                                    intersect_board, board_plane_hit, inside, physical_albedo, anchored_albedo, warping_nodes, warping_aspect,
-                                   board_height, BoardRays, inplane_calibration, design_chart, page_points
+                                   board_height, BoardRays, inplane_calibration, page_points
 # its camera-frame maps and part accessors, which this package's records answer by forwarding (VisualRadiometryToolkitCore's
 # CONTRACT_GENERICS, and VisualGeometryToolkitCore's `backproject`, whose alias there is the paper's π̂⁻¹): the kernels' `View`
 # (camera/view.jl) and the calibration state (calibration/state.jl). The paper's symbols are VisualRadiometryToolkitCore's public

@@ -121,7 +121,7 @@ struct HeightRayTag end
     inner + SMatrix{3, NH}(ntuple(q -> ForwardDiff.partials(wL[(q - 1) % 3 + 1], 1) * ForwardDiff.partials(s, (q - 1) ÷ 3 + 1), Val(3 * NH)))
 
 """
-    RadianceRecord(out, base[, est]) / RadianceRays(J, base, anchor)
+    RadianceRecord(out, base, est) / RadianceRays(J, base, anchor)
 
 The radiance-Jacobian modes of [`Φ_pixel`](@ref) (the device Jacobian): `L_c` depends on the parameters only through its local
 inputs ℓ — the albedo ρ, the roughness α, the refractive indices η, the outgoing direction ω_l and the board point 𝐱 — and channel c
