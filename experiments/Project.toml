@@ -49,8 +49,6 @@ VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "vrtk/port"}
 # BlobBoards from its cascade branch (compat on VisualGeometryToolkitCore 0.12): waits for BlobBoards 0.7.3.
 BlobBoards = {url = "https://github.com/VisualGeometryToolkit/BlobBoards.jl", rev = "cascade/vgtk-0.12"}
-# LocalOptimizationDoneRight from its cascade branch (the same compat): waits for LocalOptimizationDoneRight 0.7.2.
-LocalOptimizationDoneRight = {url = "https://github.com/VisualGeometryToolkit/LocalOptimizationDoneRight.jl", rev = "cascade/vgtk-0.12"}
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
@@ -69,7 +67,7 @@ JSON = "1"
 JpegTurbo = "0.1"
 LibRaw_jll = "0.22.2"
 LinearAlgebra = "1"
-LocalOptimizationDoneRight = "0.7.0"
+LocalOptimizationDoneRight = "0.7.2"
 NLLSsolver = "5.3.4"
 NPZ = "0.4"
 PNGFiles = "0.4.5"
