@@ -38,13 +38,14 @@ RadiometricCamera._device_elements(::CUDA.CUDABackend, xs::AbstractVector) = CUD
 
 function RadiometricCamera._batched_products(J3::CUDA.CuArray{Float64, 3}, r2::CUDA.CuMatrix{Float64}, ms)
     n, M, nt = size(J3)
-    H = similar(J3, n, n, nt); g = similar(J3, n, 1, nt)
+    nH = n * n * nt; nB = nH + n * nt
+    B = similar(J3, nB)                                      # H and g in one buffer: one download
+    H = reshape(view(B, 1:nH), n, n, nt); g = reshape(view(B, (nH + 1):nB), n, 1, nt)
     CUDA.CUBLAS.gemm_strided_batched!('N', 'T', 1.0, J3, J3, 0.0, H)
     CUDA.CUBLAS.gemm_strided_batched!('N', 'N', 1.0, J3, reshape(r2, M, 1, nt), 0.0, g)
-    nH = n * n * nt
-    buf = _pinned_host(nH + n * nt)
-    copyto!(buf, 1, H, 1, nH); copyto!(buf, nH + 1, g, 1, n * nt)
-    Hh = reshape(view(buf, 1:nH), n, n, nt); gh = reshape(view(buf, (nH + 1):(nH + n * nt)), n, nt)
+    buf = _pinned_host(nB)
+    copyto!(buf, 1, B, 1, nB)
+    Hh = reshape(view(buf, 1:nH), n, n, nt); gh = reshape(view(buf, (nH + 1):nB), n, nt)
     return [(view(gh, :, t), view(Hh, :, :, t)) for t in 1:nt]              # (views of the task's buffer: valid until its next call)
 end
 # The calling task's page-locked host buffer of at least `n` floats (grown, kept with the task: the pooled device workers'). A view's
@@ -52,7 +53,7 @@ end
 # new pages' faults), pinned and reused the link's rate.
 function _pinned_host(n::Integer)
     ref = RadiometricCamera.VgtkCore.task_buffers(() -> Ref(Float64[]), :radiometric_camera_pinned_products)
-    length(ref[]) < n && (v = Vector{Float64}(undef, n); CUDA.pin(v); ref[] = v)
+    length(ref[]) < n && (v = Vector{Float64}(undef, max(n, 5 * length(ref[]) ÷ 4)); CUDA.pin(v); ref[] = v)   # (grown by a quarter at least: few re-pins)
     return ref[]
 end
 

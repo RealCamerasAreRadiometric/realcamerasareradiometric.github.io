@@ -468,8 +468,8 @@ end
 # chain rule; residuals come from the plain flux kernel (bitwise identical to computeresidual).
 # ---------------------------------------------------------------------------
 
-"""Lazy per-tile device data: the pixel-id list `px` and its index list `idx` (the tile's own batch, `_tile_batch`), the tile's view
-pixels `pix` (its rows among a view's batch) and its measured values `ϕ`."""
+"""Lazy per-tile device data: the pixel-id list `px` and its index list `idx` (the tile's own batch, `_tile_batch`), the row inputs
+of its rows among its view's batch (`rows`) and among its own batch (`own`; `_tile_row_inputs`), and its layouts' device forms."""
 function _tile_dev!(r::PerTileResidual)
     d = r.dev[]
     d === nothing || return d
@@ -480,8 +480,8 @@ function _tile_dev!(r::PerTileResidual)
         ids[j] = UInt32((u - 1) * _image_height(s) + v)
     end
     sh(a) = _shared_read_only!(s.backend, a)                  # read on the window's queues too, written only here
-    d = (; px = sh(adapt(s.backend, ids)), idx = sh(_index_list(s.backend, length(ids))), pix = sh(adapt(s.backend, Int32.(r.pix))),
-          ϕ = sh(adapt(s.backend, r.ϕt)), ω = _device_weights(s.backend, r.ωt), layouts = Dict{Any, Any}())
+    d = (; px = sh(adapt(s.backend, ids)), idx = sh(_index_list(s.backend, length(ids))), rows = _tile_row_inputs(s, [r]),
+          own = _tile_row_inputs(s, [r]; own = true), layouts = Dict{Any, Any}())
     r.dev[] = d
     return d
 end
@@ -505,18 +505,23 @@ function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::_PoseBlock, p0
                            ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar) where {N, PX, PY}
     s = r.state
     _count_device_call!(s, :jac)
-    NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
-    NS = length(s.settings.sensor)
-    lay = _tile_layout(varflags, N, NS, PX * PY, VgtkCore.tangent_size(vg), NV, J, n_height(m), n_inplane(m); r.free, r.held_rotation_coordinates,
-                       fixed = material_fixed(m))
+    vars = (pose, p00, p10, p01, p11, foc, ap, m, vg, lt)
+    lay = _tile_layout_at(varflags, r, vars)
     # every varflags goes through the batched path (2026-10-24): `lay` already omits the fixed blocks' columns and the per-view
     # buffers hold every slot — formerly only the all-free case 1023 was batched, so a run with a fixed block (the paper's fixed
     # aperture) dropped every tile onto the far slower per-tile path
-    vars = (pose, p00, p10, p01, p11, foc, ap, m, vg, lt)
     ent = _view_batch!(s, r, vars, true)
     ivs = ent === nothing ? (1:length(r.pix)) : r.pix
     ent === nothing && (ent = _tile_batch(r, vars, true))
     return (; _tile_jacobian(r, ent, lay, vars...; ivs)..., ent.flux, ivs)
+end
+
+"""The layout of the tile `r`'s Jacobian at the varflags `varflags` and its variables `vars` (`_tile_layout`)."""
+function _tile_layout_at(varflags, r::PerTileResidual{N}, vars) where {N}
+    _, p00, _, _, _, _, _, m, vg, lt = vars
+    NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
+    return _tile_layout(varflags, N, length(r.state.settings.sensor), length(_patch_dirs(p00)), VgtkCore.tangent_size(vg), NV, J, n_height(m),
+                        n_inplane(m); r.free, r.held_rotation_coordinates, fixed = material_fixed(m))
 end
 
 """The per-tile `computeresjac` as host arrays: ONE implementation on every backend (the pixel functors of device/jacobian_kernels.jl on the state's
@@ -543,8 +548,9 @@ end
 """Enable batched per-view evaluation for a grid problem (call before optimizing; see run_lm_grid!). `next[k]`: a tile of the view
 whose tiles follow view `k`'s in the cost order (`nothing` after the last), the one the next view's batch is prefetched for;
 `pending[k]`: view `k`'s batch in flight, `(; key, need_jac, fut)` (`_batch_future!`); `blocks[k]`: its tiles' Gauss–Newton batches
-by varflags, `(; key, fut)` (`_tile_blocks_future!`), over `view_tiles[k]` with the problem's free variables `free_vars` (`idx.free`)
-and the tiles' device layouts `layouts`; `lock`: held while they change."""
+by varflags, `(; key, fut)` (`_tile_blocks_future!`), of its tiles of those varflags `view_tiles[k][vf]` (`tile_flags`: each tile's
+under the problem's free variables `idx.free`), with their row inputs `row_inputs[(k, vf)]` (`_tile_row_inputs`) and layouts' device
+forms `layouts`; `lock`: held while they change."""
 _register_grid_problem!(s::CalibrationState, p::VgtkCore.LmProblem, idx) = _register_grid_problem!(s, p.problem, idx)
 function _register_grid_problem!(s::CalibrationState, problem, idx)
     dc = _ensure_device!(s)
@@ -556,12 +562,14 @@ function _register_grid_problem!(s::CalibrationState, problem, idx)
         k = tiles[i - 1].k
         tiles[i].k != k && next[k] === nothing && (next[k] = tiles[i])
     end
+    tile_flags = IdDict{Any, Int}(t => _tile_flags(idx.free, t) for t in tiles)   # (the problem's free variables: its tiles' varflags)
+    view_tiles = [Dict{Int, Vector{eltype(tiles)}}() for _ in 1:K]
+    foreach(t -> push!(get!(() -> eltype(tiles)[], view_tiles[t.k], tile_flags[t]), t), tiles)
     s.device_cache = merge(s.device_cache, (; grid = (; problem, patches = idx.patches, lock = ReentrantLock(),
                       cache = [Ref{Any}(nothing) for _ in 1:K], pending = Vector{Any}(nothing, K), next,
-                      # the tiles' Gauss–Newton blocks a view at a time (`_tile_blocks!`): the problem's free variables (`nothing`: not
-                      # known, no batch), each view's tiles in the cost order, per view its batches in flight or done by varflags
-                      free_vars = hasproperty(idx, :free) ? BitVector(idx.free) : nothing, view_tiles = [[t for t in tiles if t.k == k] for k in 1:K],
-                      blocks = [Dict{Int, Any}() for _ in 1:K], layouts = Dict{Any, Any}())))
+                      # the tiles' Gauss–Newton blocks a view at a time (`_tile_blocks!`)
+                      tile_flags, view_tiles, row_inputs = Dict{Tuple{Int, Int}, Any}(), blocks = [Dict{Int, Any}() for _ in 1:K],
+                      layouts = Dict{Any, Any}())))
     return nothing
 end
 function _unregister_grid_problem!(s::CalibrationState)
@@ -662,12 +670,16 @@ end
 """Under the grid's lock: start the Jacobian batch of the view after `k` (`gb.next[k]`) at the trial vector `vec`, unless it is cached
 or in flight already (a residual sweep has no host assembly to overlap: none there)."""
 function _prefetch_next!(s::CalibrationState, gb, k::Integer, vec)
-    rn = gb.next[k]
-    rn === nothing && return nothing
-    length(vec) >= maximum(rn.idx) || return nothing
-    varsn = ntuple(i -> vec[rn.idx[i]], 10)
-    _batch_future!(s, gb, rn.k, varsn, vec, _view_key(gb, vec, varsn), true)
+    n = _next_tile(gb, k, vec)
+    n === nothing || _batch_future!(s, gb, n.r.k, n.vars, vec, _view_key(gb, vec, n.vars), true)
     return nothing
+end
+"""The tile of the view after `k` (`gb.next[k]`) and its variables in the trial vector `vec`, `(; r, vars)`; `nothing` after the last
+view or when `vec` does not hold them."""
+function _next_tile(gb, k::Integer, vec)
+    rn = gb.next[k]
+    (rn === nothing || length(vec) < maximum(rn.idx)) && return nothing
+    return (; r = rn, vars = ntuple(i -> vec[rn.idx[i]], 10))
 end
 
 """View `k`'s batched device evaluation at the variables `vars` (a tile's, of the trial vector `vec`) as one worker job (`_await` it):
@@ -772,41 +784,77 @@ end
     _tile_jacobian(r, ent, lay, vars...; ivs = r.pix) -> (; J, res, T, lay)
 
 One tile's Jacobian on the state's backend from the view-level device buffers `ent` (`_batch_launch`; the tile's pixels at the
-buffer's pixels `ivs`): the row kernel (`_jacobian_row!`) over the tile's pixels — the AD scatter, the focus chain, the patch fan-out
-on the tile's window lens, the parts' and the heights' columns — `J` (the layout's full
-columns × the measured rows) and the residual `res` on the backend, the column map `T` to the problem's coordinates
-(`_column_map`) and the layout (its device form cached, keyed by the layout itself, in the tile's device data). The non-finite
-entries are scrubbed where the blocks are formed (`_gauss_newton_blocks`, `_host_jacobian`). The same kernels' values and the same
-per-entry arithmetic as the host assembly it replaced.
+buffer's pixels `ivs`): the tiles' rows (`_tile_rows`) of the tile alone — `J` (the layout's full columns × the measured rows) and the
+residual `res` on the backend, the column map `T` to the problem's coordinates (`_column_map`) and the layout. The non-finite
+entries are scrubbed where the blocks are formed (`_gauss_newton_blocks`, `_host_jacobian`).
 """
-function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::_Patch{PX, PY},
-                        p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
-                        ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold,
-                        lt::LightingVar; ivs = r.pix) where {N, PX, PY}
-    s = r.state
+function _tile_jacobian(r::PerTileResidual, ent, lay, vars...; ivs = r.pix)
+    td = _tile_dev!(r)
+    J, res = _tile_rows(r.state, [r], [vars], ent, lay, ivs === r.pix ? td.rows : td.own, td.layouts)
+    return (; J, res, T = _column_map(lay, r.state.channel, vars[7], vars[8]), lay)
+end
+
+"""
+    _tile_row_inputs(s, tiles; own = false) -> (; Mx, ms, npx, pix, bufidx, ϕ, ω, P0s)
+
+The per-row inputs of one row-kernel launch over `tiles` (`_tile_rows`), each tile's rows padded to the largest tile's `Mx` pixels:
+per row its view pixel `pix` (the focus weights' index), its pixel among the kernels' outputs `bufidx` (its view's batch: `pix`;
+`own`, one tile's own batch `_tile_batch`: `1:npx`), the measured values `ϕ` and the weights `ω` of its measured channels; per tile
+its pixels `npx` (`ms` its rows, host) and patch origin. They depend on the tiles alone, so they are built once (`_tile_dev!`, the
+grid's `row_inputs`).
+"""
+function _tile_row_inputs(s::CalibrationState, tiles; own::Bool = false)
     be = s.backend
+    NC = n_channels(s); nt = length(tiles); npx = [length(t.pix) for t in tiles]; Mx = maximum(npx)
+    pix = ones(Int32, Mx * nt); ϕ = zeros(NC * Mx * nt)
+    weighted = !(first(tiles).ωt isa Unweighted); ω = weighted ? ones(NC * Mx * nt) : nothing
+    for (q, t) in enumerate(tiles)
+        o = (q - 1) * Mx; rows = (NC * o + 1):(NC * (o + npx[q]))
+        pix[(o + 1):(o + npx[q])] .= t.pix
+        ϕ[rows] .= t.ϕt
+        weighted && (ω[rows] .= t.ωt)
+    end
+    sh(a) = _shared_read_only!(be, a)                         # read on the window's queues too, written only here
+    pix_d = sh(adapt(be, pix))
+    return (; Mx, ms = NC .* npx, npx = sh(adapt(be, Int32.(npx))), pix = pix_d, bufidx = own ? sh(_index_list(be, only(npx))) : pix_d,
+            ϕ = sh(adapt(be, ϕ)), ω = weighted ? _device_weights(be, ω) : Unweighted(), P0s = sh(adapt(be, [t.P0 for t in tiles])))
+end
+
+"""
+    _tile_rows(s, tiles, tvars, ent, lay, rin, layouts) -> (J, r)
+
+THE rows of the grid route's tiles (`_tile_jacobian`: one tile; `_tiles_normal_equations`: a view's): ONE launch of `_tiles_row!` over
+the tiles' padded rows `rin` (`_tile_row_inputs`) from the view-level device buffers `ent` (`_batch_launch`) — per row
+`_jacobian_row!` with its tile's window lens and tangent bases — at the tiles' variables `tvars` (the shared blocks the first tile's),
+in the layout `lay` (its device form cached in `layouts`): the Jacobian `J` (the layout's full columns × `NC · Mx` rows a tile, zero past
+a tile's own) and the residual `r` in the state's task buffers (`_jacobian_buffers`: valid until the task's next block).
+"""
+function _tile_rows(s::CalibrationState{N}, tiles, tvars, ent, lay, rin, layouts) where {N}
+    be = s.backend
+    _, p1, _, _, _, foc, _, m, vg, lt = first(tvars)
+    PX, PY = size(_patch_dirs(p1))
     NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
-    npx = length(r.pix)
     need_v = !isempty(lay.vig_cols)
     need_lin = need_v || !isempty(lay.light_cols) || lay.μ_col > 0
-    need_f = !isempty(lay.focus_cols)
     need_g = any(q -> lay.patch_cols[q] > 0, 1:4)
     need_h = !isempty(lay.height_cols)
-    lens64 = _window_lens(s.camera.geometric, r.P0, p00, p10, p01, p11)
-    td = _tile_dev!(r)
-    bufidx = ivs === r.pix ? td.pix : td.idx                # the tile's pixels among the buffer's: the view's (batched) or its own
-    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
-    chs = fit_channels(s)
-    Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
-    VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
-                           _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
-                           need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N),
-                           s.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,
-                           need_g ? adapt(be, _window_bases(lens64, PX, PY)) : nothing, r.P0, need_g ? (Val(PX), Val(PY)) : nothing,
-                           lt.scale,
-                           need_v ? _device_copy(s, vg.basis) : nothing)
-    _note_block_bytes!(s, _device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1))   # its share of the view batch
-    return (; J = Jd, res = rd, T = _column_map(lay, s.channel, ap, m), lay)
+    Gw, gidx = isempty(lay.focus_cols) ? (nothing, nothing) : _focus_weights(s, first(tiles).k, FocusSpline(VgtkCore.model(foc)), rin.pix)
+    windows = need_g ? [_window_lens(s.camera.geometric, t.P0, v[2], v[3], v[4], v[5]) for (t, v) in zip(tiles, tvars)] : nothing
+    lenses = need_g ? [_lens32(be, w, Float64) for w in windows] : nothing
+    bases = need_g ? adapt(be, stack(w -> _window_bases(w, PX, PY), windows)) : nothing
+    chs = fit_channels(s); nt = length(tiles)
+    Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * rin.Mx * nt)
+    GC.@preserve lenses begin                                # (the lenses' device forms point into their arrays: `_device_elements`)
+        VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _tiles_row!, Jd, rin.Mx * nt, rin.Mx, rin.npx,
+                                  need_g ? _device_elements(be, lenses) : nothing, bases, rin.P0s,
+                                  rd, ent.px, rin.bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, rin.ϕ, rin.ω, chs,
+                                  _cached_layout(layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
+                                  need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor,
+                                  need_g ? (Val(PX), Val(PY)) : nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
+    end
+    npx = sum(rin.ms) ÷ length(chs)                          # the tiles' share of the view batch (the window's memory bound)
+    _note_block_bytes!(s, (_device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1)) ÷ nt)
+    return Jd, rd
 end
 
 """The residual of tile `r` from a view's flux `flux` (three channels per pixel, the kernels'; the tile's pixels at the view pixels
@@ -833,41 +881,42 @@ end
 # backend's over the zero-padded rows (on the CPU backend the per-tile products themselves).
 # ---------------------------------------------------------------------------
 
-"""The varflags NLLSsolver gives the tile `t` when the problem's free variables are `free` (`computevarflags`: bit `j − 1` set for a
-free `j`-th variable of the tile's ten)."""
-_tile_flags(free::AbstractVector{Bool}, t::PerTileResidual) = sum(j -> free[t.idx[j]] ? 1 << (j - 1) : 0, 1:10)
+"""The varflags NLLSsolver gives the tile `t` when the problem's free variables are `free` (NLLSsolver's `computevarflags` of the
+tile's ten variables)."""
+_tile_flags(free::AbstractVector{Bool}, t::PerTileResidual) = Int(NLLSsolver.computevarflags(ntuple(j -> free[t.idx[j]], 10)))
 
 """
     _tile_blocks!(s, r, vars, vf) -> (Jᵀr, JᵀJ, flux) | nothing
 
 The tile `r`'s Gauss–Newton blocks at the varflags `vf` from its view's tiles' batch (`_tile_blocks_future!`), or `nothing` (the
-per-tile path): no registered grid problem or free variables known, `vf` not the flags the problem gives the tile, variables it
-cannot locate. A tile asked again at a trial whose blocks it took already starts its view's batch again. A view's tiles of
-other varflags (a tile beside a dependent patch) are a batch of their own. Also starts the next view's batch at the trial (`gb.next`), so the device forms it while this view's are read.
+per-tile path): no registered grid problem, `vf` not the flags the problem gives the tile, or variables it cannot locate. A view's
+tiles of other varflags (a tile beside a dependent patch) are a batch of their own. Each tile's blocks are handed out once and a
+batch handed out is dropped (a view's blocks are some 70 MB); a tile asked again at the trial forms its view's batch again. Also starts
+the next view's batch at the trial (`_next_tile`), so the device forms it while this view's are read.
 """
 function _tile_blocks!(s::CalibrationState, r::PerTileResidual, vars, vf::Integer)
     gb = _grid_batch(s)
-    (gb === nothing || gb.free_vars === nothing) && return nothing
-    _tile_flags(gb.free_vars, r) == vf || return nothing
+    gb === nothing && return nothing
+    get(gb.tile_flags, r, -1) == vf || return nothing
     vec = _locate_vars(gb.problem, r, vars)
     vec === nothing && return nothing
     key = _view_key(gb, vec, vars)
-    stale = nothing
     for _ in 1:2                                             # (a second pass: the tile's blocks were handed out at this trial already)
         fut = lock(gb.lock) do
-            f = _tile_blocks_future!(s, gb, r, vars, vec, key, Int(vf); stale)
-            rn = gb.next[r.k]
-            if rn !== nothing && length(vec) >= maximum(rn.idx)
-                varsn = ntuple(i -> vec[rn.idx[i]], 10)
-                _tile_blocks_future!(s, gb, rn, varsn, vec, _view_key(gb, vec, varsn), _tile_flags(gb.free_vars, rn))
-            end
+            f = _tile_blocks_future!(s, gb, r, vars, vec, key, Int(vf))
+            n = _next_tile(gb, r.k, vec)
+            n === nothing || _tile_blocks_future!(s, gb, n.r, n.vars, vec, _view_key(gb, vec, n.vars), gb.tile_flags[n.r])
             f
         end
         blocks = _fetch_batch(fut)
         blocks === nothing && return nothing                 # (no view batch at these variables)
-        b = lock(() -> pop!(blocks, r, nothing), gb.lock)
+        b = lock(gb.lock) do
+            b = pop!(blocks, r, nothing)
+            e = get(gb.blocks[r.k], Int(vf), nothing)
+            (b === nothing || isempty(blocks)) && e !== nothing && e.fut === fut && delete!(gb.blocks[r.k], Int(vf))
+            b
+        end
         b === nothing || return b
-        stale = fut
     end
     return nothing
 end
@@ -875,86 +924,51 @@ end
     _tile_blocks_future!(s, gb, r, vars, vec, key, vf) -> Task
 
 Under the grid's lock: the future of the batch of view `r.k`'s tiles of the varflags `vf` at the trial `key` (`_view_key`), a new one
-(`_tiles_normal_equations` on a device worker, after the view's batch) when none is kept for that key or the kept one is `stale`
-(its tile's blocks handed out already). Its value: an `IdDict` tile → `(Jᵀr, JᵀJ, flux)`, from which each tile's blocks are taken
-once (`_tile_blocks!`), or `nothing` when the view has no batch at the variables (`_view_batch!`).
+(`_tiles_normal_equations` on a device worker, after the view's batch) when none is kept for that key. Its value: an `IdDict` tile →
+`(Jᵀr, JᵀJ, flux)`, from which each tile's blocks are taken once (`_tile_blocks!`), or `nothing` when the view has no batch at the
+variables (`_view_batch!`).
 """
-function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars, vec, key, vf::Int; stale = nothing)
+function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars, vec, key, vf::Int)
     e = get(gb.blocks[r.k], vf, nothing)
-    e !== nothing && e.key == key && e.fut !== stale && return e.fut
-    tiles = [t for t in gb.view_tiles[r.k] if _tile_flags(gb.free_vars, t) == vf]
+    e !== nothing && e.key == key && return e.fut
+    tiles = gb.view_tiles[r.k][vf]
+    rin = get!(() -> _tile_row_inputs(s, tiles), gb.row_inputs, (r.k, vf))
     tvars = [NLLSsolver.getvars(t, vec) for t in tiles]
     fut = Threads.@spawn begin
         ent = _view_batch!(s, r, vars, true)                 # the view's batch (memoized; it also starts the next view's)
-        ent === nothing ? nothing : _await(_on_worker(() -> _tiles_normal_equations(s, gb, tiles, tvars, ent, vf)))
+        ent === nothing ? nothing : _await(_on_worker(() -> _tiles_normal_equations(s, gb, tiles, tvars, ent, vf, rin)))
     end
     gb.blocks[r.k][vf] = (; key, fut)                        # (a batch at another trial is replaced; its future still completes)
     return fut
 end
 
 """
-    _tiles_normal_equations(s, gb, tiles, tvars, ent, vf) -> IdDict tile → (Jᵀr, JᵀJ, flux)
+    _tiles_normal_equations(s, gb, tiles, tvars, ent, vf, rin) -> IdDict tile → (Jᵀr, JᵀJ, flux)
 
-The Gauss–Newton blocks of a view's `tiles` (their variables `tvars`, all of the varflags `vf`) from the view's batch `ent`: the
-rows of every tile in one launch of `_tiles_row!` (each tile's rows padded to the largest tile's), the products `J r`, `J Jᵀ` of every
-tile at once (`_batched_products`), a tile with a non-finite entry scrubbed and formed again (`_finite_products`), and each tile's in
-the problem's coordinates (`_in_problem_coordinates`; one column map: every tile of the batch has the same layout). `_tile_jacobian`'s
-inputs, tile by tile.
+The Gauss–Newton blocks of a view's `tiles` (their variables `tvars`, all of the varflags `vf`, their row inputs `rin`) from the
+view's batch `ent`: the rows of every tile in one launch (`_tile_rows`), the products `J r`, `J Jᵀ` of every tile at once
+(`_batched_products`), a tile with a non-finite entry scrubbed and formed again (`_finite_products`), and each tile's in the problem's
+coordinates (`_in_problem_coordinates`; one column map: every tile of the batch has the same layout).
 """
-function _tiles_normal_equations(s::CalibrationState{N}, gb, tiles, tvars, ent, vf::Int) where {N}
-    be = s.backend
-    r1 = first(tiles)
-    _, p1, _, _, _, foc, ap, m, vg, lt = first(tvars)
-    PX, PY = size(_patch_dirs(p1))
-    NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
-    lay = _tile_layout(vf, N, length(s.settings.sensor), PX * PY, VgtkCore.tangent_size(vg), NV, J, n_height(m), n_inplane(m);
-                       r1.free, r1.held_rotation_coordinates, fixed = material_fixed(m))
-    need_v = !isempty(lay.vig_cols)
-    need_lin = need_v || !isempty(lay.light_cols) || lay.μ_col > 0
-    need_g = any(q -> lay.patch_cols[q] > 0, 1:4)
-    need_h = !isempty(lay.height_cols)
-    chs = fit_channels(s); NC = length(chs)
-    nt = length(tiles); npx = [length(t.pix) for t in tiles]; Mx = maximum(npx)
-    pix = ones(Int32, Mx * nt); ϕ = zeros(NC * Mx * nt)                     # per row, padded to Mx pixels a tile
-    weighted = !(r1.ωt isa Unweighted); ω = weighted ? ones(NC * Mx * nt) : nothing
-    for (q, t) in enumerate(tiles)
-        o = (q - 1) * Mx
-        pix[(o + 1):(o + npx[q])] .= t.pix
-        ϕ[(NC * o + 1):(NC * (o + npx[q]))] .= t.ϕt
-        weighted && (ω[(NC * o + 1):(NC * (o + npx[q]))] .= t.ωt)
-    end
-    pix_d = adapt(be, pix)
-    Gw, gidx = isempty(lay.focus_cols) ? (nothing, nothing) : _focus_weights(s, r1.k, FocusSpline(VgtkCore.model(foc)), pix_d)
-    windows = need_g ? [_window_lens(s.camera.geometric, t.P0, v[2], v[3], v[4], v[5]) for (t, v) in zip(tiles, tvars)] : nothing
-    lenses = need_g ? [_lens32(be, w, Float64) for w in windows] : nothing
-    bases = need_g ? adapt(be, stack(w -> _window_bases(w, PX, PY), windows)) : nothing
-    Jd = KA.zeros(be, Float64, lay.ncol, NC * Mx * nt); rd = KA.zeros(be, Float64, NC * Mx * nt)
-    GC.@preserve lenses begin
-        VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _tiles_row!, Jd, Mx * nt, Mx, adapt(be, Int32.(npx)),
-                                  need_g ? _device_elements(be, lenses) : nothing, bases, adapt(be, [t.P0 for t in tiles]),
-                                  rd, ent.px, pix_d, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, adapt(be, ϕ),
-                                  weighted ? _device_weights(be, ω) : Unweighted(), chs, _cached_layout(gb.layouts, be, lay),
-                                  need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
-                                  need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor,
-                                  need_g ? (Val(PX), Val(PY)) : nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
-    end
-    _note_block_bytes!(s, (_device_bytes(Jd, rd) + ent.bytes) ÷ nt)       # a tile's share of the batch (the window's memory bound)
-    J3 = reshape(Jd, lay.ncol, NC * Mx, nt); r2 = reshape(rd, NC * Mx, nt)
-    ms = NC .* npx
-    products = _batched_products(J3, r2, ms)
-    Tsp = SparseArrays.sparse(_column_map(lay, s.channel, ap, m))
+function _tiles_normal_equations(s::CalibrationState, gb, tiles, tvars, ent, vf::Int, rin)
+    lay = _tile_layout_at(vf, first(tiles), first(tvars))
+    Jd, rd = _tile_rows(s, tiles, tvars, ent, lay, rin, gb.layouts)
+    nt = length(tiles); M = length(rd) ÷ nt
+    J3 = reshape(Jd, lay.ncol, M, nt); r2 = reshape(rd, M, nt)
+    products = _batched_products(J3, r2, rin.ms)
+    Tsp = SparseArrays.sparse(_column_map(lay, s.channel, first(tvars)[7], first(tvars)[8]))
     blocks = Vector{Any}(undef, nt); finite = fill(true, nt)
     Threads.@threads for q in 1:nt                           # (host arithmetic alone: the device's work is done)
         g, H = products[q]
-        if all(isfinite, g) && all(isfinite, H)
+        if _finite_blocks(g, H)
             blocks[q] = (_in_problem_coordinates(Tsp, g, H)..., ent.flux)
         else
             finite[q] = false
         end
     end
     for q in findall(!, finite)                              # a non-finite entry: that tile scrubbed and formed again (this task's queue)
-        blocks[q] = (_in_problem_coordinates(Tsp, _finite_products(view(J3, :, 1:ms[q], q), view(r2, 1:ms[q], q), products[q], lay, s.run)...)...,
-                     ent.flux)
+        gH = _finite_products(view(J3, :, 1:rin.ms[q], q), view(r2, 1:rin.ms[q], q), products[q], lay, s.run)
+        blocks[q] = (_in_problem_coordinates(Tsp, gH...)..., ent.flux)
     end
     return IdDict{Any, Any}(zip(tiles, blocks))
 end
@@ -1011,7 +1025,12 @@ end
 blocks from its view's tiles' batch (`_tile_blocks!`), else its own (`_tile_jacobian_at`, `_gauss_newton_blocks`)."""
 function _block_normal_equations(varflags, r::PerTileResidual, vars)
     b = _tile_blocks!(r.state, r, vars, Int(varflags))
-    b === nothing || return 0.5 * Float64(NLLSsolver.sqnorm(_tile_residual(b[3], r, r.pix))), b[1], b[2]
+    b === nothing && return _tile_normal_equations(varflags, r, vars)
+    return 0.5 * Float64(NLLSsolver.sqnorm(_tile_residual(b[3], r, r.pix))), b[1], b[2]
+end
+"""The tile `r`'s `(cost, Jᵀr, JᵀJ)` by the per-tile path: its own Jacobian (`_tile_jacobian_at`) and its Gauss–Newton blocks
+(`_gauss_newton_blocks`)."""
+function _tile_normal_equations(varflags, r::PerTileResidual, vars)
     t = _tile_jacobian_at(varflags, r, vars...)
     g, H = _gauss_newton_blocks(t.J, t.res, t.T, t.lay, r.state.run)
     return 0.5 * Float64(NLLSsolver.sqnorm(_tile_residual(t.flux, r, t.ivs))), g, H

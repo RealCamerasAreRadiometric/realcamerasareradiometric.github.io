@@ -163,7 +163,7 @@ end
     _tiles_row!(J, i, Mx, npx, lenses, bases, P0s, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G,
                 ::Val{N}, sensor, pxy, light_scale, Z)
 
-The row kernel of a view's tiles in ONE launch (`_tiles_normal_equations`): row `i` of the zero-padded batch — tile
+The row kernel of the grid route's tiles in ONE launch (`_tile_rows`: a view's tiles, or one): row `i` of the zero-padded batch — tile
 `t = ⌈i / Mx⌉`'s pixel `i − (t − 1) Mx`, a padding row past its `npx[t]` pixels writes nothing — is [`_jacobian_row!`](@ref) at
 that position with the tile's own window lens `lenses[t]`, its tangent bases `bases[:, :, t]` and patch origin `P0s[t]`
 (`lenses === nothing`: no patch column is free, no fan-out). The per-row arrays (`bufidx`, `gidx`, `ϕ`, `ω`, `r`, `J`'s columns)
@@ -294,11 +294,13 @@ and its products formed again (`_block_products`). A non-finite entry makes its 
 Jacobian (every block but a defect's) skips the scrub's sweep over it.
 """
 function _finite_products(J, r, gH, lay, run::_LmRun)
-    g, H = gH
-    all(isfinite, g) && all(isfinite, H) && return g, H
+    _finite_blocks(gH...) && return gH
     _scrub!(J, lay, run)
     return _block_products(J, r)
 end
+"""Whether the products `g = J r`, `H = J Jᵀ` are finite: `g` and the diagonal of `H` (a non-finite Jacobian entry makes its column's
+diagonal non-finite, and finite diagonals bound the rest, |Hᵢⱼ| ≤ √(Hᵢᵢ Hⱼⱼ)) — n checks of `H`, not n²."""
+_finite_blocks(g, H) = all(isfinite, g) && all(i -> isfinite(H[i, i]), axes(H, 1))
 """
     _batched_products(J3, r2, ms) -> [(gₜ, Hₜ) for each tile t]
 
