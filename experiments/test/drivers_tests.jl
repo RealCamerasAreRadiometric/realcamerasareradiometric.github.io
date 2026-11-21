@@ -12,7 +12,7 @@
                      "image_regions", "distance_maps", "timing")
     const DRIVER_STAGE_NAMES = Dict(
         "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
-        "focus_surfaces" => ("figures",),
+        "focus_surfaces" => ("panels", "figures"),
         "texture_recovery" => ("prepare", "detect", "sheet", "init", "refine", "folds", "evaluate", "fold_report", "compare", "report", "figures"),
         "frontends" => ("prepare", "detect", "init", "evaluate"),
         "sensor_characterisation" => ("evaluate",),

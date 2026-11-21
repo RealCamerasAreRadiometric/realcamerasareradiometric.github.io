@@ -7,7 +7,31 @@ name = "focus_surfaces"
 
 [inputs]
 
+# The paper's figure (fig:focus-surfaces, Fig. 7 left: fig/focus-surfaces.tex, its panels focus-surfaces/<lens>.tex and the caption
+# focus-surfaces-caption.tex), stage panels: the focus surfaces of two refinements as PGFPlots pictures — the fisheye at f/4 (the
+# vignetting refinement, radiometric_refinement_vignetting.toml) a dome about the camera, the Tamron 20 mm at f/8 (the defocus pair's
+# refinement with the aperture and the focus surface) close to a plane. The stage samples each case's refined camera (its
+# radiometric_camera.json) on the pixel lattice and hands the samples to the figure's generator (src/paper_figures/focus_surfaces.jl),
+# whose two parts write the figure's tables (the samples on the drawn lattice lines, the focus distance's range) and its files.
+# Every key is required, of the table and of each panel.
+[panels]
+asset_dir = "focus-surfaces"    # the figure's name: plotsdir("focus-surfaces.tex", "focus-surfaces/<lens>.tex", "focus-surfaces-caption.tex"), the paper's fig/ layout
+spacing_px = 16                 # px between lattice samples: sample (i, j), counted from 0, lies at the pixel ((i + 1/2) spacing_px, (j + 1/2) spacing_px)
+# The two panels, the left and the right one. Each states
+#   config, case      the refinement config and its case: the refined camera whose focus surface the panel shows
+#   lens              the panel's file name: <asset_dir>/<lens>.tex
+#   label             the title over the panel, "<lens name>, f/<f-number>"
+#   azimuth_deg       the view, PGFPlots' view={azimuth_deg}{elevation_deg}, one from the front left above: each between 0 and 90
+#   elevation_deg     degrees. The fisheye's dome is seen from low down, so that the camera lies under it, not in front of it
+#   grid_every        a lattice line is drawn along every grid_every-th sample (and along the sensor's border): every 224 px on the
+#                     fisheye's dome, every 448 px on the Tamron's flat surface, which lines every 224 px make a dark mesh
+cases = [
+    {config = "configs/experiments/radiometric_refinement_vignetting.toml", case = "f4_fisheye_spline_warped", lens = "fisheye", label = "Fisheye lens, f/4", azimuth_deg = 27.0, elevation_deg = 14.4, grid_every = 14},
+    {config = "configs/experiments/radiometric_refinement.toml", case = "sitla_spline_warped", lens = "tamron", label = "Tamron 20 mm lens, f/8", azimuth_deg = 27.0, elevation_deg = 36.0, grid_every = 28},
+]
+
 [figures.focus_surfaces]
+# An earlier rendering of the same surfaces as a PNG (stage figures; not in the paper, whose figure is [panels] above).
 # fig:focus-surfaces (the defocus section): the focus surfaces two refinements learned, as surfaces of in-focus points in camera
 # space — the fisheye at f/4 (the vignetting refinement, radiometric_refinement_vignetting.toml) a sphere about the camera, the Tamron
 # 20 mm at f/8 (the defocus pair's refinement with the aperture and the focus surface) a plane; src/figures.jl focus_surface_figure
