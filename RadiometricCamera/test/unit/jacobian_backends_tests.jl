@@ -2,8 +2,8 @@
 # against checks that share none of its chain rules: the board warping's height columns against ForwardDiff of the flux through
 # Core's posed height field (the nodal heights seeded as duals into `Φ_pixel`, the ray met by Core's MappedSurface root, its implicit
 # derivative and the projected thin-plate derivative of `with_parameters`), and against central differences of the tile residual
-# along the material block's free height directions; the focus columns of a frozen node and of a direction-chart focus (the device
-# path ignored both before 2026-11-11); and the two backends against each other, to the device's Float32 rounding.
+# along the material block's free height directions; the focus columns (the sensor-grid thin plate spline) against central
+# differences of the tile residual; and the two backends against each other, to the device's Float32 rounding.
 #
 # The scene is the printed-edge board of edge_tests.jl (a distance map: the paper's Siemens boards' albedo, whose sharp edges make
 # the height columns sensitive) warped by a saddle of 2 % of the board's width, the paper cases' warping degree 1.
@@ -54,6 +54,19 @@
         fd = (RC.NLLSsolver.computeresidual(r, setv(unit_increment(nm, 9 + q, e))...) .- RC.NLLSsolver.computeresidual(r, setv(unit_increment(nm, 9 + q, -e))...)) ./ 2e
         @test norm(J[:, hc[q]] .- fd) <= 1e-4 * norm(fd)
     end
+
+    # 3. the focus columns (the sensor-grid thin plate spline's nodal values t̂_i) against central differences of the tile residual
+    # along each node. The step 1e-4: a step of 1e-3 crosses kinks of the residual on this scene, whose printed edge is σ_print wide
+    # everywhere (the camera's blur removed); 1e-4 agreed to 2e-6 or better for the removed direction-chart focus (2026-11-14)
+    fcols = 6 + 200 .+ (1:9)
+    upf(i, x) = ntuple(j -> j == 6 ? RC.NLLSsolver.update(vars[6], [k == i ? x : 0.0 for k in 1:9]) : vars[j], 10)
+    seen = 0
+    for i in 1:9
+        fd = (RC.NLLSsolver.computeresidual(r, upf(i, 1e-4)...) .- RC.NLLSsolver.computeresidual(r, upf(i, -1e-4)...)) ./ 2e-4
+        seen += norm(fd) > 0
+        @test norm(J[:, fcols[i]] .- fd) <= 1e-3 * norm(fd) + 1e-12 * norm(J)
+    end
+    @test seen >= 4                                                          # the tile's pixels see several focus nodes
 end
 
 @testitem "one Jacobian implementation: the CPU and the device backend (GPU)" tags = [:gpu] setup = [RCFixtures, RCGPU, EdgeScene] begin

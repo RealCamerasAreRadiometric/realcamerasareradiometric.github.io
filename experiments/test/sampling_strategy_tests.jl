@@ -127,3 +127,35 @@ end
         @test count("\\\\", s) >= 10 && occursin("ecdf\\_a2", s) && occursin("[-0.004, +0.000]", s)
     end
 end
+
+@testitem "sampling strategy: the focus metrics of a run's state" default_imports = false setup = [SamplingStrategy] begin
+    using Test
+    using DrWatson
+    import JSON
+    using Statistics: mean
+    m = driver()
+    focus_metrics(dir) = Base.invokelatest(m.focus_metrics, dir)
+    golden = projectdir("test", "pipeline", "golden", "siemens_coarse_full")      # a refinement's state.json and parameters.json
+    @test focus_metrics(mktempdir()) === nothing                                   # no state: no metrics
+    mktempdir() do d
+        cp(joinpath(golden, "parameters.json"), joinpath(d, "parameters.json"))
+        st = JSON.parsefile(joinpath(golden, "state.json"); allownan = true)
+        f = st["camera"]["focus"]
+        N = length(f["nodes"])
+        t = [1 / (1.5 + 0.1 * sin(3i)) for i in 1:N]                              # a dome about 1.5 m: every distance within ± 1/15 of 1.5 m
+        write_state(t) = (f["parameters"] = t; open(io -> JSON.json(io, st; allownan = true), joinpath(d, "state.json"), "w"))
+        write_state(t)
+        r = focus_metrics(d)
+        dist = 1 ./ t
+        @test r["nodes"] == N && r["distance_m"] ≈ dist && r["min_m"] ≈ minimum(dist) && r["max_m"] ≈ maximum(dist)
+        @test r["max_dev"] ≈ maximum(abs.(dist ./ mean(dist) .- 1))
+        @test r["dome"] == (r["max_dev"] <= m.SS["dome_tolerance"]) && r["dome"] && !r["runaway"]
+        @test isfinite(r["bending_energy"]) && r["bending_energy"] > 0
+        write_state(fill(1 / 1.5, N))                                               # a flat focus: no bending
+        @test abs(focus_metrics(d)["bending_energy"]) < 1e-9
+        t2 = copy(t); t2[1] = 0.0                                                   # a node at infinity: runaway, no dome
+        write_state(t2)
+        r2 = focus_metrics(d)
+        @test r2["runaway"] && !r2["dome"] && isinf(r2["distance_m"][1]) && r2["min_m"] ≈ minimum(dist[2:end])
+    end
+end

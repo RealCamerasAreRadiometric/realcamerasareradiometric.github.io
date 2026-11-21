@@ -232,7 +232,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     s.vig_rule isa RadialSupportRule && @printf("vignetting support: %d of %d nodes are parameters — the pole pair and those carrying ≥ %g of the mean data weight (relative weights %s); the others continue them with a zero Δ^%d across the border (Core's BoundaryRule, vignetting.boundary_order)\n",
                                                 count(s.vig_rule.supported), length(s.vig_rule.supported), opts.vignetting.support_min,
                                                 join([@sprintf("%.2g", x) for x in s.vig_rule.weight], " "), s.vig_rule.rule.order)
-    focus_smoothness!(s, focus0, data_norm2(s), opts.focus.smoothness)
+    focus_row_weight = focus_smoothness!(s, focus0, data_norm2(s), opts.focus.smoothness)   # β Σϕ²/N: the run record's (`_run_parameters`)
     # the grid's smoothness over the present nodes (per_tile_smoothness.jl): fixed at the start, its reference the start grid. A weight
     # chosen by GCV (`[grid.smoothness] weight = "gcv"`) is chosen after the closed-form start of the radiometry, on the linearization
     # there (`select_grid_smoothness_weight`)
@@ -243,7 +243,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
                           length(grid_int) - count(grid_int), smoothness_line(opts.grid.smoothness),
                           grid_gcv ? ", by GCV after the closed-form start" :
                           grid_sm === nothing ? "" : @sprintf(" (row weight %.4g, m̄ %.4g, %d rows)", grid_sm.w, grid_sm.m̄, 3 * length(grid_sm.rows)))
-    meta = (; focus_support, grid_int, grid_smoothness = grid_sm, grid_gcv = nothing, vignetting_gcv = NamedTuple[], region, coverage, init_region = g.init_region, resample = start === nothing ? g.resample : start.resample, names, views0, lens0, lens_start, fpx, in_support, features, features_for = g.features_for, W₀, H₀, be0, world = g.world, page_flip = g.page_flip,
+    meta = (; focus_support, focus_row_weight, grid_int, grid_smoothness = grid_sm, grid_gcv = nothing, vignetting_gcv = NamedTuple[], region, coverage, init_region = g.init_region, resample = start === nothing ? g.resample : start.resample, names, views0, lens0, lens_start, fpx, in_support, features, features_for = g.features_for, W₀, H₀, be0, world = g.world, page_flip = g.page_flip,
             board_y_sign = g.board_y_sign, vig_c, make_vig, vig_desc, height0, inplane0, npx, samples, R0, d_c, f_m, t_start,
             sensor_model, observations = start === nothing ? (; masks = copy(masks), ϕ, ω, qs, sensor) : nothing)   # a start's streamed photographs (`load_calibration_start`)
     start === nothing || return _from_start(s, meta, start, opts)   # a start record: its closed-form start and GCV weights loaded, not computed
