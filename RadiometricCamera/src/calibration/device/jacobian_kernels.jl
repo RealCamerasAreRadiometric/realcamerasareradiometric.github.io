@@ -110,7 +110,7 @@ end
     _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, ::Val{N}, sensor, lensw,
                    bases, P0, pxy, light_scale, Z)
 
-THE row kernel of the LM's Jacobian, both routes (`_launch_pixel_rows!` over a block's pixels): pixel `i` of the block (buffer pixel
+THE row kernel of the LM's Jacobian, both routes (Core's `_launch_rows_on!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
 `bufidx[i]` of the kernels' outputs, its id in `ids`) writes the residual `r` and the Jacobian rows (`J`, columns × rows) of its
 measured channels `chs`, in the layout's full columns (`klay`, `_kernel_layout`): the AD scatter from the slots `S` (`_slot_rows`), the
 focus chain through the nodal weights `G[:, ks, gidx[i]]` (`_focus_chain!`), a tile's patch fan-out on its window lens `lensw` with
@@ -157,21 +157,6 @@ Base.@propagate_inbounds function _jacobian_row!(J, i, r, ids, bufidx, gidx, H, 
     heights === nothing || _height_row!(rows, heights, iv, hB, klay.height_cols)
     _whiten_rows!(J, r, ω, base, Val(NC))
     return nothing
-end
-
-"""
-    _launch_pixel_rows!(row!, out, n, args...) -> out
-
-`VgtkCore._launch_rows!` for a row function whose row is a pixel's work (the Jacobian's row kernel, `_jacobian_row!`): Core's row
-kernel on the per-pixel workgroup (`_pixel_workgroup`: on the CPU backend every thread works on a small block, where Core's launch
-gives a 1,728-pixel view's rows to two), followed by a synchronize. Core's launch takes no workgroup: an upstream candidate.
-"""
-function _launch_pixel_rows!(row!::F, out, n::Integer, args::Vararg{Any, N}) where {F, N}
-    n > 0 || return out
-    be = KA.get_backend(out)
-    VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, nothing))(VgtkCore._row_kernel!)((row!, out, args...); ndrange = n)
-    KA.synchronize(be)
-    return out
 end
 
 """
@@ -265,12 +250,13 @@ on the device as a dense matrix, `T` was an upload and three small dense product
 products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
-    g, H = Array(_rows_times(J, r)), Array(J * J')
+    products() = (Array(VgtkCore._matvec!(similar(r, size(J, 1)), J, r)), Array(J * J'))   # J r: Core's (its CUDA method a one-column gemm)
+    g, H = products()
     if !(all(isfinite, g) && all(isfinite, H))
         # a non-finite Jacobian entry makes its column's diagonal of J Jᵀ non-finite: scrubbed (`_scrub_entries!`) and formed again —
         # the blocks of the scrubbed Jacobian; a finite Jacobian (every block but a defect's) skips the scrub's sweep over it
         _scrub!(J, lay, run)
-        g, H = Array(_rows_times(J, r)), Array(J * J')
+        g, H = products()
     end
     return _in_problem_coordinates(SparseArrays.sparse(T), g, H)
 end
@@ -305,16 +291,6 @@ function _in_problem_coordinates(T::SparseArrays.SparseMatrixCSC{Float64}, g::Ve
     end
     return gp, Hp
 end
-"""
-    _rows_times(J, r) -> J r
-
-The device Jacobian `J` (columns × rows) times the residual `r`: `J * r` (the host's BLAS on the CPU backend). RC's CUDA extension
-gives the device's method: the vendor library's matrix–vector product of a wide matrix is slow (73 × 230,400 Float64 on a B200:
-14.9 ms, its matrix–matrix product of the same sizes 0.33 ms; 2026-11-20), so the product is taken as a one-column matrix product
-there (0.10 ms; the same sums to rounding, 3.5e-14 relative).
-"""
-_rows_times(J, r) = J * r
-
 """The block's Jacobian in the problem's coordinates on the host (`J_fullᵀ T`, rows × n): `computeresjac`'s, outside the LM iteration
 (the tests, the stall postcondition, the grid smoothness's weight selection)."""
 _host_jacobian(J, T::Matrix{Float64}, lay, run::_LmRun) = (_scrub!(J, lay, run); Array(transpose(J) * adapt(KA.get_backend(J), T)))
@@ -481,7 +457,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
+    VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)

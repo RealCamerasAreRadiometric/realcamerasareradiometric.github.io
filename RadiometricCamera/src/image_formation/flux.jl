@@ -154,7 +154,10 @@ struct HitTag end
 The hit of the ray `(o, d)` (`d` unit) of a pixel (`Φ_pixel`'s ray `ri`) with the board `rays` (`BoardRays`: the plane, or the
 warped page): the ray's parameter `s`, the board point 𝐱, and — where a mode records it — the surface's normal 𝐧 there.
 
-- The flux and the nodal-height mode: `intersect_board` (Core's `intersection`: the plane hit, or the height field's Newton), no normal.
+- The flux: `intersect_board` (Core's `intersection`: the plane hit, or the height field's Newton), no normal.
+- The nodal-height mode (`HeightRays`) beside a radiance record of the same parameters (`RadianceRays`, the heights kernel's): Core's
+  `intersection_at` of the dual relief at the recorded hit — the implicit-function step alone, no Newton (the root is the record's);
+  without a record, `intersect_board` as the flux. A ray the record did not reach (𝐧 = 0) is a miss.
 - `RadianceRecord` (the plain parameters): the same hit with the ray's origin seeded (three partials), so Core's implicit-function
   step gives `∂𝐱/∂𝐨 = I − 𝐝 𝐧ᵀ / (𝐧 ⋅ 𝐝)` beside the hit, and with it the normal: `𝐧ᵀ = 𝐝ᵀ (I − ∂𝐱/∂𝐨)` (so 𝐧 ⋅ 𝐝 = 1). The
   record keeps 𝐱 and 𝐧 with the ray's radiance.
@@ -178,6 +181,15 @@ end
     𝐱₀ = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]); 𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
     s = dot(𝐧, 𝐱₀ - o) / dot(𝐧, d)
     return s, o + s * d, nothing
+end
+@inline function _ray_hit(::HeightRays, lr::RadianceRays, ri, rays::BoardRays, o::StaticVector{3}, d::StaticVector{3})
+    rays.warped || return (intersect_board(rays, o, d)..., nothing)
+    G = @inbounds lr.J[lr.base + ri]
+    𝐱₀ = SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2])
+    reached = !(iszero(G[1, RAD_NL + 3]) & iszero(G[2, RAD_NL + 3]) & iszero(G[3, RAD_NL + 3]))
+    nan = oftype(𝐱₀[1], NaN)
+    𝐱₀ = ifelse(reached, 𝐱₀, SVector(nan, nan, nan))                  # a ray the record did not reach: Core's miss
+    return (VgtkCore.intersection_at(rays.relief, o, d, 𝐱₀)..., nothing)
 end
 """The radiance of a ray (`Φ_pixel`'s ray `ri`): `L_c`, or one of its radiance-Jacobian modes (`RadianceRecord`, `RadianceRays`)."""
 @inline _ray_radiance(::Nothing, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧) = L_c(bd, m, lt, sm, key, 𝐛, 𝐱, ω)

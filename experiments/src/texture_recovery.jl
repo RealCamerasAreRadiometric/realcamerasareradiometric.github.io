@@ -772,16 +772,44 @@ The page's textures by Core's `cgls` on the penalized operator `op` (Core's `Pen
 differences, `difference_rows((TW, TH), 1)`, on its device): `main` the unregularised one (penalty weight 0) and `reg[k]` the one of
 `min ‖A x − b‖² + λ_k ‖∇x‖²` for every β of `weights`, `λ_k = β_k · scale` (`scale` Core's `penalty_scale` of the fit rows' energy, the
 texels and the operator's mean positive eigenvalue, so β is the stack's normalized weight), each `(; x, iterations, converged, relres)`
-with `x` on the host. `x0` the start; Core's stopping rule (relative to the normal equations' right-hand side). The 1 + |weights|
+with `x` on the host. `x0` the start; Core's stopping rule (relative to the normal equations' right-hand side). A regularised solve
+is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `diagonal`), the
+unregularised one never: without the penalty the problem is ill-posed in the texels the rows barely see, and the scaling moves those
+by 10²–10³ (where the unpreconditioned iteration leaves them at the start). The 1 + |weights|
 solves are independent and run at once, each on a worker of its own (RC's `_each_chunk`: on a device, its own stream), `op`'s arrays
 shared read-only by them (RC's `_shared_read_only!`).
 """
 function page_solves(op, b, x0; scale::Real, weights, rtol::Real, maxit::Integer)
     ws = [0.0; [β * scale for β in weights]]                           # the unregularised solve, then one per weight
     be = op.device
-    RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt))                      # read by every solve at once (RC's CUDA extension: no per-buffer sync)
-    sols = RC._each_chunk(w -> (s = VgtkCore.cgls(op, b; w, x0, rtol, max_iter = maxit); merge(s, (; x = Array(s.x)))), be, ws)
+    dA, dD = column_sumsq(op.At; device = be), column_sumsq(op.Dt; device = be)   # diag(AᵀA), diag(DᵀD): the Jacobi diagonals' parts
+    RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
+    sols = RC._each_chunk(be, ws) do w
+        s = VgtkCore.cgls(op, b; w, x0, rtol, max_iter = maxit, diagonal = w > 0 ? dA .+ w .* dD : nothing)
+        merge(s, (; x = Array(s.x)))
+    end
     return (; main = sols[1], reg = sols[2:end])
+end
+
+"""
+    column_sumsq(Ct; device) -> vector
+
+The squared column norms of the operator whose transpose is the device operator `Ct` (Core's `CSRMatrix`): `Ct`'s rows' sums of
+squares, one row kernel on `device`, so the diagonal of `CᵀC` (`page_solves`' Jacobi diagonal, `diag(AᵀA + λ DᵀD)`).
+"""
+function column_sumsq(Ct::VgtkCore.CSRMatrix; device)
+    out = VgtkCore.KA.zeros(device, Float64, Ct.m)
+    VgtkCore._launch_rows!(_row_sumsq!, out, Ct.m, Ct.rowptr, Ct.nzval)
+    return out
+end
+# Row `i`'s sum of squares.
+Base.@propagate_inbounds function _row_sumsq!(out, i, rowptr, nzval)
+    acc = zero(eltype(out))
+    for e in rowptr[i]:(rowptr[i + 1] - 1)
+        acc += nzval[e]^2
+    end
+    out[i] = acc
+    return nothing
 end
 
 # ---- the refine stage: the page under both blur models --------------------------------------------------------------------------------
