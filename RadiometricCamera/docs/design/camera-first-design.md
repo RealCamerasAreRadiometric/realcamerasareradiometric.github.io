@@ -443,3 +443,90 @@ The owner's answers (2026-11-20) to the nine questions of this report's first ve
 
 When the round is complete: the `simplify` and `code-review` skills on the branch's diff (and the monorepo branch), their
 confirmed findings fixed, and the gates again (suite, goldens, GPU tier, experiments).
+
+---
+
+## 7. Round 3 (2026-11-21, branch `perf/round3` from `main` 5ea1358)
+
+Measured on poseidon (one whole B200 per GPU job; CPU jobs 16 threads), Julia 1.13.4, baseline = `main` 5ea1358 under the
+branch's fixed benchmark scripts (the port onto the textured target had broken `benchmark/run.jl` and `linearization.jl`), in
+the same job as the branch where a table says so. Records: `/cluster/projects/vgtk/logs/rc-round3/results/`.
+
+### 7.1 Decision outcomes
+
+| # (section 6) | Outcome |
+|---|---|
+| 2 (re-centred Float32 geometry) | **not started; needs VisualRadiometryToolkitCore.** The board point, the chart position `chart(board, 𝐱)` and the texture and edge-map lookups are VisualRadiometryToolkitCore's (`TexturedTarget`, `chart`, `printed_albedo`, the edge map); a re-centred evaluation needs their forms at a local origin (an anchor's chart position in Float64 and the Float32 offset's image under the chart's linear part; a texel base index plus a Float32 fraction). Writing those in RC would copy the board's chart. Proposed upstream: `chart_offset(board, 𝐱₀, δ)` and the albedo / edge lookups at `(𝐛₀, δ𝐛)`, then RC's kernels take `𝐱 = 𝐱₀ + δ` with `𝐱₀` each pixel's chief-ray hit in Float64. The gate (`experiments/test/pipeline/jacobian_parity.jl`, 0.4 % stacked and per tile; 0.44 % in a tile with Float64 rays and the Float32 estimator, 2026-11-11) is therefore not re-measured. |
+| 3 (Core 3.3) | Core 0.12 carries b (`intersection_at`), d (`_launch_rows_on!` with `OnBackend(be; workgroupsize)`) and g (`_matvec!`, its CUDA one-column gemm). RC adopts d and g (`_launch_pixel_rows!` and the extension's `_rows_times` removed); b measured and not adopted (7.2: slower on the device). |
+| 4 (texture solve) | `page_solves` passes Core's `cgls` the Jacobi diagonal `diag(AᵀA) + λ diag(DᵀD)` for λ > 0 only (`column_sumsq`); the unregularised solve is ill-posed and stays unpreconditioned. 7.3. |
+| 5 (focus-ab) | done before this round (the sensor-grid thin plate spline; kinds C/D and B removed). The A/B's table is 7.5. |
+| 6 (grid batching) | **not done** (7.4). |
+| 8 (default vignetting) | done in 0.2.0 (`NoVignetting`). |
+
+### 7.2 The heights kernel at the record's hit (`intersection_at`): measured, not adopted
+
+Section 3.2's recommendation 3 projected the heights kernel 3–5× faster once it skips the root. Measured with Core's
+`intersection_at` at the radiance record's hit (warped 16,384-pixel view, free heights, min of 5; the same job as `main`):
+
+| backend | `main` (root, then the step) | `intersection_at` (the step at the recorded hit) | |
+|---|---:|---:|---|
+| CPU, 16 threads | 288 ms (twice: 288, 288) | 175 ms (175, 175) | 1.65× faster |
+| B200 (the Float64 heights path) | 14.7 ms | 24.0 ms (24.0 twice, also with the hit read as its six numbers) | 1.6× slower |
+
+The correction to recommendation 3: on the CPU the root was 40 % of the kernel, not 70–80 %; the rest is the step (one Dual
+evaluation of the 25-node field) and the radiance. On the device the kernel with Core's step at a supplied hit is slower than the
+root followed by the same step, so the code generated for `intersection_at`'s design-point path costs more there than the Newton
+saves (no profiler counters on the cluster; to profile on a local GPU). The device is the production backend: RC keeps the root
+(`intersect_board`). The height columns were the same to rounding (the suite's checks passed with it). For Core: why
+`intersection_at`'s Dual path is slower on a B200 than `intersection`'s root plus the same step.
+
+### 7.3 The texture solve with the Jacobi diagonal
+
+`experiments/tools/texture_benchmark.jl` (B200; 10 photographs, 739,848 sampled rows, 443,339 fit rows, 22.0 M fit nonzeros,
+240 × 336 texels; warm calls, the same job layout before and after):
+
+| | `main` | branch |
+|---|---:|---:|
+| `page_solves` iterations (weights 0, 0.001, 0.1) | 245, 195, 76 | 245, 89, 41 |
+| `page_solves` | 0.163 s | 0.134 s |
+| `run_page` (both blur models) | 1.18 s | 1.05 s (round 1's baseline 1.28 s) |
+| `run_page` iterations, learned model (0.001, 0.1) | 229, 114 | 95, 52 |
+| `run_page` iterations, pinhole model (0.001, 0.1) | 300 (not converged), 77 | 57, 21 |
+| learned model's test SSE at 0.001 / 0.1 | 1.754e-4 / 0.029939 | 2.571e-5 / 0.029918 |
+
+**The regularised textures change** (the unregularised one is bit for bit the same): Core's stopping rule is relative to the
+scaled normal equations, and the preconditioned iteration reaches a much smaller error before it stops — at weight 0.001 the
+learned model's test SSE is 6.8× lower. The texture records of the runs of record were not re-run (7.6).
+
+### 7.4 Grid route batching (decision 6): not done
+
+The tile path's cost is per-request latency: NLLSsolver asks for the tiles' blocks one at a time, and each request launches
+its row kernel, uploads the window lens and the tangent bases and forms `J r`, `J Jᵀ` with a synchronisation each. One launch
+per view needs the row kernel (`_jacobian_row!`, both routes) to read per-tile arguments by row (an array of window lenses,
+bases, `P0`, layouts) and to write ragged per-tile outputs, and the products as a strided batch on zero-padded tiles, the view's
+tiles' blocks memoized for the trial like the view's batch. That rewrites the one row kernel both routes share; with a 20-minute
+cluster round trip per GPU check it did not fit this round. Baseline (65 × 50 lattice, 8 × 16,384 px, B200): a view's tiles'
+normal equations 0.267 s, one grid LM iteration 2.82 s.
+
+### 7.5 The focus A/B on real data (the run of record's pipeline, f/4 fisheye; 2026-11-21)
+
+| variant | focus surface | free nodes | bending β | grid LM | rel-RMS | bearing error |
+|---|---|---:|---:|---:|---:|---:|
+| A | sensor-grid thin plate spline | 9 | 0 | 15 its, 584 s | 0.3298 → **0.2119** | 0.276 → 0.231 px |
+| A + bending | the same | 9 | 1e-4 (row weight 2.7e5) | 15 its, 593 s | 0.3298 → 0.2119 | 0.231 px |
+| B | the same, nodes outside the support frozen | 9 | 0 | 15 its, 591 s | 0.3298 → 0.2119 | 0.231 px |
+| C | direction-chart thin plate spline | 9 | 0 | 12 its, 518 s | 0.3295 → 0.2252 | 0.224 px |
+| D | spherical spline | 9 | 0 | 11 its, 493 s | 0.3295 → 0.2250 | 0.223 px |
+
+The sensor-grid spline fits best; C, D and B were removed (0.2.0). The row weight β Σϕ²/N of `[focus.smoothness]`, which
+only the removed report `focus_ab.json` carried, is now in the run record (`parameters.json`: `focus_options`).
+
+### 7.6 Other items of the round
+
+- **Φ_pixel's 4.4 kB a call** (3.2, recommendation 8): not Φ_pixel's. `Φ_pixel`, `_Φ_pixel`, `View(pose, camera)` and
+  `BoardRays` allocate 0 bytes called with their arguments (1.13.4, poseidon); `benchmark/run.jl`'s tile stage rebound the pixel
+  stage's captured `v`, which boxed it in every stage. Renamed.
+- **Tests:** the focus columns against central differences (the sensor-grid spline; the check of the removed direction-chart
+  focus had been the only one), `focus_metrics` of the sampling-strategy study.
+- **Not re-run:** the texture records of the runs of record (they need the run of record's texcal refinement in a results tree
+  of this version, which the cluster does not hold).

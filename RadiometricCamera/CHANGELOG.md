@@ -4,13 +4,12 @@
 
 Performance and cleanup (round 3). No calibration number moves beyond the rounding stated below; the goldens hold unmodified.
 
-- **Changed:** the nodal-height kernel takes VisualGeometryToolkitCore's `intersection_at` at the radiance record's hit (the
-  implicit-function step alone; the height field's Newton is the record's). Its partials are the root's to rounding.
 - **Changed:** the Jacobian's row kernel launches through VisualGeometryToolkitCore's `_launch_rows_on!` (`OnBackend` with the
   per-pixel workgroup, `_pixel_rows_exec`) and `J r` through its `_matvec!` (on CUDA its one-column matrix product): RC's
   `_launch_pixel_rows!` and the CUDA extension's `_rows_times` are removed.
 - **Added:** the run record (`parameters.json`) carries `focus_options` beside `vignetting_options`: `[focus.smoothness]` as applied
   and its row weight β Σϕ²/N (`focus_smoothness!`); `nothing` without a focus smoothness.
+- **Changed:** one reader of a record ray's hit (`_recorded_hit`: the chunks' tangent plane and the parts).
 - **Fixed:** `benchmark/run.jl` named its scene's board twice (a syntax error since the port onto the textured target).
 - **Tests:** the focus columns of the sensor-grid thin plate spline against central differences of the tile residual (the check of
   the removed direction-chart focus had been the only one).
