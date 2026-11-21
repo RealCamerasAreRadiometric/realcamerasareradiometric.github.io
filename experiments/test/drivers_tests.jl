@@ -9,7 +9,7 @@
     using DrWatson
 
     const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
-                     "image_regions", "distance_maps", "timing")
+                     "image_regions", "distance_maps", "timing", "vignetting_figure")
     const DRIVER_STAGE_NAMES = Dict(
         "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
         "focus_surfaces" => ("panels", "figures"),
@@ -18,7 +18,8 @@
         "sensor_characterisation" => ("evaluate",),
         "image_regions" => ("detect",),
         "distance_maps" => ("prepare",),
-        "timing" => ("start", "time", "record"))
+        "timing" => ("start", "time", "record"),
+        "vignetting_figure" => ("figures",))
     experiment_config(d) = d == "texture_recovery" ? projectdir("configs", "experiments", "texture_recovery_14mm_small.toml") :
                            d == "timing" ? projectdir("configs", "supplement", "timing.toml") : projectdir("configs", "experiments", "$d.toml")
     const DRIVER_THREADS = "2,1"
@@ -142,6 +143,7 @@ end
                          "image_regions.toml",   # the capture sets' image-region steps (scripts/image_regions.jl; 2026-11-15)
                          "distance_maps.toml",   # the printed boards' edge distance maps, read through [runs] (scripts/distance_maps.jl; 2026-11-16)
                          "convergence.toml",   # the bias of Schöps's method per LM iteration (scripts/convergence.jl; 2026-11-15)
+                         "vignetting_figure.toml",   # the paper's vignetting figure from the f/4 refinements and the diffuser photographs (scripts/vignetting_figure.jl)
                          ],
                         # ONE chrome evaluation per chrome set, its models a list (2026-11-12; the 14 mm central_30cm's above)
                         ["chrome_evaluation_fx3_$s.toml" for s in ("fisheye_10cm_ag", "fisheye_2710_si", "tamron_17cm_si", "tamron_20261108_ag", "tamron_largeaperture", "zoom48_f10")]))

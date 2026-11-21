@@ -247,7 +247,7 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/14mm/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Sigma 14 mm at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15)
+configs = ["configs/experiments/radiometric_refinement_vignetting.toml", "configs/experiments/vignetting_figure.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15); the flat field of fig:vignetting ([inputs.diffuser_14mm])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/14mm/panorama"]
@@ -265,7 +265,7 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/fisheye/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Sigma 8 mm fisheye at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of fig:vignetting ([inputs.diffuser_fisheye])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/fisheye/panorama"]
@@ -283,7 +283,7 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/tamron/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Tamron 20 mm at f/2.8 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of fig:vignetting ([inputs.diffuser_tamron])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/tamron/panorama"]
