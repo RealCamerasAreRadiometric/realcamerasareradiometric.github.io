@@ -530,3 +530,46 @@ only the removed report `focus_ab.json` carried, is now in the run record (`para
   focus had been the only one), `focus_metrics` of the sampling-strategy study.
 - **Not re-run:** the texture records of the runs of record (they need the run of record's texcal refinement in a results tree
   of this version, which the cluster does not hold).
+
+---
+
+## 8. Round 4: the device Jacobian in Float32 at Float64 hits (2026-11-21, branch `perf/round4-f32` from `main` 6b1916f)
+
+Decision 2's follow-up. Measured on poseidon (B200), Julia 1.13.4; the gate on a B200 MIG 2g.45gb slice, the benchmarks on a
+whole B200, `main` in the same job. Records: `/cluster/projects/vgtk/logs/rc-f32/` (the scripts in `bin/`, the logs and the
+benchmark JSON in `results/`).
+
+### 8.1 What was imprecise in Float32
+
+A Float32 world point is ≈ 0.06 µm coarse a metre from the origin (half an ulp), ≈ 0.1 µm after a ray's arithmetic: 0.2–0.3 % of
+the Siemens print's 0.03 mm edge blur, which moves the edge's slope by ≈ 1 %. Every column of a Float32 chunk reads the albedo's
+slope at that point. Two more Float32 terms of the same size were found while measuring:
+
+- the in-plane print error's map (Core's `Aspect ∘ Skew`) evaluated with a Float32 log-stretch: `exp(a)` is off by ≈ 6e-8, a
+  shift of the design point by as much as the coarse world point (it shows only once the error is estimated: zero at the start);
+- the estimator's reflection-sample density guard, `10⁴ eps` of its float: 2.2e-12 in Float64, 1.2e-3 in Float32 — a different
+  estimator, not a rounding of the Float64 one (the grazing samples Float64 keeps are dropped). Now Float64's value on every float
+  (`_pdf_guard`): the CPU's numbers are unchanged; the device's flux and record move towards them.
+
+### 8.2 The design: the anchor is the record's hit, the lookups are VisualRadiometryToolkitCore's
+
+The decision's text proposed each pixel's chief-ray hit in Float64 as the local origin and every ray's hit as a Float32 offset
+from it. Simpler, and enough for the gate (8.3): the radiance record already finds every ray's hit once per linearization, so
+its hit IS the anchor, and only the record's geometry stays Float64.
+
+- **The record** (`_RecordAt`, `RadianceRecord`): its geometry — the rays, the hits (the warped page's root), the albedo at them —
+  in `ANCHOR_FLOAT` (Float64) on every backend (`_anchor_inputs`); its Monte Carlo estimator in the kernels' float on the
+  estimator's own inputs. Each hit is stored to Float64's precision as its Float32 rounding and the remainder (`RadianceJac`: one
+  more column, `_recorded_anchor`).
+- **Its readers** — every Jacobian chunk (the pose's among them), the nodal heights' kernel, the parts kernel — run in Float32 and
+  look the albedo up through VisualRadiometryToolkitCore's `anchored_albedo(target, 𝐱₀, δ𝐱)`: the target's page and maps in
+  Float64 (the scene the closed form already keeps, `_anchor_board`), the anchor the recorded hit, the offset the Float32 dual
+  point's partials (value zero). The chart, the design chart with its in-plane map and the map's read are evaluated in the anchor's
+  precision, the printed edge's profile and the result in the offset's numbers. VisualRadiometryToolkitCore 0.1.2 adds
+  `anchored_albedo` and `physical_albedo` (the albedo at a physical page chart point, which RC's two compositions of
+  `printed_albedo ∘ design_chart` now call); nothing of the board's chart or maps is written in RC.
+- **Removed**: `HIGH_FLOAT`, the Float64 pose chunks (`_chunk_plan`), the Float64 height path and its own record
+  (`_height_inputs`, `_height_board`), the Float64 record and its rounded copy (`_record_as`). One chunk float on every backend.
+
+The CPU backend is unchanged but for rounding (a chunk reads the albedo at the recorded hit instead of at its own tangent-plane
+point, the same value to 1e-16).
