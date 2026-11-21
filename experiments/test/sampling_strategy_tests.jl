@@ -131,7 +131,6 @@ end
 @testitem "sampling strategy: the focus metrics of a run's state" default_imports = false setup = [SamplingStrategy] begin
     using Test
     using DrWatson
-    import JSON
     using Statistics: mean
     m = driver()
     focus_metrics(dir) = Base.invokelatest(m.focus_metrics, dir)
@@ -139,11 +138,12 @@ end
     @test focus_metrics(mktempdir()) === nothing                                   # no state: no metrics
     mktempdir() do d
         cp(joinpath(golden, "parameters.json"), joinpath(d, "parameters.json"))
-        st = JSON.parsefile(joinpath(golden, "state.json"); allownan = true)
-        f = st["camera"]["focus"]
-        N = length(f["nodes"])
+        src = read(joinpath(golden, "state.json"), String)                       # the focus's nodal values replaced in the record's text
+        a = findfirst("\"sensor_thin_plate_spline\"", src); p = findnext("\"parameters\"", src, last(a))
+        lb = findnext('[', src, last(p)); rb = findnext(']', src, lb)
+        N = length(m.RadiometricCamera.load_state(joinpath(golden, "state.json")).camera.focus.t̂_i)
         t = [1 / (1.5 + 0.1 * sin(3i)) for i in 1:N]                              # a dome about 1.5 m: every distance within ± 1/15 of 1.5 m
-        write_state(t) = (f["parameters"] = t; open(io -> JSON.json(io, st; allownan = true), joinpath(d, "state.json"), "w"))
+        write_state(t) = write(joinpath(d, "state.json"), src[1:lb] * join(repr.(Float64.(t)), ", ") * src[rb:end])
         write_state(t)
         r = focus_metrics(d)
         dist = 1 ./ t
