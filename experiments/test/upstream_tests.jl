@@ -63,7 +63,9 @@
                  ("src/image_region.jl", "produce_upstream(image_region_product(cfg, n)"),                  # every lens_coverage consumer
                  ("scripts/chrome_evaluation.jl", "produce_upstream(prepare_product(CFG, DETECT.photos)"),   # detect ← decode
                  ("scripts/convergence.jl", "produce_upstream(convergence_product(CFG, case)"),               # figure ← record
-                 ("scripts/texture_recovery.jl", "produce_upstream(texture_product()")]                       # report ← the page solve
+                 ("scripts/texture_recovery.jl", "produce_upstream(texture_product()"),                       # report ← the page solve
+                 ("scripts/texture_recovery.jl", "produce_upstream(report_product()"),                        # the paper's bands ← the report
+                 ("scripts/texture_recovery.jl", "produce_upstream(poses_product()")]                         # the paper's bands ← the poses
         for (f, call) in pairs
             @test occursin(call, src(f))
         end

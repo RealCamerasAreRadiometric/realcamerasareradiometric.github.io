@@ -364,11 +364,14 @@ run_eval((c, k)) = (produce_runs(chrome_loaded(c, k)); run_isolated(CHROME_DRIVE
 const TEXTURE_DRIVER = projectdir("scripts", "texture_recovery.jl")
 const TEXTURE_STAGES = "prepare,detect,sheet,init,refine,evaluate"
 """The texture config of variant `v` of case `c`: the texture config of record with `[upstream]` the variant's refinement (its
-config and case) and without `[folds]` and `[compare]` (one split of record; the comparison is the experiment's, `compare_config`)."""
+config and case) and without `[folds]` and `[compare]` (one split of record; the comparison is the experiment's, `compare_config`)
+and without `[bands]` and the two inputs it names (the paper's figure and its photograph band are the texture experiment's own)."""
 function texture_config(c, v)
     t = TOML.parsefile(projectdir(CFG["cases"][c]["texture"]))
     t["upstream"]["refinement"] = refinement_path(c); t["upstream"]["case"] = arm_case(c, v)
     delete!(t, "folds"); delete!(t, "compare")
+    b = pop!(t, "bands", nothing)
+    b === nothing || foreach(k -> delete!(t["inputs"], b[k]), ("photograph_cut", "photograph_record"))
     return t
 end
 texture_configs_product(c) = driver_product("texture_configs", Dict{String, Any}("experiment" => CFG["experiment"], "case" => c,

@@ -1,5 +1,6 @@
 #!/usr/bin/env julia
-# reproduce: writes plots/texture-learned.png (plotsdir(); the paper's Fig. 7 is the external texture-learned.tex)
+# reproduce: writes ../paper/fig/texture-learned.tex
+# reproduce: writes plots/texture-learned.png (plotsdir(); an earlier rendering of the same figure, not in the paper)
 # reproduce: reads configs/experiments/texture_recovery_14mm_small.toml
 # provenance: every product writes _config.toml and _provenance.toml (VisualGeometryToolkitEval produce) beside its results.
 # =============================================================================
@@ -34,6 +35,12 @@
 #   figures   [figures.<name>] → plotsdir() (fig:texture-learned: one block of the page's text stacked from the design, a training
 #             photograph on the page's texels, the pinhole's texture and ours, a few lines each; the page overview with the errors; a
 #             close-up of the design and both models), numbers.tex
+#   bands     [bands]: the paper's figure (fig:texture-learned as the paper prints it) → plotsdir(): the first three lines of the
+#             page's text, once from the design, from a training photograph, from the pinhole's texture and from ours, one band
+#             each — the PGFPlots / TikZ files texture-learned.tex, texture-learned/<band>.{tex,png} and texture-learned-caption.tex
+#             (src/paper_figures/texture_learned.jl, its parts tables and figure) from the evaluate stage's textures, the init
+#             stage's poses and the refine stage's roles. The photograph's band is an input (an author-side step's output:
+#             configs/inputs/texture_learned_photograph_20261121.toml)
 #
 #   julia --project=experiments experiments/scripts/texture_recovery.jl [--config=<toml>] [--plan] [--stage=NAME[,NAME]] [--force]
 #
@@ -48,12 +55,69 @@ include(srcdir("drivers.jl"))
 include(srcdir("radiometric_refinement.jl"))
 include(srcdir("texture_recovery.jl"))
 include(srcdir("texture_gpu.jl"))
+include(srcdir("paper_figures", "PaperFigures.jl"))                           # the paper figure's PGFPlots text (its generator: texture_learned.jl there)
 using Printf: @sprintf, @printf
 using StaticArrays: SVector
 
 const DRIVER = "scripts/texture_recovery.jl"
 const CFG_PATH = abspath(cli_option(ARGS, "config", projectdir("configs", "experiments", "texture_recovery_14mm_small.toml")))   # default: a config of record
-const CFG = load_texture_recovery_config(CFG_PATH)
+
+# ---- [bands]: the paper's figure, its table ------------------------------------------------------------------------------------
+"""The keys of `[bands]`: the figure's name under plotsdir() (`asset_dir`); the bands from the top (`order`, each with its table
+`[bands.<band>]`); whether the text reads on from band to band (`read_on`, a switch); the page's text block (`block_mm`), the text
+lines a band holds (`lines_per_band`) and the level a blank row of the design is above (`white`); the pixels a texel is drawn
+with (`pixels_per_texel`); and the photograph band's two inputs (`BANDS_INPUT_KEYS`)."""
+const BANDS_KEYS = ("asset_dir", "order", "read_on", "block_mm", "lines_per_band", "white", "pixels_per_texel", "photograph_cut", "photograph_record")
+"The keys of a `[bands.<band>]` table: what the band shows (`source`), its name in the margin (`label`) and the caption's words for it (`caption`)."
+const BAND_KEYS = ("source", "label", "caption")
+"The keys of `[bands]` that name the photograph band's inputs, each of one file: its cut (`photograph_cut`) and the record of that cut (`photograph_record`)."
+const BANDS_INPUT_KEYS = ("photograph_cut", "photograph_record")
+
+"""
+    check_bands_table(c, where) -> c
+
+`[bands]` of the texture config `c` checked (a config without the table has no stage bands): exactly `BANDS_KEYS` and a table
+per band of `order`; `asset_dir` a non-empty string; `order` a non-empty array of distinct band names; every `[bands.<band>]`
+exactly `BAND_KEYS`, its `source` the design, the photograph or a blur model of the run (`TEXTURE_VARIANTS`), each source once, its
+`label` and `caption` non-empty strings; `read_on` a switch (`"on"` | `"off"`); `block_mm` four numbers `[x0, y0, width, height]`,
+`lines_per_band` and `pixels_per_texel` integers ≥ 1, `white` a design level in (0, 1); `photograph_cut` and `photograph_record`
+inputs of stage figures, each one file pinned by its `sha256` (an author-side step's outputs are inputs of record: the figure is
+keyed by their content). An `ArgumentError` names `where` and the key.
+"""
+function check_bands_table(c::AbstractDict, where::AbstractString)
+    haskey(c, "bands") || return c
+    t = c["bands"]; w = "$where [bands]"
+    t isa AbstractDict || throw(ArgumentError("$w must be a table"))
+    order = get(t, "order", nothing)
+    order isa AbstractVector && !isempty(order) && all(b -> b isa AbstractString && !isempty(b) && !(b in BANDS_KEYS), order) && allunique(order) ||
+        throw(ArgumentError("$w order = $(repr(order)): a non-empty array of distinct band names (none a key of [bands]), from the top"))
+    check_required_keys(t, (BANDS_KEYS..., order...), w)
+    t["asset_dir"] isa AbstractString && !isempty(t["asset_dir"]) ||
+        throw(ArgumentError("$w asset_dir = $(repr(t["asset_dir"])): a non-empty string (the figure's files are <asset_dir>.tex, <asset_dir>/<band>.{tex,png}, <asset_dir>-caption.tex)"))
+    sources = ("design", "photograph", TEXTURE_VARIANTS...)
+    for b in order
+        check_required_keys(t[b], BAND_KEYS, "$w.$b")
+        t[b]["source"] in sources ||
+            throw(ArgumentError("$w.$b source = $(repr(t[b]["source"])): design (the printed design), photograph (the training photograph's cut) or a blur model ($(join(TEXTURE_VARIANTS, ", ")))"))
+        all(k -> t[b][k] isa AbstractString && !isempty(t[b][k]), ("label", "caption")) || throw(ArgumentError("$w.$b label, caption: non-empty strings"))
+    end
+    allunique(t[b]["source"] for b in order) || throw(ArgumentError("$w: every band another source, got $(join((t[b]["source"] for b in order), ", "))"))
+    RadiometricCamera.read_switch(t["read_on"], "$w read_on")
+    t["block_mm"] isa AbstractVector && length(t["block_mm"]) == 4 && all(_is_number, t["block_mm"]) && t["block_mm"][3] > 0 && t["block_mm"][4] > 0 ||
+        throw(ArgumentError("$w block_mm = $(repr(t["block_mm"])): [x0, y0, width, height] in mm"))
+    for k in ("lines_per_band", "pixels_per_texel")
+        _is_count(t[k]) && t[k] >= 1 || throw(ArgumentError("$w $k = $(repr(t[k])): an integer ≥ 1"))
+    end
+    _is_number(t["white"]) && 0 < t["white"] < 1 || throw(ArgumentError("$w white = $(repr(t["white"])): a design level in (0, 1)"))
+    for k in BANDS_INPUT_KEYS
+        i = t[k] isa AbstractString ? get(c["inputs"], t[k], nothing) : nothing
+        i !== nothing && i["stage"] == "figures" && haskey(i, "sha256") ||
+            throw(ArgumentError("$w $k = $(repr(t[k])) is not an input of stage figures pinned by its sha256"))
+    end
+    return c
+end
+
+const CFG = check_bands_table(load_texture_recovery_config(CFG_PATH), CFG_PATH)
 const SET = first(keys(CFG["prepare"]))
 const REFINEMENT_PATH = projectdir(CFG["upstream"]["refinement"])
 const REFINEMENT = load_radiometric_refinement_config(REFINEMENT_PATH)      # the refinement whose camera is held fixed
@@ -342,6 +406,62 @@ figures(p) = produce_figures(p, figure_assets(CFG); driver = DRIVER, config_path
     nothing
 end
 
+# ---- bands: the paper's figure ------------------------------------------------------------------------------------------------------
+# fig:texture-learned as the paper prints it: the generator's two parts (src/paper_figures/texture_learned.jl) on this run's own
+# records. Its part `tables` cuts the bands' text lines out of the evaluate stage's textures and design, chooses the training
+# photograph from the init stage's poses among the refine stage's fit photographs, and takes that photograph's band from an input:
+# cutting it out of the RAW photograph needs a demosaic and a feature registration (rawpy, OpenCV), an author-side step whose two
+# outputs are inputs of record (`[bands] photograph_cut`, `photograph_record`). The part refuses a record of another photograph
+# than the one it chooses, or of other text lines than this layout's: a run that moves the choice needs the step run again.
+# A stage of its own, after the driver's figures (as the convergence driver's panels beside its figure): it alone reads that input
+# — a data root without it must not stop the figures and their numbers.tex — and the page solve's roles beside the report, and its
+# product is keyed apart from the renders of [figures].
+"""The bands product (its output figure.tex, the figure's main file beside its tables; the tables in `tables/`, the figure kept in
+`assets/`): keyed by `[bands]`, the photograph band's two inputs (tier, path, sha256) and the keys of the three products it reads.
+One result at any thread count."""
+bands_product() = driver_product("bands", Dict{String, Any}("experiment" => CFG["experiment"], "bands" => CFG["bands"],
+                                                            "inputs" => inputs_record(CFG, [CFG["bands"][k] for k in BANDS_INPUT_KEYS]),
+                                                            "upstream" => Dict("evaluate" => report_product().key, "init" => poses_product().key,
+                                                                               "refine" => texture_product().key));
+                                 output = "figure.tex", threads = nothing)
+"""
+    write_bands(t, dir; evaluate, poses, roles) -> Vector{String}
+
+The paper's figure of the `[bands]` table `t` from a run's records, into `dir`; the files written. `evaluate` is an evaluate
+product's directory (report.json, design.png, texture_pinhole.png, texture_learned.png), `poses` an init product's poses.json and
+`roles` a refine product's page.json (photographs, roles). The photograph band's two inputs are written where the generator's part
+`tables` reads them — `dir/tables`, as T. Harder's texture_learned.py left them there: the cut stays, the record is rewritten with
+the whole figure's numbers (meta.toml) — then the parts `tables` (→ `dir/tables`: meta.toml and one 8-bit image per band) and
+`figure` (→ `dir/assets`: `<asset_dir>.tex`, the folder of its bands, its caption) run, with every setting of `t` handed to the
+generator; the files name this stage as their generator.
+"""
+function write_bands(t::AbstractDict, dir::AbstractString; evaluate::AbstractString, poses::AbstractString, roles::AbstractString)
+    tables = joinpath(dir, "tables"); mkpath(tables)
+    write(joinpath(tables, "photograph.png"), read(config_input(CFG, t["photograph_cut"])))      # written, not copied: an input's file may be read-only
+    write(joinpath(tables, "meta.toml"), read(config_input(CFG, t["photograph_record"])))
+    bands = [(; name = b, source = t[b]["source"], label = t[b]["label"], caption = t[b]["caption"]) for b in t["order"]]
+    return PaperFigures.generate("texture-learned"; part = "all", data = tables, out = joinpath(dir, "assets"), evaluate, poses, roles,
+                                 asset_dir = t["asset_dir"], bands, read_on = RadiometricCamera.read_switch(t["read_on"], "[bands] read_on"),
+                                 block_mm = t["block_mm"], lines_per_band = t["lines_per_band"], white = t["white"], pixels_per_texel = t["pixels_per_texel"],
+                                 generator = "experiments/$DRIVER (stage bands; T. Harder's texture_learned.py)")
+end
+"""Stage bands: the paper's figure from the report (its textures and design), the poses and the page solve (its roles), each
+produced on demand; kept in the product (`assets/`) and published to plotsdir() (`produce_figures`)."""
+bands(p) = produce_figures(p, String[]; driver = DRIVER, config_path = CFG_PATH,
+                           inputs = [product_dir(report_product()), product_dir(poses_product()), product_dir(texture_product()),
+                                     (config_input(CFG, CFG["bands"][k]) for k in BANDS_INPUT_KEYS)...]) do dir
+    edir = produce_upstream(report_product(), "the report whose textures the bands show"; make = () -> report(report_product()),
+                            command = driver_run(DRIVER, CFG_PATH, "evaluate").command)
+    idir = produce_upstream(poses_product(), "the poses the training photograph is chosen by"; make = () -> poses(poses_product()),
+                            command = driver_run(DRIVER, CFG_PATH, "prepare,detect,sheet,init").command)
+    tdir = produce_upstream(texture_product(), "the page solve whose roles name the training photographs";
+                            driver_run(DRIVER, CFG_PATH, "prepare,detect,sheet,init,refine")..., gpu = true)
+    files = write_bands(CFG["bands"], dir; evaluate = edir, poses = joinpath(idir, "poses.json"), roles = joinpath(tdir, "page.json"))
+    figure = joinpath(dir, "assets", CFG["bands"]["asset_dir"] * ".tex")
+    println(">> bands → ", figure, " (", length(files), " files: the tables, the figure, its bands, its caption)")
+    cp(figure, joinpath(dir, "figure.tex"); force = true)                      # the output, written last
+end
+
 "The refine stage solves on the GPU (src/texture_gpu.jl); every other stage on the CPU. No stage hands a [pipeline] to bin/refine.jl."
 const GPU_STAGES = [:refine, :folds]
 
@@ -363,6 +483,8 @@ const STAGES = [
     Stage(:report, "summary.md: the metrics' definitions, the results per run and blur model, the folds' spread, the provenance (from the records)";
           items = () -> [summary_product()], product = identity, run = summary),
     Stage(:figures, "fig:texture-closeup → plotsdir(), numbers.tex"; items = () -> [figures_product()], product = identity, run = figures),
+    Stage(:bands, "[bands]: the paper's figure fig:texture-learned (plotsdir(<asset_dir>.tex, <asset_dir>/<band>.{tex,png}, <asset_dir>-caption.tex))";
+          items = () -> haskey(CFG, "bands") ? [bands_product()] : Product[], product = identity, run = bands),
 ]
 
 run_stages("texture_recovery", STAGES)

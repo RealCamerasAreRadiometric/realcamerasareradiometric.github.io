@@ -678,3 +678,14 @@ paths = ["geometric_accuracy/night_stars/data/fx3-fisheye-siemens-30cm-all/openc
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-17/<path> (as above)"
 provenance = "OpenCV's raw calibration.json and the run logs of the two starts above (opencv_calibrate_schoeps.py's outputs, before ocv_record.jl)"
 configs = []                      # no config reads them: the records above are the inputs; kept as the step's raw outputs
+
+# rc_baselines_2026-11-21: an ADDITION to rc_baselines_2026-11-10 / -17, laid over the data root beside them — the band "training
+# photograph" of fig:texture-learned, the author-side step configs/inputs/texture_learned_photograph_20261121.toml records
+# (experiments/tools/texture_learned_photograph.py: rawpy 0.27.1, OpenCV 5.0.0). Packed with MANIFEST.tsv, MD5SUMS and README.md
+# on the author's cluster and copied to the MDS share's derived/rc_baselines_2026-11-21/ the same day (read back byte for byte).
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/photograph.png",
+         "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/meta.toml"]
+where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-21/<path> (packed on the author's cluster and copied to the share on 2026-11-21, with MANIFEST.tsv, MD5SUMS and README.md)"
+provenance = "the band \"training photograph\" of fig:texture-learned and the record of its cut: texture_learned_photograph.py (the photograph part of T. Harder's texture_learned.py; rawpy 0.27.1, OpenCV 5.0.0 SIFT + RANSAC) on the texture run of 2026-11-16 — the RAW photograph DSC03316.ARW, its first three text lines turned level by 3.84°, 573 × 76 px (sha256 ae5d0392…), and meta.toml (sha256 6f0c2833…); configs/inputs/texture_learned_photograph_20261121.toml"
+configs = ["configs/experiments/texture_recovery_14mm_small.toml"]
