@@ -179,9 +179,11 @@ end
 """A record ray's hit `(𝐱, 𝐧, reached)` (`RadianceJac`'s last two columns): `reached` false where the record did not reach the ray
 (its zeros, 𝐧 = 0)."""
 @inline function _recorded_hit(lr::RadianceRays, ri)
-    G = @inbounds lr.J[lr.base + ri]
-    𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
-    return SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]), 𝐧, !iszero(𝐧)
+    # the six numbers alone, from the record's flat storage (a `RadianceJac` is column-major: 𝐱 at offset 3(RAD_NL + 1), 𝐧 after it)
+    flat = reinterpret(eltype(eltype(lr.J)), lr.J)
+    q = (lr.base + ri - 1) * (3 * (RAD_NL + 3)) + 3 * (RAD_NL + 1)
+    @inbounds 𝐱, 𝐧 = SVector(flat[q + 1], flat[q + 2], flat[q + 3]), SVector(flat[q + 4], flat[q + 5], flat[q + 6])
+    return 𝐱, 𝐧, !iszero(𝐧)
 end
 @inline function _ray_hit(::Nothing, lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
     𝐱₀, 𝐧, _ = _recorded_hit(lr, ri)
