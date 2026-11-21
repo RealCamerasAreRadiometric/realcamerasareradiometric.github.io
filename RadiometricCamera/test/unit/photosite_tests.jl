@@ -45,7 +45,7 @@
                                                        read_noise * randn(rng), 0, WHITE - 1))
 
     "The mosaic `m` as the pipeline reads it (the entry point's photosite route, `RC._observe`): its linear photosite values on the raw grid and its valid green mask."
-    read_photosites(m) = RC._observe(RC.Photosites(), m, trues(size(m)), "test", VgtkCore.SensorModel())
+    read_photosites(m) = RC._observe(RC.Photosites(), m, trues(size(m)), "test", VgtkCore.SensorModel(), :G)
 
     "The calibration fixture's two-view board, the renders and their compute masks."
     function photosite_board(; W = 24, H = 24)
