@@ -842,8 +842,8 @@ _tile_flags(free::AbstractVector{Bool}, t::PerTileResidual) = sum(j -> free[t.id
 
 The tile `r`'s Gauss–Newton blocks at the varflags `vf` from its view's tiles' batch (`_tile_blocks_future!`), or `nothing` (the
 per-tile path): no registered grid problem or free variables known, `vf` not the flags the problem gives the tile, variables it
-cannot locate, or its blocks already handed out at this trial. A view's tiles of other varflags (a tile beside a dependent patch) are
-a batch of their own. Also starts the next view's batch at the trial (`gb.next`), so the device forms it while this view's are read.
+cannot locate. A tile asked again at a trial whose blocks it took already starts its view's batch again. A view's tiles of
+other varflags (a tile beside a dependent patch) are a batch of their own. Also starts the next view's batch at the trial (`gb.next`), so the device forms it while this view's are read.
 """
 function _tile_blocks!(s::CalibrationState, r::PerTileResidual, vars, vf::Integer)
     gb = _grid_batch(s)
@@ -851,33 +851,42 @@ function _tile_blocks!(s::CalibrationState, r::PerTileResidual, vars, vf::Intege
     _tile_flags(gb.free_vars, r) == vf || return nothing
     vec = _locate_vars(gb.problem, r, vars)
     vec === nothing && return nothing
-    fut = lock(gb.lock) do
-        f = _tile_blocks_future!(s, gb, r, vars, vec, _view_key(gb, vec, vars), Int(vf))
-        rn = gb.next[r.k]
-        if rn !== nothing && length(vec) >= maximum(rn.idx)
-            varsn = ntuple(i -> vec[rn.idx[i]], 10)
-            _tile_blocks_future!(s, gb, rn, varsn, vec, _view_key(gb, vec, varsn), _tile_flags(gb.free_vars, rn))
+    key = _view_key(gb, vec, vars)
+    stale = nothing
+    for _ in 1:2                                             # (a second pass: the tile's blocks were handed out at this trial already)
+        fut = lock(gb.lock) do
+            f = _tile_blocks_future!(s, gb, r, vars, vec, key, Int(vf); stale)
+            rn = gb.next[r.k]
+            if rn !== nothing && length(vec) >= maximum(rn.idx)
+                varsn = ntuple(i -> vec[rn.idx[i]], 10)
+                _tile_blocks_future!(s, gb, rn, varsn, vec, _view_key(gb, vec, varsn), _tile_flags(gb.free_vars, rn))
+            end
+            f
         end
-        f
+        blocks = _fetch_batch(fut)
+        blocks === nothing && return nothing                 # (no view batch at these variables)
+        b = lock(() -> pop!(blocks, r, nothing), gb.lock)
+        b === nothing || return b
+        stale = fut
     end
-    blocks = _fetch_batch(fut)
-    return lock(() -> pop!(blocks, r, nothing), gb.lock)
+    return nothing
 end
 """
     _tile_blocks_future!(s, gb, r, vars, vec, key, vf) -> Task
 
 Under the grid's lock: the future of the batch of view `r.k`'s tiles of the varflags `vf` at the trial `key` (`_view_key`), a new one
-(`_tiles_normal_equations` on a device worker, after the view's batch) when none is kept for that key. Its value: an `IdDict` tile →
-`(Jᵀr, JᵀJ, flux)`, from which each tile's blocks are taken once (`_tile_blocks!`).
+(`_tiles_normal_equations` on a device worker, after the view's batch) when none is kept for that key or the kept one is `stale`
+(its tile's blocks handed out already). Its value: an `IdDict` tile → `(Jᵀr, JᵀJ, flux)`, from which each tile's blocks are taken
+once (`_tile_blocks!`), or `nothing` when the view has no batch at the variables (`_view_batch!`).
 """
-function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars, vec, key, vf::Int)
+function _tile_blocks_future!(s::CalibrationState, gb, r::PerTileResidual, vars, vec, key, vf::Int; stale = nothing)
     e = get(gb.blocks[r.k], vf, nothing)
-    e !== nothing && e.key == key && return e.fut
+    e !== nothing && e.key == key && e.fut !== stale && return e.fut
     tiles = [t for t in gb.view_tiles[r.k] if _tile_flags(gb.free_vars, t) == vf]
     tvars = [NLLSsolver.getvars(t, vec) for t in tiles]
     fut = Threads.@spawn begin
         ent = _view_batch!(s, r, vars, true)                 # the view's batch (memoized; it also starts the next view's)
-        ent === nothing ? IdDict{Any, Any}() : _await(_on_worker(() -> _tiles_normal_equations(s, gb, tiles, tvars, ent, vf)))
+        ent === nothing ? nothing : _await(_on_worker(() -> _tiles_normal_equations(s, gb, tiles, tvars, ent, vf)))
     end
     gb.blocks[r.k][vf] = (; key, fut)                        # (a batch at another trial is replaced; its future still completes)
     return fut

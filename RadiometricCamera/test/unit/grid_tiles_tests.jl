@@ -14,7 +14,16 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
-    export tex, board, W, H, board, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p
+    export tex, board, W, H, board, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p,
+           per_tile_blocks
+
+    """`per_tile_blocks(vf, t, vars, s)`: the tile `t`'s `(cost, Jᵀr, JᵀJ)` at the varflags `vf` by the per-tile path — its own
+    Jacobian from its view's batch (`_tile_jacobian_at`, `_gauss_newton_blocks`): the reference of the tiles' batch (`_tile_blocks!`)."""
+    function per_tile_blocks(vf, t, vars, s)
+        tj = RC._tile_jacobian_at(vf, t, vars...)
+        g, H = RC._gauss_newton_blocks(tj.J, tj.res, tj.T, tj.lay, s.run)
+        return 0.5 * Float64(RC.NLLSsolver.sqnorm(RC._tile_residual(tj.flux, t, tj.ivs))), g, H
+    end
 
     tex = fixture_board()
     board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
@@ -277,12 +286,13 @@ end
         RC._unregister_grid_problem!(s_g)
         # a view's tiles in one batch (`_tile_blocks!`): the residuals' cost bit for bit, the blocks the per-tile path's to the products'
         # summation order (two strided batched gemms over the zero-padded rows); no tile forms its own Jacobian
-        let ts = RC.tile_costs(prob_g)
-            blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(1023), t, RC.NLLSsolver.getvars(t, prob_g.variables)...) for t in ts]
-            per_tile = blocks()
-            jac0 = s_g.run.device_calls[:jac]
-            batched = RC._with_registered(blocks, s_g, prob_g, idx_g; concurrent = false)
-            @test s_g.run.device_calls[:jac] == jac0
+        let ts = RC.tile_costs(prob_g), vars_of(t) = RC.NLLSsolver.getvars(t, prob_g.variables)
+            per_tile, batched, jacs = RC._with_registered(s_g, prob_g, idx_g; concurrent = false) do
+                ref = [per_tile_blocks(RC.static(1023), t, vars_of(t), s_g) for t in ts]
+                jac0 = s_g.run.device_calls[:jac]
+                ref, [RC.NLLSsolver.computecostgradhess(RC.static(1023), t, vars_of(t)...) for t in ts], s_g.run.device_calls[:jac] - jac0
+            end
+            @test jacs == 0
             for (x, y) in zip(per_tile, batched)
                 @test x[1] == y[1]
                 @test norm(y[2] - x[2]) <= 1e-12 * norm(x[2]) && norm(y[3] - x[3]) <= 1e-12 * norm(x[3])
@@ -317,15 +327,14 @@ end
         prob_b, idx_b = build_problem_grid(s_b; patch = (5, 5), fixed)
         ts = RC.tile_costs(prob_b)
         vfs = [flags(idx_b.free, t) for t in ts]
-        blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(vf), t, RC.NLLSsolver.getvars(t, prob_b.variables)...) for (t, vf) in zip(ts, vfs)]
-        per_tile = blocks()                                         # unregistered: every tile its own Jacobian
-        jac0 = s_b.run.device_calls[:jac]
-        batched, again = RC._with_registered(s_b, prob_b, idx_b; concurrent = false) do
-            b = blocks()
-            @test s_b.run.device_calls[:jac] == jac0                 # the batches: no tile formed its own Jacobian
-            b, blocks()                                               # a tile asked again at the trial: its own blocks (handed out once)
+        vars_of(t) = RC.NLLSsolver.getvars(t, prob_b.variables)
+        blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(vf), t, vars_of(t)...) for (t, vf) in zip(ts, vfs)]
+        per_tile, batched, again, jacs = RC._with_registered(s_b, prob_b, idx_b; concurrent = false) do
+            ref = [per_tile_blocks(RC.static(vf), t, vars_of(t), s_b) for (t, vf) in zip(ts, vfs)]
+            jac0 = s_b.run.device_calls[:jac]
+            ref, blocks(), blocks(), s_b.run.device_calls[:jac] - jac0   # the tiles asked again at the trial: their view's batch again
         end
-        @test s_b.run.device_calls[:jac] == jac0 + length(ts)
+        @test jacs == 0                                              # the batches: no tile formed its own Jacobian
         @test all(((x, y),) -> x[1] == y[1] && x[2] == y[2] && x[3] == y[3], zip(per_tile, batched))
         @test all(((x, y),) -> x[1] == y[1] && x[2] == y[2] && x[3] == y[3], zip(per_tile, again))
         cam_ === camera_m && @test all(k -> length(unique(vfs[[t.k == k for t in ts]])) > 1, 1:2)   # tiles of several varflags in a view
