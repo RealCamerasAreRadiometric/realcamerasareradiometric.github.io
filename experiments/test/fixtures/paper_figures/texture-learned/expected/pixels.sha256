@@ -1,0 +1,5 @@
+# SHA-256 of the decoded pixels (8-bit grey, row by row, one byte per pixel), the size (width x height) and the path of each band's image of the paper's figure
+d98805339ece2a5ec3af363d05a2a2d2453b57476339e425e8dd87b0f26bb758  3135x410  texture-learned/truth.png
+86ea8a41130cf6f8d7e9de848fe676505b4293c9eea6026469fab1250430e37b  2865x380  texture-learned/photograph.png
+ca6576beb5846b2a9c2bd17bee1360b1894eff3bd06fd52463ad394691772e53  3135x410  texture-learned/pinhole.png
+d0960390ede5034c6ec9b893daeb730fc02e889d474d5ce96a6c063c995f3192  3135x410  texture-learned/ours.png

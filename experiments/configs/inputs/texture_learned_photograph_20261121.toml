@@ -1,0 +1,45 @@
+# RATIONALE
+#   question:   the paper's Fig. 7 (right, fig:texture-learned) shows the first three lines of the page's text four times: in the design,
+#               in a training photograph and in the two recovered textures. The photograph's band is a cut of a RAW photograph; finding and
+#               cutting it needs a demosaicing RAW decoder and a feature registration (rawpy, OpenCV's SIFT and RANSAC), which no package of
+#               the stack provides and no machine of the run of record has
+#   hypothesis: none (an input: the band, cut the way the submitted figure's was)
+#   decides:    the inputs of record texture_learned_photograph and texture_learned_photograph_record
+#               (configs/experiments/texture_recovery_14mm_small.toml, read by its stage bands), tier rc_baselines_2026-11-21
+#   evidence:   the tool is the photograph part of the step `tables` of T. Harder's texture_learned.py (the generator of the submitted
+#               figure, 2026-11-16), taken out of it line for line. On the texture run of 2026-11-16 it writes the photograph.png that
+#               generator wrote for the submitted figure, byte for byte, and the same record entries; both were run again side by side on
+#               2026-11-21 (the same Python, rawpy and OpenCV)
+#   date:       2026-11-21
+#
+# The band "training photograph" of fig:texture-learned (AUTHOR-SIDE: its outputs are inputs of record, tier rc_baselines_2026-11-21 —
+# as the OpenCV starts of opencv_starts_20261117.toml, a step of other systems whose result is imported as data). This file is the
+# step's record: the tool, its versions, what it read, its arguments, its outputs (each pinned where the config reads it). The exact
+# command: experiments/tools/texture_learned_photograph_20261121.sh. The rest of the figure — the other three bands, the choice of
+# the photograph, every number of its tables and the PGFPlots files — is the stage bands of scripts/texture_recovery.jl
+# (src/paper_figures/texture_learned.jl), which checks this band against the run it draws: the photograph it chooses from the run's
+# poses must be the one named here, cut for the text lines of its layout. A run that chooses another photograph needs this step again.
+
+[tool]
+script = "experiments/tools/texture_learned_photograph.py"   # the photograph part of texture_learned.py's step `tables` (2026-11-16), line for line
+commands = "experiments/tools/texture_learned_photograph_20261121.sh"
+python = "3.10.12"
+rawpy = "0.27.1"                                         # the RAW decoder: LibRaw 0.22.1, its default demosaic, camera white balance, linear, 16 bit
+libraw = "0.22.1"
+opencv = "5.0.0"                                         # cv2: SIFT, the brute-force matcher, findHomography (RANSAC), warpAffine (bicubic)
+numpy = "2.2.6"
+pillow = "12.3.0"                                        # reads design.png, writes photograph.png (optimize)
+
+[bands.texture_14mm_small]
+config = "configs/experiments/texture_recovery_14mm_small.toml"
+run = "the texture run of 2026-11-16 (RadiometricCamera 0.11.5): texture_recovery evaluate/16f9d84088c7714b (design.png, report.json), init/a2902f6141e57d0e (poses.json), refine/270c783b87521b12 (page.json: the photographs' roles)"
+frames = "paper-data/defocus/14mm/texture-learning"      # tier rc_raw_photos: the 106 RAW photographs of the texture set (the config's input raw_14mm_texture_small_20261109)
+frame = "DSC03316.ARW"                                   # the photograph the tool chose: training photograph 39 of 63 (tilt 2.10°, 12.77° off the axis, 0.494 m)
+frame_md5 = "89bb4e945be67427658fe7e64c26fce8"           # as the published folder's MD5SUMS
+args = "<evaluate> <init>/poses.json <frames> <out> --roles=<refine>/page.json"   # no option: the bands truth, photograph, pinhole, ours; the same three text lines in every band; the cut turned level
+output = "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/photograph.png"   # 573 × 76 px, turned by 3.84°; 2046 SIFT matches, 1798 homography inliers
+sha256 = "ae5d0392ed17cb81a7caf52a167f3cb31fc307de0cd955c23a87488ae92adbaa"
+md5 = "7ae64538a58010677ba16c10bd9c3a1a"
+record = "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/meta.toml"
+record_sha256 = "6f0c2833aba632ac03dc3cb293ce03881c9820f9748527eda0c9af3864a2eddb"
+record_md5 = "d1ac683ce7a78db3c3f97457c3b5da2c"

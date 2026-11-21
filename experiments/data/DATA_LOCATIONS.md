@@ -25,6 +25,17 @@ read it and its provenance.
 VGTK_DATA_ROOT=<data root> …           # with <data root>/paper-data → the share's folder
 ```
 
+## The board-warping session: `board-warping` on the share
+
+| | |
+|---|---|
+| where | the same folder of the share, `radiometric-camera-paper-data/board-warping/` (the photographs of 2026-11-19): `siemens-board/{14mm,fisheye,tamron}` (214, 204, 203 ARW; 5.27, 4.92, 5.03 GiB) and `april-board/{14mm,fisheye,tamron}` (235, 184, 206 ARW; 5.58, 4.35, 4.88 GiB) — 1,246 Sony FX3 ARW, 30.0 GiB, every one at f/10, 0.625 s, ISO 100; each board stayed in place for its three sets |
+| excluded | five photographs of the fisheye AprilGrid set (DSC06045, DSC06052–DSC06055) are not in the published set and not in the view list of record |
+| binding | under the data root as `paper-data/board-warping/…`, as every folder of the share; the folder's macOS side files (`._*`, `.DS_Store`) are no photographs (the stack's listing leaves them out) |
+| in the configs | `configs/experiments/radiometric_refinement_board_warping.toml` (the six sets) and `configs/experiments/frontends.toml` (the three Siemens-star sets, whose starts the front ends make); the figure: `configs/supplement/board_warping_lenses.toml` |
+| open | the folder is not yet in the share's `README.md`, `MANIFEST.tsv` and `MD5SUMS` (4362 photographs without it). The three AprilGrid starts the refinements read (tier `rc_baselines`: `geometric_accuracy/night_stars/data/fx3-{14mm,tamron}-aprilgrid-bw20261119/schoeps_dense_green`, `fx3-fisheye-aprilgrid-bw20261119/schoeps_dense_aruco_green`; 17 files each, 43.4 MB together) are not yet on the share: they go to `derived/rc_baselines_<date>/` in the data root's layout, with `MANIFEST.tsv` and `MD5SUMS` |
+| file names | the fisheye AprilGrid set's file numbers run through numbers the 14 mm Siemens-star session of 2026-11-03 also used (the camera's counter came round), the five excluded ones among them: the sets are told apart by their folders, never by a file name |
+
 ## The derived inputs: `derived/rc_baselines_2026-11-10` on the share
 
 | | |
@@ -59,6 +70,19 @@ VGTK_DATA_ROOT=<data root> …           # with <data root>/paper-data → the s
 | holds | the tier `rc_synthetic` as the configs read it, version v8: `geometric_accuracy/detector_bias/data/{ds_truth,ds_poses_real,render_inputs}/` (the truth lens, the 100 poses, the render state) and `…/data/v8/{circle_field_stop, ds_aprilgrid/gt, ds_siemens/gt}/` (the field stop, both boards' 100 linear renders with their sRGB copies, truth reports, camera, image circle, state, trajectory); the front ends' outputs on the renders are in the baseline folder |
 | how it was made | `scripts/make_detector_bias_inputs.jl` (the poses, the field stop), `scripts/detector_bias.jl` stage `prepare` with `[ground_truth] regenerate = "all"` (the renders; GPU) — both removed in rc-0116 with the synthetic detector bias (git history, tag v0.11.5); the golden calibration case still reads `fisheye_full` |
 | binding, checks | as above: lay it over the data root; `MANIFEST.tsv`, `MD5SUMS`, `README.md` |
+
+## The rendered sets of the detector bias: `detector_bias/` on the share, and what was prepared from it
+
+The detector-bias experiment (`configs/experiments/detector_bias.toml`, fig:detector-bias) reads rendered photographs with a known
+camera at known poses, and what an author-side preparation made of them for its two cases.
+
+| | |
+|---|---|
+| the renders | the same folder of the share, `radiometric-camera-paper-data/detector_bias/` (F. Seegräber's Mitsuba 3.9.0 renders, 4256 × 2848, 8-bit sRGB; in no `MANIFEST.tsv` yet): `output_fov_april/` (a 1 m AprilGrid through a FOV-model camera) and `output_ds_siemens/` (the 1 m Siemens-star board through a Double Sphere fisheye), each `images/` (10 000 PNG: 22.66 GB and 14.02 GB) and `data.npy` (the render pipeline's record of every render's detections and their true projections: 80.8 MB and 214.4 MB). Two more sets beside them (`output_ds_april/`, `output_fov_siemens/`) are read by no config |
+| binding | with the photographs: `data_root()/paper-data/detector_bias/…` (tier `rc_synthetic`). A case reads 200 renders of its set (`[views]`: 457 MB and 247 MB), the figure the two `data.npy`, each pinned by its sha256 in the config |
+| what was prepared | in the data root's layout, tiers `rc_synthetic`, `rc_baselines` and `rc_calibration` (`configs/data_artifacts.toml`, the five `[[unpacked]]` entries of `detector_bias.toml`): `geometric_accuracy/detector_bias/data/mitsuba/{fov,ds_siemens}/gt/` (the 200 views' truth: the true pixels, poses and camera), `…/mitsuba/ds/circle_rgb/F1.png` (the Double Sphere renders' image disc), `…/mitsuba/fov/frontend/` and `…/mitsuba/fov/records/start_opencv.json` (OpenCV's corners as the front end's feature file, and its OpenCV-14 calibration), `…/mitsuba/ds_siemens/schoeps/` (T. Schöps's central-generic calibration on his detector's star centres) and `geometric_accuracy/data/target/aprilgrid_mitsuba_exact/{board,distance_map_10ppm}/` (the renders' AprilGrid as a board, and its printed-edge distance map): 30 files, 202 MB in all |
+| where that is | on the author's cluster, in the data root the paper's detector-bias runs read; not yet on the share. To publish it: copy the paths above, as they are, to `radiometric-camera-paper-data/derived/<tier>_<date>/<path>` with `MANIFEST.tsv` and `MD5SUMS`, and lay them over the data root like the other derived tiers. The 1 m Siemens-star board the second case reads is the refinements' (`derived/rc_calibration_2026-11-10`) |
+| how it was made | by hand on the author's cluster from the render pipeline's records (Python and Julia tools outside this project): the views drawn at random from the renders with enough detections, the truth and the feature files written from `data.npy`, OpenCV's `cv2.calibrateCamera` and T. Schöps's `camera_calibration` run on the detections, the board built from the render pipeline's own AprilGrid texture. Not drivers of this project: their outputs are inputs of record |
 
 ## On rtx-01-mds
 

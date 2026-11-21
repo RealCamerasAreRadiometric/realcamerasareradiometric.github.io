@@ -1,0 +1,60 @@
+# RATIONALE
+#   question:   does the refinement find the same shape of a printed calibration board from every lens that photographed it?
+#   hypothesis: the bending is a property of the board, so with the board in place the refinements of three lenses give the same
+#               surface, up to a plane (the piston and the two tilts belong to the poses)
+#   decides:    the supplement's board-warping figure across lenses and what its text says about the lenses' agreement
+#   evidence:   the spline refinements of RC 0.11.5 on the session's six sets: the surfaces span −2.5 … +0.6 mm on the AprilGrid and
+#               −1.5 … +1.7 mm on the Siemens stars; two lenses' surfaces of a board differ by 0.06 … 0.18 mm RMS (0.19 … 0.63 mm at
+#               most), the best-fit plane of the difference removed
+#   owner:      T. Harder
+#   date:       2026-11-20
+#
+# Config of record of the board warping across lenses (scripts/board_warping.jl with --config=<this>; src/board_warping.jl): both
+# printed calibration boards photographed with the three lenses in ONE session, each board in place for its three sets, and the height
+# of each page above its plane as the radiometric refinement of each set estimated it. Nothing is estimated here: every case is a
+# case of [upstream] radiometric_refinement, as it is there, and the stage reads the calibrated target its refinement wrote
+# (radiometric_target.json: the page, the warping's 5 × 5 nodal heights, the in-plane aspect and skew). The surface between the nodes
+# is the package's own (VisualRadiometryToolkitCore's board_height). A supplement experiment: its products lie under
+# results_root()/supplement/board_warping/, beside those of configs/supplement/board_warping.toml (the same driver, keyed apart).
+#
+#   julia --project=experiments experiments/scripts/board_warping.jl --config=experiments/configs/supplement/board_warping_lenses.toml [--plan] [--stage=figures]
+
+[experiment]
+name = "board_warping"
+
+[inputs]
+# none of its own: the photographs, the starts and the targets are the upstream config's inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement_board_warping.toml"   # the session's six cases, as they are there (each refine product is read by its key)
+
+[heights]
+samples = 201                  # the surface is sampled at samples × samples page positions, the page's edges included: every 5 mm of a 1 m page (the panels' mesh takes every [figure] mesh_stride-th of them; the lenses' differences are taken on all of them)
+
+[sets]
+# The session's six capture sets, each with the case of [upstream] whose refinement is read: the central spline's, the paper's
+# camera model. A set's name is its panel's (board-warping-lenses/<set>.tex); its case is named <set>_<camera model>_warped, one
+# camera model for all sets (the drawing code finds a set's files by that name, and its caption names the model).
+bw_ag_14mm    = "bw_ag_14mm_spline_warped"      # Sigma 14 mm, AprilGrid
+bw_ag_fisheye = "bw_ag_fisheye_spline_warped"   # 8 mm fisheye, AprilGrid
+bw_ag_tamron  = "bw_ag_tamron_spline_warped"    # Tamron 20 mm, AprilGrid
+bw_si_14mm    = "bw_si_14mm_spline_warped"      # Sigma 14 mm, Siemens stars
+bw_si_fisheye = "bw_si_fisheye_spline_warped"   # 8 mm fisheye, Siemens stars
+bw_si_tamron  = "bw_si_tamron_spline_warped"    # Tamron 20 mm, Siemens stars
+
+[figure]
+drawing = "board-warping-lenses"   # the drawing code (src/paper_figures/board_warping_lenses.jl): the board-warping figure's panels for the sets of one session, and tables that state per row — a board in place — how far the surfaces of two of its sets differ
+asset_dir = "board-warping-lenses"   # plotsdir("board-warping-lenses.tex", "board-warping-lenses/<set>.tex", "board-warping-lenses/key.tex"): the paper's fig/ layout
+columns = ["Sigma 14\\,mm lens", "Fisheye lens", "Tamron 20\\,mm lens"]   # the lenses, left to right (LaTeX text)
+rows = [                       # the boards, top to bottom: a row's label (LaTeX text) and its sets, one per column; the tables compare the sets of a row (meta.toml [boards.<label, lower case, _ for a space>])
+    {label = "AprilGrid", sets = ["bw_ag_14mm", "bw_ag_fisheye", "bw_ag_tamron"]},
+    {label = "Siemens stars", sets = ["bw_si_14mm", "bw_si_fisheye", "bw_si_tamron"]},
+]
+# Every panel draws its set's height field as a surface over the page, a mesh whose patches are coloured in bands of height. All
+# panels share one box and one colour scale, symmetric about zero, so the bands' borders are the same contour lines in every panel.
+# The values are those of configs/supplement/board_warping.toml: the two figures are drawn alike.
+band_heights_mm = [0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0]   # the candidates of a band's height, ascending: the first that needs at most max_bands bands on each side of zero for the largest |height| of all panels is taken (0.5 mm for the refinements of 2026-11-20), the last when none does
+max_bands = 8                  # the most bands on each side of zero
+mesh_stride = 10               # every mesh_stride-th sample of [heights] is a mesh point (201 samples: 21 × 21 points, 400 patches per panel)
+view_azimuth_elevation_deg = [20, 38]   # the panels' view: its azimuth and elevation (PGFPlots' view; 0, 90 would look straight down on the page), each within 0 … 90
+height_exaggeration = 50       # heights are drawn this many times as large as lengths on the page

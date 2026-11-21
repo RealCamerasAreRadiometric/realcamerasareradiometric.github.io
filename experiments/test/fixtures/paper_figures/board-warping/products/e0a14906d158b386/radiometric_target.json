@@ -1,0 +1,117 @@
+{
+    "schema": "rc/radiometric_target/v2.0",
+    "generator": {
+        "name": "VisualGeometryToolkitIO",
+        "version": "0.10.6"
+    },
+    "units": {
+        "length": "mm",
+        "time": "s",
+        "angle": "rad",
+        "pixel": "colmap",
+        "density": "dpi",
+        "radiance": "relative",
+        "length_roles": {}
+    },
+    "conventions": {
+        "rotation_encoding": "quaternion_wxyz_hamilton",
+        "transform_convention": "x_to = R * x_from + t",
+        "matrix_layout": "rows",
+        "grid_layout": "row_major",
+        "index_base": 1
+    },
+    "target": {
+        "type": "planar_target",
+        "reference": "texture",
+        "calibration": {
+            "type": "rigid"
+        },
+        "board": {
+            "size": {
+                "width": 1000.0,
+                "height": 1000.0
+            },
+            "origin": [
+                0.0,
+                0.0
+            ]
+        },
+        "canvas": {
+            "size": {
+                "width": 1000.0,
+                "height": 1000.0
+            },
+            "origin": [
+                0.0,
+                0.0
+            ]
+        }
+    },
+    "warping": [
+        0.0039446161342167885,
+        -0.5187029660908898,
+        -0.976209427145262,
+        -0.6352224501327056,
+        0.030398990064938673,
+        1.191071798598499,
+        0.446349709770333,
+        -0.2248879591912205,
+        0.1537173053393547,
+        0.3480357740787271,
+        1.46528741307721,
+        0.7408464181543707,
+        0.04459844438456252,
+        0.09934517738519402,
+        0.8169276151117933,
+        1.414242065671413,
+        0.4964255930977663,
+        -0.3782917018498509,
+        -0.0196523444531999,
+        0.243332697489456,
+        0.46150512775033986,
+        -0.7289571905952351,
+        -1.68687729900549,
+        -1.6028467197992964,
+        -0.2943617637400692
+    ],
+    "warping_aspect": 1.0,
+    "inplane_print_error": {
+        "type": "composition",
+        "compose": [
+            {
+                "type": "aspect",
+                "parameters": [
+                    0.0008937103112220172
+                ]
+            },
+            {
+                "type": "skew",
+                "parameters": [
+                    0.000423853205445717
+                ]
+            }
+        ]
+    },
+    "material": {
+        "alpha_ink": 0.04402768770270621,
+        "alpha_noink": 0.838795082470879,
+        "eta_ink": [
+            2.6726413036936014,
+            2.6726413036936014,
+            2.6726413036936014
+        ],
+        "eta_noink": [
+            1.0,
+            1.0,
+            1.0
+        ],
+        "mu": 0.5050251981718443
+    },
+    "ink_spread": 0.0,
+    "print_blur": {
+        "frame": "target:board",
+        "covariance": {
+            "isotropic": 0.0007672899999999999
+        }
+    }
+}

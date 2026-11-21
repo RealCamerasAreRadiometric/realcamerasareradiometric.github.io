@@ -257,7 +257,9 @@
         @test gpu_stages(:start => [cpu], :refine => [cpu, gpu], :evaluate => []) == [:refine]
         expected = Dict("texture_recovery" => [:refine, :folds],         # the page solves (the split of record and its rotations) on one GPU
                         "chrome_evaluation_paper" => [:sets],             # the paper config's sets: each set's detect on the GPU ([detect] device = "gpu")
-                        "focus_surfaces" => Symbol[])                  # the focus surfaces read the refinements' records
+                        "focus_surfaces" => Symbol[],                  # the focus surfaces read the refinements' records
+                        "vignetting_figure" => Symbol[],               # the vignetting figure reads the f/4 refinements' records and the diffuser photographs, on the host
+                        "board_warping" => Symbol[])                   # the board-warping figure reads the spline refinements' records
         for c in load_config_tables(projectdir("configs", "figures", "numbers.toml"), NUMBERS_CONFIG_KEYS)["runs"]["experiments"]
             name = TOML.parsefile(projectdir(c))["experiment"]["name"]
             m = withenv("VGTK_DATA_ROOT" => mktempdir(), "VGTK_RESULTS_ROOT" => mktempdir()) do
@@ -279,7 +281,7 @@
         txt = String(take!(out))
         ok || @info txt
         @test ok
-        for st in ("chrome_evaluation_paper", "focus_surfaces", "texture_recovery_14mm_small", "numbers", "verify", "deploy")
+        for st in ("chrome_evaluation_paper", "focus_surfaces", "texture_recovery_14mm_small", "vignetting_figure", "board_warping", "numbers", "verify", "deploy")
             @test occursin(Regex("^\\s+$st\\s+(check|\\d+/\\d+ produced)", "m"), txt)
         end
         @test occursin("plan only", txt)
@@ -308,7 +310,7 @@ end
              "radiometric_refinement_vignetting", "chrome_evaluation", "chrome_evaluation_score", "regenerate_paper",
              "results_branch"]
     env0 = filter(p -> !(first(p) in ("VGTK_DATA_ROOT", "VGTK_RESULTS_ROOT", "CASES", "CHROME_CASES", "VIG_CASES",
-                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
+                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "DETECTOR_BIAS_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
 
     @testset "--only: a subset with its prerequisites, or alone" begin
         @test select_stages(g) == paper                            # no flags: every paper stage, nothing else
@@ -321,11 +323,18 @@ end
         # the refinements' prepare (and the front ends it reads) and the image regions, never after the whole refinement array
         @test !("convergence" in select_stages(g)) && select_stages(g; only = ["convergence"]) ==
               ["setup", "distance_maps", "image_regions", "frontends_prepare", "frontends_detect", "frontends_init", "radiometric_refinement_prepare", "convergence"]
+        # the detector bias on the rendered sets (scripts/detector_bias.jl): only when named, after the image regions and the distance maps its cases read
+        @test !("detector_bias" in select_stages(g)) && select_stages(g; only = ["detector_bias"]) == ["setup", "distance_maps", "image_regions", "detector_bias"]
+        @test select_stages(g; only = ["detector_bias"], deps = false) == ["detector_bias"]
         # the warping ablation (scripts/warping_ablation.jl): only when named, after the same prerequisites (its mode "both" reuses the refinements of record by their keys)
         # (and after the refinements of record and the chrome sets' detect and index it shares: they are made once, upstream)
         @test !("warping_ablation" in select_stages(g)) && select_stages(g; only = ["warping_ablation"]) ==
               ["setup", "distance_maps", "image_regions", "frontends_prepare", "frontends_detect", "frontends_init", "radiometric_refinement_prepare",
                "radiometric_refinement", "chrome_evaluation", "warping_ablation"]
+        # the panoramas (scripts/panorama_vignetting.jl, scripts/panorama_stitching.jl): only when named; a lens's panoramas after its
+        # sweep's chain (and the image regions it reads) and after the f/4 refinements
+        @test !("panorama_vignetting" in select_stages(g)) && select_stages(g; only = ["panorama_vignetting"]) == ["setup", "image_regions", "panorama_vignetting"]
+        @test !("panorama_stitching" in select_stages(g)) && issubset(["radiometric_refinement_vignetting", "panorama_vignetting"], select_stages(g; only = ["panorama_stitching"]))
     end
 
     # every launcher of scripts/slurm/ is a stage's, the chrome index grid's too (a stage since 2026-11-12, its private three-job
@@ -336,7 +345,7 @@ end
     @test !("chrome_index_grid" in select_stages(g)) && select_stages(g; only = ["chrome_index_grid"]) == ["setup", "chrome_index_grid"]
     # the case selections the graph exports are the ones the launchers read (common.sh, texture_recovery.sbatch)
     common = join(read(projectdir("scripts", "slurm", f), String) for f in ("common.sh", "texture_recovery.sbatch", "sampling_strategy.sbatch",
-                  "chrome_evaluation.sbatch", "warping_ablation.sbatch"))
+                  "chrome_evaluation.sbatch", "warping_ablation.sbatch", "panorama_stitching.sbatch"))
     for s in g.stages
         isempty(s.select_env) || @test occursin("\${$(s.select_env):-", common)
     end

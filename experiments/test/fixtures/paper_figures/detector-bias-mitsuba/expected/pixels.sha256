@@ -1,0 +1,11 @@
+# SHA-256 of the decoded pixels (8-bit RGB, row by row, three bytes per pixel), the size and the path of each PNG of the paper's figure
+2df9ce8a3f11d8a255d73c0c1447122390f12d04d55b4e45b71577ae461a548f  532x356  detector-bias-mitsuba/opencv-aprilgrid-ocv14-bias.png
+52513b913c023411e2e3c9a8605c4e37952257b9d2c65d1ff6f9564aa5f722d4  532x356  detector-bias-mitsuba/opencv-aprilgrid-ocv14-camera-geometric.png
+0342927f5ddc4a62cc8f7b7a15c3149846810d2ce4bcd005921d89c790cdad2c  532x356  detector-bias-mitsuba/opencv-aprilgrid-ocv14-camera-radiometric.png
+7878b98abec126ac1d0d70f1f4f94d5817ed9fccd055a1eb70cfde5f75cbf868  532x356  detector-bias-mitsuba/opencv-aprilgrid-ocv14-pose-geometric.png
+647c7d345ce0a9774fd498604a68daca1eae126ba190b1f78b4e9a5be21fc7a6  532x356  detector-bias-mitsuba/opencv-aprilgrid-ocv14-pose-radiometric.png
+be0de1b1663f752f3e7ba72a6b7b705e66254b50fd36abb562b364a0cf04697d  532x356  detector-bias-mitsuba/schops-siemensstars-spline-ds-bias.png
+4d36a2a6e0e9a953d9f500bb92bcdbe01afbc49b9a11da4d46628d995473f1c3  532x356  detector-bias-mitsuba/schops-siemensstars-spline-ds-camera-geometric.png
+4fe9c2faeea41cee56d60de88dd88b45dcd7a32e9480612f8c1671036c22240c  532x356  detector-bias-mitsuba/schops-siemensstars-spline-ds-camera-radiometric.png
+374939bc9b8dc06687eaeeebc65b362b73cc0506e80db20248eb880c90468c28  532x356  detector-bias-mitsuba/schops-siemensstars-spline-ds-pose-geometric.png
+41833c9c5cc301dbd43b969fcc581643524dd3f697fb7829add6f538d896cc9c  532x356  detector-bias-mitsuba/schops-siemensstars-spline-ds-pose-radiometric.png

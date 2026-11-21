@@ -155,7 +155,7 @@ provenance = "the camera's raw files as captured on 2026-11-02 (EXIF: model, len
 # (dir sensor_characterisation/, its three files; a new binding in ../Artifacts.toml). Until it is packed each record is an input of
 # VisualGeometryToolkitEval's reserved tier "unpublished", pinned by its sha256 in every config that reads it ([inputs.fx3_sensor_characterisation]:
 # radiometric_refinement.toml, radiometric_refinement_vignetting.toml, chrome_evaluation_fx3_tamron_largeaperture.toml,
-# chrome_evaluation_fx3_zoom48_f10.toml), kept on dgx01 under the unpublished root (/raid/data/jpr/containers/sensor_characterisation,
+# chrome_evaluation_fx3_zoom48_f10.toml; [inputs.sensor_characterisation]: panorama_vignetting_fx3_<lens>.toml), kept on dgx01 under the unpublished root (/raid/data/jpr/containers/sensor_characterisation,
 # read only) and linked into the data root as sensor_characterisation/ (the refinements' [pipeline] camera.sensor_characterisation names it
 # there, data_root()-relative):
 #   sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json   sha256 add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737
@@ -247,13 +247,13 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/14mm/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Sigma 14 mm at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15)
+configs = ["configs/experiments/radiometric_refinement_vignetting.toml", "configs/experiments/vignetting_figure.toml", "configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the 14 mm f/4 session's coverage frame DSC04161 ([image_regions.fx3_14mm_f4_20261028], 2026-11-15); the flat field of fig:vignetting ([inputs.diffuser_14mm]); the 14 mm sweep reads the same coverage frame ([inputs.raw_14mm_diffuser_20261028])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/14mm/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "38 files; the frames of the Sony FX3 + Sigma 14 mm indoor pure-rotation sweep of 2026-10-29 as captured (14-bit ARW 4256 x 2848; the 11 of the 2026-11-04 run: two rows, pitch ≈ 0° and ≈ +14°, yaw over 360°, the frames of PanoramaStitching's examples/panorama_vignetting config_fx3_14mm.toml)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/fisheye/siemens-stars"]
@@ -265,13 +265,13 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/fisheye/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Sigma 8 mm fisheye at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of fig:vignetting ([inputs.diffuser_fisheye])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/fisheye/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (Sony ILME-FX3, Sigma 8 mm F3.5 fisheye at f/4, 14-bit ARW 4256 x 2848), 2026-10-29; Hugging Face panorama_good/fisheye"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_fisheye.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/tamron/siemens-stars"]
@@ -283,13 +283,13 @@ configs = ["configs/experiments/radiometric_refinement_vignetting.toml"]
 paths = ["paper-data/vignetting/tamron/diffuser"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "1 files; the diffuser flat-field photograph of the Tamron 20 mm at f/2.8 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/vignetting_figure.toml"]   # the flat field of fig:vignetting ([inputs.diffuser_tamron])
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/vignetting/tamron/panorama"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
 provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (taken in overlapping order), Sony ILME-FX3 + Tamron 20 mm at f/2.8, 14-bit ARW 4256 x 2848, 2026-10-29; the config of record uses all 35 (`frames`)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_tamron.toml"]   # the sweep whose frames the lens's panoramas are composed from ([inputs.raw]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/defocus/14mm/calibration"]
@@ -433,19 +433,19 @@ configs = []   # read by no config of record since 2026-11-16: the vignetting st
 paths = ["geometric_accuracy/records/2710/14mm_kb_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the Kannala–Brandt fit of the FX3 + 14 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/14mm_kb_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree (2026-11-08: the 14 mm panoramas' lens again, the learned grid's registration failed); since 2026-11-12 the source of the 14 mm panoramas' camera record with its lens coverage (configs/inputs/panorama_cameras.toml)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_14mm.toml"]   # the camera the sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/fisheye_kb_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the Kannala–Brandt fit of the FX3 + 8 mm fisheye to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/fisheye_kb_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree"
-configs = ["configs/experiments/chrome_evaluation_fx3_fisheye_2710_si.toml"]
+configs = ["configs/experiments/chrome_evaluation_fx3_fisheye_2710_si.toml", "configs/experiments/panorama_vignetting_fx3_fisheye.toml"]   # the camera the fisheye sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/tamron_opencv5_fit.json"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (copied 2026-11-10 with MANIFEST.tsv and MD5SUMS; on rtx-01-mds the data root of the paper run, data/DATA_LOCATIONS.md): made on the cluster by the front-end chains of rc-results main_2026-11-05/tools (or earlier nights, named in the provenance)"
 provenance = "the OpenCV-5 fit of the FX3 + Tamron 20 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/tamron_opencv5_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree; the Tamron panoramas' camera as it is, a full-sensor BoundedCamera (the lens covers the whole sensor: no lens coverage beyond it, owner ruling 2026-11-12)"
-configs = []   # the experiments that read it left the project (rc-0116, 2026-11-18); the data is kept
+configs = ["configs/experiments/panorama_vignetting_fx3_tamron.toml"]   # the camera the sweep is registered with ([inputs.lens]; scripts/panorama_vignetting.jl)
 
 [[unpacked.rc_baselines]]
 paths = ["geometric_accuracy/records/2710/14mm_kb_fit_lens_coverage.json"]
@@ -678,3 +678,102 @@ paths = ["geometric_accuracy/night_stars/data/fx3-fisheye-siemens-30cm-all/openc
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-17/<path> (as above)"
 provenance = "OpenCV's raw calibration.json and the run logs of the two starts above (opencv_calibrate_schoeps.py's outputs, before ocv_record.jl)"
 configs = []                      # no config reads them: the records above are the inputs; kept as the step's raw outputs
+
+# The board-warping session (2026-11-19): both printed boards photographed with the three lenses, each board in place for its three
+# sets — the share's folder board-warping, one entry per set (1,246 ARW, 30.0 GiB; the folder's macOS side files, ._* and .DS_Store,
+# are no photographs and no data: the stack's listing leaves them out). The folder is not yet in the share's README.md, MANIFEST.tsv
+# and MD5SUMS. The fisheye AprilGrid set's file numbers run through numbers the 14 mm Siemens-star session of 2026-11-03 used (the
+# camera's counter came round): the two sets are told apart by their folders, never by a file name.
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/14mm"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "235 files, 5.58 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Sigma 14 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/14mm)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/fisheye"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "184 files, 4.35 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/fisheye), less the five photographs DSC06045 and DSC06052–DSC06055 the author excluded (not in the published set, not in the view list of record)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/april-board/tamron"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "206 files, 4.88 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Tamron 20 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/tamron)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/14mm"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "214 files, 5.27 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Sigma 14 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/14mm)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/fisheye"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "204 files, 4.92 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/fisheye)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+[[unpacked.rc_raw_photos]]
+paths = ["paper-data/board-warping/siemens-board/tamron"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "203 files, 5.03 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Tamron 20 mm, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/siemens-board/tamron)."
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml", "configs/experiments/frontends.toml"]
+
+# The AprilGrid starts of the board-warping session: inputs of record of tier rc_baselines as the AprilGrid starts of record are, made
+# on 2026-11-20 by the chain that made those (experiments/frontends_history/ of tag v0.10.0: the sRGB and green copies, the tag
+# corners, T. Schöps's central-generic on the dense dataset). NOT YET ON THE SHARE: three folders of 17 files each (43.4 MB together),
+# to be packed with MANIFEST.tsv, MD5SUMS and a README and copied to derived/rc_baselines_<date>/ in the data root's layout.
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid-bw20261119/schoeps_dense_green", "geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-bw20261119/schoeps_dense_aruco_green", "geometric_accuracy/night_stars/data/fx3-tamron-aprilgrid-bw20261119/schoeps_dense_green"]
+where = "the author's cluster (the front-end chain's output folders of 2026-11-20); to be copied to the author's folder on the MDS share, radiometric-camera-paper-data/derived/rc_baselines_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "T. Schöps's central-generic (cell 150 px, 4 pyramid levels) on the dense AprilGrid dataset of each lens's AprilGrid set of the board-warping session — the corners of OpenCV ArUco + cornerSubPix on the green sRGB copies (the 14 mm, the Tamron), of OpenCV's ArucoDetector (the fisheye) — 2026-11-20: 17 files per folder (the dataset, the intrinsics, the poses and points, the tool's report images, run.log, views.txt), 15.4 MB, 13.4 MB and 14.6 MB"
+configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
+
+# rc_baselines_2026-11-21: an ADDITION to rc_baselines_2026-11-10 / -17, laid over the data root beside them — the band "training
+# photograph" of fig:texture-learned, the author-side step configs/inputs/texture_learned_photograph_20261121.toml records
+# (experiments/tools/texture_learned_photograph.py: rawpy 0.27.1, OpenCV 5.0.0). Packed with MANIFEST.tsv, MD5SUMS and README.md
+# on the author's cluster and copied to the MDS share's derived/rc_baselines_2026-11-21/ the same day (read back byte for byte).
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/photograph.png",
+         "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/meta.toml"]
+where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-21/<path> (packed on the author's cluster and copied to the share on 2026-11-21, with MANIFEST.tsv, MD5SUMS and README.md)"
+provenance = "the band \"training photograph\" of fig:texture-learned and the record of its cut: texture_learned_photograph.py (the photograph part of T. Harder's texture_learned.py; rawpy 0.27.1, OpenCV 5.0.0 SIFT + RANSAC) on the texture run of 2026-11-16 — the RAW photograph DSC03316.ARW, its first three text lines turned level by 3.84°, 573 × 76 px (sha256 ae5d0392…), and meta.toml (sha256 6f0c2833…); configs/inputs/texture_learned_photograph_20261121.toml"
+configs = ["configs/experiments/texture_recovery_14mm_small.toml"]
+
+# The detector bias on the rendered sets (fig:detector-bias; configs/experiments/detector_bias.toml): F. Seegräber's Mitsuba 3
+# renders are in the author's folder on the MDS share (detector_bias/, beside the photographs: no upload needed); what the
+# author-side preparation made of them for the two cases — the 200 views' truth, the detectors' outputs as front-end files, the
+# geometric calibrations, the renders' AprilGrid as a board — is in the data root of the paper's runs and not yet on the share.
+[[unpacked.rc_synthetic]]
+paths = ["paper-data/detector_bias/output_fov_april/images", "paper-data/detector_bias/output_fov_april/data.npy"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "10 001 files, 22.74 GB; the AprilGrid set of the detector bias: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB, 0.4–5.1 MB each; 22.66 GB) of a 1 m AprilGrid at random poses through a FOV-model camera, by F. Seegräber, and the render pipeline's record data.npy (80.8 MB, sha256 4603e567…: per render OpenCV's detected tag corners, their true projections and board points). The case reads 200 of the renders (457 MB: [views] mitsuba_fov), the figure's bias panel the whole record. The folder also holds mitsuba_cam_to_worlds.npy (the true poses, 1.3 MB), which no config reads"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_synthetic]]
+paths = ["paper-data/detector_bias/output_ds_siemens/images", "paper-data/detector_bias/output_ds_siemens/data.npy"]
+where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
+provenance = "10 001 files, 14.23 GB; the Siemens-star set of the detector bias: 10 000 Mitsuba 3.9.0 renders (image_0000.png … image_9999.png, 4256 × 2848, 8-bit sRGB, 0.5–3.2 MB each; 14.02 GB) of the flat 1 m Siemens-star board at random poses through a Double Sphere fisheye, by F. Seegräber, and the render pipeline's record data.npy (214.4 MB, sha256 6f4d1ee9…: per render the star centres T. Schöps's detector found, their true projections and board points). The case reads 200 of the renders (247 MB: [views] mitsuba_siemens_fisheye), the figure's bias panel the whole record. The folder also holds features.bin (the detections as T. Schöps's feature file, 45.9 MB) and mitsuba_cam_to_worlds.npy (1.3 MB), which no config reads"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_synthetic]]
+paths = ["geometric_accuracy/detector_bias/data/mitsuba/fov/gt", "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/gt",
+         "geometric_accuracy/detector_bias/data/mitsuba/ds/circle_rgb"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_synthetic_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "7 files, 42.0 MB; the truth of the two cases' 200 views, written from the render pipeline's records by the author-side preparation — per case gt/poses.json (the board's points and per view the true pixels of the detected features; 9.5 MB the AprilGrid case, 32.2 MB the Siemens-star case), gt/trajectory.json (the true poses: Mitsuba's camera-to-world matrices in the board's page frame) and gt/camera.json (the true camera) — and ds/circle_rgb/F1.png (97 kB, sha256 26d4e2a1…), the image disc of the Double Sphere renders: the per-pixel maximum of 200 renders of that camera, on which the Siemens-star case's lens coverage is measured ([image_regions.mitsuba_fisheye_disc])"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_baselines]]
+paths = ["geometric_accuracy/detector_bias/data/mitsuba/fov/frontend", "geometric_accuracy/detector_bias/data/mitsuba/fov/records/start_opencv.json",
+         "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/schoeps"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_baselines_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "18 files, 21.6 MB; the detectors' outputs and the geometric calibrations the two cases start from: fov/frontend/dataset.bin (OpenCV's AprilGrid corners of the 200 views as the front end's feature file, 0.5 MB), fov/records/start_opencv.json (plain OpenCV's calibration on them, OpenCV-14: cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL; a vgio/cameras record) and ds_siemens/schoeps/ (T. Schöps's camera_calibration, central-generic, cell 150 px, 4 pyramid levels, on his detector's star centres of the 200 views: intrinsics0.yaml, the poses, the pruned dataset.bin, its reports and run.log; 16 files, 21.0 MB)"
+configs = ["configs/experiments/detector_bias.toml"]
+
+[[unpacked.rc_calibration]]
+paths = ["geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board", "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/distance_map_10ppm"]
+where = "the author's cluster, in the data root the paper's detector-bias runs read; not yet on the MDS share: to be copied there in the data root's layout as radiometric-camera-paper-data/derived/rc_calibration_<date>/<path>, with MANIFEST.tsv and MD5SUMS (data/DATA_LOCATIONS.md)"
+provenance = "5 files, 138.0 MB; the renders' AprilGrid as a board, built by the author-side preparation from the render pipeline's own texture (11815 px at 300 dpi; 10 × 10 tags 36h11, tag 80.01 mm, spacing 18.203333 mm, on a page of 1016.3476 mm): board/ (texture.png, texture_features.bin, board.json; 1.2 MB) and distance_map_10ppm/ (its printed-edge distance map at 10 px per mm, a vgio/raster record: distance_map.json + distance_map.tiff, 136.9 MB)"
+configs = ["configs/experiments/detector_bias.toml"]

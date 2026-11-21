@@ -66,7 +66,7 @@ end
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
     include(srcdir("radiometric_refinement.jl"))
-    for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
+    for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml", "radiometric_refinement_board_warping.toml")
         rc = load_radiometric_refinement_config(projectdir("configs", "experiments", f))
         @test !haskey(rc, "kinds")
         for (c, t) in rc["cases"]                                  # owner 2026-11-16 23:30: 8,192 every global case, 16,384 every spline

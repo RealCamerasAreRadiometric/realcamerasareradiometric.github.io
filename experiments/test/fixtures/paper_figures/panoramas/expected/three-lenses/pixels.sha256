@@ -1,0 +1,7 @@
+# SHA-256 of the decoded pixels (8-bit RGB, row by row, three bytes per pixel), the size (width x height) and the path of each panel's image
+0e9b5114a9967da37c10748af50311279952bcde3af8d05bc9b6428407940da8  98x46  panoramas-james/fisheye-no-correction.png
+412adc8b0d5208258390442c588578bdfe97dc740e5c29ae44ec6cb2ee9a7b35  98x46  panoramas-james/fisheye-our-correction.png
+daa83fc1da6b207ba688afc13ead1477eb4cd3ee72f00ad45480d02ab3846619  98x38  panoramas-james/sigma14-no-correction.png
+efb22de38076af41ec64d46d8ac5718dba1fd32d7c75254dfc5a1f3b5134ba45  98x38  panoramas-james/sigma14-our-correction.png
+d822da2056ea6fbd14fd869f68c67e8c3fab5ddc5dff25d73526b28c069b5013  98x24  panoramas-james/tamron20-no-correction.png
+7a2eb7505b81b147778ed4d319ce47a6d42643bfdc0b25ee2176575cc72daeda  98x24  panoramas-james/tamron20-our-correction.png

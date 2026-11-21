@@ -26,8 +26,11 @@
     @test isempty(pins)
     isempty(pins) || foreach(h -> println("CPU pinned: ", h[1], ":", h[2], "  ", strip(h[3])), pins)
 
-    # 2. the retired tag "cuda" as a config value (PanoramaStitching's own `[example.compute] device` key left with the panorama configs, rc-0116)
-    cuda = [h for f in files if endswith(f, ".toml") for h in hits(f, r"=\s*\"cuda\"")]
+    # 2. the retired tag "cuda" as a config value — except PanoramaStitching's own keys in the sweeps' configs (its example reads
+    # `[example.compute] device` and `[example.registration] execution_provider` in its own spelling)
+    PS_KEYED = ("../experiments/configs/experiments/panorama_vignetting_fx3_14mm.toml", "../experiments/configs/experiments/panorama_vignetting_fx3_fisheye.toml",
+                "../experiments/configs/experiments/panorama_vignetting_fx3_tamron.toml")
+    cuda = [h for f in files if endswith(f, ".toml") && !(f in PS_KEYED) for h in hits(f, r"=\s*\"cuda\"")]
     @test isempty(cuda)
     isempty(cuda) || foreach(h -> println("retired tag \"cuda\": ", h[1], ":", h[2], "  ", strip(h[3])), cuda)
 

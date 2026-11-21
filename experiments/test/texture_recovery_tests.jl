@@ -31,8 +31,10 @@
     end
     e = refused(c -> c["texture"]["tiles"] = 3);                              @test e isa ArgumentError && occursin("tiles", e.msg)
     e = refused(c -> c["texture"]["split_every"] = 2);                        @test e isa ArgumentError && occursin("split_every", e.msg)
-    # the optional tables: [folds] (the rotations of the split) and [compare] (page runs by their refine keys)
-    @test refused(c -> delete!(c, "folds")) === nothing && refused(c -> delete!(c, "compare")) === nothing
+    # the optional tables: [folds] (the rotations of the split), [compare] (page runs by their refine keys) and [bands] (the paper's
+    # figure: the driver's stage checks its keys, test/texture_learned_figure_tests.jl)
+    @test refused(c -> delete!(c, "folds")) === nothing && refused(c -> delete!(c, "compare")) === nothing && refused(c -> delete!(c, "bands")) === nothing
+    @test haskey(good, "bands")
     e = refused(c -> c["folds"] = Dict("rotations" => 9));                     @test e isa ArgumentError && occursin("rotations", e.msg)
     e = refused(c -> c["folds"] = Dict("rotations" => 5, "every" => 5));       @test e isa ArgumentError && occursin("every", e.msg)
     cmp = Dict("runs" => Dict("new" => "c6276681a0d215b8"), "this" => "b", "reference" => "new", "crop_mm" => [28.0, 239.0, 60.0, 33.0])

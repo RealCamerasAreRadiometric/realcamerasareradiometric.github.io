@@ -1,0 +1,2 @@
+# SHA-256 of the decoded pixels (8-bit RGB, row by row, three bytes per pixel; a grey image as three equal channels), the size and the path of the paper's strip
+c3e64c3d5fbb55a35f90833b5edbb742d618198a8fe7c26237f03f3cd9885a92  3135x410  teaser/texture-strip.png

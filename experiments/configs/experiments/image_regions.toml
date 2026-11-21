@@ -18,6 +18,10 @@ configs = [
     "configs/experiments/radiometric_refinement.toml",               # the fisheye 10 cm AprilGrid set (f/22)
     "configs/experiments/radiometric_refinement_vignetting.toml",     # the 14 mm's f/4 session (housing; the diffuser DSC04161), the fisheye's f/4 Siemens set
     "configs/experiments/chrome_evaluation_fx3_fisheye_10cm_ag.toml", # the fisheye 10 cm chrome set: its session's AprilGrid step (the same key as the refinement's)
-    "configs/experiments/frontends.toml",                             # the fisheye 30 cm Siemens set (its own frames; owner 2026-11-16: the paper's fisheye Siemens set)
+    "configs/experiments/frontends.toml",                             # the fisheye 30 cm Siemens set (its own frames; owner 2026-11-16: the paper's fisheye Siemens set) and the board-warping session's fisheye Siemens set
     "configs/experiments/chrome_evaluation_fx3_fisheye_30cm_si.toml", # the fisheye 30 cm chrome set: its session's Siemens step (the same key as the front end's)
+    "configs/experiments/radiometric_refinement_board_warping.toml",  # the board-warping session's two fisheye sets (the Siemens set's: the same key as the front end's)
+    "configs/experiments/panorama_vignetting_fx3_14mm.toml",          # the 14 mm sweep: the f/4 session's step (the same key as the vignetting set's)
+    "configs/experiments/panorama_vignetting_fx3_fisheye.toml",       # the fisheye sweep (its own frames)
+    "configs/experiments/detector_bias.toml",                         # the detector bias's Double Sphere renders: their image disc
 ]

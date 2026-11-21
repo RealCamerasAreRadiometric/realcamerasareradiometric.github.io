@@ -1,0 +1,49 @@
+# The tables of the vignetting figure (src/paper_figures/vignetting.jl), written by scripts/vignetting_figure.jl: per lens
+# <lens>_diagonal.tsv — t, px along the sensor's diagonal from the centre of the learned vignetting; the diffuser's flat field,
+# the learned vignetting and cos(atan(|t| / f_px))^4, each over its value at the centre. [lenses.<lens>]: the lens's name, the
+# thin lens model's focal length (f_mm, and f_px in the sensor's pixels), the centre and the ends of its diagonal;
+# [sources.<lens>]: where its curves come from.
+diagonal_ymax = 1.08
+order = ["fourteen", "fisheye", "tamron"]
+
+[lenses.fisheye]
+centre = [2129.142574455497, 1433.2598172749463]
+f_mm = 7.8059
+f_px = 933.2
+label = "Fisheye lens, f/4"
+t_max = 1043.5000488185906
+t_min = -1044.4999511814094
+
+[lenses.fourteen]
+centre = [2136.3560431189735, 1420.6269565377356]
+f_mm = 14.68
+f_px = 1755.0
+label = "Sigma 14 mm lens, f/4"
+t_max = 1653.5000488185906
+t_min = -1676.4999511814094
+
+[lenses.tamron]
+centre = [2148.024049752741, 1414.3321013787092]
+f_mm = 20.7787
+f_px = 2484.1
+label = "Tamron 20 mm lens, f/2.8"
+t_max = 2533.5000488185906
+t_min = -2542.4999511814094
+
+[sources.fisheye]
+case = "f4_fisheye_spline_warped"
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+diffuser = "DSC04166.png"
+refine = "350c8458977a2efb"
+
+[sources.fourteen]
+case = "f4_14mm_spline_warped"
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+diffuser = "DSC04161.png"
+refine = "64950cb2ad025100"
+
+[sources.tamron]
+case = "f4_tamron_spline_warped"
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+diffuser = "DSC04175.png"
+refine = "0ca9c03ba11ff939"

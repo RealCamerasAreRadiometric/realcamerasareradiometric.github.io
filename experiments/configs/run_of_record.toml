@@ -14,9 +14,13 @@
 # refinements of record (chrome sets and f/4), their chrome evaluations, the texture, then the regeneration and its results branch.
 # The SUPPLEMENT group's timing (configs/supplement/timing.toml) is launched by hand until it has a stage of the graph (REPRODUCE.md,
 # "Running on Slurm"; a known limitation); the STUDIES (configs/studies/) never run here.
+# The SUPPLEMENT group's board warping across lenses (configs/supplement/board_warping_lenses.toml: the stages
+# radiometric_refinement_board_warping_prepare, radiometric_refinement_board_warping and board_warping_lenses of the graph) is named
+# when wanted, until ../paper reads its figure and its inputs of tier rc_baselines are on the share (data/DATA_LOCATIONS.md).
 # Not a paper result: golden (the package's gate), convergence (its stage `panels` makes fig:convergence-rms from the refinements
 # of record: named when wanted), chrome_index_grid (a measurement), sensor_characterisation (its record is an input of record),
-# paper_pdf (after accept_results).
+# paper_pdf (after accept_results). Not launched either: detector_bias (fig:detector-bias, on a co-author's renders: its inputs
+# are not in the data root of record yet; named when they are).
 stages = [
     "setup", "image_regions",
     "frontends_prepare", "frontends_detect", "frontends_init", "frontends_evaluate",

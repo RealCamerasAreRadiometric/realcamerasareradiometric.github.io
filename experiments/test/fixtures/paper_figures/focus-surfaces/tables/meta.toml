@@ -1,0 +1,29 @@
+# The numbers of fig:focus-surfaces (experiments/src/paper_figures/focus_surfaces.jl): the in-focus surfaces of two refined cameras on the pixel lattice — per lens
+# <lens>.tsv (i j x y z: lattice sample (i, j), 0-based, at the pixel ((i + 1/2) spacing_px, (j + 1/2) spacing_px); its in-focus point in the
+# camera's coordinates, m), the samples on the drawn lattice lines only (per lens a line every `every` samples). focus_* : the focus distance over ALL lattice samples the lens images (m).
+spacing_px = 16
+order = ["fisheye", "tamron"]
+
+[lenses.fisheye]
+label = "Fisheye lens, f/4"
+case = "f4_fisheye_spline_warped"
+nx = 266
+ny = 178
+every = 14
+view = [27, 14.4]
+imaged = 14303
+focus_min = 0.5140
+focus_max = 0.7780
+focus_median = 0.6484
+
+[lenses.tamron]
+label = "Tamron 20 mm lens, f/8"
+case = "sitla_spline_warped"
+nx = 266
+ny = 178
+every = 28
+view = [27, 36]
+imaged = 47348
+focus_min = 0.2142
+focus_max = 0.3304
+focus_median = 0.2463

@@ -1,0 +1,58 @@
+# RATIONALE
+#   question:   is the vignetting a large-aperture refinement learns the lens's own — does it remove the brightness differences
+#               where the frames of a panorama meet?
+#   hypothesis: frames of a pure-rotation sweep see one direction at different sensor points; composed as they are, the panorama
+#               shows the vignetting as a seam at every frame boundary, and divided by the right V it shows none
+#   decides:    the supplement's panoramas figure (panoramas-james.tex) and what its text says about the learned vignetting
+#   evidence:   the panoramas of the three lenses' indoor sweeps of 2026-10-29, each with and without the V of its lens's f/4
+#               refinement
+#   owner:      T. Harder
+#   date:       2026-11-19
+#
+# Config of record of the supplement's panoramas figure (scripts/panorama_figure.jl; src/panorama_figure.jl): per lens the panorama
+# of its pure-rotation sweep twice, composed from the frames as they are and from the frames with the learned vignetting divided
+# out. Nothing is computed here: every panorama is a file of the lens's panoramas product (scripts/panorama_stitching.jl on the
+# lens's config, its stage panoramas: panorama_<candidate>.png), read by its key; the drawing code
+# (src/paper_figures/panoramas.jl) puts each through one display curve and reduces it to the panels' width. A supplement
+# experiment: its products lie under results_root()/supplement/panorama_figure/.
+#
+#   julia --project=experiments experiments/scripts/panorama_figure.jl [--plan] [--stage=figures] [--config=<toml>]
+
+[experiment]
+name = "panorama_figure"
+
+[inputs]
+# none of its own: the sweeps' frames, their cameras and the refinements are the lenses' configs' inputs
+
+# The lenses. `config` names the lens's panorama_stitching config of record. `label` is the lens's name in two lines (LaTeX, the
+# two parted by \\): turned at the left of its row at text width; in one column, and in the caption, the two lines are joined by a
+# space. `aperture` is its aperture in the caption (LaTeX). `panel` begins the names of its panels' files,
+# <asset_dir>/<panel>-<column>.tex and .png.
+[lenses.fourteen]
+config = "configs/experiments/panorama_stitching_fx3_14mm.toml"
+label = "Sigma\\\\14\\,mm lens"
+aperture = "$f/4$"
+panel = "sigma14"
+
+[lenses.fisheye]
+config = "configs/experiments/panorama_stitching_fx3_fisheye.toml"
+label = "fisheye\\\\lens"
+aperture = "$f/4$"
+panel = "fisheye"
+
+[lenses.tamron]
+config = "configs/experiments/panorama_stitching_fx3_tamron.toml"
+label = "Tamron\\\\20\\,mm lens"
+aperture = "$f/2.8$"
+panel = "tamron20"
+
+[figure]
+asset_dir = "panoramas-james"  # plotsdir("panoramas-james.tex", "panoramas-james/<panel>-<column>.{tex,png}", "panoramas-james-caption.tex"): the paper's fig/ layout
+order = ["fourteen", "fisheye", "tamron"]   # the lenses, from the top
+columns = [                    # the columns from the left: the end of a panel's file name, the candidate of the panorama stage it shows (panorama_<candidate>.png) and its title (LaTeX)
+    {panel = "no-correction", candidate = "original", title = "no vignetting correction"},
+    {panel = "our-correction", candidate = "learned", title = "our vignetting correction"},
+]
+gain = 2.5                     # the display curve of every panel: an 8-bit value x = v / 255 becomes g x / (1 + (g − 1) x) (the shadows lifted, white kept),
+gamma = 1.5                    # then its power 1 / gamma
+width_px = 1400                # the panels' width in pixels: each panorama (3600 px wide at 0.1° per pixel) is reduced to it (Lanczos)

@@ -1,0 +1,64 @@
+# The numbers of fig:texture-learned (texture_learned.py): <band>.png — the 4 sources (8-bit grey, design units 0 … 1 as 0 … 255).
+# The design and the textures: one pixel per texel of the page over the region of the bands' text lines. Texel coordinates are
+# 0-based, x right, y down; a range is first, past-last. [bands.*] rows: the band's rows of the region; lines: its text lines
+# (1-based) of the text block. The photograph: a cut of the decoded photograph at its own scale, not rectified — photo_box: the
+# bounding box of its band's rectangle in the photograph (its pixels); pixels: the cut's width and height; [photograph] turned_deg:
+# the cut is turned in the image plane by this angle about the band's centre so that the text lines are level (0: the untouched pixels).
+# [errors.*]: |texture − design| over the whole text block, design units. design: the run's file of the printed design (the
+# ground truth), the reference of the photograph's place, of the cuts and of the errors; as a band it is "truth".
+tex_mm = 0.254
+page = [827, 1169]
+text_block = [100, 100, 727, 1065]
+region = [100, 117, 727, 199]
+design = "design.png"
+lines_per_band = 3
+read_on = false
+order = ["truth", "photograph", "pinhole", "ours"]
+
+[bands.truth]
+source = "design.png"
+rows = [0, 82]
+lines = [1, 3]
+
+[bands.photograph]
+source = "DSC03316.ARW"
+rows = [0, 82]
+lines = [1, 3]
+pixels = [573, 76]
+photo_box = [2037, 1182, 2614, 1296]
+
+[bands.pinhole]
+source = "texture_pinhole.png"
+rows = [0, 82]
+lines = [1, 3]
+
+[bands.ours]
+source = "texture_learned.png"
+rows = [0, 82]
+lines = [1, 3]
+
+[photograph]
+view = "DSC03316.ARW"
+role = "fit"
+number = 39
+of = 63
+of_all_photographs = 106
+tilt_deg = 2.10
+off_axis_deg = 12.77
+distance_m = 0.494
+in_plane_deg = 3.84
+turned_deg = 3.84
+rectified = false
+photo_px_per_texel = 0.913
+sift_matches = 2046
+homography_inliers = 1798
+
+[errors.pinhole]
+median = 0.0000
+mean = 0.1437
+rms = 0.2505
+
+[errors.ours]
+median = 0.0039
+mean = 0.0979
+rms = 0.1788
