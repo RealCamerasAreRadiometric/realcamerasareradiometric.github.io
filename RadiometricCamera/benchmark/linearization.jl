@@ -19,7 +19,7 @@ function linearization()
     r, vars, flags = first_block(problem, view_blocks(problem))
     pose, dist, foc, ap, m, vg, lt = vars
     dc = RC._ensure_device!(s); be = s.backend; F = RC._kernel_float(be); G = RC.HIGH_FLOAT
-    k = r.k; px = dc.px[k]; idx = dc.idx[k]; npx = length(s.px[k]); Hh = _image_height(s)
+    k = r.k; px = dc.px[k]; idx = dc.idx[k]; npx = length(s.px[k]); Hh = RC._image_height(s)
     NV = Int(RC.n_control_points(VgtkCore.model(vg))); J = Int(RC.sh_count(RC.max_degree(lt.light)))
     NS = length(s.settings.sensor); N = length(VgtkCore.model(foc).t̂_i)
     lay = RC._jacobian_layout(flags, N, NS, VgtkCore.tangent_size(vg), NV, J, VgtkCore.tangent_size(dist); NH = RC.n_height(m), NI = RC.n_inplane(m), fixed = RC.material_fixed(m))
