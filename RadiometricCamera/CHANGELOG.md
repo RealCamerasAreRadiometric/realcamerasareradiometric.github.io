@@ -23,7 +23,7 @@ Performance and cleanup (round 3). No calibration number moves beyond the roundi
   (B200, 10 photographs, 443,339 fit rows; `experiments/tools/texture_benchmark.jl`) the iterations of the weights 0.001 and 0.1
   are 195, 76 → 89, 41 (the unregularised 245, unchanged); in `run_page` the learned model's 229, 114 → 95, 52 and the pinhole's
   300 (not converged), 77 → 57, 21; the learned model's test SSE at weight 0.001 1.754e-4 → 2.571e-5, at 0.1 0.029939 → 0.029918
-  (the unregularised texture's bit for bit). `run_page` 1.18 → 1.05 s warm.
+  (the unregularised texture's bit for bit). `run_page` 1.04 → 1.00 s warm, `page_solves` 0.157 → 0.141 s (the same job).
 - **Tests:** the sampling-strategy study's `focus_metrics` (a dome, a flat focus, a node at infinity).
 
 ## 0.2.0 (2026-11-21)

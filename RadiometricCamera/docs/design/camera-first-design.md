@@ -488,8 +488,8 @@ saves (no profiler counters on the cluster; to profile on a local GPU). The devi
 | | `main` | branch |
 |---|---:|---:|
 | `page_solves` iterations (weights 0, 0.001, 0.1) | 245, 195, 76 | 245, 89, 41 |
-| `page_solves` | 0.163 s | 0.134 s |
-| `run_page` (both blur models) | 1.18 s | 1.05 s (round 1's baseline 1.28 s) |
+| `page_solves` | 0.157 s | 0.141 s |
+| `run_page` (both blur models) | 1.04 s | 1.00 s (round 1's baseline 1.28 s) |
 | `run_page` iterations, learned model (0.001, 0.1) | 229, 114 | 95, 52 |
 | `run_page` iterations, pinhole model (0.001, 0.1) | 300 (not converged), 77 | 57, 21 |
 | learned model's test SSE at 0.001 / 0.1 | 1.754e-4 / 0.029939 | 2.571e-5 / 0.029918 |
