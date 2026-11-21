@@ -134,14 +134,11 @@ Base.@kwdef struct GridOptions <: AbstractOptionsTable
     start_perturbation::Union{Nothing, StartPerturbationOptions} = nothing   # {sigma_px, seed}: the start perturbed; absent = none
 end
 
-"""`[focus]`: EXPERIMENT (focus-ab, focus_ab.jl) — the parameterisation of the focus surface."""
+"""`[focus]`: the focus surface, the sensor-grid thin plate spline — its nodes, their data support and its smoothness."""
 Base.@kwdef struct FocusOptions <: AbstractOptionsTable
-    variant::String = _option_default(FocusOptions, :variant)                             # A | B | C | D (focus_ab.jl's header)
-    node_count::Int = _option_default(FocusOptions, :node_count)                          # C / D: node count of the cap (0 = A's node count: the support nodes of the 5 × 5 grid, 25 without an image circle)
-    lens_coverage_scale::Float64 = _option_default(FocusOptions, :lens_coverage_scale)    # A / B: the grid's nodes kept inside the lens coverage scaled by this (`_scaled_coverage`, as [masks]; `focus_start_nodes`)
+    lens_coverage_scale::Float64 = _option_default(FocusOptions, :lens_coverage_scale)    # the grid's nodes kept inside the lens coverage scaled by this (`_scaled_coverage`, as [masks]; `focus_start_nodes`)
     smoothness::AbstractSmoothness = _option_default(FocusOptions, :smoothness)    # [focus.smoothness]: bending ½ β (Σϕ²/N) t̂ᵀQ̃t̂ (weight 0 = none) | none
-    support_min::Float64 = _option_default(FocusOptions, :support_min)                    # A / B: a node with less than this share of the mean data weight Σ b_i(𝐩)² is dependent (`focus_node_support`; 0 = every node with a pixel)
-    perturb::Vector{Float64} = _option_default(FocusOptions, :perturb)              # [σ, seed]: the start's free nodal values × exp(σ z), z ~ N(0, 1); empty = none
+    support_min::Float64 = _option_default(FocusOptions, :support_min)                    # a node with less than this share of the mean data weight Σ b_i(𝐩)² is dependent (`focus_node_support`; 0 = every node with a pixel)
 end
 
 """`[masks]`: the samples of the run (the LM's; the closed-form start runs on the same pixels): `samples_per_view` of each view's usable observations."""

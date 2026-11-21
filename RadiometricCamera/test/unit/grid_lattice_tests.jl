@@ -41,20 +41,10 @@ end
         m = msg(Dict("io" => Dict("init" => "lens:x.json"), "grid" => Dict(k => v)))
         @test occursin("`grid.$k`", m) && occursin("lens:", m)
     end
-    # the focus surface's keys of the other variants
-    m = msg(Dict("focus" => Dict("variant" => "A", "node_count" => 30)))
-    @test occursin("`focus.node_count`", m) && occursin("variant", m)
-    for k in ("support_min" => 0.1, "lens_coverage_scale" => 0.9)
-        m = msg(Dict("focus" => Dict("variant" => "C", k)))
-        @test occursin("`focus.$(first(k))`", m) && occursin("variant", m)
-    end
-    # the focus surface held: its smoothness and its start perturbation have nothing to act on
-    for k in ("smoothness" => Dict("type" => "none"), "perturb" => [0.1, 1.0])
-        m = msg(Dict("fixed" => ["focus"], "focus" => Dict(k)))
-        @test occursin("`focus.$(first(k))`", m) && occursin("fixed", m)
-    end
+    # the focus surface held: its smoothness has nothing to act on
+    m = msg(Dict("fixed" => ["focus"], "focus" => Dict("smoothness" => Dict("type" => "none"))))
+    @test occursin("`focus.smoothness`", m) && occursin("fixed", m)
     # the applicable spellings read
-    @test RC.pipeline_options(Dict("focus" => Dict("variant" => "C", "node_count" => 30))).focus.node_count == 30
     @test RC.pipeline_options(Dict("io" => Dict("init" => "lens:x.json"))).grid == RC.GridOptions()
 end
 

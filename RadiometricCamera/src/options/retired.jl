@@ -1,5 +1,8 @@
 # The retired keys of the pipeline's configs, each refused by name, whatever its value, with its migration (Core's `check_keys` would
 # refuse them as unknown keys without one; its `retired` warns and ignores, which would change an old config's run silently).
+const _FOCUS_KIND_REMOVED = "removed: the focus A/B experiment is decided and its other parameterisations (the nodes outside the " *
+                            "support frozen, the direction-chart thin plate spline, the spherical spline) are deleted — the focus surface " *
+                            "is the sensor-grid thin plate spline, every node free"
 const RETIRED_KEYS = (
     ("io", "photosites") => "a RAW photograph is read as one by its file (`load_photo`: Core's RawMosaic, its green photosites; " *
                             "`io.channel = \"G\"`), a decoded image as one — never by a flag (owner ruling 2026-11-13); delete the key",
@@ -54,11 +57,16 @@ const RETIRED_KEYS = (
                             "config of record named one; start the nodal heights with `warping.heights_mm`",
     # RC 0.11.4 (owner 2026-11-15): ONE word for a spline's free values, "node", and ONE key for how many, `node_count`
     ("vignetting", "coefficients") => "renamed `[vignetting] node_count` (the stack's one word for a spline's free values, node; RC 0.11.4): node_count = 16",
-    ("focus", "nodes")   => "renamed `[focus] node_count` (the cap's CVT / TPS node count; the stack's one key for how many nodes, RC 0.11.4): node_count = 0",
+    ("focus", "nodes")   => _FOCUS_KIND_REMOVED * " (the key was a direction chart's node count); delete the key",
     ("lm", "xtol")       => "renamed `[lm] xtol_rel` (RC 0.11.4, owner 2026-11-16: Core 0.10.11's relative step test, Ceres' parameter " *
                             "tolerance, under Core's name; the absolute step test is Core's of record, no key): xtol_rel = 1.0e-8",
     ("focus", "node_rho_max") => "renamed `[focus] lens_coverage_scale` (RC 0.11.4: the same scaling of the lens coverage about its centre as " *
-                            "`[masks] lens_coverage_scale`, `_scaled_coverage`): lens_coverage_scale = 0.9")
+                            "`[masks] lens_coverage_scale`, `_scaled_coverage`): lens_coverage_scale = 0.9",
+    # the focus A/B is decided (the sensor-grid thin plate spline fits best): its keys are removed
+    ("focus", "variant") => _FOCUS_KIND_REMOVED * " (the former variant \"A\"); delete the key",
+    ("focus", "node_count") => _FOCUS_KIND_REMOVED * ", its nodes the 5 × 5 sensor grid's inside the lens coverage " *
+                            "(`focus.lens_coverage_scale`, `focus.support_min`); delete the key",
+    ("focus", "perturb") => "removed with the focus A/B experiment (a perturbed focus start was its robustness test); delete the key")
 
 # RC 0.11.4 (owner 2026-11-15, the stack's switch convention): a switch of a config is a string — "on" | "off" — and TOML's true/false
 # is refused wherever a switch is read (`read_switch`), naming the new spelling: no alias, no silent reading of an old boolean.

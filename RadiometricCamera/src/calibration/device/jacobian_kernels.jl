@@ -3,8 +3,8 @@
 # The Jacobian and its Gauss–Newton blocks on the state's backend (owner, 2026-11-13: GPU first — no host Jacobian, no host scatter
 # and no host BLAS in the LM iteration). The kernels' outputs stay on the device: the dual chunks' partials are gathered into one slot
 # array (`_slot_rows`), ONE row kernel (`_jacobian_row!`, both LM routes: a view's rows and a tile's) writes the measured channels'
-# rows of the Jacobian in the layout's full columns, and the blocks' coordinates — the channel ties, the charts' column scales, the
-# held focus nodes — are one column map `T` (`_column_map`) applied to the n × n products (`_gauss_newton_blocks`): only `JᵀJ` and
+# rows of the Jacobian in the layout's full columns, and the blocks' coordinates — the channel ties, the charts' column scales
+# — are one column map `T` (`_column_map`) applied to the n × n products (`_gauss_newton_blocks`): only `JᵀJ` and
 # `Jᵀr` reach the host.
 # ---------------------------------------------------------------------------
 
@@ -175,30 +175,27 @@ function _launch_pixel_rows!(row!::F, out, n::Integer, args::Vararg{Any, N}) whe
 end
 
 """
-    _focus_weights(s, k, tps, lens, vix, vix_d) -> (G, gidx)
+    _focus_weights(s, k, tps, vix_d) -> (G, gidx)
 
 The focus chain's nodal weights of view `k`'s pixels on the backend (`G[n, ks, ·]`: node `n`'s weight at sensor sample `ks`,
-`_nodal_weights_at`) and the block's index into them (`gidx[i]` for the block's pixel `i`, at view pixel `vix[i]`; `vix_d` the same
-list on the backend, the block's cached copy). The sensor chart's
-weights depend on the pixel alone: computed once per view and kept in the device cache (`:focus_weights`, keyed by the focus's nodes);
-a direction chart's (EXPERIMENT focus-ab) follow the lens, so they are computed for the block's pixels at each call (a host step: see
-the audit in the module notes).
+`_nodal_weights_at`) and the block's index into them (`gidx[i]` for the block's pixel `i`: its view pixel, `vix_d`, the block's list
+on the backend, its cached copy). The weights depend on the pixel alone: computed once per view and kept in the device cache
+(`:focus_weights`, keyed by the focus's nodes).
 """
-function _focus_weights(s::CalibrationState, k::Integer, tps::FocusSpline{N}, lens, vix::AbstractVector{<:Integer}, vix_d) where {N}
+function _focus_weights(s::CalibrationState, k::Integer, tps::FocusSpline{N}, vix_d) where {N}
     be = s.backend
     NS = length(s.settings.sensor)
     function weights(pix)
         G = Array{Float64}(undef, N, NS, length(pix))
         for (i, iv) in enumerate(pix)
             u, v = s.px[k][iv]
-            g = _nodal_weights_at(tps, lens, s.settings.sensor, u, v, Val(NS))
+            g = _nodal_weights_at(tps, s.settings.sensor, u, v, Val(NS))
             for ks in 1:NS, n in 1:N
                 G[n, ks, i] = g[ks][n]
             end
         end
         return _shared_read_only!(be, adapt(be, G))
     end
-    tps.kind == FOCUS_SENSOR || return weights(vix), adapt(be, collect(Int32(1):Int32(length(vix))))
     G = lock(_DEVICE_CACHE_LOCK) do                          # (the views run concurrently: `_windowed`)
         dc = _ensure_device!(s)
         fw = get(dc, :focus_weights, nothing)
@@ -243,18 +240,17 @@ _cached_layout(cache::AbstractDict, be, lay) =
                     cache, lay), _DEVICE_CACHE_LOCK)
 
 """
-    _column_map(lay, c, foc, ap, m) -> T
+    _column_map(lay, c, ap, m) -> T
 
 The map from the layout's full columns (`lay`) to the problem's coordinates of the blocks: the aperture's log chart (`_log_r_column!`)
-and the material's charts (`_chart_material_columns!`) as column scales, a channel-`c` state's tie bases (`_tie_columns`) and the held
-focus nodes left out (`_restricted_focus`) — the column operations of the Jacobian, applied to the identity (`ncol × n`). The problem's
-Jacobian is `J_full T`.
+and the material's charts (`_chart_material_columns!`) as column scales and a channel-`c` state's tie bases (`_tie_columns`) — the
+column operations of the Jacobian, applied to the identity (`ncol × n`). The problem's Jacobian is `J_full T`.
 """
-function _column_map(lay, c::Integer, foc, ap, m)
+function _column_map(lay, c::Integer, ap, m)
     T = Matrix{Float64}(I, lay.ncol, lay.ncol)
     _log_r_column!(T, lay, ap)
     _chart_material_columns!(T, lay, m)
-    return _restricted_focus(_tie_columns(T, lay, c), lay.focus_cols, foc)
+    return _tie_columns(T, lay, c)
 end
 
 """
@@ -263,9 +259,9 @@ end
 The Gauss–Newton blocks of a block's rows in the problem's coordinates: `Tᵀ(J r)` and `Tᵀ(J Jᵀ)T` of the device Jacobian `J` (full
 columns × rows) and residual `r`. The products over the rows, `J r` and `J Jᵀ`, are formed on their backend (BLAS on the CPU, the
 device's library on a GPU: one code path) and only their `ncol` and `ncol × ncol` values reach the host; the column map `T`
-(`_column_map`: a column scale, a selection, a channel tie — a few entries per column) is applied there as a sparse matrix. (Applied
+(`_column_map`: a column scale, a channel tie — a few entries per column) is applied there as a sparse matrix. (Applied
 on the device as a dense matrix, `T` was an upload and three small dense products per block: 0.84 ms of a tile's 1.43 ms on a B200,
-2026-11-20, and on the CPU two dense `ncol³` products per tile. A scale or a selection gives the same entries as the dense
+2026-11-20, and on the CPU two dense `ncol³` products per tile. A scale gives the same entries as the dense
 products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
@@ -481,7 +477,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     # in cost computations") if it differs from the trial cost beyond isapprox — and the value part of the
     # dual kernel differs from the plain flux kernel in its last bits. So take it from the flux kernel.
     flux = _launch_rows(_flux_functor(s, r.k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, dc.px[r.k])
-    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), view0.geometric, 1:npx, dc.idx[r.k]) : (nothing, nothing)
+    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), dc.idx[r.k]) : (nothing, nothing)
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
@@ -491,7 +487,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
     _note_block_bytes!(s, _device_bytes(rays, hrays === rays ? nothing : hrays, S, hh, ph, flux, Jd, rd) +
                        sum(sizeof, hs; init = 0))
-    return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, foc, ap, m))
+    return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, ap, m))
 end
 """The device layouts of the views' Jacobians, keyed by the layout (`_cached_layout`; every view of a state has the same layout for
 the same free blocks), kept in the device cache."""
@@ -568,7 +564,7 @@ function _seed_chunk(::Val{F}, c0, C, lay, pose, foc, m, board, NI) where {F}
     pose_d = _seeded_pose(VgtkCore.model(pose), x -> cd(x, 0), ω, ρ)
     t̂d = SVector(ntuple(i -> cd(VgtkCore.model(foc).t̂_i[i], 0), Val(N)))
     wa = coeff * collect(t̂d)
-    focus_d = Focus{D, N}(nodes, t̂d, SVector{N, D}(ntuple(i -> wa[i], Val(N))), SVector{3, D}(wa[N + 1], wa[N + 2], wa[N + 3]), VgtkCore.model(foc).kind)
+    focus_d = Focus{D, N}(nodes, t̂d, SVector{N, D}(ntuple(i -> wa[i], Val(N))), SVector{3, D}(wa[N + 1], wa[N + 2], wa[N + 3]))
     mat_d, surf_d = _material_dual(m.mat, m.surface, cd, lay.off_m, D; off_h = 0, off_i = NI > 0 ? lay.off_i : 0)
     return D, cd, pose_d, focus_d, mat_d, with_state(board, surf_d)
 end

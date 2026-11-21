@@ -91,16 +91,16 @@ end
 end
 
 # The focus support rule's record (owner ruling 2026-11-16): after `focus.support_min` drops the weakly seen nodes and the TPS is rebuilt
-# on the supported ones, `focus_info[:support]` describes the REBUILT node set (its weights and support, one entry per node of the
-# start's focus), and names how many candidate nodes were dropped — never the pre-rebuild set beside the rebuilt `start` / `free`.
+# on the supported ones, the start's `focus_support` describes the REBUILT node set (its weights and support, one entry per node of the
+# start's focus), and names how many candidate nodes were dropped — never the pre-rebuild set.
 @testitem "focus support: the record describes the rebuilt node set" setup = [RCFixtures, CheckpointScene] begin
     mktempdir() do dir
         s = run_board(dir, Dict("max_iter" => 1), fixture_board(), cam; checkpoint = "off", start_only = true,
-                      tables = Dict("focus" => Dict("variant" => "A", "support_min" => 0.9)))
-        info = s.start.focus_info; sup = info[:support]
+                      tables = Dict("focus" => Dict("support_min" => 0.9)))
+        sup = s.start.focus_support
         f = s.start.views0[1].focus
         @test sup.dropped > 0                                                  # the rule dropped nodes (else this test says nothing)
-        @test length(sup.weight) == length(sup.supported) == length(f.t̂_i) == length(info[:free]) == length(info[:start])
+        @test length(sup.weight) == length(sup.supported) == length(f.t̂_i)
         @test sup.support_min == 0.9
     end
 end

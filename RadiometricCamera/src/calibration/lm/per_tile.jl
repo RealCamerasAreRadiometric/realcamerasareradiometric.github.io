@@ -350,9 +350,9 @@ function build_problem_grid(s::CalibrationState{N}; patch::Tuple{Int, Int} = GRI
         push!(variables, _patch_var(lens0, rows, cols)); ip[PI + 1, PJ + 1] = length(variables)
     end
     smoothness === nothing || _add_grid_smoothness!(blocks, smoothness, ip, (px_n, py_n), free === nothing ? trues(G_x, G_y) : free, PatchT; held_rotation_coordinates)
-    push!(variables, focus_block(focus(s); fixed = s.focus_fixed), _aperture_var(lens0, s), mv, vv, lv)
+    push!(variables, focus_block(focus(s)), _aperture_var(lens0, s), mv, vv, lv)
     i_f, i_r, i_m, i_v, i_l = (length(variables) - 4):length(variables)
-    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)                                 # EXPERIMENT (focus-ab)
+    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)
     n_tiles = 0
     for k in 1:K
         groups = Dict{Tuple{Int, Int}, Vector{Int}}()
@@ -783,7 +783,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
     lens64 = _window_lens(s.camera.geometric, r.P0, p00, p10, p01, p11)
     td = _tile_dev!(r)
     bufidx = ivs === r.pix ? td.pix : td.idx                # the tile's pixels among the buffer's: the view's (batched) or its own
-    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), lens64, r.pix, td.pix) : (nothing, nothing)
+    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     _launch_pixel_rows!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
@@ -794,7 +794,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
                            lt.scale,
                            need_v ? _device_copy(s, vg.basis) : nothing)
     _note_block_bytes!(s, _device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1))   # its share of the view batch
-    return (; J = Jd, res = rd, T = _column_map(lay, s.channel, foc, ap, m), lay)
+    return (; J = Jd, res = rd, T = _column_map(lay, s.channel, ap, m), lay)
 end
 
 """The residual of tile `r` from a view's flux `flux` (three channels per pixel, the kernels'; the tile's pixels at the view pixels

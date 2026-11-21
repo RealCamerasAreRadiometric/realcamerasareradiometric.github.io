@@ -117,7 +117,6 @@ for (name, replacement) in (
         :F_dielectric => "`fresnel_dielectric`", :D_v => "`visible_normal_density`",
         :chief_dir => "`chief_direction`", :sample_vndf_caps => "`sample_visible_normal`", :PDF_reflect => "`reflection_pdf`",
         :f_CT_parts => "`cook_torrance_terms`", :f_CT => "`cook_torrance`",
-        :t̂_dir => "`inverse_focus_distance(focus, direction)` (the paper's `t̂`, its alias, of a unit chief direction)",
         :ae_chart => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `project(Lens(Equidistant()), d)`",
         :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`",
         # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
@@ -156,3 +155,10 @@ with_surface(args...; kwargs...) = throw(ArgumentError(
 green_photosite_mask(args...; kwargs...) = throw(ArgumentError(
     "green_photosite_mask is retired: the usable photosites of one colour filter are `photosite_mask(m, channel)`, channel :R, :G or :B — " *
     "the green photosites `photosite_mask(m, :G)`"))
+
+# ---- removed name (the focus A/B experiment is decided: the focus surface is the sensor-grid thin plate spline). The focus surfaces
+# on the chief directions are deleted, here and in VisualRadiometryToolkitCore; the old name is refused by name.
+"""Removed with the focus surfaces on the chief directions: the inverse focus distance is read at a sensor position."""
+t̂_dir(args...; kwargs...) = throw(ArgumentError(
+    "t̂_dir was removed with the focus surfaces on the chief directions: the focus surface is the sensor-grid thin plate spline, read at " *
+    "a sensor position — VisualRadiometryToolkitCore's `inverse_focus_distance(focus, 𝐩)` (the paper's `t̂`, its alias)"))

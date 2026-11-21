@@ -58,7 +58,6 @@ ftol = 5.0e-4                # √(2/N) of the largest-N case of record (texcal_
 xtol_rel = 1.0e-8            # Core 0.10.11's relative step test, Ceres' parameter tolerance (owner 2026-11-15; Core's name 2026-11-16)
 
 [focus]
-variant = "A"
 lens_coverage_scale = 0.9
 support_min = 0.0
 smoothness = { type = "bending", weight = 0.0 }

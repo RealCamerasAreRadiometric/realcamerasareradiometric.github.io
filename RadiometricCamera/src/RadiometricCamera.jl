@@ -43,7 +43,7 @@ Layout: `camera/` (the geometric models, the kernels' view of the camera at a po
 the closed-form blocks, the problem, the LM's per-view and per-tile blocks in `lm/`, the device kernels in `device/`, the LM driver),
 `start/` (the start: front ends, poses, masks, the radiometric start, the start record), `diagnostics/` (the live monitor, the
 self-check, the render dumps), `options/` (the options, their TOML reader, the device tags, the retired keys), `io/` (photographs,
-camera models, the run's outputs, RC's records) and `experiments/` (the focus-ab experiment).
+camera models, the run's outputs, RC's records).
 """
 module RadiometricCamera
 
@@ -51,7 +51,7 @@ module RadiometricCamera
 using LinearAlgebra: LinearAlgebra, ColumnNorm, Diagonal, I, UniformScaling, cross, dot, norm, normalize, qr, qr!, rank
 using StaticArrays: StaticArrays, MVector, SMatrix, SVector, StaticArray, StaticVector
 using Statistics: Statistics, cov, mean, median, quantile, std
-using Random: Random, AbstractRNG, MersenneTwister
+using Random: Random, AbstractRNG
 using StableRNGs: StableRNG
 using Printf: Printf, @printf, @sprintf
 using ForwardDiff: ForwardDiff
@@ -93,8 +93,7 @@ using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coeff
 using VisualRadiometryToolkitCore: AbstractVignetting, NoVignetting, TensorProductVignetting, RadialVignetting, VIGNETTING_TAGS,
                                    coefficient_jacobian, control_points, with_control_points, n_control_points   # the vignetting fields (their centre is `VgtkCore.center`)
 using VisualRadiometryToolkitCore: RadiometricCameraModel, with_vignetting, chief_ray, 𝔭, aperture_direction   # the radiometric camera, its geometric camera's chief ray, the back-projection from the aperture on a camera's parts
-using VisualRadiometryToolkitCore: Focus, FocusSpline, FOCUS_SENSOR, FOCUS_DIRECTION_CHART, FOCUS_SPHERE,
-                                   focus_weights, polar_cap_nodes                                # the focus surface and its kinds
+using VisualRadiometryToolkitCore: Focus, FocusSpline                                           # the focus surface: the sensor-grid thin plate spline
 using VisualRadiometryToolkitCore: 𝐩_of_pixel, luma_image, SensorQuadrature, ApertureQuadrature, sensor_samples, 𝐩_sample,
                                    𝐚_sample, 𝐚_weight, 𝐚_border, n_disc, n_border              # the sensor domain and the quadrature rules
 using VisualRadiometryToolkitCore: Material, Θ_m_nonlinear, with_nonlinear, with_μ, texture_weight, 𝛂, 𝛈,
@@ -160,7 +159,6 @@ include("start/frontends/schoeps_run.jl")
 include("start/prepare.jl")
 include("calibration/calibrate.jl")
 include("io/run_outputs.jl")
-include("experiments/focus_ab.jl")          # EXPERIMENT (focus-ab)
 include("io/records.jl")       # RC's kinds: rc/radiometric_camera/v3.1, rc/radiometric_target/v2.0, rc/calibration_state/v3.1, …
 include("start/start_record.jl")              # the refinement's start as its own step: the start record
 include("precompile.jl")                         # the precompile workload: the hot paths' native code, cached in the package image

@@ -79,7 +79,7 @@ One linearization of a block (a view; in the grid route a view's batch, then its
 
 `sensor/` (notation, quadrature) · `camera/` (vignetting, focus, pose, geometric models, the radiometric camera) ·
 `target/` · `image_formation/` (radiance, flux) · `calibration/` (state, closed form, `lm/` per view and per tile,
-`device/` workers and kernels) · `start/` · `options/` · `io/` · `diagnostics/` · `experiments/` (focus-ab).
+`device/` workers and kernels) · `start/` · `options/` · `io/` · `diagnostics/`.
 The layout follows the model's nouns and is sound; section 3 lists the two places where a file does not sit where
 its content belongs. I do not recommend a reorganization beyond those.
 
@@ -194,7 +194,7 @@ Ranked by measured gain. "Done" items are commits on the branch; the rest are re
 | 6 | Host allocation per linearization: the record buffer is allocated and zeroed per view per call (CPU: 2.3 GB per full view) | benchmark `view_jacobian` bytes | reuse per-task buffers as the Jacobian's already do (`_jacobian_buffers`) | GC pressure; a few % | low | none |
 | 7 | `CalibrationState.backend::Any`, `device_cache::Any` (a NamedTuple grown by `merge`), `start::Any` | `cost(state)` infers `Tuple{Any, Any}`, `all_parts(state)` an abstract `RadiometryParts` | a type parameter for the backend; a small mutable `DeviceCache` struct with typed optional fields | none measurable (function barriers hold); clarity, fewer locks around `merge` | low | none (internal fields) |
 | 8 | `Φ_pixel` allocates 4.4 kB per call on the cluster's Julia 1.13.3 (0 B on 1.13.4 locally) | benchmark `pixel` bytes | investigate when 1.13.4 is on the cluster; likely an escape-analysis difference in `View(pose, camera)` | host-only path | — | none |
-| 9 | `src/experiments/` (focus-ab) lives inside the package's hot path: `t̂(camera, 𝐩)` branches on `focus.kind` per sensor sample | code | when the experiment is decided, make the chart a type parameter of `Focus` (dispatch, no branch) or remove kinds 1–2 | small; simplicity | decided: section 6, decision 5 | internal |
+| 9 | `src/experiments/` (focus-ab) lives inside the package's hot path: `t̂(camera, 𝐩)` branches on `focus.kind` per sensor sample | code | when the experiment is decided, make the chart a type parameter of `Focus` (dispatch, no branch) or remove kinds 1–2 | small; simplicity | done: kinds 1–2 and `src/experiments/` removed (section 6, decision 5) | internal |
 | 10 | `closed_form.jl` holds `pixel_parts`/`_linear_rows` (image formation) beside the solves | layout | move the parts to `image_formation/parts.jl` | none; layout | trivial | none |
 
 ### 3.3 Proposed for VisualGeometryToolkitCore
@@ -425,7 +425,7 @@ The owner's answers (2026-11-20) to the nine questions of this report's first ve
 | 2 | Finding C's device numbers | ACCEPTED. Follow-up of high priority: re-centred Float32 geometry with Float64 accumulation (each pixel's chief-ray hit once in Float64 as a local origin, the per-ray hits and texture / edge lookups as Float32 offsets from it), measured against the 0.4 % gate per tile on the Siemens case, to drop the Float64 estimator and record (Float64 is 1/64 rate on the RTX Pro 6000s, 1/2 on a B200) | follow-up, not started |
 | 3 | Core 3.3 a–g | DO ALL, pushed and released through the stack's release process (the owner posts the Registrator comment), then RC adopts | a: committed locally on the monorepo branch `perf/height-field-fused-jacobian` (ea3cc069), not pushed; b–g not started |
 | 4 | Texture solve | (a) Krylov.jl (LSMR or CGLS, Jacobi-preconditioned by diag(AᵀA)), the penalty stacked `[A; √λ D]`, cuSPARSE CSR for `A` and an explicit `Aᵀ` in the CUDA extension; benchmark against `cgls`, verify the textures within tolerance, delete the redundant custom solver / CSR code, re-run the texture records once. (b) the error scoring stays on the device | (b) done (36c9de9); (a) not started. The device construction of this branch (`page_footprints`, `fit_operator`) produces exactly the CSR arrays a `CuSparseMatrixCSR` holds, so it carries over. |
-| 5 | focus-ab | keep the parameterizations as a TYPE PARAMETER of `Focus` (no `kind` branch), moved out of `src/experiments/`; find the experiment's records and re-run it on the cluster | not started |
+| 5 | focus-ab | keep the parameterizations as a TYPE PARAMETER of `Focus` (no `kind` branch), moved out of `src/experiments/`; find the experiment's records and re-run it on the cluster | superseded (owner, after the A/B on real data: the sensor-grid thin plate spline fits best): the other parameterizations, `Focus`'s `kind` and `src/experiments/` are removed |
 | 6 | Grid route | one row-kernel launch and one batched product per view for all its tiles, on this branch, after 1, 3, 4 | not started; the measurements of section 5.2 (65 × 50) are its baseline |
 | 7 | Release | finish the round on the branch, merge, register 0.1.0 from that commit; no version bump | — |
 | 8 | Default vignetting | `NoVignetting()` (Core, 3 f): V ≡ 1 by dispatch, no parameters, no columns | needs 3 f; the branch's default is still the flat 4 × 4 surface |

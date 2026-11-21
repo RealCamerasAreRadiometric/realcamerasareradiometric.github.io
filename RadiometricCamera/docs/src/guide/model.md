@@ -91,7 +91,6 @@ src/diagnostics/                    monitor.jl, selfcheck.jl, render.jl
 src/options/                        tables.jl, toml.jl (PipelineOptions from TOML: pipeline_options, config_dict), device.jl, retired.jl
 src/io/                             photographs.jl (photos, BlobBoards sessions), camera_models.jl (lens / grid records, Schöps import),
                                     run_outputs.jl (save_radiometric_calibration), records.jl (RC's record kinds)
-src/experiments/                    focus_ab.jl (EXPERIMENT focus-ab)
 bin/refine.jl                       the refinement driver (--config=<toml>; configs/default.toml lists every key)
 docs/                               this manual (docs/make.jl, built locally and by CI)
 examples/                           the commented walkthrough

@@ -100,8 +100,6 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
             length(nodes), length(nodes_box), box.origin[1], box.origin[1] + box.widths[1], box.origin[2], box.origin[2] + box.widths[2],
             circ === nothing ? "" : @sprintf(", inside the image circle scaled by %.2f", opts.focus.lens_coverage_scale), count(iszero, focus0.t̂_i))
     views0 = [View(poses0[k], lens0, focus0, R0) for k in 1:K]
-    # EXPERIMENT (focus-ab): the variant's focus (`[focus]`); the masks are computed with A's start focus so every variant sees the same pixels
-    focusV, in_supportV, focus_info = focus_variant(opts.focus, lens0, nodes, focus0, in_support, d_c, W₀, H₀; features)
     @printf("f %.2f mm (%.1f px), sensor %.1f mm, s′ %.3f mm (derived, thin lens), focus plane through the mean board centre %.3f m, aperture r₀ %.3f mm (f/%.1f); backend %s\n",
             _mm(f_m), fpx, VgtkCore.ustrip(VgtkCore.mm, _sensor_width(opts)), _mm(d_s), d_c, _mm(R0), opts.camera.fnumber, nameof(typeof(backend))); flush(stdout)
 
@@ -135,7 +133,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     # `samples_per_view` of THOSE are drawn per view (owner, 2026-11-15: conditioned on the usable observations, so a small image circle
     # and a lens filling the sensor get the same count; `draw_samples` tests the candidates it needs, in its keys' order).
     # A start record's masks are its final ones (the drawn samples): read, not drawn
-    mask_views = views0                                                         # the mask test's views: the unperturbed start's, A's start focus
+    mask_views = views0                                                         # the mask test's views: the unperturbed start's
     if start === nothing
         masks = [inreg for _ in 1:K]                                            # the candidates, before the observation model
     else
@@ -151,7 +149,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     # the grid's nodes under the imaged region (per_tile_smoothness.jl): the lens holds those the region reaches, the parameters of the run
     grid_held = _present_nodes(route, lens0, opts.grid.nodes)                  # nothing per view (no lattice)
     grid_held === nothing || (lens0 = VgtkCore.with_present(lens0, grid_held))
-    views0 = [View(poses0[k], lens0, focusV, R0) for k in 1:K]; in_support = in_supportV      # EXPERIMENT (focus-ab)
+    views0 = [View(poses0[k], lens0, focus0, R0) for k in 1:K]
     px = Vector{Vector{Tuple{Int, Int}}}(undef, K)                              # each view's samples, set below (observed or loaded)
     ϕ = Vector{Vector{Float64}}(undef, K); ω = Vector{Any}(undef, K); qs = Vector{Any}(undef, K)          # the measured values and their rows' weights (weighting.jl)
     ch = _io_channel(opts.io.channel)                                           # 0: RGB; c: channel c alone, one residual per pixel
@@ -203,38 +201,38 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     any(isempty, px) && @warn "views without masked pixels" views = names[isempty.(px)]
     all(isempty, px) && error("no masked pixels at all: the board is not inside the views (pose/board frame error?) — check the SELF-CHECK line")
     # the focus nodes' data support (the vignetting's rule, `node_support`): a node with less than `focus.support_min` of the mean data
-    # weight is dependent — the TPS is rebuilt on the supported nodes, which continues the surface over it (A / B: the sensor-grid TPS)
-    if opts.focus.support_min > 0 && focus_info[:kind] == 0
-        fsup = focus_node_support(focusV, px, opts.focus.support_min)
+    # weight is dependent — the TPS is rebuilt on the supported nodes, which continues the surface over it
+    focus_support = nothing
+    if opts.focus.support_min > 0
+        fsup = focus_node_support(focus0, px, opts.focus.support_min)
         @printf("focus support: %d of %d nodes carry ≥ %g of the mean data weight (relative weights %s)%s\n", count(fsup.supported), length(fsup.supported),
                 opts.focus.support_min, join([@sprintf("%.2g", x) for x in fsup.weight], " "),
                 all(fsup.supported) ? "" : "; the others are dependent: the TPS is built on the supported nodes"); flush(stdout)
-        dropped = [collect(n) for (n, ok) in zip(focusV.nodes, fsup.supported) if !ok]
+        dropped = [collect(n) for (n, ok) in zip(focus0.nodes, fsup.supported) if !ok]
         if !all(fsup.supported)
-            nodes = _check_focus_nodes(focusV.nodes[fsup.supported], lens0)
+            nodes = _check_focus_nodes(focus0.nodes[fsup.supported], lens0)
             focus0 = Focus(FocusSpline(nodes), focus_start(lens0, nodes, d_c))
-            focusV, in_supportV, focus_info = focus_variant(opts.focus, lens0, nodes, focus0, in_support, d_c, W₀, H₀; features)
-            views0 = [View(poses0[k], lens0, focusV, R0) for k in 1:K]; in_support = in_supportV
-            fsup = focus_node_support(focusV, px, opts.focus.support_min)      # the record describes the REBUILT node set (owner 2026-11-16)
+            views0 = [View(poses0[k], lens0, focus0, R0) for k in 1:K]
+            fsup = focus_node_support(focus0, px, opts.focus.support_min)      # the record describes the REBUILT node set (owner 2026-11-16)
         end
         # one entry per node of the run's focus (weight, support); the candidates the rule dropped, by position
-        focus_info[:support] = (; weight = fsup.weight, supported = collect(fsup.supported), support_min = opts.focus.support_min,
-                                dropped = length(dropped), dropped_nodes = dropped)
+        focus_support = (; weight = fsup.weight, supported = collect(fsup.supported), support_min = opts.focus.support_min,
+                         dropped = length(dropped), dropped_nodes = dropped)
     end
     empty_targets = [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:K]
     material0 = Material(; roughness_ink = opts.material.alpha_ink, roughness_paper = opts.material.alpha_noink, refractive_index_ink = opts.material.eta_ink, refractive_index_paper = opts.material.eta_noink, diffuse_weight = opts.material.mu)
     light0 = EnvironmentLight(SphericalHarmonicMap(1.0, opts.lighting.sh_order), b, r_SH)   # L ≡ 1 in every channel
     make_vig, vig_desc = _vignetting_spec(opts, W₀, H₀, coverage, vig_c)
     println("vignetting field: ", vig_desc, "; gauge V(𝐜) = 1 held ", "exactly (the centre's free direction eliminated)"); flush(stdout)
-    s = CalibrationState(board, st, RadiometricCameraModel(lens0, focusV, R0, make_vig()), [v.pose for v in views0], material0, light0, empty_targets;
-                         masks, ϕ, backend, region, channel = ch, focus_fixed = findall(!, collect(focus_info[:free])),   # (focus-ab B: the held nodes)
+    s = CalibrationState(board, st, RadiometricCameraModel(lens0, focus0, R0, make_vig()), [v.pose for v in views0], material0, light0, empty_targets;
+                         masks, ϕ, backend, region, channel = ch,
                          sensor_models = sensor, sensor = om.sensor, photo_kind = om.kind, weights = _run_weights(ω), quanta = qs,
                          support_min = opts.vignetting.support_min, boundary_order = opts.vignetting.boundary_order,
                          mu_bounds = opts.material.mu_bounds, jacobian_chunk = opts.compute.jacobian_chunk)
     s.vig_rule isa RadialSupportRule && @printf("vignetting support: %d of %d nodes are parameters — the pole pair and those carrying ≥ %g of the mean data weight (relative weights %s); the others continue them with a zero Δ^%d across the border (Core's BoundaryRule, vignetting.boundary_order)\n",
                                                 count(s.vig_rule.supported), length(s.vig_rule.supported), opts.vignetting.support_min,
                                                 join([@sprintf("%.2g", x) for x in s.vig_rule.weight], " "), s.vig_rule.rule.order)
-    focus_smoothness!(s, focus_info, focusV, data_norm2(s), opts.focus.smoothness)      # EXPERIMENT (focus-ab)
+    focus_smoothness!(s, focus0, data_norm2(s), opts.focus.smoothness)
     # the grid's smoothness over the present nodes (per_tile_smoothness.jl): fixed at the start, its reference the start grid. A weight
     # chosen by GCV (`[grid.smoothness] weight = "gcv"`) is chosen after the closed-form start of the radiometry, on the linearization
     # there (`select_grid_smoothness_weight`)
@@ -245,7 +243,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
                           length(grid_int) - count(grid_int), smoothness_line(opts.grid.smoothness),
                           grid_gcv ? ", by GCV after the closed-form start" :
                           grid_sm === nothing ? "" : @sprintf(" (row weight %.4g, m̄ %.4g, %d rows)", grid_sm.w, grid_sm.m̄, 3 * length(grid_sm.rows)))
-    meta = (; focus_info, grid_int, grid_smoothness = grid_sm, grid_gcv = nothing, vignetting_gcv = NamedTuple[], region, coverage, init_region = g.init_region, resample = start === nothing ? g.resample : start.resample, names, views0, lens0, lens_start, fpx, in_support, features, features_for = g.features_for, W₀, H₀, be0, world = g.world, page_flip = g.page_flip,
+    meta = (; focus_support, grid_int, grid_smoothness = grid_sm, grid_gcv = nothing, vignetting_gcv = NamedTuple[], region, coverage, init_region = g.init_region, resample = start === nothing ? g.resample : start.resample, names, views0, lens0, lens_start, fpx, in_support, features, features_for = g.features_for, W₀, H₀, be0, world = g.world, page_flip = g.page_flip,
             board_y_sign = g.board_y_sign, vig_c, make_vig, vig_desc, height0, inplane0, npx, samples, R0, d_c, f_m, t_start,
             sensor_model, observations = start === nothing ? (; masks = copy(masks), ϕ, ω, qs, sensor) : nothing)   # a start's streamed photographs (`load_calibration_start`)
     start === nothing || return _from_start(s, meta, start, opts)   # a start record: its closed-form start and GCV weights loaded, not computed

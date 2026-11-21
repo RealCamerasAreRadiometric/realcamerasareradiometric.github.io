@@ -72,17 +72,14 @@ nodes = "interior"             # the nodes the lens holds, its parameters: "inte
 # start_perturbation = {sigma_px = 0.5, seed = 7}   # OPTIONAL, no default (absent = none; both keys required): the start grid's
 #                                                   # direction controls rotated by sigma_px / f px rad RMS per tangent axis (StableRNG(seed))
 
-[focus]                # EXPERIMENT (focus-ab): the focus surface's parameterisation (src/experiments/focus_ab.jl)
-variant = "A"          # "A" sensor-grid TPS, all free | "B" its nodes outside the support frozen | "C" direction-chart TPS | "D" spherical spline
-node_count = 0         # C / D: node count of the cap (0 = A's 25; RC 0.11.4, was `nodes`)
-lens_coverage_scale = 0.9  # A / B: the 5 × 5 grid's nodes kept inside the lens coverage scaled by 0.9 about its centre (as [masks]
+[focus]                # the focus surface: the sensor-grid thin plate spline, every node free
+lens_coverage_scale = 0.9  # the 5 × 5 grid's nodes kept inside the lens coverage scaled by 0.9 about its centre (as [masks]
                        #   lens_coverage_scale: an image circle's semi-axes; was `node_rho_max`, RC 0.11.4), i.e. within ρ ≤ 0.9 of its normalised radius (1 = its rim): over the circle's
                        #   box the grid's nodes lie at ρ = 0, ½, √2/2 ≈ 0.707 (the inner 3 × 3), 1 (the side midpoints, ON the rim), ≥ 1.118 (outside);
                        #   0.9 is inside the gap (0.707, 1) with a margin of ≥ 0.1 on either side, so the rim's four are dropped by design, whatever
                        #   the ellipse's orientation (2026-11-15: they ran to infinite focus); the sensor's rectangle keeps every node
 smoothness = { type = "bending", weight = 0.0 }   # [focus.smoothness]: the focus surface's bending smoothness, weight β (0 = none) | "none"
-support_min = 0.0      # A / B: a focus node with less than this share of the mean data weight is dependent (the vignetting's rule, node_support); 0 = every node with a pixel is free (the rule before 2026-11-15)
-perturb = []           # [σ, seed]: the start's free nodal values × exp(σ z); empty = none
+support_min = 0.0      # a focus node with less than this share of the mean data weight is dependent (the vignetting's rule, node_support); 0 = every node with a pixel is free (the rule before 2026-11-15)
 
 [masks]
 samples_per_view = 27500   # the samples per view, drawn uniformly without replacement from its USABLE observations (inside the sampling region, the

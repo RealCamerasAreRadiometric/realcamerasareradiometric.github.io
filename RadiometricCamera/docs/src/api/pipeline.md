@@ -28,7 +28,7 @@ Private = false
 Modules = [RadiometricCamera]
 Pages = ["start/masks.jl", "start/image_region.jl", "start/focus_start.jl", "start/start_poses.jl", "start/radiometric_start.jl",
          "start/frontends/calibration_session.jl", "start/frontends/schoeps_run.jl", "start/start_calibration.jl", "start/prepare.jl", "start/start_record.jl",
-         "diagnostics/monitor.jl", "diagnostics/selfcheck.jl", "diagnostics/render.jl", "io/run_outputs.jl", "experiments/focus_ab.jl"]
+         "diagnostics/monitor.jl", "diagnostics/selfcheck.jl", "diagnostics/render.jl", "io/run_outputs.jl"]
 Private = false
 ```
 
@@ -40,8 +40,10 @@ records of the Core values it holds, under IO 0.10's envelope (one `units` and o
 `rc/calibration_state/v3.1` (the state files `state.json`, `state_it<N>.json` and a start record's start state; with the
 photographs' observation model) and `rc/run_parameters/v3.0`. A record of an earlier RC version is refused by name — a camera or a
 state of RC 0.9–0.11.0 (v3.0) too, which states no observation model (RC 0.11.1: refused, never migrated, naming the refinement step
-that regenerates it) — but an `rc/run_parameters/v2.0` or `rc/focus_ab/v1.0` (their grid and focus `prior*` keys renamed to the
-smoothness vocabulary, RC 0.11.0), which read through their version steps.
+that regenerates it) — but an `rc/run_parameters/v2.0` (its grid `prior*` keys renamed to the smoothness vocabulary, RC 0.11.0),
+which reads through its version step. A camera's or a state's focus surface is the sensor-grid thin plate spline
+(`"type": "sensor_thin_plate_spline"`); a record of a removed focus surface (`direction_thin_plate_spline`,
+`direction_spherical_spline`) and a file of the removed kind `rc/focus_ab` (the focus A/B experiment's report) are refused by name.
 
 ## The observation model and the one entry point of photographs
 

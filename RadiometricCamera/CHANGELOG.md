@@ -8,14 +8,34 @@ number of a calibration changes: the moved code is the same arithmetic, and the 
 
 - **Moved to VisualRadiometryToolkitCore (breaking: no longer public names of RadiometricCamera):** the radiometric camera
   `RadiometricCameraModel` with `geometric`, `focus`, `aperture_radius`, `with_geometric`, `with_focus`, `with_aperture_radius`,
-  `with_vignetting`, `chief_dir`, `𝔣`, `t̂`, `π̂⁻¹`, `world_ray`, `𝔭`; the focus surface `Focus`, `FocusSpline`, `n_nodes`, `𝔱` and the
-  focus kinds; the sensor domain and quadrature (`𝐩_of_pixel`, `pixel_of_𝐩`, `ℐ_𝐮`, `luma`, `luma_image`, `SensorQuadrature`,
+  `with_vignetting`, `chief_dir`, `𝔣`, `t̂`, `π̂⁻¹`, `world_ray`, `𝔭`; the focus surface `Focus`, `FocusSpline`, `n_nodes`, `𝔱`;
+  the sensor domain and quadrature (`𝐩_of_pixel`, `pixel_of_𝐩`, `ℐ_𝐮`, `luma`, `luma_image`, `SensorQuadrature`,
   `ApertureQuadrature`, `sensor_samples`, `aperture_samples`, `aperture_border`, `𝐩_sample`, `𝐚_sample`, `𝐚_weight`, `𝐚_border`,
   `n_disc`, `n_border`); the material (`Material`, `Θ_m_nonlinear`, `with_nonlinear`, `with_μ`, `texture_weight`, `𝛂`, `𝛈`, `D_ggx`,
   `Λ_ggx`, `G1_ggx`, `G2_ggx`, `F_dielectric`, `sample_vndf_caps`, `D_v`, `PDF_reflect`, `reflect`, `f_CT_parts`, `f_CT`). Import
   them from there (`using VisualRadiometryToolkitCore: Focus, Material`). `RadiometricCameraModel` stays exported here (a re-export: the
   headline's camera type). The moved names this package does not use itself (`with_geometric`, `with_focus`, `with_aperture_radius`,
   `pixel_of_𝐩`, `ℐ_𝐮`, `aperture_samples`, `aperture_border`, `Λ_ggx`, `G1_ggx`, `ae_chart`) are refused by name with the replacement.
+- **Removed (breaking): the focus A/B experiment and its alternative focus parameterisations.** The experiment is decided on real
+  data: the sensor-grid thin plate spline fits best, and it is the one focus surface (the former variant "A": VisualRadiometryToolkitCore's
+  `Focus`, every node free). No number of a calibration changes: the kept path is the same arithmetic in the same order, and the
+  goldens hold unmodified. Removed:
+  - the variants "B" (the nodes outside the support frozen: `CalibrationState`'s `focus_fixed`, `focus_block`'s `fixed` keyword), "C"
+    (the thin plate spline in the azimuthal-equidistant chart of the chief directions) and "D" (the spherical spline), with `Focus`'s
+    `kind` and every branch on it (VisualRadiometryToolkitCore's `FOCUS_SENSOR`, `FOCUS_DIRECTION_CHART`, `FOCUS_SPHERE`,
+    `focus_weights`, `polar_cap_nodes` and the direction method of `inverse_focus_distance` are removed there; `t̂_dir` is refused by
+    name here);
+  - `src/experiments/focus_ab.jl` (`focus_variant`, `focus_theta_max`, `focus_node_pixel_counts`, `write_focus_ab`); the bending
+    smoothness of the focus surface stays (`[focus.smoothness]`; `focus_smoothness!`, now in `src/calibration/smoothness.jl`), with the
+    focus start and the node-support rule (`focus.lens_coverage_scale`, `focus.support_min`);
+  - the options `focus.variant`, `focus.node_count` and `focus.perturb`: each is refused by name (`RETIRED_KEYS`), whatever its value —
+    delete the key (the retired `focus.nodes` names the same removal);
+  - the report `focus_ab.json` and its record kind `rc/focus_ab`: a run no longer writes it, and a file of it (v1.0 or v2.0) is refused
+    by name by `VisualGeometryToolkitIO.read_record`. A run's focus surface is in its state and camera records.
+  Records: a camera or a state whose focus `type` is `sensor_thin_plate_spline` reads unchanged (`rc/radiometric_camera/v3.1` and
+  `rc/calibration_state/v3.1`: no schema version changes — the body is the same, and the two removed values of `type` were refused
+  values of the same key before they existed); one whose `type` is `direction_thin_plate_spline` or `direction_spherical_spline` is
+  refused by name (the focus surface type was removed; refine again from the run's start).
 - **Added:** a RAW photograph is fitted at the photosites of any one colour filter: `io.channel = "R"`, `"G"` or `"B"` (it was
   `"G"` alone), an `ObservationModel` of `Photosites` with the channel `:R`, `:G` or `:B` (`:RGB` stays refused: a photosite is ONE
   observation). `photosite_mask(m, channel)` gives the usable photosites of one filter on the raw grid (Core's `photosite_colors`: 0

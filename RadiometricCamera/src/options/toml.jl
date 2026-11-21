@@ -38,7 +38,7 @@ names_input_path(key::AbstractString, v) =
 """The keys whose values name an OUTPUT: the run's directory `io.out`, the LM's log `lm.log`."""
 const PIPELINE_OUTPUT_KEYS = ("io.out", "lm.log")
 # the string options that are no path (a tag-like choice)
-const _NOT_PATH_KEYS = ("focus.variant", "io.channel", "warping.inplane", "camera.sensor_model")
+const _NOT_PATH_KEYS = ("io.channel", "warping.inplane", "camera.sensor_model")
 
 # ---- derived values the pipeline reads -------------------------------------------------------------------------------------------
 """The sensor width as a length quantity (`camera.sensor_mm` mm)."""
@@ -264,7 +264,6 @@ function _check_options(opts::PipelineOptions)
                             "weigh; state a number for `grid.smoothness.weight` (or free the grid)"))
     opts.sweep.joint && smoothing(opts.vignetting.smoothness) &&
         throw(ArgumentError("`vignetting.smoothness` = $(smoothness_line(opts.vignetting.smoothness)) with `sweep.joint`: the joint solve has no smoothness penalty"))
-    opts.focus.variant in ("A", "B", "C", "D") || throw(ArgumentError("`focus.variant` = $(repr(opts.focus.variant)) is not one of A, B, C, D"))
     0 < opts.focus.lens_coverage_scale <= 1 || throw(ArgumentError("`focus.lens_coverage_scale` = $(opts.focus.lens_coverage_scale) is not in (0, 1]: the scale of the lens coverage the focus nodes keep inside"))
     opts.masks.samples_per_view >= 1 || throw(ArgumentError("`masks.samples_per_view` = $(opts.masks.samples_per_view): at least one sample per view"))
     let m = opts.masks; check_draw(m.samples_per_view, m.gradient_bias, m.edge_fraction, m.addon_samples, m.addon_gradient_bias); end   # the draw's settings together (masks.jl)
@@ -274,8 +273,6 @@ function _check_options(opts::PipelineOptions)
     sp = opts.grid.start_perturbation
     sp === nothing || (isfinite(sp.sigma_px) && sp.sigma_px >= 0) ||
         throw(ArgumentError("`grid.start_perturbation.sigma_px` = $(sp.sigma_px) is not a finite σ ≥ 0"))
-    length(opts.focus.perturb) in (0, 2) ||
-        throw(ArgumentError("`focus.perturb` needs 2 values [σ, seed] or none, got $(length(opts.focus.perturb))"))
     return opts
 end
 
@@ -305,14 +302,7 @@ const INAPPLICABLE_KEYS = (
     ("grid", "node_count") => o -> (o.grid.lattice isa DerivedLattice && _frontend_tag(o) == "schoeps") ?
         "a Schöps start (`frontend.type = \"schoeps\"`, `grid.lattice = \"derived\"`) is his own lattice extended over the lens coverage, " *
         "never subdivided (m = 1, `schoeps_start`): no node count acts on it" : nothing,
-    ("focus", "node_count") => o -> o.focus.variant in ("C", "D") ? nothing :
-        "focus variant $(o.focus.variant) lays its nodes on the 5 × 5 grid: a node count is variants C / D's",
-    ("focus", "support_min") => o -> o.focus.variant in ("A", "B") ? nothing :
-        "focus variant $(o.focus.variant) has no support rule: it is variants A / B's (their 5 × 5 grid)",
-    ("focus", "lens_coverage_scale") => o -> o.focus.variant in ("A", "B") ? nothing :
-        "focus variant $(o.focus.variant) keeps no grid nodes inside the coverage: it is variants A / B's",
     ("focus", "smoothness") => o -> "focus" in o.fixed ? "the focus surface is held (\"focus\" in `fixed`): no smoothness acts on it" : nothing,
-    ("focus", "perturb") => o -> "focus" in o.fixed ? "the focus surface is held (\"focus\" in `fixed`): it has no free nodal value to perturb" : nothing,
 )
 """Why the option `table.key` cannot act in a run of `opts` (`INAPPLICABLE_KEYS`), or `nothing` where it applies."""
 function inapplicable_reason(opts::PipelineOptions, table::AbstractString, key::AbstractString)

@@ -89,31 +89,23 @@ end
 # (Core's parameter protocol of a focus surface — its nodal values t̂ᵢ, rebuilt through its host-side spline system — is
 # VisualRadiometryToolkitCore's, with the type)
 """
-    focus_block(f; fixed = ()) -> VgtkCore.SubsetManifold
+    focus_block(f) -> VgtkCore.SubsetManifold
 
 The focus block of the LM: Core's `restrict(ParameterManifold(f; box), free)` of the focus surface `f` — its nodal values stepped
-additively and clamped at 0 (the box, `t̂ᵢ ≥ 0`), the nodes `fixed` (indices; EXPERIMENT focus-ab variant B holds the nodes
-outside the support at their fill values, `CalibrationState`'s `focus_fixed`) held. Its model is the focus (`VgtkCore.model`).
+additively and clamped at 0 (the box, `t̂ᵢ ≥ 0`), every node free. Its model is the focus (`VgtkCore.model`).
 """
-function focus_block(f::Focus{T, N}; fixed = ()) where {T, N}
+function focus_block(f::Focus{T, N}) where {T, N}
     box = NamedTuple{VgtkCore.parameter_names(f)}(ntuple(_ -> (0.0, Inf), N))
-    return VgtkCore.restrict(VgtkCore.ParameterManifold(f; box), SVector{N, Bool}(ntuple(i -> !(i in fixed), N)))
+    return VgtkCore.restrict(VgtkCore.ParameterManifold(f; box), SVector{N, Bool}(ntuple(_ -> true, N)))
 end
 """The focus block's type (`focus_block`): Core's restricted `ParameterManifold` of a `Focus`."""
 const _FocusBlock = VgtkCore.SubsetManifold{<:VgtkCore.ParameterManifold{<:Focus}}
-"""The free coordinates of the focus block `foc` among the `N` columns of a Jacobian's focus block (`lay.focus_cols`): every column
-but the held nodes' (the restriction's basis, a selection)."""
-function _restricted_focus(J, focus_cols, foc::_FocusBlock)
-    (isempty(focus_cols) || length(foc.idx) == length(focus_cols)) && return J
-    held = Set(focus_cols[i] for i in eachindex(focus_cols) if !(i in foc.idx))
-    return J[:, [c for c in axes(J, 2) if !(c in held)]]
-end
 
 """
     FocusSmoothnessResidual(i_f, L)
 
-EXPERIMENT (focus-ab): the bending-energy smoothness of the focus surface as residual rows `L t̂` (`L` already carries √weight). Depends on
-the focus block only; its Jacobian is `L` on the block's free nodes.
+The bending-energy smoothness of the focus surface as residual rows `L t̂` (`L` already carries √weight). Depends on
+the focus block only; its Jacobian is `L`.
 """
 struct FocusSmoothnessResidual{N} <: NLLSsolver.AbstractResidual
     idx::SVector{1, Int}
@@ -125,7 +117,7 @@ NLLSsolver.varindices(r::FocusSmoothnessResidual) = r.idx
 NLLSsolver.getvars(r::FocusSmoothnessResidual{N}, vars::Vector) where {N} = (vars[r.idx[1]]::_FocusBlock,)
 NLLSsolver.computeresidual(r::FocusSmoothnessResidual, f::_FocusBlock) = r.L * collect(VgtkCore.model(f).t̂_i)
 NLLSsolver.computeresjac(varflags, r::FocusSmoothnessResidual, f::_FocusBlock) = (NLLSsolver.computeresidual(r, f), r.L[:, collect(f.idx)])
-"""Add the focus smoothness `L` (EXPERIMENT focus-ab: the state's `focus_smoothness`, `√w L` with `‖L t̂‖² = t̂ᵀQ̃t̂`; empty = none) to a
+"""Add the focus smoothness `L` (the state's `focus_smoothness`, `√w L` with `‖L t̂‖² = t̂ᵀQ̃t̂`; empty = none) to a
 problem's residual blocks `blocks`."""
 function _add_focus_smoothness!(blocks, i_f, N, L::AbstractMatrix)
     isempty(L) && return blocks
@@ -406,11 +398,10 @@ function _jacobian_layout(varflags, N::Integer, NS::Integer, NF::Integer, NV::In
             P = off_r + (_bit(varflags, 4) ? 1 : 0))
 end
 
-"""The focus's nodal weights at every sensor sample of pixel `(u, v)` (closure-free for type stability): `focus_weights`, the sensor
-TPS's for the sensor chart (the paper's runs, focus variant A), the chart's at the chief direction through the lens for the direction
-charts (focus-ab's variants)."""
-@inline _nodal_weights_at(tps, lens, sensor, u, v, ::Val{NS}) where {NS} =
-    ntuple(ks -> focus_weights(tps, lens, 𝐩_sample(sensor, ks, u, v)), Val(NS))
+"""The focus's nodal weights at every sensor sample of pixel `(u, v)` (closure-free for type stability): Core's `nodal_weights` of
+the focus's thin plate spline system at the sample's sensor position."""
+@inline _nodal_weights_at(tps, sensor, u, v, ::Val{NS}) where {NS} =
+    ntuple(ks -> VgtkCore.nodal_weights(tps.sys, 𝐩_sample(sensor, ks, u, v)), Val(NS))
 
 """Chain rule for the focus columns of one pixel: `J[row, focus_cols[i]] = Σ_ks ∂Φ/∂t̂(𝐩_ks) · gᵢ(𝐩_ks)`."""
 @inline function _focus_chain!(Jm, row0::Integer, dt̂::SMatrix{3}, g, focus_cols)
@@ -723,11 +714,11 @@ function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Intege
     material_held, blocks_held = _hold_material(blocks_held, NH > 0 || inplane)
     mv = MaterialVar(s.mat, s.board.state, s.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
     variables = Any[VgtkCore.LeftRigidManifold6(s.poses[k]) for k in 1:K]
-    push!(variables, lv_d, focus_block(focus(s); fixed = s.focus_fixed),
+    push!(variables, lv_d, focus_block(focus(s)),
           ApertureVar(aperture_radius(s)), mv, vv, lv)
     i_d, i_f, i_r, i_m, i_v, i_l = (K + 1):(K + 6)
     blocks = Any[PerViewResidual{N}(k, SVector(k, i_d, i_f, i_r, i_m, i_v, i_l), s) for k in 1:K]
-    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)                                 # EXPERIMENT (focus-ab)
+    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)
     idx = (; poses = 1:K, distortion = i_d, focus = i_f, aperture = i_r, material = i_m, vignetting = i_v, lighting = i_l)
     free = trues(length(variables))
     last(lens_free(geometric(s); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns

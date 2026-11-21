@@ -31,7 +31,7 @@
     @test !Base.ispublic(RC, :geometric) && !Base.ispublic(RC, :Focus) && Base.ispublic(RC, :flat_vignetting) && Base.isexported(RC, :RadiometricCameraModel)
     @test RC.geometric === VrtkCore.geometric && RC.Focus === VrtkCore.Focus && RC.Material === VrtkCore.Material
     for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱,
-              :chief_dir, :sample_vndf_caps, :PDF_reflect, :f_CT_parts, :f_CT, :t̂_dir, :ae_chart, :ae_dir)
+              :chief_dir, :sample_vndf_caps, :PDF_reflect, :f_CT_parts, :f_CT, :ae_chart, :ae_dir)
         @test_throws "moved to VisualRadiometryToolkitCore" getfield(RC, n)(1)
     end
     # VisualRadiometryToolkitCore's public names are descriptive; the refusal names the one to call, and the paper's symbols this
@@ -39,6 +39,7 @@
     @test_throws "`chief_direction`" RC.chief_dir(1)
     @test_throws "`cook_torrance`" RC.f_CT(1)
     @test_throws "`backproject(Lens(Equidistant()), ξ)`" RC.ae_dir(1)
+    @test_throws "t̂_dir was removed" RC.t̂_dir(1)                                       # the focus surfaces on the chief directions are removed: no replacement there
     @test RC.𝔣 === VrtkCore.focus_point && RC.t̂ === VrtkCore.inverse_focus_distance && RC.π̂⁻¹ === VgtkCore.backproject && RC.𝔭 === VrtkCore.center_of_projection
     @test RC.π̂⁻¹(v, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0)) === VrtkCore.aperture_direction(v.geometric, v.focus, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0))
     # the camera's in-focus blur is removed: no field, no constructor argument, no name of it

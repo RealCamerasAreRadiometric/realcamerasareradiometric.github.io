@@ -422,17 +422,17 @@ compare_product(c) = Base.invokelatest(texture_module(compare_path(c)).compare_p
 run_compare(c) = (run_isolated(TEXTURE_DRIVER; args = ["--config=$(compare_path(c))", "--stage=compare"]); nothing)
 
 # ---- the record --------------------------------------------------------------------------------------------------------------
-"The focus surface of a refinement (focus_ab.json): node distances (m), their range, the max deviation from the mean, dome (every node
+"The focus surface of a refinement (its state's, state.json: the sensor-grid thin plate spline's nodal values): node distances (m), their range, the max deviation from the mean, dome (every node
 finite, its distance within ± `[sampling_strategy] dome_tolerance` of their mean), the bending energy."
 function focus_metrics(dir)
-    f = joinpath(dir, "focus_ab.json"); isfile(f) || return nothing
-    r = VgtkIO.read_record(f; allownan = true)
-    t = Float64.(collect(r.final)); d = [x > 0 && isfinite(x) ? 1 / x : Inf for x in t]
+    f = joinpath(dir, "state.json"); isfile(f) || return nothing
+    focus = RadiometricCamera.load_state(f).camera.focus
+    t = Float64.(collect(focus.t̂_i)); d = [x > 0 && isfinite(x) ? 1 / x : Inf for x in t]
     fin = filter(isfinite, d); μ = isempty(fin) ? NaN : mean(fin)
     dev = isempty(fin) ? NaN : maximum(abs.(fin ./ μ .- 1))
     wh = Float64.(collect(VgtkIO.read_record(joinpath(dir, "parameters.json"); allownan = true).image_size))
     hd = hypot(wh...) / 2                                            # the sensor's half-diagonal (px): the nodes in its units, so the energy compares across cases
-    nodes = [SVector{2, Float64}(Float64.(collect(n)) ./ hd) for n in r.nodes]
+    nodes = [SVector{2, Float64}(Float64.(collect(n)) ./ hd) for n in focus.nodes]
     be = try VgtkCore.bending_energy(VgtkCore.ThinPlateSplineSystem(nodes), t) catch; NaN end
     return Dict{String, Any}("distance_m" => d, "min_m" => isempty(fin) ? NaN : minimum(fin), "max_m" => isempty(fin) ? NaN : maximum(fin),
                              "max_dev" => dev, "dome" => length(fin) == length(d) && dev <= SS["dome_tolerance"], "runaway" => length(fin) < length(d) || any(<=(0), t),

@@ -63,7 +63,6 @@ function _write_calibration(s::CalibrationState, meta, opts::PipelineOptions, re
     rcam = s.camera; gfin = rcam.geometric
     (c0, rms0) = meta.costs.init; (c1, rms1) = costs.linear; (c2, rms2) = costs.final
     _write_run_cameras(route, opts, meta, gfin, lens0, trace, costs, (rms0, rms1, rms2))
-    write_focus_ab(joinpath(opts.io.out, "focus_ab.json"), meta.focus_info, s, W₀, H₀)     # EXPERIMENT (focus-ab)
     save_state(joinpath(opts.io.out, "state.json"), s, names; page_flip = meta.page_flip,
                provenance = (; iterations = length(trace), μ_lin = meta.μ_lin, cost = (; init = (c0, rms0), linear = (c1, rms1), final = (c2, rms2))))
     save_radiometric_camera(joinpath(opts.io.out, "radiometric_camera.json"), calibrated_camera(s); provenance = (; views = names))

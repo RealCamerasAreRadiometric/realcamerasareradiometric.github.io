@@ -60,7 +60,7 @@ end
         "RC_GX" => ["grid.node_count"], "RC_GY" => ["grid.node_count"],   # grid.size → node_count (RC 0.11.4)
         "RC_GRID_PRIOR" => ["grid.smoothness"], "RC_GRID_PRIOR_WEIGHT" => ["grid.smoothness"],
         "RC_GRID_PERTURB" => ["grid.start_perturbation"],
-        "RC_FOCUS" => ["focus.variant"], "RC_FOCUS_NODES" => ["focus.node_count"], "RC_FOCUS_PRIOR" => ["focus.smoothness"], "RC_FOCUS_PERTURB" => ["focus.perturb"],
+        "RC_FOCUS_PRIOR" => ["focus.smoothness"],
         "RC_MASK_FRAC" => ["masks.samples_per_view"], "RC_NPIX" => ["masks.samples_per_view"],   # one count since 2026-11-15
         "RC_MASK_EDGE" => ["masks.gradient_bias"], "RC_SEED" => ["masks.seed"],
         "RC_N" => ["rendering.N"], "RC_NRHO" => ["rendering.n_rho"], "RC_NPHI" => ["rendering.n_phi"], "RC_NP" => ["rendering.n_p"],
@@ -85,8 +85,9 @@ end
                      "RC_LINEAR_FRAC",   # masks.linear_fraction: not read since 2026-10-31, retired with RC 0.11.0
                      "RC_RMIN", "RC_RMAX",   # camera.r_min / r_max: inert, retired with RC 0.11.0 (a held aperture is fixed = ["aperture"])
                      "RC_PSF",           # rendering.psf_sigma: inert since 2026-11-14, retired with RC 0.11.0
-                     "RC_HEIGHT_POINTS"] # warping.points: a hand-parsed file, retired with RC 0.11.0
-    @test length(FORMER_KNOBS) == 65                                     # RC_SAVE_INIT (io.save_init) retired with the start record, RC_LINEAR_FRAC (masks.linear_fraction) with RC 0.11.0
+                     "RC_HEIGHT_POINTS", # warping.points: a hand-parsed file, retired with RC 0.11.0
+                     "RC_FOCUS", "RC_FOCUS_NODES", "RC_FOCUS_PERTURB"]   # focus.variant / node_count / perturb: removed with the focus A/B experiment
+    @test length(FORMER_KNOBS) == 62                                     # RC_SAVE_INIT (io.save_init) retired with the start record, RC_LINEAR_FRAC (masks.linear_fraction) with RC 0.11.0
     @test allunique(vcat(first.(FORMER_KNOBS), RETIRED_KNOBS))
     for (var, paths) in FORMER_KNOBS, p in paths
         @test haskey_path(RC.PipelineOptions, p)
@@ -218,8 +219,13 @@ end
     end
     @test occursin("image_circle", thrown_message(() -> RC.pipeline_options(Dict("camera" => Dict("image_circle" => [1.0, 2.0, 3.0])))))   # retired: measured
     @test occursin("grid.smoothness.type", thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "tikhonov"))))))
-    @test occursin("focus.variant", thrown_message(() -> RC.pipeline_options(Dict("focus" => Dict("variant" => "E")))))
-    @test occursin("focus.perturb", thrown_message(() -> RC.pipeline_options(Dict("focus" => Dict("perturb" => [0.1])))))
+    # the focus A/B experiment's keys are removed, each refused by name whatever its value: the focus surface is the sensor-grid thin plate spline
+    for (k, v) in ("variant" => "A", "variant" => "C", "node_count" => 30, "perturb" => [0.1, 3.0])
+        m = thrown_message(() -> RC.pipeline_options(Dict("focus" => Dict(k => v))))
+        @test occursin("`focus.$k` is retired", m) && occursin("removed", m)
+        k == "perturb" || @test occursin("the focus surface is the sensor-grid thin plate spline", m)
+    end
+    @test fieldnames(RC.FocusOptions) == (:lens_coverage_scale, :smoothness, :support_min)
     # warping.inplane: "none" | "aspect_skew"; inplane_start: none or the two finite values (a, u); "inplane" is a fixable block
     @test occursin("warping.inplane", thrown_message(() -> RC.pipeline_options(Dict("warping" => Dict("inplane" => "affine")))))
     @test occursin("warping.inplane_start", thrown_message(() -> RC.pipeline_options(Dict("warping" => Dict("inplane_start" => [0.01])))))
@@ -298,10 +304,10 @@ end
     using TOML
     o = RC.pipeline_options(Dict{String, Any}(); set = ["lm.max_time=1e-10", "lm.max_iter=2", "io.out=/tmp/rc out", "frontend.type=schoeps",
                                                         "io.views=[\"V01.png\", \"V02.png\"]", "camera.lens_coverage=/data/image_region.json",
-                                                        "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.perturb=[0.1, 3]"])
+                                                        "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.support_min=0.25"])
     @test o.lm.max_time == 1e-10 && o.lm.max_iter == 2 && o.io.out == "/tmp/rc out" && o.frontend.type === RC.SchoepsFrontend
     @test o.io.views == ["V01.png", "V02.png"] && o.camera.lens_coverage == "/data/image_region.json"
-    @test o.grid.smoothness == RC.BendingSmoothness(0.1) && o.focus.perturb == [0.1, 3.0]
+    @test o.grid.smoothness == RC.BendingSmoothness(0.1) && o.focus.support_min == 0.25
     # an override replaces a file's value and is refused like a file's unknown key
     @test RC.pipeline_options(Dict("lm" => Dict("max_iter" => 7)); set = ["lm.max_iter=3"]).lm.max_iter == 3
     @test occursin("fto", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["lm.fto=1"])))
@@ -318,7 +324,7 @@ end
                            frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, page_mm = (1000.0, 1000.0)),
                            camera = RC.CameraOptions(; lens_coverage = "regions/image_region.json"),
                            grid = RC.GridOptions(; smoothness = RC.BendingSmoothness(1e-2),
-                                                 start_perturbation = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)), focus = RC.FocusOptions(; variant = "C", node_count = 30),
+                                                 start_perturbation = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)), focus = RC.FocusOptions(; support_min = 0.1, smoothness = RC.BendingSmoothness(0.5)),
                            vignetting = RC.VignettingOptions(; model = VrtkCore.RadialVignetting, node_count = 16),
                            fixed = ["material", "lighting", "aperture"], lm = RC.LMOptions(; max_iter = 2),
                            edge = RC.EdgeOptions(; ink_spread_mm = 0.02, print_sigma_mm = 0.03), compute = RC.ComputeOptions(; backend = RC.CPUCompute))
@@ -401,11 +407,14 @@ end
     @test r3.grid.smoothness.type == "pspline" && r3.grid.smoothness.order == 3 && r3.grid.smoothness.weight == "gcv" && r3.grid.smoothness.beta == 0.0123
     @test r3.grid.smoothness.cost.final == 1.5e-4 && r3.grid.smoothness.selection.β == 0.0123
     @test r3.vignetting_options.smoothness.weight == 0.5 && r3.vignetting_options.smoothness.order == 3 && r3.vignetting_options.boundary_order == 3
-    # and the focus A/B record v1.0's prior_* likewise (rc/focus_ab v2.0)
-    fa = joinpath(mktempdir(), "focus_ab.json")
-    VgtkIO.write_record(fa, (; schema = "rc/focus_ab/v1.0", variant = "A", prior_beta = 0.25, prior_weight = 3.5))
-    f2 = VgtkIO.read_record(fa)
-    @test f2.schema == "rc/focus_ab/v2.0" && f2.smoothness.type == "bending" && f2.smoothness.weight == 0.25 && f2.smoothness.row_weight == 3.5 && !haskey(f2, :prior_beta)
+    # the focus A/B experiment's report (rc/focus_ab, focus_ab.json) is a removed kind: a file of it, of either version, is refused by name
+    @test !haskey(RC.RECORD_SCHEMAS, :focus_ab)
+    for v in ("v1.0", "v2.0")
+        fa = joinpath(mktempdir(), "focus_ab.json")
+        VgtkIO.write_record(fa, (; schema = "rc/focus_ab/$v", variant = "A"))
+        m = thrown_message(() -> VgtkIO.read_record(fa))
+        @test occursin("rc/focus_ab", m) && occursin("was removed", m) && occursin("sensor-grid thin plate spline", m)
+    end
     sc_dir = mktempdir()                                                       # a self-check: its selfcheck.json (_write_selfcheck's record)
     VgtkIO.write_record(joinpath(sc_dir, "selfcheck.json"),
         (; schema = RC.RECORD_SCHEMAS.selfcheck, init = "", schoeps = "run", views = ["V01.png"], n = [12], median = [0.21], p90 = [0.4], mean = [0.25],
@@ -488,11 +497,11 @@ end
     write(joinpath(dir, "b.toml"), "[io\n")
     @test any(f -> occursin("does not parse", f), RC.boolean_switch_violations([dir]))
     # ONE key for a spline's node count (RC 0.11.4): the old keys refused by name, naming `node_count`
-    for (t, k) in (("vignetting", "coefficients"), ("focus", "nodes"))
+    for (t, k, names) in (("vignetting", "coefficients", "node_count"), ("focus", "nodes", "sensor-grid thin plate spline"))   # (the focus's node count was a removed direction chart's)
         m = thrown_message(() -> RC.pipeline_options(Dict(t => Dict(k => 16))))
-        @test occursin("`$t.$k` is retired", m) && occursin("node_count", m)
+        @test occursin("`$t.$k` is retired", m) && occursin(names, m)
     end
-    @test RC.pipeline_options(Dict("vignetting" => Dict("node_count" => 12), "focus" => Dict("variant" => "C", "node_count" => 30))).vignetting.node_count == 12
+    @test RC.pipeline_options(Dict("vignetting" => Dict("node_count" => 12))).vignetting.node_count == 12
     # the package's configs carry no boolean switch (the paper project's: experiments/test, calibration_tests.jl)
     @test isempty(RC.boolean_switch_violations([joinpath(RC_ROOT, "configs")]))
 end

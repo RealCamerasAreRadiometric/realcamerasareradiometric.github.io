@@ -53,8 +53,7 @@ mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, T
     jacobian_chunk::Int                       # dual partials per Jacobian kernel launch on a device (`compute.jacobian_chunk`, `_jac_chunk`)
     device_cache::Any                         # per-view device data (device/jacobian_kernels.jl); nothing on CPU
     channel::Int                              # 0: the three channels measured (3 residuals per pixel); c ∈ 1:3: channel c alone (1)
-    focus_fixed::Vector{Int}                  # the focus nodes the LM holds (`focus_block`'s `fixed`; EXPERIMENT focus-ab variant B), none by default
-    focus_smoothness::Matrix{Float64}         # EXPERIMENT (focus-ab): the focus's bending smoothness rows (`focus_smoothness!`); 0 × 0 = none
+    focus_smoothness::Matrix{Float64}         # the focus's bending smoothness rows (`focus_smoothness!`); 0 × 0 = none
     mu_bounds::NTuple{2, Float64}             # the interval (lo, hi) of μ (`material.mu_bounds`): the LM's chart, the closed-form solves' clamp
     quanta::Vector{Union{Nothing, Vector{Float64}}}   # per view, each row's RAW code step in its units (`_quanta`); nothing: a decoded image
     sensor_models::Vector{VgtkCore.SensorModel}   # per view, the photograph's sensor model (Core's, resolved from the camera's characterisation by its EXIF: `photo_set`); the absent model for a decoded image
@@ -87,13 +86,13 @@ _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
 """
     CalibrationState(board, settings, camera, poses, mat, light, targets; masks = nothing, δ = 0.02,
                      external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = CPU(), ϕ = nothing,
-                     channel = 0, focus_fixed = Int[], mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
+                     channel = 0, mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
                      sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
                      sensor = NoSensorRecord(), photo_kind = Decoded(false))
 
 `channel` (0: the three channels; 1–3: that channel alone, ONE residual per measured pixel, `fit_channels`): a
 single-channel state ties the other channels' lighting coefficients and refractive indices η to channel `channel`'s
-(`tie_channels`), which no residual reads. `focus_fixed`: the focus nodes the LM holds (indices; `focus_block`); the focus's bending smoothness rows, `focus_smoothness`, are set by
+(`tie_channels`), which no residual reads. The focus's bending smoothness rows, `focus_smoothness`, are set by
 `focus_smoothness!` (none at construction). `mu_bounds` `(lo, hi)` (`material.mu_bounds`; e.g. (0.6, 1.0): paper at most 40 % specular):
 the interval of the diffuse weight μ — the LM steps on the chart μ = lo + (hi − lo) σ(w) (`MaterialVar`), the closed-form solves
 clamp to it. `jacobian_chunk` (`compute.jacobian_chunk`): the dual partials per Jacobian kernel launch on a device (`_jac_chunk`;
@@ -120,7 +119,7 @@ function CalibrationState(board::TexturedTarget, settings::RenderSettings, camer
                           mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}};
                           masks = nothing, δ::Real = 0.02, external_masks = nothing, support_min::Real = 0.0, region = nothing,
                           boundary_order::Integer = 2, backend = KernelAbstractions.CPU(), ϕ = nothing, channel::Integer = 0,
-                          focus_fixed = Int[], mu_bounds = (0.0, 1.0), jacobian_chunk::Integer = 4,
+                          mu_bounds = (0.0, 1.0), jacobian_chunk::Integer = 4,
                           sensor_models = fill(VgtkCore.SensorModel(), length(poses)),
                           weights::Union{Unweighted, AbstractVector{<:AbstractVector{<:Real}}} = Unweighted(),
                           quanta = fill(nothing, length(poses)), sensor::SensorStatement = NoSensorRecord(),
@@ -162,7 +161,7 @@ function CalibrationState(board::TexturedTarget, settings::RenderSettings, camer
     end
     rule = vignetting_rule(camera.vignetting, region, px; support_min, order = boundary_order)
     return CalibrationState{N, typeof(board), typeof(settings), typeof(camera), typeof(light), eltype(poses)}(
-        board, settings, camera, poses, VgtkCore.convert_eltype(Float64, mat), light, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), collect(Int, focus_fixed), zeros(0, 0),
+        board, settings, camera, poses, VgtkCore.convert_eltype(Float64, mat), light, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), zeros(0, 0),
         Float64.(Tuple(mu_bounds)), Union{Nothing, Vector{Float64}}[q === nothing ? nothing : Vector{Float64}(q) for q in quanta],
         collect(VgtkCore.SensorModel, sensor_models), sensor, photo_kind, _LmRun(), nothing)
 end

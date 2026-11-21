@@ -63,18 +63,3 @@ end
     @test_throws ArgumentError RC._check_focus_nodes(nb[1:5], nothing)          # 5 collinear nodes (the first row)
     @test RC._check_focus_nodes(nb[[1, 5, 21, 25]], nothing) == nb[[1, 5, 21, 25]]
 end
-
-@testitem "focus_ab node counts: a masked pixel without a ray" setup = [RCFixtures] begin
-    using RadiometricCamera: Focus
-    using StaticArrays
-    # a lens that gives no ray (NaN) right of u = 300: the pixel counts skip it and count it, the largest chief-ray angle stays
-    # finite (2026-11-08: two refined parametric lenses had masked corner pixels past their invertible range, focus_ab.json failed)
-    struct _HalfLens end
-    RadiometricCamera.chief_ray(::_HalfLens, 𝐩::StaticVector{2}) = 𝐩[1] > 300 ? SVector(NaN, NaN, NaN) : SVector(𝐩[1] - 200, 𝐩[2] - 150, 400.0)
-    W, H = 400, 300
-    f = Focus(5, 1.5, W, H)
-    px = [[(10, 10), (390, 20), (100, 200)], [(250, 150), (399, 299)]]
-    cnt, θpx, noray = RadiometricCamera.focus_node_pixel_counts(f, _HalfLens(), px, W, H)
-    @test noray == 2 && sum(cnt) == 3
-    @test isfinite(θpx) && 0 < θpx < π / 2
-end

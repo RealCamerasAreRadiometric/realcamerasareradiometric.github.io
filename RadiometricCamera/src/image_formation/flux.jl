@@ -81,18 +81,10 @@ end
     e1, e2 = _seed_tangents(x)
     return g1 * e1 + g2 * e2
 end
-"""EXPERIMENT (focus-ab): the seeded `t̂` and the unit chief direction of a sensor sample. Kind 0 (the sensor chart) in the original
-order; the direction charts (kinds 1, 2) evaluate t̂ AT the (seeded) chief direction, so the lens's / grid directions' partials reach t̂
-through the chart (the dual template of the direction seeds is a zero of the focus's element type)."""
+"""The seeded `t̂` (the focus surface's thin plate spline at 𝐩) and the unit chief direction of a sensor sample."""
 @inline function _focus_and_dir(view::View, 𝐩, fseed, dirseed, ks::Integer)
-    f = view.focus
-    if f.kind == 0
-        t̂s = _t̂_seeded(t̂(f, 𝐩), fseed, ks)
-        return t̂s, normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
-    end
-    tmpl = _t̂_seeded(zero(eltype(f.w)), fseed, ks)
-    dch = normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, tmpl))
-    return _t̂_seeded(t̂(f, dch), fseed, ks), dch
+    t̂s = _t̂_seeded(t̂(view.focus, 𝐩), fseed, ks)
+    return t̂s, normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
 end
 @inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
     slot = fbase + ks

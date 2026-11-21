@@ -67,8 +67,18 @@
         # in COLMAP pixels
         @test_throws "print_blur: a blur on the print is on the board's plane (\"frame\": \"target:board\"), got the pixel frame colmap" load_state(edited("\"frame\": \"target:board\"", "\"pixel_frame\": \"colmap\""))
         @test_throws "the pixel frame \"opencv\"" load_state(edited("\"pixel\": \"colmap\"", "\"pixel\": \"opencv\""))
+        # the focus surface's one type is the sensor-grid thin plate spline; a record of a removed focus surface on the chief directions
+        # (a state's or a camera's) is refused by name, another type as no focus surface type
+        sensor_type = "\"type\": \"sensor_thin_plate_spline\""
+        @test count(sensor_type, text) == 1 && RC.FOCUS_TYPE == "sensor_thin_plate_spline"
+        for removed in RC.REMOVED_FOCUS_TYPES
+            @test_throws "the focus surface type \"$removed\" was removed" load_state(edited(sensor_type, "\"type\": \"$removed\""))
+            @test_throws "the one focus surface is \"sensor_thin_plate_spline\"" load_state(edited(sensor_type, "\"type\": \"$removed\""))
+        end
+        @test_throws "\"hexagonal_spline\" is not a focus surface type" load_state(edited(sensor_type, "\"type\": \"hexagonal_spline\""))
         save_radiometric_camera(joinpath(dir, "camera.json"), RC.CalibratedCamera(camera, raw, settings))
         text = read(joinpath(dir, "camera.json"), String)
+        @test_throws "the focus surface type \"direction_spherical_spline\" was removed" load_radiometric_camera(edited(sensor_type, "\"type\": \"direction_spherical_spline\""))
         @test_throws "the pixel frame \"opencv\"" load_radiometric_camera(edited("\"pixel\": \"colmap\"", "\"pixel\": \"opencv\""))
     end
 end

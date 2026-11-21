@@ -21,7 +21,7 @@
 # The camera body: "camera" IO's bounded camera body (`camera_json(::BoundedCamera, frame; length_unit)`: the model's body — K in
 # COLMAP pixels and the lens record — the extent, the sensor's pitch and the lens coverage), "aperture" {"radius"} (a length),
 # "focus" the focus surface as a parametric record {"type", "nodes", "parameters", "unit": "1/m"} (the nodal inverse distances t̂ᵢ;
-# its nodes COLMAP pixels or direction-chart positions by its type), "vignetting" VisualRadiometryToolkitIO's vignetting body (a camera without vignetting has none: saving it is refused there); a camera record also
+# its type "sensor_thin_plate_spline", its nodes COLMAP pixels), "vignetting" VisualRadiometryToolkitIO's vignetting body (a camera without vignetting has none: saving it is refused there); a camera record also
 # "observation_model" and "settings" (a CalibratedCamera: below).
 # The observation model (observation_model.jl): {"sensor": {"type": "record", "sha256": <the characterisation file's sha256>} |
 # {"type": "none"}, "photos": {"kind": "photosites", "channel": "R" | "G" | "B"} | {"kind": "decoded", "channel": "RGB" | "R" | "G" | "B",
@@ -49,8 +49,8 @@ const RECORD_SCHEMAS = (radiometric_camera = "rc/radiometric_camera/v3.1", radio
                         # the initialization region of the grid cameras in a directory (initialization_region.json): their start's region
                         initialization_region = "rc/initialization_region/v1.0",
                         # the run's reports (IO 0.10's `write_record` states every file's schema): the self-check's summary and per-view
-                        # vectors (selfcheck.json, selfcheck_vectors.json) and the focus A/B diagnostic (focus_ab.json)
-                        selfcheck = "rc/selfcheck/v1.0", selfcheck_vectors = "rc/selfcheck_vectors/v1.0", focus_ab = "rc/focus_ab/v2.0",
+                        # vectors (selfcheck.json, selfcheck_vectors.json)
+                        selfcheck = "rc/selfcheck/v1.0", selfcheck_vectors = "rc/selfcheck_vectors/v1.0",
                         # the start of a refinement (start.json of a start record: start/start_record.jl)
                         refinement_start = "rc/refinement_start/v1.0",
                         # the measured image region of a capture set (its keyed step: start/image_region.jl; camera.lens_coverage)
@@ -59,8 +59,10 @@ const RECORD_SCHEMAS = (radiometric_camera = "rc/radiometric_camera/v3.1", radio
 const _COLMAP = VgtkCore.PixelFrame{:colmap}       # the pixel frame RC's models are in (frames rule 1); every record declares it
 # The style of an RC record with lengths in `u`: its `units` object (IO's envelope) declares `u` and the COLMAP pixel frame.
 _style(u) = VgtkIO.VgioStyle(; length_unit = u, pixel_frame = _COLMAP)
-# The focus surface's types by `Focus.kind` (0, 1, 2; focus_charts.jl).
-const FOCUS_TYPES = ("sensor_thin_plate_spline", "direction_thin_plate_spline", "direction_spherical_spline")
+# The focus surface's type in a record: the thin plate spline over the sensor (its nodes COLMAP pixels). The types of the removed
+# focus surfaces on the chief directions are refused by name (`_focus_from_body`).
+const FOCUS_TYPE = "sensor_thin_plate_spline"
+const REMOVED_FOCUS_TYPES = ("direction_thin_plate_spline", "direction_spherical_spline")
 
 _len(x, u) = VgtkIO.write_length(x * VgtkCore.m, u)                  # a plain metre value → the file's number
 _floats(v) = Float64[Float64(x::Real) for x in v]
@@ -83,13 +85,17 @@ function _lens_from_body(s, b, aperture)
     return VgtkIO.camera_from_json(VgtkCore.BoundedCamera, b, _COLMAP; length_unit = s.length_unit)
 end
 
-_focus_body(f::Focus) = (type = FOCUS_TYPES[f.kind + 1], nodes = [Float64[n[1], n[2]] for n in f.nodes], parameters = Float64.(collect(f.t̂_i)),
+_focus_body(f::Focus) = (type = FOCUS_TYPE, nodes = [Float64[n[1], n[2]] for n in f.nodes], parameters = Float64.(collect(f.t̂_i)),
                          unit = "1/m")
 function _focus_from_body(b)
-    kind = findfirst(==(b.type::String), FOCUS_TYPES)
-    kind === nothing && throw(ArgumentError("focus: $(repr(b.type)) is not a focus surface type ($(join(FOCUS_TYPES, ", ")))"))
+    type = b.type::String
+    type in REMOVED_FOCUS_TYPES && throw(ArgumentError(
+        "focus: the focus surface type $(repr(type)) was removed (the focus A/B experiment is decided: the focus surfaces on the " *
+        "chief directions are deleted); the one focus surface is $(repr(FOCUS_TYPE)), the sensor-grid thin plate spline — " *
+        "refine again from the run's start with the current package"))
+    type == FOCUS_TYPE || throw(ArgumentError("focus: $(repr(type)) is not a focus surface type (the one type: $(repr(FOCUS_TYPE)))"))
     b.unit == "1/m" || throw(ArgumentError("focus: the inverse distances are in 1/m (got $(repr(b.unit)))"))
-    return Focus(FocusSpline([SVector{2, Float64}(_floats(n)...) for n in b.nodes::Vector{Any}], kind - 1), _floats(b.parameters))
+    return Focus(FocusSpline([SVector{2, Float64}(_floats(n)...) for n in b.nodes::Vector{Any}]), _floats(b.parameters))
 end
 
 # (RC's own functions, not methods of JSON.lower / JSON.lift: the camera type is VisualRadiometryToolkitCore's and the style IO's — a
@@ -288,12 +294,12 @@ through its version step, `_run_parameters_v3`); another schema is an `ArgumentE
 """
 load_run_parameters(path::AbstractString) = first(_read_kind(path, :run_parameters))
 
-# ---- the version steps of the smoothness vocabulary (RC 0.11.0): rc/run_parameters v2.0 → v3.0, rc/focus_ab v1.0 → v2.0 -----------
+# ---- the version step of the smoothness vocabulary (RC 0.11.0): rc/run_parameters v2.0 → v3.0 ------------------------------------
 # The records' keys of a component's smoothness follow `[<component>.smoothness]` (src/pipeline/smoothness.jl, `smoothness_record`):
 # a v2.0 run record's grid `prior`, `prior_weight`, `prior_cost`, `prior_beta`, `prior_gcv` become its `smoothness` {type, order,
 # weight, cost, beta, selection} (a pspline's order its Δ³: 3, the only one v2.0's code had), its `vignetting_options`'
-# `smoothness_weight` and `smoothness_gcv` the vignetting's `smoothness` {type "pspline", order 3, weight, selection}; a v1.0 focus
-# A/B record's `prior_beta`, `prior_weight` its `smoothness` {type "bending", order null, weight, row_weight}. The values as stored.
+# `smoothness_weight` and `smoothness_gcv` the vignetting's `smoothness` {type "pspline", order 3, weight, selection}. The values as
+# stored.
 _order_v3(type) = type == "pspline" ? 3 : nothing
 function _run_parameters_v3(t::AbstractDict)
     t = Dict{String, Any}(t); t["schema"] = RECORD_SCHEMAS.run_parameters
@@ -315,14 +321,14 @@ function _run_parameters_v3(t::AbstractDict)
     end
     return t
 end
-function _focus_ab_v2(t::AbstractDict)
-    t = Dict{String, Any}(t); t["schema"] = RECORD_SCHEMAS.focus_ab
-    β = pop!(t, "prior_beta", 0.0); w = pop!(t, "prior_weight", 0.0)
-    t["smoothness"] = Dict{String, Any}("type" => "bending", "order" => nothing, "weight" => β, "row_weight" => w)
-    return t
-end
 VgtkIO.migrate_schema(::Val{Symbol("rc/run_parameters/v2.0")}, t::AbstractDict) = _run_parameters_v3(t)
-VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v1.0")}, t::AbstractDict) = _focus_ab_v2(t)
+# The removed kind rc/focus_ab (the focus A/B experiment's report, focus_ab.json) is refused by name wherever a record is read
+# through its version step (`VgtkIO.read_record`): the experiment is decided and the report is no longer written or read.
+const _FOCUS_AB_REMOVED = "the record kind rc/focus_ab (focus_ab.json, the focus A/B experiment's report) was removed: the experiment is " *
+                          "decided, the focus surface is the sensor-grid thin plate spline, and a run's focus surface is in its " *
+                          "state and camera records (state.json, radiometric_camera.json: `camera.focus`)"
+VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v1.0")}, ::AbstractDict) = throw(ArgumentError(_FOCUS_AB_REMOVED))
+VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v2.0")}, ::AbstractDict) = throw(ArgumentError(_FOCUS_AB_REMOVED))
 
 """The file beside a directory's grid cameras that holds their initialization region ([`save_initialization_region`](@ref))."""
 const INITIALIZATION_REGION_FILE = "initialization_region.json"
