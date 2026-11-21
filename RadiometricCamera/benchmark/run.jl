@@ -193,6 +193,7 @@ function stages(c)
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
         () -> RC._with_registered(s, problem, idx) do
             sweep()
+            foreach(empty!, RC._grid_batch(s).blocks)     # (the tiles' batches handed out: formed again, from the memoized view's batch)
             t0 = time_ns(); x = sweep(); Span(x + length(tiles), (time_ns() - t0) / 1e9)   # (not `v`: that rebound the pixel's v, boxed it in every stage, 4.4 kB a Φ_pixel call)
         end
     end)

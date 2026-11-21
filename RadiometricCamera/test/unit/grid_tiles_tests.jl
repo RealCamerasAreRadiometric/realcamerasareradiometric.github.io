@@ -325,7 +325,9 @@ end
         per_tile, batched, again, jacs = RC._with_registered(s_b, prob_b, idx_b; concurrent = false) do
             ref = [RC._tile_normal_equations(RC.static(vf), t, vars_of(t)) for (t, vf) in zip(ts, vfs)]
             jac0 = s_b.run.device_calls[:jac]
-            ref, blocks(), blocks(), s_b.run.device_calls[:jac] - jac0   # the tiles asked again at the trial: their view's batch again
+            b = blocks()
+            jacs = s_b.run.device_calls[:jac] - jac0
+            ref, b, blocks(), jacs                                    # the tiles asked again at the trial: the per-tile path
         end
         @test jacs == 0                                              # the batches: no tile formed its own Jacobian
         @test all(((x, y),) -> x[1] == y[1] && x[2] == y[2] && x[3] == y[3], zip(per_tile, batched))

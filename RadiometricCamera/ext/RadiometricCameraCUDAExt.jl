@@ -43,18 +43,29 @@ function RadiometricCamera._batched_products(J3::CUDA.CuArray{Float64, 3}, r2::C
     H = reshape(view(B, 1:nH), n, n, nt); g = reshape(view(B, (nH + 1):nB), n, 1, nt)
     CUDA.CUBLAS.gemm_strided_batched!('N', 'T', 1.0, J3, J3, 0.0, H)
     CUDA.CUBLAS.gemm_strided_batched!('N', 'N', 1.0, J3, reshape(r2, M, 1, nt), 0.0, g)
-    buf = _pinned_host(nB)
+    buf = _take_pinned(nB)
     copyto!(buf, 1, B, 1, nB)
     Hh = reshape(view(buf, 1:nH), n, n, nt); gh = reshape(view(buf, (nH + 1):nB), n, nt)
-    return [(view(gh, :, t), view(Hh, :, :, t)) for t in 1:nt]              # (views of the task's buffer: valid until its next call)
+    return [(view(gh, :, t), view(Hh, :, :, t)) for t in 1:nt], buf     # (views of the buffer: valid until it is given back)
 end
-# The calling task's page-locked host buffer of at least `n` floats (grown, kept with the task: the pooled device workers'). A view's
-# tiles' blocks are some 60 MB: downloaded into fresh pageable memory they took 65–210 ms on a B200 (the driver's staging and the
-# new pages' faults), pinned and reused the link's rate.
-function _pinned_host(n::Integer)
-    ref = RadiometricCamera.VgtkCore.task_buffers(() -> Ref(Float64[]), :radiometric_camera_pinned_products)
-    length(ref[]) < n && (v = Vector{Float64}(undef, max(n, 5 * length(ref[]) ÷ 4)); CUDA.pin(v); ref[] = v)   # (grown by a quarter at least: few re-pins)
-    return ref[]
+# A pool of page-locked host buffers for the batches' downloads (a view's tiles' blocks are some 60 MB: into fresh pageable memory
+# they took 65–210 ms on a B200, the driver's staging and the new pages' faults; pinned and reused, the link's rate). A batch takes one
+# (`_take_pinned`) and gives it back once its blocks are read (`_release_host_buffer!`); as many exist as batches ran at once, and
+# the pool is dropped when the grid problem is unregistered (`_release_host_buffers!`: unpinned as they are collected), so no
+# memory stays locked after a solve.
+const _PINNED = Vector{Vector{Float64}}()
+const _PINNED_LOCK = ReentrantLock()
+function _take_pinned(n::Integer)
+    buf = lock(_PINNED_LOCK) do
+        i = findfirst(b -> length(b) >= n, _PINNED)
+        i === nothing ? nothing : popat!(_PINNED, i)
+    end
+    buf === nothing || return buf
+    v = Vector{Float64}(undef, n + n ÷ 4)                    # (a quarter more: a view of more tiles reuses it)
+    CUDA.pin(v)
+    return v
 end
+RadiometricCamera._release_host_buffer!(::CUDA.CUDABackend, buf::Vector{Float64}) = (lock(() -> push!(_PINNED, buf), _PINNED_LOCK); nothing)
+RadiometricCamera._release_host_buffers!(::CUDA.CUDABackend) = (lock(() -> empty!(_PINNED), _PINNED_LOCK); nothing)
 
 end # module
