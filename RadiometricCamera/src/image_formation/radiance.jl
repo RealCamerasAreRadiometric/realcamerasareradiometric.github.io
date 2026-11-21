@@ -83,13 +83,14 @@ end
 
 """The common start of a ray's radiance (`L_c`, the radiance-Jacobian modes of `_ray_radiance`): the ray's direction ω_l in the board's local frame, the
 element type `T` of its radiance, whether the ray reaches the board from the front (`front`; from behind its radiance is zero) and
-the material `(ρ, α, η)` at the chart point 𝐛 (`_radiance_material`). Type-stable in the kernels: the material is evaluated for
-every ray (a ray from behind discards it)."""
-@inline function _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
+the material `(ρ, α, η)` at the chart point 𝐛 (`_radiance_material`), or of the albedo `ρ` the caller looked up (a chunk's anchored
+lookup, `_ray_radiance`). Type-stable in the kernels: the material is evaluated for every ray (a ray from behind discards it)."""
+@inline _ray_material(bd, m, lt, 𝐛::StaticVector{2}, 𝐱, ω) = _ray_material(bd, m, lt, physical_albedo(bd, 𝐛), 𝐱, ω)
+@inline function _ray_material(bd, m, lt, ρ::StaticVector{3}, 𝐱, ω)
     t, b, n = board_frame(bd)
     ω_l = to_local(t, b, n, -ω)
     T = promote_type(eltype(ω_l), eltype(𝐱), eltype(m.refractive_index_ink), eltype(coefficients(lt)))
-    return ω_l, T, ω_l[3] > 0, _radiance_material(bd, m, 𝐛)
+    return ω_l, T, ω_l[3] > 0, _radiance_material(m, ρ)
 end
 """
     L_c(board, mat, light, sampler, key, 𝐛, 𝐱, ω) -> SVector{3}
@@ -105,10 +106,10 @@ The radiance leaves the board towards −ω.
     front || return zero(SVector{3, Tz})
     return _radiance_mc(bd, m, lt, s, key, ρ, α, η, ω_l, 𝐱, Tz)
 end
-"""The albedo ρ, roughness α and refractive indices η of the board point of chart `𝐛` (`L_c`'s material inputs): the texture (or
-the printed edge) at the DESIGN point the physical 𝐛 shows, blending ink ↔ no ink by its value."""
-@inline function _radiance_material(bd::TexturedTarget, m::Material, 𝐛::StaticVector{2})
-    ρ = printed_albedo(bd, design_chart(bd, 𝐛))
+"""The albedo ρ, roughness α and refractive indices η of a board point of albedo `ρ` (`L_c`'s material inputs; ρ the target's
+`physical_albedo`: the texture, or the printed edge, at the DESIGN point the physical point shows): α and η blend ink ↔ no ink by
+the albedo's value."""
+@inline function _radiance_material(m::Material, ρ::StaticVector{3})
     wv = texture_weight(ρ)
     return ρ, 𝛂(m, wv), 𝛈(m, wv)
 end
@@ -160,7 +161,7 @@ function radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<:
     T = promote_type(eltype(ω_l), eltype(m.refractive_index_ink))
     Bd = zero(SMatrix{3, J, T, 3J}); Bs = zero(SMatrix{3, J, T, 3J})
     ω_l[3] <= 0 && return RadianceParts{J, T, 3J}(Bd, Bs)
-    ρ = printed_albedo(bd, design_chart(bd, 𝐛))   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
+    ρ = physical_albedo(bd, 𝐛)   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
     wv = texture_weight(ρ)                                                # the texture value blends ink ↔ no ink
     α = 𝛂(m, wv); η = 𝛈(m, wv)
     h = key_hash(s, key)

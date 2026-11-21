@@ -407,20 +407,43 @@ end
         s0, x0 = intersect_board(rays, o, d)
         @test abs(s - s0) < 1e-14 && norm(x - x0) < 1e-14 && dot(n, d) ≈ 1
         @test norm(cross(normalize(n), VgtkCore.normal(rays.relief, x0))) < 1e-9          # Core's normal of the surface there (either sense)
-        # the record's entry as a chunk reads it, [L | ∂L/∂ℓ | 𝐱 | 𝐧], and the dual ray: origin and direction seeded
-        rec[1] = RC.RadianceJac{Float64}(ntuple(q -> (j = (q - 1) ÷ 3; c = (q - 1) % 3 + 1; j == RC.RAD_NL + 1 ? x[c] : j == RC.RAD_NL + 2 ? n[c] : 0.0), 3 * (RC.RAD_NL + 3)))
+        # the record's entry as a chunk reads it, [L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃], and the dual ray: origin and direction seeded
+        rec[1] = RC.RadianceJac{Float64}(ntuple(q -> (j = (q - 1) ÷ 3; c = (q - 1) % 3 + 1; j == RC.RAD_NL + 1 ? x[c] : j == RC.RAD_NL + 2 ? n[c] : 0.0), 3 * (RC.RAD_NL + 4)))
         D = ForwardDiff.Dual{Nothing, Float64, 6}
         seed(v, k0) = SVector{3, D}(ntuple(i -> D(v[i], ForwardDiff.Partials(ntuple(j -> Float64(j == k0 + i), 6))), 3))
         od, dd = seed(o, 0), seed(d, 3)
-        st, xt, _ = RC._ray_hit(nothing, RC.RadianceRays(rec, 0), 1, rays, od, dd)
+        st, xt, _ = RC._ray_hit(nothing, RC.RadianceRays(rec, 0, board_hs), 1, rays, od, dd)
         sc, xc = intersect_board(rays, od, dd)                    # Core's hit of the dual ray (the plane's, or the Newton's with its implicit step)
         @test abs(ForwardDiff.value(st) - s0) < 1e-13 && norm(ForwardDiff.value.(xt) - x0) < 1e-13
         @test all(j -> norm(map(q -> ForwardDiff.partials(q)[j], xt) - map(q -> ForwardDiff.partials(q)[j], xc)) < 1e-10, 1:6)
         @test norm(collect(ForwardDiff.partials(st)) - collect(ForwardDiff.partials(sc))) < 1e-10
         # a ray the record did not reach (zeros): not finite, so the flux skips it; the parts' hit likewise
-        blank = RC.RadianceRays([zero(RC.RadianceJac{Float64})], 0)
+        blank = RC.RadianceRays([zero(RC.RadianceJac{Float64})], 0, board_hs)
         @test !isfinite(ForwardDiff.value(first(RC._ray_hit(nothing, blank, 1, rays, od, dd)))) && !isfinite(first(RC._parts_hit(blank, 1, rays, o, d)))
-        sp, xp = RC._parts_hit(RC.RadianceRays(rec, 0), 1, rays, o, d)
+        sp, xp = RC._parts_hit(RC.RadianceRays(rec, 0, board_hs), 1, rays, o, d)
         @test abs(sp - s0) < 1e-13 && xp == x && RC._parts_hit(nothing, 1, rays, o, d) == (s0, x0)
     end
+end
+
+@testitem "radiance record: Float64 geometry with a Float32 estimator; its hits keep Float64's precision" setup = [RCFixtures, EdgeScene] begin
+    using StaticArrays, LinearAlgebra
+    import VisualGeometryToolkitCore as VgtkCore
+    # A device's record (`RadianceRecord` with `est`): the rays, their hits and the albedo there in ANCHOR_FLOAT, the estimator in
+    # Float32 — run here on the CPU backend against the all-Float64 record of the same parameters. The anchor (𝐱̃ + (𝐱 − 𝐱̃)) is the
+    # Float64 hit; the radiance and its local partials agree to Float32's rounding of the estimator alone.
+    s = edge_state(edge_s, targets_e)
+    be = s.backend; dc = RC._ensure_device!(s); k = 1; H = RC._image_height(s)
+    args = (be, dc.px[k], dc.idx[k], k, H, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light, s.board, s.settings)
+    r64 = RC._radiance_record_device(args...; anchor = s.board)
+    F = Float32
+    est = (; mat = VgtkCore.convert_eltype(F, s.mat), light = VgtkCore.convert_eltype(F, s.light), board = VgtkCore.convert_eltype(F, s.board))
+    r32 = RC._radiance_record_device(args...; est, anchor = s.board)
+    @test eltype(r64.J) === RC.RadianceJac{Float64} && eltype(r32.J) === RC.RadianceJac{Float32}
+    a64 = RC.RadianceRays(r64.J, 0, s.board); a32 = RC.RadianceRays(r32.J, 0, s.board)
+    reached = [!iszero(G[:, RC.RAD_NL + 3]) for G in r64.J]
+    @test count(reached) > length(reached) ÷ 2 && reached == [!iszero(G[:, RC.RAD_NL + 3]) for G in r32.J]
+    @test all(iszero(G[:, RC.RAD_NL + 4]) for G in r64.J)                                     # Float64: no remainder
+    @test maximum(i -> norm(RC._recorded_anchor(a32, i) - RC._recorded_anchor(a64, i)), findall(reached)) < 1e-12
+    scale = maximum(G -> maximum(abs, G[:, 1:(1 + RC.RAD_NL)]), r64.J)
+    @test maximum(i -> maximum(abs, Float64.(r32.J[i][:, 1:(1 + RC.RAD_NL)]) - r64.J[i][:, 1:(1 + RC.RAD_NL)]), eachindex(r64.J)) < 1e-4 * scale
 end

@@ -121,32 +121,62 @@ struct HeightRayTag end
     inner + SMatrix{3, NH}(ntuple(q -> ForwardDiff.partials(wL[(q - 1) % 3 + 1], 1) * ForwardDiff.partials(s, (q - 1) ÷ 3 + 1), Val(3 * NH)))
 
 """
-    RadianceRecord(out, base) / RadianceRays(J, base)
+    RadianceRecord(out, base[, est]) / RadianceRays(J, base, anchor)
 
 The radiance-Jacobian modes of [`Φ_pixel`](@ref) (the device Jacobian): `L_c` depends on the parameters only through its local
 inputs ℓ — the albedo ρ, the roughness α, the refractive indices η, the outgoing direction ω_l and the board point 𝐱 — and channel c
 reads ρ and η only through ρ_c and η_c, so `RAD_NL` = 8 local slots carry its whole derivative: one shared by ρ_c, α, one shared by
 η_c, ω_l's two tangent components (ω_l is a unit vector: its partials are tangent, `_seed_tangents`) and 𝐱's three.
 `RadianceRecord`: at the plain parameters, each ray's `[L | ∂L/∂ℓ]` and its hit (`RadianceJac`, `_ray_hit`) are written to `out[base + ray]` (ray
-`(ks − 1) NA + la` of the pixel) and its value used. `RadianceRays`: the ray's ℓ, dual in the chunk's (or the height mode's) slots,
-replaces the estimator by its linearisation at the record, `L⁰ + J (ℓ − value(ℓ))` — the chain rule (∂L/∂θ = ∂L/∂ℓ · ∂ℓ/∂θ), so a
-chunk's partials skip the estimator. A ray the record did not reach reads as zero radiance with zero partials (the buffer is zeroed),
-as `L_c` returns for a ray the board does not face.
+`(ks − 1) NA + la` of the pixel) and its value used. The record's geometry — the rays, their hits, the albedo looked up there — is in
+the numbers of the `Φ_pixel` call (`ANCHOR_FLOAT` on a device), its estimator in the record's float (`eltype` of `out`'s rows), on the
+inputs `est` (`(; mat, light, board)` in that float; `nothing`: the call's own, one float). `RadianceRays`: the ray's ℓ, dual in the
+chunk's (or the height mode's) slots, replaces the estimator by its linearisation at the record, `L⁰ + J (ℓ − value(ℓ))` — the chain
+rule (∂L/∂θ = ∂L/∂ℓ · ∂ℓ/∂θ), so a chunk's partials skip the estimator; its albedo is VisualRadiometryToolkitCore's anchored lookup at
+the recorded hit (`anchored_albedo` on `anchor`, the target in `ANCHOR_FLOAT`: the hit's value, the chunk's partials). A ray the record
+did not reach reads as zero radiance with zero partials (the buffer is zeroed), as `L_c` returns for a ray the board does not face.
 """
-struct RadianceRecord{A}
+struct RadianceRecord{A, E}
     out::A
     base::Int
+    est::E
 end
-struct RadianceRays{A}
+RadianceRecord(out, base) = RadianceRecord(out, base, nothing)
+struct RadianceRays{A, B}
     J::A
     base::Int
+    anchor::B
 end
+"""
+    RecordedRays(J, anchor)
+
+A view's radiance record on its backend (`_launch_record`): the rays' rows `J` (`RadianceJac`, pixel-major) and the target in
+`ANCHOR_FLOAT` (`anchor`: its page and maps; a kernel replaces its state) at whose recorded hits the chunks, the height kernel and the
+parts read the rays (`RadianceRays`).
+"""
+struct RecordedRays{A, B}
+    J::A
+    anchor::B
+end
+Adapt.@adapt_structure RecordedRays
 struct RadianceTag end
 const RAD_NL = 8
-"""A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` in the kernels' float type `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend): the
-radiance and its `RAD_NL` local partials, then the ray's hit: its board point 𝐱 and the board surface's normal 𝐧 there (`_ray_hit`;
-any length, 𝐧 ⋅ 𝐝 = 1)."""
-const RadianceJac{T} = SMatrix{3, RAD_NL + 3, T, 3 * (RAD_NL + 3)}
+"""
+    ANCHOR_FLOAT = Float64
+
+The float, on every backend, of a radiance record's geometry: the rays, their hits and the albedo looked up there (`RadianceRecord`),
+and so of the ANCHOR at which every reader of the record looks the albedo up again (`RadianceRays`: VisualRadiometryToolkitCore's
+`anchored_albedo`, the recorded hit plus the reader's Float32 offset). A Float32 board point is ≈ 0.1 µm coarse a metre from the
+origin, and on a printed edge (the Siemens print's σ 0.03 mm) the radiance's slope moves by ≈ 1 % with it (dgx01, 2026-11-11: the
+pose's columns 0.37–0.82 % off the CPU's, the gate 0.4 %): the point must be Float64. Its arithmetic is not: the estimator, the
+Jacobian chunks and the height kernel run in the kernels' float (`_kernel_float`) at the anchored point.
+"""
+const ANCHOR_FLOAT = Float64
+"""A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧 | 𝐱 − 𝐱̃]` in the record's float `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend):
+the radiance and its `RAD_NL` local partials, then the ray's hit: its board point 𝐱̃ (𝐱 rounded to `T`), the board surface's normal 𝐧
+there (`_ray_hit`; any length, 𝐧 ⋅ 𝐝 = 1) and the rounding's remainder, so the hit `𝐱̃ + (𝐱 − 𝐱̃)` holds `ANCHOR_FLOAT`'s precision
+(`_recorded_anchor`; zero in Float64)."""
+const RadianceJac{T} = SMatrix{3, RAD_NL + 4, T, 3 * (RAD_NL + 4)}
 struct HitTag end
 """
     _ray_hit(hrays, lrays, ri, rays, o, d) -> (s, 𝐱, 𝐧)
@@ -175,12 +205,17 @@ warped page): the ray's parameter `s`, the board point 𝐱, and — where a mod
     𝐧 = SVector{3, T}(ntuple(j -> (d[j] - (d[1] * ForwardDiff.partials(𝐱d[1], j) + d[2] * ForwardDiff.partials(𝐱d[2], j) + d[3] * ForwardDiff.partials(𝐱d[3], j))), Val(3)))
     return ForwardDiff.value(sd), SVector{3, T}(ntuple(c -> ForwardDiff.value(𝐱d[c]), Val(3))), 𝐧
 end
-"""A record ray's hit `(𝐱, 𝐧, reached)` (`RadianceJac`'s last two columns): `reached` false where the record did not reach the ray
-(its zeros, 𝐧 = 0)."""
+"""A record ray's hit `(𝐱̃, 𝐧, reached)` (`RadianceJac`'s hit columns: the hit in the record's float): `reached` false where the record
+did not reach the ray (its zeros, 𝐧 = 0)."""
 @inline function _recorded_hit(lr::RadianceRays, ri)
     G = @inbounds lr.J[lr.base + ri]
     𝐧 = SVector(G[1, RAD_NL + 3], G[2, RAD_NL + 3], G[3, RAD_NL + 3])
     return SVector(G[1, RAD_NL + 2], G[2, RAD_NL + 2], G[3, RAD_NL + 2]), 𝐧, !iszero(𝐧)
+end
+"""A record ray's hit in `ANCHOR_FLOAT` (`RadianceJac`: 𝐱̃ + (𝐱 − 𝐱̃)): the anchor of its readers' lookups (`_ray_radiance`)."""
+@inline function _recorded_anchor(lr::RadianceRays, ri)
+    G = @inbounds lr.J[lr.base + ri]
+    return SVector(ntuple(c -> ANCHOR_FLOAT(G[c, RAD_NL + 2]) + ANCHOR_FLOAT(G[c, RAD_NL + 4]), Val(3)))
 end
 @inline function _ray_hit(::Nothing, lr::RadianceRays, ri, rays, o::StaticVector{3}, d::StaticVector{3})
     𝐱₀, 𝐧, _ = _recorded_hit(lr, ri)
@@ -190,22 +225,32 @@ end
 """The radiance of a ray (`Φ_pixel`'s ray `ri`): `L_c`, or one of its radiance-Jacobian modes (`RadianceRecord`, `RadianceRays`)."""
 @inline _ray_radiance(::Nothing, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧) = L_c(bd, m, lt, sm, key, 𝐛, 𝐱, ω)
 @inline function _ray_radiance(lr::RadianceRecord, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
-    ω_l, T, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
+    ω_l, T, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)            # the record's geometry: its hit and the albedo there
     front || return zero(SVector{3, T})
-    D = ForwardDiff.Dual{RadianceTag, T, RAD_NL}
-    ε(j) = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials(ntuple(i -> i == j ? one(T) : zero(T), Val(RAD_NL))))
-    e1, e2 = _seed_tangents(ω_l)
-    L = _radiance_mc(bd, m, lt, sm, key, ρ .+ ε(1), α + ε(2), η .+ ε(3), ω_l + ε(4) * e1 + ε(5) * e2,
-                     SVector(𝐱[1] + ε(6), 𝐱[2] + ε(7), 𝐱[3] + ε(8)), D)
+    E = eltype(eltype(lr.out))                                               # the estimator's float, the record's
+    bdE, mE, ltE = _estimator_inputs(lr.est, bd, m, lt)
+    D = ForwardDiff.Dual{RadianceTag, E, RAD_NL}
+    ε(j) = ForwardDiff.Dual{RadianceTag}(zero(E), ForwardDiff.Partials(ntuple(i -> i == j ? one(E) : zero(E), Val(RAD_NL))))
+    ω_lE = SVector{3, E}(ω_l); 𝐱E = SVector{3, E}(𝐱)
+    e1, e2 = _seed_tangents(ω_lE)
+    L = _radiance_mc(bdE, mE, ltE, sm, key, SVector{3, E}(ρ) .+ ε(1), E(α) + ε(2), SVector{3, E}(η) .+ ε(3), ω_lE + ε(4) * e1 + ε(5) * e2,
+                     SVector(𝐱E[1] + ε(6), 𝐱E[2] + ε(7), 𝐱E[3] + ε(8)), D)
     @inbounds lr.out[lr.base + ri] = eltype(lr.out)(ntuple(q -> (c = (q - 1) % 3 + 1; j = (q - 1) ÷ 3;
                                                               j == 0 ? ForwardDiff.value(L[c]) : j <= RAD_NL ? ForwardDiff.partials(L[c], j) :
-                                                              j == RAD_NL + 1 ? 𝐱[c] : 𝐧[c]), Val(3 * (RAD_NL + 3))))   # [L | ∂L/∂ℓ | 𝐱 | 𝐧]
-    return SVector(ntuple(c -> ForwardDiff.value(L[c]), Val(3)))
+                                                              j == RAD_NL + 1 ? 𝐱E[c] : j == RAD_NL + 2 ? E(𝐧[c]) : E(𝐱[c] - 𝐱E[c])),
+                                                       Val(3 * (RAD_NL + 4))))   # [L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃]
+    return SVector(ntuple(c -> T(ForwardDiff.value(L[c])), Val(3)))
 end
+"""The estimator's inputs of a record (`RadianceRecord`'s `est`): the call's own (`nothing`: one float), or `(; mat, light, board)` in
+the record's float."""
+@inline _estimator_inputs(::Nothing, bd, m, lt) = (bd, m, lt)
+@inline _estimator_inputs(est, bd, m, lt) = (est.board, est.mat, est.light)
 @inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
 @inline _δ(x::Real) = zero(x)
 @inline function _ray_radiance(lr::RadianceRays, ri, bd, m, lt, sm, key, 𝐛, 𝐱, ω, 𝐧)
-    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, 𝐛, 𝐱, ω)
+    # the albedo at the recorded hit (ANCHOR_FLOAT) moved by the ray's partials, under the chunk's state (`anchored_albedo`)
+    ρ𝐱 = anchored_albedo(with_state(lr.anchor, bd.state), _recorded_anchor(lr, ri), _δ.(𝐱))
+    ω_l, Tz, front, (ρ, α, η) = _ray_material(bd, m, lt, ρ𝐱, 𝐱, ω)
     front || return zero(SVector{3, Tz})
     e1, e2 = _seed_tangents(ForwardDiff.value.(ω_l))
     q4 = _δ(dot(e1, ω_l)); q5 = _δ(dot(e2, ω_l)); qα = _δ(α)

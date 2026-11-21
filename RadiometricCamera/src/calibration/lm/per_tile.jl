@@ -668,14 +668,14 @@ function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, nee
     lensf = _assemble_lens(s.camera.geometric::GridLike, vec, gb.patches)
     return _batch_launch(s, k, vars, lensf, vec[first(gb.patches)], s.device_cache.px[k], s.device_cache.idx[k], key, need_jac)
 end
-"""One chunk of a view batch's Jacobian (`_batch_launch`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on the
-lens `lens` and the board `board` (its state replaced by the seeded one), both in `F` (`_kernel_float`, or
-`HIGH_FLOAT` for the pose's chunks: `hi`). Returns the `_JacAt` inputs `(view, mat, board, fbase, dbase, hi)`."""
-function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, board, hi::Bool) where {F}
+"""One chunk of a view batch's Jacobian (`_batch_launch`) in the kernels' float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on
+the lens `lens` and the board `board` (its state replaced by the seeded one), both in `F`. Returns the `_JacAt` inputs
+`(view, mat, board, fbase, dbase)`."""
+function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, board) where {F}
     N = length(VgtkCore.model(foc).t̂_i)
     D, cd, pose_d, focus_d, mat_d, board_d = _seed_chunk(Val(F), c0, C, lay, pose, foc, m, board, lay.NI)
     view_d = View{D, N, typeof(lens)}(pose_d, lens, focus_d, cd(ap.r, lay.off_r + 1))
-    return (view_d, mat_d, board_d, Int32(lay.off_f - c0), Int32(lay.off_dir - c0), hi)
+    return (view_d, mat_d, board_d, Int32(lay.off_f - c0), Int32(lay.off_dir - c0))
 end
 
 """
@@ -697,8 +697,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
                                      F(ap.r))
     H = _image_height(s)
     fluxf = _flux_functor(s, k, v32, VgtkCore.model(vg), m.mat, lt.light, m.surface)
-    recordf = nothing; hrecordf = nothing; jacf = Tuple{Int, Any}[]; heightf = nothing; partsf = nothing
-    hk = nothing
+    recordf = nothing; jacf = Tuple{Int, Any}[]; heightf = nothing; partsf = nothing
     C = s.jacobian_chunk
     P = 0
     if need_jac
@@ -716,16 +715,12 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
         m32 = VgtkCore.convert_eltype(F, m.mat)
         board32 = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
-        recordf = (be, px, idx, k, H, v32, vig32j, m32, l32j, board32, st32)   # the estimator once per ray (`_launch_record`)
-        if _needs_high(F, lay.NH > 0)                      # the nodal heights' kernel and its own record, in Float64 (`HIGH_FLOAT`)
-            hk = _height_inputs(s, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light, lensf)
-            HIGH_FLOAT === F || (hrecordf = (be, px, idx, k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st))   # (CPU: the chunks' record)
-            lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st, m.surface.h))
-        end
-        plan = _chunk_plan(_chunk_starts(P, C), F, (lens32, dc.board),
-                           hk === nothing ? nothing : (hk.view.geometric, hk.board))
-        for (c0, Fc, inputs, high) in plan
-            push!(jacf, (c0, _tile_chunk(Val(Fc), c0, C, lay, pose, foc, ap, m, inputs..., high)))
+        # the estimator once per ray (`_launch_record`: its geometry in `ANCHOR_FLOAT`)
+        recordf = _record_inputs(s, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light,
+                                 (v32, vig32j, m32, l32j, board32, st32), lensf)
+        lay.NH > 0 && (heightf = (k, H, v32, vig32j, m32, l32j, board32, st32, m.surface.h))
+        for c0 in _chunk_starts(P, C)
+            push!(jacf, (c0, _tile_chunk(Val(F), c0, C, lay, pose, foc, ap, m, lens32, dc.board)))
         end
         partsf = (Int32(k), Int32(H), v32, vig32j, m32, l32j, board32, st32, (Val(J), Val(NV)))   # (`_PartsAt`, with the batch's record)
     end
@@ -734,14 +729,10 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
     vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
     return _on_worker() do
         fo = _launch_rows(fluxf, be, px)
-        # the estimator once per ray: in `HIGH_FLOAT` where a chunk needs it, that record rounded for the others (`_record_as`)
-        hrays = hrecordf === nothing ? nothing : _launch_record(hrecordf...)
-        rays = recordf === nothing ? nothing : hrays === nothing ? _launch_record(recordf...) : _record_as(F, hrays)
-        hrays === nothing && (hrays = rays)
-        ho = heightf === nothing ? nothing : _launch_rows(_height_functor(heightf..., px, hrays), be, idx; workgroupsize = 128)
-        co = [(c0, hi ? _launch_rows(_JacAt(Int32(k), Int32(H), vd, hk.vig, md, hk.light, sd, hk.st, Val(C), fb, db, px, hrays), be, idx; workgroupsize = 128) :
-                        _launch_rows(_JacAt(Int32(k), Int32(H), vd, vig32j, md, l32j, sd, st32, Val(C), fb, db, px, rays), be, idx; workgroupsize = 128))
-              for (c0, (vd, md, sd, fb, db, hi)) in jacf]
+        rays = recordf === nothing ? nothing : _launch_record(be, px, idx, k, H, recordf.inputs...; recordf.kw...)
+        ho = heightf === nothing ? nothing : _launch_rows(_height_functor(heightf..., px, rays), be, idx; workgroupsize = 128)
+        co = [(c0, _launch_rows(_JacAt(Int32(k), Int32(H), vd, vig32j, md, l32j, sd, st32, Val(C), fb, db, px, rays), be, idx; workgroupsize = 128))
+              for (c0, (vd, md, sd, fb, db)) in jacf]
         po = partsf === nothing ? nothing : _launch_rows(_PartsAt(partsf..., px, rays), be, idx)
         KA.synchronize(be)
         flux = Float64.(Array(fo))                         # the residual's values (a channel triple per pixel); the Jacobian's stay on the device
@@ -750,7 +741,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         # the batch's outputs are read by its tiles' row kernels on other queues (the main task's, the window's workers) and never
         # written again: out of the per-buffer queue tracking (`_shared_read_only!`), as the view's pixel lists
         foreach(a -> a === nothing || _shared_read_only!(be, a), (fo, S, po, ho))
-        bytes = _device_bytes(fo, rays, hrays === rays ? nothing : hrays, ho, po, S) + sum(x -> sizeof(x[2]), co; init = 0)
+        bytes = _device_bytes(fo, rays === nothing ? nothing : rays.J, ho, po, S) + sum(x -> sizeof(x[2]), co; init = 0)
         (; key, flux, flux_d = fo, px, C, S, parts = po, heights = ho, bytes)
     end
 end

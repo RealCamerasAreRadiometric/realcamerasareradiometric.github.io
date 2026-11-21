@@ -507,7 +507,7 @@ _register_window!(s::CalibrationState, p::VgtkCore.LmProblem, select; width::Uni
     _register_window!(s, p.problem, select; width)                           # an LM problem: its NLLSsolver problem's blocks
 function _register_window!(s::CalibrationState, problem, select; width::Union{Nothing, Integer} = nothing)
     _unregister_window!(s)
-    _ensure_device!(s); _height_board(s); _view_phi(s, 1)        # the device cache's lazy entries, built before workers read it
+    _ensure_device!(s); _anchor_board(s); _view_phi(s, 1)        # the device cache's lazy entries, built before workers read it
     list = [c for T in keys(problem.costs) if select(T) for c in get(problem.costs, T)]
     pos = IdDict{Any, Int}(c => i for (i, c) in enumerate(list))
     s.device_cache = merge(s.device_cache, (; window = (; problem, list, pos, width = Ref(width === nothing ? 0 : Int(width)),

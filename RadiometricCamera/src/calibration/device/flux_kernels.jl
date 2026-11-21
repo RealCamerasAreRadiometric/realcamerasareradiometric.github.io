@@ -176,18 +176,19 @@ function _jac_device(be, px, idx, k, H, view, vig, mat, light, board, st, ::Val{
 end
 
 """The pixel id and the radiance-Jacobian rows of the `i`-th pixel of the list `px` (`rays`: a view's record, `_radiance_record_device`)."""
-@inline function _pixel_and_rays(px, rays, i::UInt32, st)
+@inline function _pixel_and_rays(px, rays::RecordedRays, i::UInt32, st)
     nr = length(st.sensor) * n_disc(st.aperture)
-    return (@inbounds px[i]), RadianceRays(rays, (Int(i) - 1) * nr)
+    return (@inbounds px[i]), RadianceRays(rays.J, (Int(i) - 1) * nr, rays.anchor)
 end
 """The device list `1 … n` (the functors that read a record map over pixel indices), built once per pixel list: a view's in the
 device cache (`_ensure_device!`, `idx`), a tile's in its own (`_tile_dev!`)."""
 _index_list(be, n::Integer) = adapt(be, collect(UInt32(1):UInt32(n)))
 
-"""The radiance record of a pixel index (`RadianceRecord`): `Φ_pixel` at the plain parameters writing every ray's `[L | ∂L/∂ℓ]`.
-A thread per pixel: the pixel's footprint, sensor samples and focus are formed once for its rays (a thread per ray or per sensor
-sample measured 13× and 2× slower on a 12 048-px view)."""
-struct _RecordAt{V, G, M, L, S, T, P, O}
+"""The radiance record of a pixel index (`RadianceRecord`): `Φ_pixel` at the plain parameters writing every ray's `[L | ∂L/∂ℓ]`,
+its geometry in the numbers of `view`, `board` and `st`, its estimator in the record's float on `est` (`RadianceRecord`). A thread per
+pixel: the pixel's footprint, sensor samples and focus are formed once for its rays (a thread per ray or per sensor sample measured
+13× and 2× slower on a 12 048-px view)."""
+struct _RecordAt{V, G, M, L, S, T, P, O, E}
     k::Int32
     H::Int32
     view::V
@@ -198,6 +199,7 @@ struct _RecordAt{V, G, M, L, S, T, P, O}
     st::T
     px::P
     out::O
+    est::E
 end
 Adapt.@adapt_structure _RecordAt
 _row_type(f::_RecordAt) = SVector{3, _float_of(f.st)}
@@ -205,41 +207,35 @@ _row_type(f::_RecordAt) = SVector{3, _float_of(f.st)}
     nr = length(f.st.sensor) * n_disc(f.st.aperture)
     u, v = _decode_px(@inbounds(f.px[i]), f.H)
     return SVector{3, _float_of(f.st)}(_Φ_pixel(u, v, Int(f.k), Int(f.H), f.view, f.vig, f.mat, f.light, f.board, f.st, nothing, nothing,
-                                       nothing, RadianceRecord(f.out, (Int(i) - 1) * nr)))
+                                       nothing, RadianceRecord(f.out, (Int(i) - 1) * nr, f.est)))
 end
 """
-    _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32) -> device vector of `RadianceJac`
+    _radiance_record_device(be, px, idx, k, H, view, vig, mat, light, board, st; est = nothing, anchor) -> RecordedRays
 
-The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (the kernel's float type) (view `v32`, material, lighting, scene with
-its surface): per ray `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
-the height kernel of the same parameters read it (`rays`) instead of carrying their partials through the estimator.
+The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (view, material,
+lighting, scene with its surface): per ray `[L | ∂L/∂ℓ | 𝐱̃ | 𝐧 | 𝐱 − 𝐱̃]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed
+where no ray reached, with the target `anchor` (`ANCHOR_FLOAT`) its readers look the albedo up on (`RecordedRays`). Its geometry is in
+the inputs' float (`ANCHOR_FLOAT` on a device: `_anchor_inputs`), its estimator and rows in the kernels' float on `est`
+(`(; mat, light, board)`; `nothing`: the inputs' own, one float). The chunks, the height kernel and the parts of the same parameters
+read it (`rays`) instead of carrying their partials through the estimator.
 """
-function _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
-    out = _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
+function _radiance_record_device(be, args...; kw...)
+    out = _launch_record(be, args...; kw...)
     KA.synchronize(be)
     return out
 end
 """`_radiance_record_device` without the wait (this task's device queue orders the kernels that read it after it)."""
-function _launch_record(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
-    nr = length(st32.sensor) * n_disc(st32.aperture)
-    F = _float_of(st32)
+function _launch_record(be, px, idx, k, H, view, vig, mat, light, board, st; est = nothing, anchor)
+    nr = length(st.sensor) * n_disc(st.aperture)
+    F = est === nothing ? _float_of(st) : _target_float(est.board)
     out = reinterpret(RadianceJac{F}, KA.zeros(be, F, length(RadianceJac{F}) * nr * length(px)))
-    f = _RecordAt(Int32(k), Int32(H), v32, vig32, m32, l32, board32, st32, px, out)
+    f = _RecordAt(Int32(k), Int32(H), view, vig, mat, light, board, st, px, out, est)
     haskey(_CAPACITY, typeof(be)) || _note_capacity!(be, f, idx, 128)   # the LM's heaviest kernel: its occupancy sizes the window
     _launch_rows(f, be, idx; workgroupsize = 128)
-    return out
+    return RecordedRays(out, anchor)
 end
-
-"""
-    _record_as(F, record) -> record in the float `F`
-
-A radiance record (`_launch_record`, in `HIGH_FLOAT`) in the kernels' float `F`: the same numbers, rounded (one device broadcast,
-queued on this task's queue). A device linearization needs the record in both floats — `HIGH_FLOAT` for the pose's chunks and the
-heights, the kernels' float for the other chunks and the parts — and ran the estimator once in each (the kernels'-float record
-29 ms of a 76,800-pixel view's 127 ms on a B200, 2026-11-20); the rounded `HIGH_FLOAT` record is the more accurate of the two (the
-Float32 estimator's α and η derivatives are up to 0.4 % off at a printed edge, `HIGH_FLOAT`).
-"""
-_record_as(::Type{F}, record) where {F} = reinterpret(RadianceJac{F}, F.(reinterpret(eltype(eltype(record)), record)))
+"""The float of a textured target's page and maps."""
+_target_float(::TexturedTarget{T}) where {T} = T
 
 """The resident threads of the radiance-record kernel by backend type (`_note_capacity!`): the capacity the blocks' window divides
 (`_window_width`); `nothing` on a backend without an occupancy query. Keyed by the backend, not one value: the package image's

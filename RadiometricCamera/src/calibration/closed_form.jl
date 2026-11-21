@@ -151,12 +151,12 @@ Base.length(p::RadiometryParts) = length(p.parts)
     all_parts(s::CalibrationState) -> RadiometryParts
 
 The parts of every masked pixel, rendered once on the state's backend: Core's `pointwise!` of `_PixelPartsAt` (device/jacobian_kernels.jl) per view,
-in Float64 on every backend, as the nodal heights' path (`_height_float`): the closed-form solves are exact least squares on them.
+in Float64 on every backend (`ANCHOR_FLOAT`'s scene, `_anchor_board`): the closed-form solves are exact least squares on them.
 """
 function all_parts(s::CalibrationState)
     be = s.backend
     dc = _ensure_device!(s)
-    board = _height_board(s)                                                  # the Float64 scene on the backend
+    board = _anchor_board(s)                                                  # the Float64 scene on the backend
     G = Float64
     mat = VgtkCore.convert_eltype(G, s.mat); light = VgtkCore.convert_eltype(G, s.light); st = VgtkCore.convert_eltype(G, s.settings)
     R = _parts_type(light, st)

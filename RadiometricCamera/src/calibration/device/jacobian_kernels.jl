@@ -331,27 +331,29 @@ function _ensure_device!(s::CalibrationState)
     return s.device_cache
 end
 
-"""The scene of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
-kernels' scene itself where the two float types agree)."""
-function _height_board(s::CalibrationState)
+"""The scene in `ANCHOR_FLOAT` on the state's backend, adapted once and kept in the device cache (the kernels' scene itself where the
+two float types agree): the radiance record's geometry (`_anchor_inputs`), the anchor of its readers' lookups (`RecordedRays`) and
+the closed-form solves' parts (`all_parts`)."""
+function _anchor_board(s::CalibrationState)
     dc = _ensure_device!(s)
-    hasproperty(dc, :board_h) && return dc.board_h
+    hasproperty(dc, :board_a) && return dc.board_a
     be = s.backend
-    G = HIGH_FLOAT
+    G = ANCHOR_FLOAT
     sh = G === _kernel_float(be) ? dc.board : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, s.board)))
-    s.device_cache = merge(s.device_cache, (; board_h = sh))
+    s.device_cache = merge(s.device_cache, (; board_a = sh))
     return sh
 end
 """
-    _height_inputs(s, view, vig, m::MaterialVar, light[, lens]) -> (; view, vig, mat, light, board, st)
+    _anchor_inputs(s, view, vig, m::MaterialVar, light[, lens]) -> (; view, vig, mat, light, board, st)
 
-The inputs of the nodal heights' radiance record and height kernel at the trial parameters, in `HIGH_FLOAT` (Float64). `view` is
-host-side; its lens is adapted here (`lens`: an already assembled grid, `_lens32` of it in the float type).
+The inputs of the radiance record's geometry at the trial parameters, in `ANCHOR_FLOAT` (Float64): its rays, their hits and the
+albedo there (`RadianceRecord`). `view` is host-side; its lens is adapted here (`lens`: an already assembled grid, `_lens32` of it in
+the float type).
 """
-function _height_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, lens = nothing)
+function _anchor_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, lens = nothing)
     be = s.backend
-    G = HIGH_FLOAT
-    board = with_state(_height_board(s), VgtkCore.convert_eltype(G, m.surface))
+    G = ANCHOR_FLOAT
+    board = with_state(_anchor_board(s), VgtkCore.convert_eltype(G, m.surface))
     vG = lens === nothing ? adapt(be, VgtkCore.convert_eltype(G, view)) :
          (l = _lens32(be, lens, G); View{G, length(view.focus.t̂_i), typeof(l)}(_pose_eltype(G, view.pose), l, VgtkCore.convert_eltype(G, view.focus), G(view.r)))
     return (; view = vG, vig = VgtkCore.convert_eltype(G, vig), mat = VgtkCore.convert_eltype(G, m.mat), light = VgtkCore.convert_eltype(G, light),
@@ -400,7 +402,8 @@ is one of the dual slots) in the kernels' float type (`_kernel_float`: Float32 o
 partials per chunk), the nodal heights by the height kernel, the linear blocks' analytic columns by the parts kernel, the flux by the
 flux kernel — all kept on the device and assembled by the row kernel (`_jacobian_row!`): `J` (the layout's full columns × the measured
 rows) and the residual `res` on the backend, the flux (device), the layout and the column map `T` to the problem's coordinates
-(`_column_map`).
+(`_column_map`). The chunks, the height kernel and the parts read the view's radiance record, whose geometry is `ANCHOR_FLOAT`'s
+(`_anchor_inputs`) and whose hits anchor their albedo lookups (`RadianceRays`).
 """
 function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist::_LensBlock,
                         foc::_FocusBlock, ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar) where {N}
@@ -427,25 +430,15 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)
     vk = adapt(be, VgtkCore.convert_eltype(F, view0))                 # adapt: a grid lens carries arrays
     mk = VgtkCore.convert_eltype(F, m.mat); boardk = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
-    G = HIGH_FLOAT                                             # the heights' and the pose chunks' float type and inputs
-    hk = _needs_high(F, need_h) ? _height_inputs(s, view0, VgtkCore.model(vg), m, lt.light) : nothing
-    # the estimator once per ray: in `HIGH_FLOAT` where a chunk needs it (a device: the pose's), and then that record's numbers
-    # rounded to the kernels' float for the other chunks and the parts (`_record_as`), not a second record
-    if G === F || hk === nothing                               # (the CPU backend: the chunks' record is already Float64)
-        rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), vk, vigk, mk, lk, boardk, stk)
-        hrays = rays
-    else
-        hrays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st)
-        rays = _record_as(F, hrays)
-    end
+    # the estimator once per ray, in the kernels' float; its geometry (the rays, the hits, the albedo there) in `ANCHOR_FLOAT`
+    rec = _record_inputs(s, view0, VgtkCore.model(vg), m, lt.light, (vk, vigk, mk, lk, boardk, stk))
+    rays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), rec.inputs...; rec.kw...)   # complete: the chunks' queues read it
     _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
-    hrays === rays || _shared_read_only!(be, hrays)
-    plan = _chunk_plan(c0s, F, (vigk, lk, dc.board, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.board, hk.st, hrays))
-    hs = _each_chunk(be, plan) do (c0, Fc, inputs, _)                 # the chunks' launches overlap (one worker queue each)
-        _view_chunk(Val(Fc), s, r, lay, c0, C, pose, dist, foc, ap, m, inputs...)
+    hs = _each_chunk(be, c0s) do c0                                   # the chunks' launches overlap (one worker queue each)
+        _view_chunk(Val(F), s, r, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, dc.board, stk, rays)
     end
     S = _slot_rows(be, [(c0, h, C) for (c0, h) in zip(c0s, hs)], P, npx)
-    hh = need_h ? _heights_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st, m.surface.h; rays = hrays) :
+    hh = need_h ? _heights_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), vk, vigk, mk, lk, boardk, stk, m.surface.h; rays) :
          nothing                                           # the nodal heights: the height kernel's partials
     ph = need_lin ? _parts_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(s), vk, vigk, mk, lk, boardk, stk, J, NV; rays) : nothing
     # The residual must be BITWISE the one `computeresidual` returns for the same parameters: NLLSsolver
@@ -461,9 +454,23 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
-    _note_block_bytes!(s, _device_bytes(rays, hrays === rays ? nothing : hrays, S, hh, ph, flux, Jd, rd) +
+    _note_block_bytes!(s, _device_bytes(rays.J, S, hh, ph, flux, Jd, rd) +
                        sum(sizeof, hs; init = 0))
     return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, ap, m))
+end
+"""
+    _record_inputs(s, view, vig, m::MaterialVar, light, kernel_inputs[, lens]) -> (; inputs, kw)
+
+The arguments of THE radiance record (`_launch_record(be, px, idx, k, H, inputs...; kw...)`) at the trial parameters: its geometry in
+`ANCHOR_FLOAT` (`_anchor_inputs` of the host `view`, `vig`, `m`, `light`; `lens` a tile batch's assembled grid), its estimator in the
+kernels' float on `kernel_inputs` = `(view, vig, mat, light, board, st)` (adapted), the anchor of its readers' lookups. On the CPU
+backend the two floats agree: the kernels' inputs alone.
+"""
+function _record_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, light, kernel_inputs, lens = nothing)
+    _kernel_float(s.backend) === ANCHOR_FLOAT && return (; inputs = kernel_inputs, kw = (; anchor = _anchor_board(s)))
+    _, _, mk, lk, boardk, _ = kernel_inputs
+    a = _anchor_inputs(s, view, vig, m, light, lens)
+    return (; inputs = (a.view, a.vig, a.mat, a.light, a.board, a.st), kw = (; est = (; mat = mk, light = lk, board = boardk), anchor = _anchor_board(s)))
 end
 """The device layouts of the views' Jacobians, keyed by the layout (`_cached_layout`; every view of a state has the same layout for
 the same free blocks), kept in the device cache."""
@@ -506,9 +513,9 @@ function _block_jacobian(varflags, r::PerViewResidual, vars...)
            _host_jacobian(v.J, v.T, v.lay, r.state.run)
 end
 
-"""One chunk of the per-view Jacobian (`_view_jacobian`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded,
+"""One chunk of the per-view Jacobian (`_view_jacobian`) in the kernels' float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded,
 the plain vignetting, lighting and settings, the board `board` (its state replaced by the seeded one) and the record `rays` all in
-`F` (`_kernel_float`, or `HIGH_FLOAT` for the pose's chunks)."""
+`F`."""
 function _view_chunk(::Val{F}, s::CalibrationState, r::PerViewResidual{N}, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, board, stk,
                      rays) where {F, N}
     be = s.backend
