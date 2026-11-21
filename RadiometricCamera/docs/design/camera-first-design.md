@@ -511,16 +511,17 @@ dependent patch is in a batch of its own varflags):
 
 - ONE launch of the row kernel over the view's tiles' rows, each tile padded to the largest tile's pixels (`_tiles_row!`: per row its
   tile's window lens, bases and patch origin around the unchanged `_jacobian_row!`);
-- the products as two strided batched gemms over the zero-padded rows (CUDA extension; the CPU backend forms each tile's as before),
-  downloaded once into a pooled page-locked buffer (into fresh pageable memory the 60 MB took 65–210 ms);
-- the problem's coordinates on the host's threads, the finiteness test on `g` and the diagonal of `H`.
+- the blocks in the problem's coordinates on the device (CUDA extension: `TᵀJ` as one product, then two strided batched gemms over the
+  zero-padded rows), downloaded once into a pooled page-locked buffer (into fresh pageable memory the 60 MB took 65–210 ms), each
+  tile's copied out as it is handed out; the finiteness test on `g` and the diagonal of `H`. The CPU backend forms each tile's as
+  the per-tile path does (`_gauss_newton_blocks`).
 
 The per-tile path is the same builder over one tile (`_tile_rows`). It serves the tests, the stall postcondition, a tile asked again
 at a trial and a failed batch.
 
 **Identity.** The rows and the residual are the per-tile path's bit for bit: the same row kernel at the same inputs. On the CPU
 backend the blocks are too; the test `grid lens / a view's tiles in one batch` covers every tile, with a dependent patch and with a
-held aperture. On a B200 the blocks differ only in the products' summation order (the batched gemm over the padded rows):
+held aperture. On a B200 the blocks differ only in rounding — `(TᵀJ)(TᵀJ)ᵀ` instead of `Tᵀ(JJᵀ)T`, summed over the padded rows — at
 ≤ 1e-12 of the block's norm, tested on every tile. The cost is bit for bit. One grid LM iteration ends at the same cost to every
 printed digit (7.74473219238; 7.744732192378656 in full), and the tile stages' checksums are the same.
 
@@ -529,9 +530,12 @@ jobs of the same node):
 
 | stage | `main` | branch | |
 |---|---:|---:|---|
-| a view's tiles: normal equations (the view's batch included) | 0.261 s | 0.187 s | 1.4× |
-| the tiles' rows and products alone (the view's batch memoized) | 0.152 s | 0.029 s | 5.3× |
-| LM, 1 iteration, grid | 2.71 s | 2.61 s | |
+| a view's tiles: normal equations (the view's batch included) | 0.261 s | 0.167 s | 1.6× |
+| the tiles' rows and products alone (the view's batch memoized) | 0.152 s | 0.035 s | 4.3× |
+| LM, 1 iteration, grid | 2.71 s | 2.71 s | — |
+
+(The branch's two earlier states measured 0.159–0.187 s, 0.021–0.029 s and 2.61–2.96 s: one LM iteration varies by ±0.2 s from job to
+job.)
 
 The batch's own phases, warm, for one view of 108 tiles (16,384 px, padded to 224 a tile):
 
@@ -540,19 +544,18 @@ The batch's own phases, warm, for one view of 108 tiles (16,384 px, padded to 22
 | the windows' lenses and bases (108 small uploads) | 1.1–1.8 |
 | the row kernel | 0.85 |
 | the products and their download | 2–5 |
-| the problem's coordinates (16 threads) | 4–18 |
+| the problem's coordinates (then on the host's threads; now on the device, inside the products) | 4–18 |
 
 The LM iteration gains little, because the tiles were not its critical path. The iteration's linearizations take 1.02–1.04 s on
 `main` and 0.73–0.75 s on the branch, measured on the calling task. The other ≈ 1.9–2.1 s is unchanged: the residual sweeps and
 NLLSsolver's assembly and sparse solve. On `main` the window's concurrent tile jobs already hid most of the tiles' latency behind the
 next view's batch, so the view batches' Jacobian kernels now bound the linearization. Records:
-`/cluster/projects/vgtk/logs/rc-round4-grid/results/` (`base-6b1916f-grid`, `br-b1189b4-grid`).
+`/cluster/projects/vgtk/logs/rc-round4-grid/results/` (`base-6b1916f-grid`, `br-60cfef3-grid`).
 
 Left as they are, with the measurement:
 - **The tiles' window still runs.** Its jobs only wait for the batch: the tile stage is 0.026 s with it and 0.021 s without, and one
   LM iteration is within noise. Removing it changes the run record's `window_width` provenance for grid runs.
 - **The window lenses are uploaded per tile.** Packing them into one upload would save about 1 ms a view.
-- **`TᵀHT` stays on the host.** On the device it would be a third batched gemm, and the host copy keeps the CPU's blocks bit for bit.
 
 ### 7.5 The focus A/B on real data (the run of record's pipeline, f/4 fisheye; 2026-11-21)
 
