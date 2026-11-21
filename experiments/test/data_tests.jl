@@ -21,7 +21,7 @@
     const CATALOG = load_catalog(projectdir("configs", "data_artifacts.toml"))
     const TIERS = tier_entries(CATALOG)                                   # tier => [entry, …] (the entries of record)
     const OF_RECORD = entries_of_record(CATALOG)
-    const RETIRED = sort(setdiff(keys(CATALOG.artifacts), OF_RECORD))
+    const RETIRED = sort(collect(setdiff(keys(CATALOG.artifacts), OF_RECORD)))
 
     """Every (config, input id, tier, path) of the configs of record: the experiments' [inputs] and the calibration cases' [pipeline]
     inputs (tier rc_calibration; a case's `io.images` as the photographs of its `io.views`, and its `[experiment] dataset`, the case's
