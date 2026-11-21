@@ -21,6 +21,7 @@
         "PIPELINE_CONFIG_FILE" => "a record's file name",
         "_NO_OBSERVATION_MODEL" => "the provenance text a pre-0.11.1 record is read with, no setting",
         "IMAGE_REGION_FILE" => "a record's file name",
+        "FOCUS_TYPE" => "a record's tag: the one type of a focus surface in a camera body (the sensor-grid thin plate spline)",
         "DISTANCE_MAP_FILE" => "a record's file name (the distance-map step's raster record)",
         "DISTANCE_MAPS_DRIVER" => "a driver path (scripts/distance_maps.jl, the distance-map step's maker)",
         "WARPING_RECORD_FILE" => "a record's file name",

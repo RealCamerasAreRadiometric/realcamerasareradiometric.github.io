@@ -324,11 +324,12 @@ end
 VgtkIO.migrate_schema(::Val{Symbol("rc/run_parameters/v2.0")}, t::AbstractDict) = _run_parameters_v3(t)
 # The removed kind rc/focus_ab (the focus A/B experiment's report, focus_ab.json) is refused by name wherever a record is read
 # through its version step (`VgtkIO.read_record`): the experiment is decided and the report is no longer written or read.
-const _FOCUS_AB_REMOVED = "the record kind rc/focus_ab (focus_ab.json, the focus A/B experiment's report) was removed: the experiment is " *
-                          "decided, the focus surface is the sensor-grid thin plate spline, and a run's focus surface is in its " *
-                          "state and camera records (state.json, radiometric_camera.json: `camera.focus`)"
-VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v1.0")}, ::AbstractDict) = throw(ArgumentError(_FOCUS_AB_REMOVED))
-VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v2.0")}, ::AbstractDict) = throw(ArgumentError(_FOCUS_AB_REMOVED))
+_refuse_focus_ab() = throw(ArgumentError(
+    "the record kind rc/focus_ab (focus_ab.json, the focus A/B experiment's report) was removed: the experiment is decided, the focus " *
+    "surface is the sensor-grid thin plate spline, and a run's focus surface is in its state and camera records (state.json, " *
+    "radiometric_camera.json: `camera.focus`)"))
+VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v1.0")}, ::AbstractDict) = _refuse_focus_ab()
+VgtkIO.migrate_schema(::Val{Symbol("rc/focus_ab/v2.0")}, ::AbstractDict) = _refuse_focus_ab()
 
 """The file beside a directory's grid cameras that holds their initialization region ([`save_initialization_region`](@ref))."""
 const INITIALIZATION_REGION_FILE = "initialization_region.json"
