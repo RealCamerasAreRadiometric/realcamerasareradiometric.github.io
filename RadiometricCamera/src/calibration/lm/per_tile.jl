@@ -943,12 +943,20 @@ function _tiles_normal_equations(s::CalibrationState{N}, gb, tiles, tvars, ent, 
     ms = NC .* npx
     products = _batched_products(J3, r2, ms)
     Tsp = SparseArrays.sparse(_column_map(lay, s.channel, ap, m))
-    out = IdDict{Any, Any}()
-    for (q, t) in enumerate(tiles)
-        g, H = _finite_products(view(J3, :, 1:ms[q], q), view(r2, 1:ms[q], q), products[q], lay, s.run)
-        out[t] = (_in_problem_coordinates(Tsp, g, H)..., ent.flux)
+    blocks = Vector{Any}(undef, nt); finite = fill(true, nt)
+    Threads.@threads for q in 1:nt                           # (host arithmetic alone: the device's work is done)
+        g, H = products[q]
+        if all(isfinite, g) && all(isfinite, H)
+            blocks[q] = (_in_problem_coordinates(Tsp, g, H)..., ent.flux)
+        else
+            finite[q] = false
+        end
     end
-    return out
+    for q in findall(!, finite)                              # a non-finite entry: that tile scrubbed and formed again (this task's queue)
+        blocks[q] = (_in_problem_coordinates(Tsp, _finite_products(view(J3, :, 1:ms[q], q), view(r2, 1:ms[q], q), products[q], lay, s.run)...)...,
+                     ent.flux)
+    end
+    return IdDict{Any, Any}(zip(tiles, blocks))
 end
 
 # The final LM iteration's speculative linearization. NLLSsolver's LM computes the Jacobian at each iteration's first trial point

@@ -304,7 +304,8 @@ end
 
 The products `J r`, `J Jᵀ` of a batch of blocks on the host (`_tiles_normal_equations`): block `t` the first `ms[t]` rows of
 `J3[:, :, t]` (columns × rows, zero past them) and of `r2[:, t]`. Here one block at a time (`_block_products` of each, the per-tile
-products' arithmetic); RC's CUDA extension forms all of them as two strided batched products over the zero-padded rows.
+products' arithmetic); RC's CUDA extension forms all of them as two strided batched products over the zero-padded rows, downloaded
+into the calling task's page-locked buffer (the blocks views of it: valid until the task's next call).
 """
 _batched_products(J3, r2, ms) = [_block_products(view(J3, :, 1:ms[t], t), view(r2, 1:ms[t], t)) for t in eachindex(ms)]
 """
@@ -314,7 +315,7 @@ The full-column products `g = J r` and `H = J Jᵀ` in the problem's coordinates
 (`ncol × n`): one sweep of `T`'s stored entries per output entry, written straight into the `n` and `n × n` results (no
 `ncol × n` intermediate: a tile's 289² values twice per block were 3.5 GB of host allocation per grid linearization of 864 tiles).
 """
-function _in_problem_coordinates(T::SparseArrays.SparseMatrixCSC{Float64}, g::Vector{Float64}, H::Matrix{Float64})
+function _in_problem_coordinates(T::SparseArrays.SparseMatrixCSC{Float64}, g::AbstractVector{Float64}, H::AbstractMatrix{Float64})
     n = size(T, 2); rows = SparseArrays.rowvals(T); vals = SparseArrays.nonzeros(T)
     gp = Vector{Float64}(undef, n); Hp = Matrix{Float64}(undef, n, n)
     @inbounds for j in 1:n
