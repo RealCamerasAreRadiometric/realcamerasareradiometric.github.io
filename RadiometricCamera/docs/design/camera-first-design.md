@@ -1,5 +1,13 @@
 # RadiometricCamera: design and performance report
 
+> **Dated report (2026-11-20), kept as a record; not the current API.** It describes the package as it was on the branch
+> `perf/optimize-and-compose`, before RadiometricCamera 0.2.0. Since then the generic layer moved to VisualRadiometryToolkitCore
+> (the radiometric camera, `Focus`, the quadrature, `Material`, the vignetting models, the light), the board is that package's
+> `TexturedTarget` with its own `TargetState` (`PrintedTarget`, `BoardSurface`, `Scene` and `with_surface` are gone: the entry
+> points take the camera, the pose and the board), a camera composed from its geometric camera has `NoVignetting` unless one is
+> given, and the alternative focus parameterisations were removed. The owners named in the tables below are those of that date.
+> The current API is in the manual (`docs/src/`) and in `CHANGELOG.md` (0.2.0).
+
 Branch `perf/optimize-and-compose` (from `main` at 8b3ba04), 2026-11-20. Not a published docs page. Measurements: the
 benchmark scripts in `RadiometricCamera/benchmark/` and `experiments/tools/texture_benchmark.jl`, run as Slurm jobs on
 poseidon (one whole NVIDIA B200 per GPU job; CPU jobs 16 threads on Emerald Rapids), Julia 1.13.3. Wall times are

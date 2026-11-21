@@ -11,7 +11,7 @@
 # otherwise the field is the cone V(𝐜) + V′(0) ‖𝐩 − 𝐜‖ near the centre, where few pixels constrain the slope.
 # ---------------------------------------------------------------------------
 
-# The radial profile's chart (`:linear` or `:projective`) is Core's `RadialVignetting(…; chart)` (hoisted from this package
+# The radial profile's chart (`:linear` or `:projective`) is VisualRadiometryToolkitCore's `RadialVignetting(…; chart)` (hoisted from this package
 # bit-identically, 2026-11-11; its `radial_chart`, `projective_knots`, `with_center`). Its centre is the camera's principal point,
 # fixed (owner ruling 2026-11-11: no free centre; `vignetting_center`).
 """The extrapolation orders of a lattice's dependent nodes that Core's `BoundaryRule(m, region; order)` takes, checked when the

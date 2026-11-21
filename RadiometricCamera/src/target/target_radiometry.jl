@@ -48,7 +48,7 @@ width) of the page the warping was learned on (`aspect`, `warping_aspect` of its
 a page of another aspect), the in-plane print error as the refinement learned it (`inplane`, the `(a, u)` of Core's `Aspect ∘ Skew` in
 the warping's placed chart — `inplane_calibration`; zero = the design as printed) and the print's radiometry ([`TargetRadiometry`](@ref)).
 A flat warping (every nodal height zero) is the plane on any page: its aspect may be `nothing`; a warped one, or an in-plane error
-(whose chart depends on the aspect), without an aspect is an `ArgumentError`. [`board_surface`](@ref) is the scene's
+(whose chart depends on the aspect), without an aspect is an `ArgumentError`. [`board_surface`](@ref) is the board's
 `TargetState` of it on a board.
 """
 struct RadiometricTarget{G, T, R <: TargetRadiometry}
@@ -74,7 +74,7 @@ end
     board_surface(b::TexturedTarget, t::RadiometricTarget) -> TargetState
     board_surface(aspect, t::RadiometricTarget) -> TargetState
 
-The scene's `TargetState` of a radiometric target on the board `b` (or a page of `aspect` = height / width): its warping, its in-plane
+The `TargetState` of a radiometric target on the board `b` (or a page of `aspect` = height / width): its warping, its in-plane
 print error and its print's edge parameters. The target's warping and in-plane error must have been learned on a page of the board's
 aspect (`t.aspect == warping_aspect(b)` to 1e-6), or be flat and as designed: an `ArgumentError` otherwise, since the nodal heights (and the
 placed chart of the in-plane error) on a page of another aspect are another surface.

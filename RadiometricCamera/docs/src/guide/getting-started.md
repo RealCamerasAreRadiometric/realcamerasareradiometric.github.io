@@ -65,7 +65,7 @@ xs = range(-0.5, 0.5; length = 4)
 vignetting_true = VisualRadiometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
 camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # geometric camera, focus surface, aperture radius (m), vignetting
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
-light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # Core's light: degree 2 per channel on the sphere (b, r_SH)
+light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # VisualRadiometryToolkitCore's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; diffuse_weight = 0.4)
 masks = [compute_mask(camera_true, p, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
 photos = [render_view(k, camera_true, poses[k], material_true, light_true, board, settings, masks[k]) for k in 1:2]

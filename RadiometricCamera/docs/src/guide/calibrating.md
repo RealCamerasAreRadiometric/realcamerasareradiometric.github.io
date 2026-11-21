@@ -20,7 +20,7 @@ parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and 
 ## Calibrate a session
 
 A calibration session stored as VisualGeometryToolkitIO records (a camera, the board's target and the trajectory of its
-frames) and its photographs give the scene, the camera's starting lens and focus surface and the photographs' poses
+frames) and its photographs give the board, the camera's starting lens and focus surface and the photographs' poses
 ([`load_session`](@ref)). The block below needs the reader's
 own session, so it is not run here:
 
@@ -35,7 +35,7 @@ r_SH = sphere_radius(b, [p.t for p in ds.poses])
 W, H = Tuple(extent(ds.lens₀))                    # the image is the camera's
 camera = RadiometricCameraModel(ds.lens₀, ds.focus₀, ds.r₀, RadialVignetting(16, Point2(W / 2, H / 2), hypot(W, H) / 2))
 s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
-                     EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # Core's light
+                     EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # VisualRadiometryToolkitCore's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
 run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)
 save_grid("grid.json", geometric(s))

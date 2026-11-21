@@ -1,8 +1,8 @@
 # Target and lighting
 
-The printed board 𝓑 and its warping h, the Cook–Torrance SVBSDF and the radiance L_c. The light is VisualGeometryToolkitCore's
+The printed board 𝓑 and its warping h, the Cook–Torrance SVBSDF and the radiance L_c. The light is VisualRadiometryToolkitCore's
 `EnvironmentLight` (real spherical harmonics per channel on a sphere about the board centre, `SphericalHarmonicMap`); its
-documentation is Core's.
+documentation is that package's.
 
 ```@meta
 CurrentModule = RadiometricCamera

@@ -444,8 +444,8 @@ end
 
 The state of a refinement's state file (`state.json`, `state_it<N>.json`, a start record's state.json; `rc/calibration_state/v3.1`,
 [`save_state`](@ref)): `(; camera, target, poses, names, light, settings, observation, page_flip)` — the `RadiometricCameraModel`, the
-[`RadiometricTarget`](@ref) (`board_surface(board, target)` the scene's surface on a board of its page's aspect), the poses (camera → world, plain metres) of the
-photographs `names`, Core's `EnvironmentLight` (plain metres), the [`RenderSettings`](@ref), the photographs' [`ObservationModel`](@ref)
+[`RadiometricTarget`](@ref) (`board_surface(board, target)` the board's state on a board of its page's aspect), the poses (camera → world, plain metres) of the
+photographs `names`, VisualRadiometryToolkitCore's `EnvironmentLight` (plain metres), the [`RenderSettings`](@ref), the photographs' [`ObservationModel`](@ref)
 and the ±y choice (`nothing` when the state records none); `calibrated_camera(load_state(path))` its [`CalibratedCamera`](@ref). A
 v3.0 state (RC 0.9–0.11.0) states no observation model and is refused by name with the step that regenerates it.
 """
