@@ -96,8 +96,7 @@ end
 
 The density below which a reflection sample is skipped (a visible-normal sample at grazing incidence: its weight is 0/0), the same
 on every float: Float64's `10⁴ eps` (2.2e-12), in `T`. A guard of the float's own `10⁴ eps` was 1.2e-3 in Float32 — a different
-estimator, not a rounding of the Float64 one: it dropped the grazing samples Float64 keeps (the device's radiance and its record
-1e-3 off the CPU's on a warped board, 2026-11-21).
+estimator, not a rounding of the Float64 one: it dropped the grazing samples Float64 keeps.
 """
 @inline _pdf_guard(::Type{T}) where {T} = T(eps(Float64) * 10000)
 """

@@ -573,3 +573,34 @@ its hit IS the anchor, and only the record's geometry stays Float64.
 
 The CPU backend is unchanged but for rounding (a chunk reads the albedo at the recorded hit instead of at its own tangent-plane
 point, the same value to 1e-16).
+
+### 8.3 The gate, re-measured: 0.44 % → passes at ≤ 0.12 %
+
+`experiments/test/pipeline/jacobian_parity.jl`'s check (the device's Jacobian against the CPU backend's, tile by tile, at the
+start and after a 3-iteration grid LM; gates 0.4 % stacked and for the worst column of a tile with ≥ 300 px), run on the run of
+record's options of the 14 mm f/4 Siemens refinement (`rc-results-0.11.5/radiometric_refinement/refine/2b7f327cce111075`: the 1 m
+print with its distance-map edge, σ_print 0.0277 mm, in-plane aspect + skew, warping degree 1, N 16 Hammersley, n_p 2; its first two
+views, 17 tiles). The harness is the check's logic on that record (`/cluster/projects/vgtk/logs/rc-f32/bin/gate_f32.jl`; the
+check's own config names inputs the cluster's results tree does not resolve). Largest relative column error, stacked over the
+tiles / worst column of a tile:
+
+| block | `main` start | `main` lm3 | branch start | branch lm3 |
+|---|---:|---:|---:|---:|
+| **pose (gated)** | 1.2e-12 / 1.8e-12 | 1.4e-12 / 2.6e-12 | 1.1e-5 / 5.7e-4 | 3.8e-4 / 8.6e-4 |
+| **nodal heights (gated)** | 2.2e-12 / 2.6e-12 | 2.3e-12 / 3.2e-12 | 2.2e-5 / 1.7e-4 | 4.5e-4 / 1.2e-3 |
+| lens patches (4 blocks) | 1.9e-2 / 5.9e-2 | 4.9e-2 / 1.8e-1 | 4.6e-5 / 1.2e-2 | 9.6e-4 / 5.3e-3 |
+| focus | 2.4e-2 / 4.7e-2 | 1.0e-2 / 2.3e-2 | 8.6e-6 / 3.4e-5 | 5.7e-4 / 1.2e-3 |
+| aperture | 6.0e-3 / 5.4e-2 | 1.1e-2 / 3.9e-2 | 2.4e-5 / 1.6e-4 | 4.4e-4 / 9.8e-4 |
+| in-plane print error | 7.5e-3 / 1.4e-2 | 4.4e-3 / 1.1e-2 | 1.9e-6 / 8.5e-6 | 3.5e-4 / 7.9e-4 |
+| Θ_m (α, η, μ) | 1.7e-4 / 2.7e-4 | 1.6e-4 / 3.2e-4 | **1.2e-2 / 2.9e-2** | **1.4e-2 / 2.0e-2** |
+| vignetting, lighting (the parts) | 8.1e-6 / 4.3e-5 | 1.8e-5 / 9.5e-5 | 3.2e-6 / 4.8e-5 | 2.6e-6 / 4.5e-5 |
+
+The gate passes (`GATE PASS`, both states). Before the in-plane map and the density guard were fixed (8.1; the two together, not
+measured apart), the branch's pose stood at 1.3e-3 stacked and 4.1e-3 in a tile after the LM (the in-plane error and the heights
+estimated by then): a fail by 0.01 %. The columns after the LM (≈ 4e-4) stay 20–40× those at the start (≈ 1e-5); what of the
+Float32 estimator grows with the estimated state is not isolated (8.6).
+`main` holds its gated columns in Float64 and every other chunk at a Float32 board point: its other columns are 0.6–18 % off; on
+the branch they are ≤ 0.1 % stacked. **One block got worse: Θ_m's nonlinear columns** (the roughness and the refractive indices,
+1.7e-4 → 1.2–1.4e-2 stacked): they are the record's own partials ∂L/∂α, ∂L/∂η, which `main` took from its Float64 estimator and
+the branch from the Float32 one (`main`'s report of decision 2 measured "up to 0.4 %" of the Float32 estimator's α and η
+derivatives at an edge). Not in the gate; open (8.6).
