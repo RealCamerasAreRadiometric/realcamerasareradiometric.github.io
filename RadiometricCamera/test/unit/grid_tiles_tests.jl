@@ -286,7 +286,8 @@ end
         RC._unregister_grid_problem!(s_g)
         # a view's tiles in one batch (`_tile_blocks!`): the residuals' cost bit for bit, the blocks the per-tile path's to the products'
         # summation order (two strided batched gemms over the zero-padded rows); no tile forms its own Jacobian
-        let ts = RC.tile_costs(prob_g), vars_of(t) = RC.NLLSsolver.getvars(t, prob_g.variables)
+        let ts = RC.tile_costs(prob_g)
+            vars_of(t) = RC.NLLSsolver.getvars(t, prob_g.variables)
             per_tile, batched, jacs = RC._with_registered(s_g, prob_g, idx_g; concurrent = false) do
                 ref = [per_tile_blocks(RC.static(1023), t, vars_of(t), s_g) for t in ts]
                 jac0 = s_g.run.device_calls[:jac]
