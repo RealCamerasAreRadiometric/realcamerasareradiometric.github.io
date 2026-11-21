@@ -228,7 +228,7 @@ end
     front || return zero(SVector{3, T})
     E = eltype(eltype(lr.out))                                               # the estimator's float, the record's
     D = ForwardDiff.Dual{RadianceTag, E, RAD_NL}
-    ε(j) = ForwardDiff.Dual{RadianceTag}(zero(E), ForwardDiff.Partials(ntuple(i -> i == j ? one(E) : zero(E), Val(RAD_NL))))
+    ε(j) = _unit_partial(RadianceTag, E, j, Val(RAD_NL))
     ω_lE = SVector{3, E}(ω_l); 𝐱E = SVector{3, E}(𝐱); 𝐧E = SVector{3, E}(𝐧); δE = SVector{3, E}(𝐱 - 𝐱E)   # (the geometry's numbers end here)
     e1, e2 = _seed_tangents(ω_lE)
     L = _radiance_mc(lr.est.board, lr.est.mat, lr.est.light, sm, key, SVector{3, E}(ρ) .+ ε(1), E(α) + ε(2), SVector{3, E}(η) .+ ε(3),
@@ -252,10 +252,8 @@ partials (the material block's α and η), and the Float32 estimator's were 1.2�
 """
 @inline function _material_partials(::Type{E}, L, bd, m, lt, sm, key, ρ, α, η, ω_l::StaticVector{3, T}, 𝐱) where {E, T}
     E === T && return (SVector(ntuple(c -> ForwardDiff.partials(L[c], 2), Val(3))), SVector(ntuple(c -> ForwardDiff.partials(L[c], 3), Val(3))))
-    D = ForwardDiff.Dual{RadianceTag, T, 2}
-    εα = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials((one(T), zero(T))))
-    εη = ForwardDiff.Dual{RadianceTag}(zero(T), ForwardDiff.Partials((zero(T), one(T))))
-    L2 = _radiance_mc(bd, m, lt, sm, key, ρ, α + εα, η .+ εη, ω_l, 𝐱, D)
+    L2 = _radiance_mc(bd, m, lt, sm, key, ρ, α + _unit_partial(RadianceTag, T, 1, Val(2)), η .+ _unit_partial(RadianceTag, T, 2, Val(2)),
+                      ω_l, 𝐱, ForwardDiff.Dual{RadianceTag, T, 2})
     return (SVector{3, E}(ntuple(c -> ForwardDiff.partials(L2[c], 1), Val(3))), SVector{3, E}(ntuple(c -> ForwardDiff.partials(L2[c], 2), Val(3))))
 end
 @inline _δ(x::ForwardDiff.Dual) = x - ForwardDiff.value(x)
