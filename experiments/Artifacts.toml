@@ -291,3 +291,11 @@ lazy = true
     [[rc_thorlabs_target_20261121.download]]
     sha256 = "12c887cd6e58382849e3e32885272db63c35c3f76b68435856f5118e63ea70a0"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_thorlabs_target_20261121.tar.gz?download=1"
+
+[rc_targets_20261122]
+git-tree-sha1 = "8b08931014c046ec44d599fb5b118ae769911182"
+lazy = true
+
+    [[rc_targets_20261122.download]]
+    sha256 = "0f7389a3ebe2041d90e74b9871f0d275a478730449900a6dd074f95a64d84332"
+    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_targets_20261122.tar.gz?download=1"

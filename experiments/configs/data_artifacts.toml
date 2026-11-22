@@ -398,7 +398,7 @@ filter = ["geometric_accuracy/data/target/siemens_1m/**", "geometric_accuracy/da
           "geometric_accuracy/data/target/blobboard_a4_6eb/**", "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*",
           "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**",
           "!**/*DSC06055*", "!**/*DSC06055*/**"]
-files = 14
+files = 34
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_calibration"
