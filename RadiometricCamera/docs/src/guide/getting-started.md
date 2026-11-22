@@ -16,7 +16,12 @@ over a double-sphere fisheye lens; any Core lens plugs in the same way. The imag
 `BoundedCamera`'s `Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration
 runs at the sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
 
+Every kernel runs on the GPU when one is functional, once its package is loaded (`using CUDA`; [`default_backend`](@ref)), and
+otherwise on the CPU, with a warning that the run will be very slow; KernelAbstractions' `backend = CPU()` chooses the CPU. On a GPU the kernels
+compute in Float32, so the checks below hold to Float32's precision on either device.
+
 ```@example tutorial
+using CUDA                                      # the GPU, when there is one: RadiometricCamera's default device
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
 using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, 𝔟   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
@@ -67,7 +72,7 @@ camera_true = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # VisualRadiometryToolkitCore's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; diffuse_weight = 0.4)
-masks = [compute_mask(camera_true, p, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
+masks = [compute_mask(camera_true, p, board, settings; δ = 0.02) for p in poses]
 photos = [render_view(k, camera_true, poses[k], material_true, light_true, board, settings, masks[k]) for k in 1:2]
 size(photos[1])
 ```
@@ -93,7 +98,7 @@ parts) and reproduces the photographs exactly:
 
 ```@example tutorial
 solve_linear_blocks!(s; joint = true)
-cost(s)[2] < 1e-10, s.mat.diffuse_weight ≈ 0.4
+cost(s)[2] < 1e-4, isapprox(s.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
 ```
 
 The vignetting and the lighting come back up to their common gauge: the state pins V = 1 at the sensor's centre, and the

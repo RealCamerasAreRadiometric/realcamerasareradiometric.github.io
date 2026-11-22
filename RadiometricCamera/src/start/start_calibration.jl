@@ -60,8 +60,8 @@ function start_geometry(options::PipelineOptions; record = nothing, load_state =
 end
 
 """
-    start_calibration(geometry::StartGeometry, photographs; options, device = default_device()) -> CalibrationState
-    start_calibration(camera, poses, observations, photographs; target, options, device = default_device(), names) -> CalibrationState
+    start_calibration(geometry::StartGeometry, photographs; options, device = default_backend()) -> CalibrationState
+    start_calibration(camera, poses, observations, photographs; target, options, device = default_backend(), names) -> CalibrationState
 
 The start of a radiometric calibration: it lifts the geometric camera of `geometry` (or of `camera`, `poses`, `observations` and
 `target`, the geometric calibration as data) into a radiometric state — the focus surface through the mean target centre, the
@@ -75,9 +75,9 @@ with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camer
 (`VisualGeometryToolkitIO.load(BoundedCamera, …)`, `load(TargetObservations, …)`) — RC reads no foreign format.
 """
 start_calibration(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions,
-                  device = VgtkCore.default_device()) = _start_state(geometry, photographs, options, nothing; backend = device)
+                  device = default_backend()) = _start_state(geometry, photographs, options, nothing; backend = device)
 start_calibration(camera::VgtkCore.BoundedCamera, poses::AbstractVector, observations::AbstractVector, photographs::AbstractVector{<:AbstractString};
-                  target::TexturedTarget, options::PipelineOptions, device = VgtkCore.default_device(), names = basename.(photographs)) =
+                  target::TexturedTarget, options::PipelineOptions, device = default_backend(), names = basename.(photographs)) =
     start_calibration(StartGeometry(camera, poses, observations, target; names), photographs; options, device)
 
 """
@@ -91,7 +91,7 @@ save_calibration_start(dir::AbstractString, state::CalibrationState; options::Pi
     (save_start(dir, state, state.start, start_options(options)); dir)   # the record keys by the start options alone (no output: io.out, lm.log)
 
 """
-    load_calibration_start(dir; options, device = default_device(), observations = nothing, photographs) -> CalibrationState
+    load_calibration_start(dir; options, device = default_backend(), observations = nothing, photographs) -> CalibrationState
 
 The refinement's state from the start record `dir` ([`save_calibration_start`](@ref); refused when its start options are not
 `start_options(options)`): the front end's target and observations, the record's camera, region and poses, the photographs streamed
@@ -99,7 +99,7 @@ at the record's masks (or the start's own streamed `observations`, handed over i
 again), and the closed-form start's state, costs and GCV weights loaded — nothing of the start computed again. `photographs`: the
 files of the record's views, by default the run's (`io.images`, [`start_photographs`](@ref)).
 """
-function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = VgtkCore.default_device(), observations = nothing,
+function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = default_backend(), observations = nothing,
                                 photographs = nothing, load_state = RadiometricCamera.load_state)
     record = load_refinement_start(dir; masks = observations === nothing ? nothing : observations.masks)
     check_start_options(record, options)

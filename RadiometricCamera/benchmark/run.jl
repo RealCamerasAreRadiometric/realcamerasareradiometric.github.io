@@ -87,7 +87,7 @@ function benchmark_board()
     cpu = KA.CPU()
     masks = [RC.compute_mask(camera, p, board, settings; δ = 0.02, backend = cpu) for p in poses]
     PIXELS > 0 && (masks = map(thinned, masks))
-    photos = [RC.render_view(k, camera, poses[k], mat, light, board, settings, masks[k]) for k in 1:VIEWS]
+    photos = [RC.render_view(k, camera, poses[k], mat, light, board, settings, masks[k]; backend = cpu) for k in 1:VIEWS]   # the CPU's photographs on every device
     start_light = EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH)
     # the timed states: a perturbed start on the benchmark's device
     state(lens_ = lens) = RC.CalibrationState(board, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,

@@ -41,8 +41,26 @@ function rc_backend(backend; inline::Bool = true, fallback::Bool = true)
     d = Base.invokelatest(VgtkCore.default_device)
     if d isa KernelAbstractions.CPU
         fallback || error("compute backend \"gpu\": no functional GPU (set it to \"cpu\" to run on the CPU)")
-        @warn "compute backend \"gpu\": NO FUNCTIONAL GPU — running on the CPU"
+        @warn "compute backend \"gpu\": NO FUNCTIONAL GPU — running on the CPU, which is very slow"
         return d
     end
     return inline ? Base.invokelatest(() -> typeof(d)(; always_inline = true)) : d
+end
+
+"""
+    default_backend() -> KernelAbstractions.Backend
+
+The device of RC's entry points when the caller supplies none (the `backend` of [`CalibrationState`](@ref), [`render_view`](@ref)
+and [`compute_mask`](@ref)): VisualGeometryToolkitCore's `default_device()`, a functional GPU when its vendor package is loaded
+(`using CUDA`), else the CPU, with a warning, once per session, that the run will be very slow. A caller that supplies
+`backend = CPU()` has chosen the CPU and is not warned. It does not load the vendor package, as a driver's [`rc_backend`](@ref) does:
+a keyword default runs inside the caller's function, which cannot call the methods a package load defines then (world age), so a
+script loads it itself, `using CUDA`, before its first call.
+"""
+function default_backend()
+    d = VgtkCore.default_device()
+    d isa KernelAbstractions.CPU &&
+        @warn "RadiometricCamera: no functional GPU — running on the CPU, which is very slow. Load the GPU's package (`using CUDA`) " *
+              "before the first call for the GPU, or supply `backend = CPU()` to choose the CPU." maxlog = 1
+    return d
 end

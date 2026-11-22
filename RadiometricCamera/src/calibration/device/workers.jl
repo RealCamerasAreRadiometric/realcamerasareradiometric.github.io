@@ -4,8 +4,8 @@
 # `_PartsAt`) mapped over the pixel list by VisualGeometryToolkitCore's `pointwise!` on the state's backend VALUE (`OnBackend`, so its
 # `always_inline` holds; a broadcast would launch on a default-built backend): one kernel each, no kernel code here, and this file never
 # references CUDA. ONE implementation (owner policy, 2026-11-11): the CPU backend runs the same functors in Float64 (`_kernel_float`;
-# all dual slots in one chunk, `_jac_chunk`), a device in Float32 — opt-in via `CalibrationState(...; backend = CUDABackend(;
-# always_inline = true))` after `using CUDA` (set CUDA_VISIBLE_DEVICES before loading CUDA). Build the device backend with
+# all dual slots in one chunk, `_jac_chunk`), a device in Float32 — the default (`default_backend`: Core's `default_device()`
+# after `using CUDA`; set CUDA_VISIBLE_DEVICES before loading CUDA), the CPU by `backend = CPU()`. Build a device backend by hand with
 # `always_inline = true`: without it the Jacobian kernel needs twice the local memory per thread and runs 1.5× slower at C = 4 (the
 # flux 4.4×); values move by ≤ 2.2e-7. Flux and Jacobian share the one backend, so the residual stays bitwise the one
 # `computeresidual` returns. The device's Float32 realisation of the common-random-number stream is deterministic but not

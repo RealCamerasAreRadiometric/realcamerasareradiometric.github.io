@@ -85,7 +85,7 @@ _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
 
 """
     CalibrationState(board, settings, camera, poses, mat, light, targets; masks = nothing, δ = 0.02,
-                     external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = CPU(), ϕ = nothing,
+                     external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = default_backend(), ϕ = nothing,
                      channel = 0, mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
                      sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
                      sensor = NoSensorRecord(), photo_kind = Decoded(false))
@@ -118,7 +118,7 @@ empty placeholder arrays.
 function CalibrationState(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel{<:Any, <:Focus{Float64, N}}, poses::AbstractVector{<:EuclideanMap},
                           mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}};
                           masks = nothing, δ::Real = 0.02, external_masks = nothing, support_min::Real = 0.0, region = nothing,
-                          boundary_order::Integer = 2, backend = KernelAbstractions.CPU(), ϕ = nothing, channel::Integer = 0,
+                          boundary_order::Integer = 2, backend = default_backend(), ϕ = nothing, channel::Integer = 0,
                           mu_bounds = (0.0, 1.0), jacobian_chunk::Integer = 4,
                           sensor_models = fill(VgtkCore.SensorModel(), length(poses)),
                           weights::Union{Unweighted, AbstractVector{<:AbstractVector{<:Real}}} = Unweighted(),

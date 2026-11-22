@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.3.0: breaking)
+
+- **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required
+  and is now optional), `start_calibration` and `load_calibration_start` default their device to the new `default_backend()`:
+  VisualGeometryToolkitCore's `default_device()`, a functional GPU once its package is loaded (`using CUDA`), else the CPU, with
+  a warning, once per session, that the run will be very slow. They defaulted to the CPU before (`start_calibration` and
+  `load_calibration_start` to `default_device()`, without a warning). Supplying `backend = CPU()` chooses the CPU and does not
+  warn. On a GPU the kernels compute in Float32, so a call that relied on the CPU default and compares to Float64 tolerances
+  supplies `backend = CPU()`. The default does not load CUDA: a keyword default runs inside the caller's function, which cannot
+  call the methods a package load defines then (world age), so the README, the landing page and Getting Started load it
+  (`using CUDA`) and drop `rc_backend("cpu")`; their checks hold to Float32's precision on either device. Loading CUDA forgets a
+  default device resolved before it (RadiometricCameraCUDAExt's `__init__`). The drivers are unchanged: they supply the device
+  of their `[compute] backend` (`rc_backend`), and the runs of record with it.
 
 - **Tests:** the golden pipeline case (`experiments/test/pipeline/golden/siemens_coarse_full`) is re-recorded on a full B200 (GPU,
   Julia 1.13). Two causes moved it since its recording of 2026-11-16, neither a regression: RC 0.11.5's intended change to the

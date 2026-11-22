@@ -272,17 +272,18 @@ radiance.
 end
 
 """
-    compute_mask(camera, pose, board, settings; δ = 0.02, external = nothing, backend) -> BitMatrix
+    compute_mask(camera, pose, board, settings; δ = 0.02, external = nothing, backend = default_backend()) -> BitMatrix
 
 Pixel mask of `camera` (a `RadiometricCameraModel`) at `pose` (camera → world): `true` where the chief ray and every
 (footprint corner × aperture border sample) ray hits the board inside `[δ, 1−δ]²` in front of the camera; intersected with
-`external`. `board_valid` over every pixel of `external` (all of them without one): one kernel on `backend`, required. A caller
+`external`. `board_valid` over every pixel of `external` (all of them without one): one kernel on `backend` (by default [`default_backend`](@ref)). A caller
 that needs only some of the pixels (the start's draw, `draw_samples`) tests those alone through `BoardValidity`.
 """
 compute_mask(camera::RadiometricCameraModel, pose::EuclideanMap, board::TexturedTarget, st::RenderSettings; kwargs...) =
     _compute_mask(View(pose, camera), board, st; kwargs...)
 """The kernels' form of [`compute_mask`](@ref): the camera at its pose as a `View`."""
-function _compute_mask(view::View, board::TexturedTarget, st::RenderSettings; δ::Real = 0.02, external = nothing, backend)
+function _compute_mask(view::View, board::TexturedTarget, st::RenderSettings; δ::Real = 0.02, external = nothing,
+                       backend = default_backend())
     W, H = _image_size(view)                                                   # the image is the camera's
     ids = external === nothing ? collect(1:(H * W)) : findall(vec(external))   # column-major: (u − 1) H + v
     mask = falses(H, W)
@@ -357,20 +358,20 @@ end
 masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)]
 
 """
-    render_view(k, camera, pose, mat, light, board, settings, mask; backend = CPU()) -> Array{Float64, 3}
+    render_view(k, camera, pose, mat, light, board, settings, mask; backend = default_backend()) -> Array{Float64, 3}
 
 `H × W × 3` image of photograph `k`, `camera` (a `RadiometricCameraModel`) at `pose` (camera → world), zeros outside the
-mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (KernelAbstractions' `CPU()` by default; a device:
-`rc_backend("gpu")`), in the backend's kernel float as a state's kernels (`_kernel_float`: Float64 on the CPU backend, Float32 on a
+mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (by default [`default_backend`](@ref): the GPU when one is
+functional, else the CPU with a warning), in the backend's kernel float as a state's kernels (`_kernel_float`: Float64 on the CPU backend, Float32 on a
 device, where the image agrees with the CPU's to Float32 rounding). `k` is the photograph's index: it keys the common random numbers
 of the radiance, so photograph `k` of a state renders with its index.
 """
 render_view(k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight, board::TexturedTarget,
-            st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU()) =
+            st::RenderSettings, mask::AbstractMatrix{Bool}; backend = default_backend()) =
     _render_view(k, View(pose, camera), camera.vignetting, mat, light, board, st, mask; backend)
 """The kernels' form of [`render_view`](@ref): the camera at its pose as a `View`, the vignetting apart."""
 function _render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
-                      board::TexturedTarget, st::RenderSettings, mask::AbstractMatrix{Bool}; backend = KernelAbstractions.CPU())
+                      board::TexturedTarget, st::RenderSettings, mask::AbstractMatrix{Bool}; backend)
     W, H = _image_size(view)                                                   # the image is the camera's; the mask is of it
     size(mask) == (H, W) || throw(ArgumentError("render_view: the mask is $(size(mask, 1)) × $(size(mask, 2)) (rows × columns), the camera's image $H × $W"))
     px = masked_pixels(mask)

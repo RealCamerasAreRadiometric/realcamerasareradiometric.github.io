@@ -79,7 +79,7 @@ they are registered in General. Add that registry once, beside General, then the
 
 ```julia-repl
 pkg> registry add General https://github.com/prittjam/CauRegistry.jl
-pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore
+pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore CUDA
 ```
 
 ## Getting started
@@ -93,6 +93,7 @@ photographs and recovers the lighting, the vignetting and the material from them
 ```
 
 ```julia
+using CUDA                                    # the GPU when there is one: the default device (else the CPU with a warning)
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel
 using VisualRadiometryToolkitCore: Material, 𝔟
@@ -112,11 +113,11 @@ camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)
 pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
 light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # VisualRadiometryToolkitCore's light, L ≡ 1
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
-mask = compute_mask(camera, pose, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
+mask = compute_mask(camera, pose, board, settings; δ = 0.02)   # on the default device: the GPU, else the CPU
 img = render_view(1, camera, pose, Material(), light, board, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)
 count(mask)                     # 76800 = 320 × 240: the board covers every pixel
 Φ = Φ_pixel(160, 120, 1, camera, pose, Material(), light, board, settings)   # the pixel 𝐮 = (u, v) = (160, 120)
-Φ ≈ img[120, 160, :]            # true: the render is Φ_c(𝐮) of each pixel (img is 240 × 320 × 3: row v, column u)
+isapprox(Φ, img[120, 160, :]; rtol = 1e-4)   # true: the render is Φ_c(𝐮) of each pixel, to Float32 on a GPU (img is 240 × 320 × 3: row v, column u)
 ```
 
 ## Method

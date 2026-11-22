@@ -30,4 +30,8 @@ function RadiometricCamera._shared_read_only!(::CUDA.CUDABackend, x)
     return x
 end
 
+# A default device resolved before CUDA loaded (the CPU, memoized by VisualGeometryToolkitCore's `default_device`) is forgotten, so
+# RC's default device (`default_backend`) is the GPU from this load on when one is functional.
+__init__() = RadiometricCamera.VgtkCore.reset_default_device!()
+
 end # module

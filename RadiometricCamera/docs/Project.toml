@@ -1,4 +1,5 @@
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 RadiometricCamera = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
 VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
@@ -8,6 +9,7 @@ VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 RadiometricCamera = {path = ".."}
 
 [compat]
+CUDA = "5"
 Documenter = "1"
 VisualGeometryToolkitCore = "0.13.1"
 VisualRadiometryToolkitCore = "0.1.1"
