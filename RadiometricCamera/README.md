@@ -42,9 +42,9 @@ using VisualRadiometryToolkitCore: Material, 𝔟
 # camera (VisualGeometryToolkitCore's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
-W, H = 320, 240                               # the image, in pixels
-K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)   # focal length 412 px, principal point at the centre
-geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+sz = Size2(320, 240)                          # the image, in pixels
+K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, sz[1] / 2, sz[2] / 2, 1.0)   # focal length 412 px, principal point at the centre
+geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), sz)
 
 # The radiometric camera, one object, composed from the geometric camera: focused at 1.5 m, aperture radius 4 cm, and no
 # vignetting (VisualRadiometryToolkitCore's NoVignetting, the default: V ≡ 1, no parameters).
@@ -55,9 +55,9 @@ light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radiu
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 mask = compute_mask(camera, pose, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu"))   # the device: rc_backend of a compute tag (public, not exported)
 img = render_view(1, camera, pose, Material(), light, board, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)
-count(mask)                     # 76800 = W × H: the board covers every pixel
+count(mask)                     # 76800 = 320 × 240: the board covers every pixel
 Φ = Φ_pixel(160, 120, 1, camera, pose, Material(), light, board, settings)   # the pixel 𝐮 = (u, v) = (160, 120)
-Φ ≈ img[120, 160, :]            # true: the render is Φ_c(𝐮) of each pixel (img is H × W × 3: row v, column u)
+Φ ≈ img[120, 160, :]            # true: the render is Φ_c(𝐮) of each pixel (img is 240 × 320 × 3: row v, column u)
 ```
 
 [Getting Started](docs/src/guide/getting-started.md) continues from here: it renders two photographs and recovers the
