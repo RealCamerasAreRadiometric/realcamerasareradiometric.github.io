@@ -177,12 +177,12 @@ end
     @test !RC.start_is_grid(RC.pipeline_options(Dict("io" => Dict("init" => "lens:a/lens.json"))))
     @test all(i -> RC.start_is_grid(RC.pipeline_options(Dict("io" => Dict("init" => i)))), ("", "grid:a/grid.json"))
     @test count("route = lm_route(lens0)", psrc) == 2 && !occursin("parametric = ", psrc)               # the route: the start camera's type, never a Bool
-    # GPU first: a refinement's device, and its image region's measurement, is Core's default_device() unless the caller names one (review
+    # GPU first: a refinement's device, and its image region's measurement, is default_backend() (Core's default_device(), warning on the CPU) unless the caller names one (review
     # finding 10: prepare_refinement defaulted to the CPU)
     ssrc = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "start_calibration.jl"), String)
-    @test occursin("start_calibration(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions,\n                  device = VgtkCore.default_device())", ssrc)
-    @test occursin("function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = VgtkCore.default_device(),", ssrc)
-    @test occursin("function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,\n                              device = VgtkCore.default_device(),", psrc)
+    @test occursin("start_calibration(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions,\n                  device = default_backend())", ssrc)
+    @test occursin("function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = default_backend(),", ssrc)
+    @test occursin("function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,\n                              device = default_backend(),", psrc)
     @test !occursin("_lm_problem_kw", psrc) && count("if !getfield(blocks, k)", psrc) == 1                       # the held blocks: derived once
     # the printed edge is never a parameter, so no route can leave it free and unsolved (review finding 2: a parametric run recorded
     # it free and never solved it): whatever the holds the problem's keywords hold no edge, on either route

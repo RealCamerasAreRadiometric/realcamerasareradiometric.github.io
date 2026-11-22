@@ -80,7 +80,7 @@ A view with fewer usable observations than its count uses them all; never padded
 draw_samples(rng, usable::AbstractMatrix{Bool}, img::AbstractArray, n::Integer; kw...) = draw_samples(rng, _every_candidate, usable, img, n; kw...)
 function draw_samples(rng, valid, candidates::AbstractMatrix{Bool}, img::AbstractArray, n::Integer; gradient_bias::Real = 0.0,
                       edge_detector::AbstractEdgeDetector, edge_fraction::Real = 0.0, addon_samples::Integer = 0, addon_gradient_bias::Real = 0.0,
-                      channels = axes(img, 3), diagonal::Bool = false, device = VgtkCore.default_device())
+                      channels = axes(img, 3), diagonal::Bool = false, device = default_backend())
     check_draw(n, gradient_bias, edge_fraction, addon_samples, addon_gradient_bias)
     cand = findall(vec(candidates))                                   # the candidates' linear (column-major) indices
     Uc = rand(rng, length(cand))                                      # the view's uniforms: every candidate's key, the stream consumed once

@@ -28,7 +28,7 @@ function _schoeps_model(yamlpath::AbstractString, W::Integer, H::Integer, who::A
 end
 
 """
-    schoeps_gridlens(yaml, W, H; coverage = nothing, device = default_device()) -> BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}
+    schoeps_gridlens(yaml, W, H; coverage = nothing, device = default_backend()) -> BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}
 
 A Schöps run's central spline model (VisualGeometryToolkitIO's reader: a SplineLens camera, K its lattice's gauge) over the `W × H`
 image (its own) resampled EXACTLY by [`exact_start`](@ref): his lattice extended over the sensor ∩ the lens coverage (`coverage`, the
@@ -37,12 +37,12 @@ run's image circle; else his own) on his own spacing, never subdivided, turned o
 schoeps_gridlens(yamlpath::AbstractString, W::Integer, H::Integer; kwargs...) = schoeps_start(yamlpath, W, H; kwargs...).lens
 
 """
-    schoeps_start(yaml, W, H; coverage = nothing, device = default_device()) -> (; lens, init_region, resample)
+    schoeps_start(yaml, W, H; coverage = nothing, device = default_backend()) -> (; lens, init_region, resample)
 
 [`schoeps_gridlens`](@ref)'s grid start `lens`, the source's [`initialization_region`](@ref) `init_region` (Schöps's calibrated
 area: where his model is defined) and the resample's record `resample` ([`exact_start`](@ref)).
 """
-function schoeps_start(yamlpath::AbstractString, W::Integer, H::Integer; coverage = nothing, device = VgtkCore.default_device())
+function schoeps_start(yamlpath::AbstractString, W::Integer, H::Integer; coverage = nothing, device = default_backend())
     src = _schoeps_model(yamlpath, W, H, "schoeps_gridlens")
     src isa SplineCamera ||
         throw(ArgumentError("schoeps_gridlens: $yamlpath holds a non-central model; this package's cameras are central (a Schöps run's central-generic model)"))

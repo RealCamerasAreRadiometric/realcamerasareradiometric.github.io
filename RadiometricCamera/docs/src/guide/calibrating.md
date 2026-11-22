@@ -56,7 +56,7 @@ with the options of [`PipelineOptions`](@ref) read from one TOML file (`bin/refi
 `parameters.json` and the run's options (`pipeline_config.toml`), and, with `[io] checkpoint_each = "on"`, a lens / poses /
 state file after every iteration (the convergence monitors of the experiments read them). It uses the GPU when CUDA is
 functional; `[compute] backend = "cpu"` forces the CPU ([`start_calibration`](@ref)'s and [`load_calibration_start`](@ref)'s
-default device is Core's `default_device()`, GPU first).
+default device is [`default_backend`](@ref): the GPU when one is functional, else the CPU with a warning).
 
 A run on RAW photographs names the camera's sensor characterisation: `[camera] sensor_characterisation` is the path of the
 body's `vgio/sensor_characterisation` record (VisualGeometryToolkitCore's `SensorCharacterisation`, read by

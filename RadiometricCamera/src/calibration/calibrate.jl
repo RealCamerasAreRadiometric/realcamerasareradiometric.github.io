@@ -78,15 +78,15 @@ function refine_calibration!(state::CalibrationState; options::PipelineOptions, 
 end
 
 """
-    calibrate(geometry::StartGeometry, photographs; options, device = default_device()) -> FitResult{CalibrationEstimate, CalibrationMetadata}
-    calibrate(camera, poses, observations, photographs; target, options, device = default_device())
+    calibrate(geometry::StartGeometry, photographs; options, device = default_backend()) -> FitResult{CalibrationEstimate, CalibrationMetadata}
+    calibrate(camera, poses, observations, photographs; target, options, device = default_backend())
 
 A radiometric calibration in one call: [`start_calibration`](@ref) (with the start's options, `start_options(options)`), then
 [`refine_calibration!`](@ref) of that state. The state refined is the one a start record rebuilds (`save_calibration_start` →
 `load_calibration_start`, bin/refine.jl's path): the start reads no refinement-only key (`REFINE_ONLY_KEYS`), and a record carries
 the start's values bit for bit.
 """
-function calibrate(args...; options::PipelineOptions, device = VgtkCore.default_device(), kwargs...)
+function calibrate(args...; options::PipelineOptions, device = default_backend(), kwargs...)
     so = _start_run_options(options)
     s = start_calibration(args...; options = so, device, kwargs...)
     return refine_calibration!(s; options)

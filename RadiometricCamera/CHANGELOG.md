@@ -5,8 +5,10 @@
 - **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required
   and is now optional), `start_calibration` and `load_calibration_start` default their device to the new `default_backend()`:
   VisualGeometryToolkitCore's `default_device()`, a functional GPU once its package is loaded (`using CUDA`), else the CPU, with
-  a warning, once per session, that the run will be very slow. They defaulted to the CPU before (`start_calibration` and
-  `load_calibration_start` to `default_device()`, without a warning). Supplying `backend = CPU()` chooses the CPU and does not
+  a warning, once per session, that the run will be very slow. They defaulted to the CPU before (`start_calibration`,
+  `load_calibration_start`, `calibrate`, `measure_image_region`, `start_grid`, `exact_start`, `check_coverage`, `calibrated_folds`,
+  `schoeps_start`, `edge_strength` and the start's masks to `default_device()`, without a warning; they now default to
+  `default_backend()` too). Supplying `backend = CPU()` chooses the CPU and does not
   warn. On a GPU the kernels compute in Float32, so a call that relied on the CPU default and compares to Float64 tolerances
   supplies `backend = CPU()`. The default does not load CUDA: a keyword default runs inside the caller's function, which cannot
   call the methods a package load defines then (world age), so the README, the landing page and Getting Started load it

@@ -63,7 +63,7 @@ Each pixel's edge strength g (`H × W`, on the host) of the image `plane` (`edge
 on `device`: the plane crosses to the device once (none on the CPU: the plane itself), the support as its `Bool`s (one byte per pixel, Core's
 narrow upload, converted there), g is formed there and comes back once (none on the CPU).
 """
-function edge_strength(d::GaussianDerivativeEdges, plane::AbstractMatrix{<:Real}, support::AbstractMatrix{Bool}; device = VgtkCore.default_device())
+function edge_strength(d::GaussianDerivativeEdges, plane::AbstractMatrix{<:Real}, support::AbstractMatrix{Bool}; device = default_backend())
     a = VgtkCore.on_device(Float32, device, plane)
     m = VgtkCore.on_device(Float32, device, Matrix{Bool}(support))   # a BitMatrix has no device backend: its Bools (1 B/px)
     gx, gy = VgtkFeatures.gaussian_gradient(a, d.sigma, m)      # the normalized convolution over the support (gaussian_blur's)
