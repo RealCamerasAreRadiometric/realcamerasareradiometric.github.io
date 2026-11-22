@@ -30,7 +30,7 @@ using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 sz = Size2(320, 240)                              # the image, in pixels
-K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, sz[1] / 2, sz[2] / 2, 1.0)
+K = CameraCalibrationMat(412.0, sz)
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), sz)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide

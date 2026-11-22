@@ -25,8 +25,9 @@
   0.24689; the new costs 5.074424987570717 (start), 4.931025570093097 (after the linear solve), 4.352524958361566 (final). The
   tolerance mode of `compare_outputs.jl` (1e-9) is meaningful only in the recorded environment (Julia, Manifest and device).
 
-- **Changed:** on VisualGeometryToolkitCore 0.13 (`[compat]` `"0.13"`; its removed spherical spline and dilogarithm were
-  never called here), in the package and every workspace member.
+- **Changed:** on VisualGeometryToolkitCore 0.13.2 (`[compat]` `"0.13.2"`; 0.13's removed spherical spline and dilogarithm
+  were never called here), in the package and every workspace member. The examples build K from the image,
+  `CameraCalibrationMat(412.0, sz)` (0.13.2: the focal length and the principal point at the image's centre).
 
 ### experiments (the storage design: VisualGeometryToolkitEval 0.10)
 
