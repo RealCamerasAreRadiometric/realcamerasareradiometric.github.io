@@ -133,7 +133,7 @@ end
     run_image_region(cfg, name; driver, config_path, detect = VgtkFeatures.detect_image_circle) -> dir
 
 The step of `[image_regions.<name>]`, produced or loaded: RadiometricCamera's `measure_image_region` on its frames
-([`image_region_frames`](@ref), the sha256 checked) on the device (`default_device()`: GPU first), its record written by
+([`image_region_frames`](@ref), the sha256 checked) on the device (`RadiometricCamera.default_backend()`: GPU first, the CPU with its warning), its record written by
 RadiometricCamera's `save_image_region` (IO). `detect` is Features' detector (a test hands a stub).
 """
 function run_image_region(cfg::AbstractDict, name::AbstractString; driver::AbstractString, config_path::AbstractString,
@@ -143,7 +143,7 @@ function run_image_region(cfg::AbstractDict, name::AbstractString; driver::Abstr
         t = cfg["image_regions"][name]
         files = image_region_frames(cfg, name)
         m = RadiometricCamera.measure_image_region(files; image = String(t["image"]), outlier_halfwidth_px = Float64(t["outlier_halfwidth_px"]), seed = Int(t["seed"]),
-                                                    device = VgtkCore.default_device(), detect)
+                                                    device = RadiometricCamera.default_backend(), detect)
         RadiometricCamera.save_image_region(joinpath(dir, IMAGE_REGION_FILE), m;
                                             provenance = (; source = "VisualGeometryToolkitFeatures detect_image_circle on $(length(files)) frames of $(dirname(first(files)))",
                                                           config = relpath(config_path, projectdir()), region = name))

@@ -17,7 +17,7 @@ source experiments/scripts/slurm/common.sh
 # =============================================================================
 # image_regions.sbatch — scripts/image_regions.jl on its config of record: one task, every capture set's measured image region (stage
 # detect: RadiometricCamera's measure_image_region, Features' detect_image_circle on the device; src/image_region.jl), each step
-# produced or loaded by its key. DEVICE: Core's default_device() — the runner's gres makes the allocated GPU device 0 of the job
+# produced or loaded by its key. DEVICE: RadiometricCamera.default_backend() (Core's default_device(), warning on the CPU) — the runner's gres makes the allocated GPU device 0 of the job
 # (CUDA_VISIBLE_DEVICES); nothing pins the CPU. RESOURCES: the CPUs, the memory per CPU (8480M, the node ratio) and the GPU are the
 # runner's — configs/reproduce.toml [[stage]] cpus_per_task, mem_per_cpu and gpu, the one source; a launcher submitted by hand states
 # them on its sbatch line.

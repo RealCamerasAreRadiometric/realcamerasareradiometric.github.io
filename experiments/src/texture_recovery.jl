@@ -239,7 +239,7 @@ function read_sheet(dir::AbstractString)
 end
 
 """
-    board_finder(board_json, camera, table; gallery, device = BlobBoards.default_device()) -> NamedTuple
+    board_finder(board_json, camera, table; gallery, device = RC.default_backend()) -> NamedTuple
 
 BlobBoards' `find_boards` set up for the board of `board_json` (its design JSON, `load_board`) on its pose arm through `camera`, the
 refinement's `BoundedCamera` held fixed: the configuration `FindBoardsConfig(table; camera)` (`table` BlobBoards' own `[find_boards]`
@@ -247,7 +247,7 @@ table, `[poses.find_boards]`, read by BlobBoards with the stack's strategy reade
 BlobBoards' configuration (`descriptor_network_path()`; on the CPU its CPU provider) and the board's gallery features (`BoardGallery`,
 cached in the file `gallery`). Returns `(; board, features, network, bundles, config, device)`.
 """
-function board_finder(board_json::AbstractString, camera, table::AbstractDict; gallery::AbstractString, device = BlobBoards.default_device())
+function board_finder(board_json::AbstractString, camera, table::AbstractDict; gallery::AbstractString, device = RC.default_backend())
     config = BlobBoards.FindBoardsConfig(table; camera)
     config.geometry isa BlobBoards.PoseGeometry || throw(ArgumentError("board_finder: the [find_boards] geometry is $(typeof(config.geometry)), not the pose arm (type = \"pose\")"))
     network = device isa BlobBoards.KernelAbstractions.CPU ?
