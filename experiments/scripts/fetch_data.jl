@@ -7,7 +7,7 @@
 #
 #   julia --project=experiments experiments/scripts/fetch_data.jl                 the required tiers
 #   julia --project=experiments experiments/scripts/fetch_data.jl --all           every tier (the retired ones too: the private dataset)
-#   julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_targets_20261121,rc_golden_20261121
+#   julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_targets_20261122,rc_golden_20261121
 #   julia --project=experiments experiments/scripts/fetch_data.jl --list          the catalog, nothing fetched
 #
 # Each tree is installed once into the artifact store (VisualGeometryToolkitCore's artifact_store: VGTK_ARTIFACT_STORE, else the

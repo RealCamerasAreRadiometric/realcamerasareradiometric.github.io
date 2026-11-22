@@ -283,13 +283,6 @@ lazy = true
     sha256 = "907cc5a8fae93f1891ab92f5867656c5676c9a872ba2df0515bd82074f4375d0"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_sensor_model_20261121.tar.gz?download=1"
 
-[rc_targets_20261121]
-git-tree-sha1 = "746ee88b577ea256dbf6f9aaa04740d151cb5564"
-lazy = true
-
-    [[rc_targets_20261121.download]]
-    sha256 = "683e8b767aeb1779bb21b673d27cc5ad7c45254c3a9c14d35a19cff1ad0c5230"
-    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_targets_20261121.tar.gz?download=1"
 
 [rc_thorlabs_target_20261121]
 git-tree-sha1 = "8cbf4f5ebe4869f715881eff9b96f0bc3dbd2a2f"

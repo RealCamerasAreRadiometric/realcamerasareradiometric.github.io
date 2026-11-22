@@ -6,7 +6,7 @@
 # of record — the record's placeholder until the tarballs are uploaded). NEVER uploads (data/README.md).
 #
 #   VGTK_DATA_ROOT=<the author's data root> julia --project=experiments experiments/scripts/make_artifacts.jl --dry-run
-#   VGTK_DATA_ROOT=… julia --project=experiments experiments/scripts/make_artifacts.jl [--only=rc_targets_20261121,…]
+#   VGTK_DATA_ROOT=… julia --project=experiments experiments/scripts/make_artifacts.jl [--only=rc_targets_20261122,…]
 #       [--stage=<dir> (default output/artifacts, git-ignored)] [--record=<record>=<Zenodo id>,…] [--local-toml=<path>] | --check [--stage=<dir>]
 #
 # --dry-run lists every entry of record (the retired ones with --only): its files, their bytes, the overlap with the other entries,

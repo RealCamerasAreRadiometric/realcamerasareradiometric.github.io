@@ -391,18 +391,19 @@ required = true
 what = "the raw photographs of paper-data/vignetting/tamron/siemens-stars (Sony FX3 ARW, as captured), one session folder of the author's published set"
 provenance = "the 163 Siemens-star photographs (Sony FX3 ARW) of the 1 m board with the Tamron 20 mm F2.8 at f/2.8, captured on 2026-10-28 (the HIF previews left out)"
 
-[artifacts.rc_targets_20261121]
+[artifacts.rc_targets_20261122]
 kind = "tree"
 dir = "geometric_accuracy/data/target"
-filter = ["geometric_accuracy/data/target/siemens_1m/board/**", "geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml",
-          "geometric_accuracy/data/target/aprilgrid/board_sdf_8ppm/**", "geometric_accuracy/data/target/blobboard_a4_6eb/**",
-          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+filter = ["geometric_accuracy/data/target/siemens_1m/**", "geometric_accuracy/data/target/aprilgrid/**",
+          "geometric_accuracy/data/target/blobboard_a4_6eb/**", "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*",
+          "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**",
+          "!**/*DSC06055*", "!**/*DSC06055*/**"]
 files = 14
 mount = "data"
 record = "rc_vig_derived"
 tier = "rc_calibration"
 required = true
-what = "the printed targets the configs of record read: the 1 m Siemens-star board (texture, features, board record, the generator's signed-distance map sdf.f32 + sdf.json), its 30 x 30 pattern definition, the AprilGrid's signed-distance board (8 px per mm) and the A4 texture sheet blobboard_a4_6eb"
+what = "the printed targets the drivers read: the 1 m Siemens-star board (texture, features, board record, the generator's signed-distance map sdf.f32 + sdf.json, its 30 x 30 pattern and tag), the AprilGrid's records (the design, its stratified variant and the signed-distance board at 8 px per mm) and the A4 texture sheet blobboard_a4_6eb; supersedes rc_targets_20261121 (packed the same day without the AprilGrid design the board checks read)"
 provenance = "the board generators (scripts/make_targets.jl and the generators of rc_calibration_20261029; the distance maps by data/target/make_sdf.sh, byte-identical on regeneration); the sheet by BlobBoards (frontends_history of tag v0.10.0)"
 
 [artifacts.rc_thorlabs_target_20261121]

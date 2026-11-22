@@ -26,7 +26,7 @@ and sha256 to its Zenodo record (a placeholder until the record is published).
 ```
 julia --project=experiments experiments/scripts/fetch_data.jl --list          # the catalog
 julia --project=experiments experiments/scripts/fetch_data.jl                 # the required tiers
-julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_golden_20261121,rc_targets_20261121   # the golden gate's inputs
+julia --project=experiments experiments/scripts/fetch_data.jl --only=rc_golden_20261121,rc_targets_20261122   # the golden gate's inputs
 ```
 
 `scripts/fetch_data.jl` installs each tree into the artifact store (sha256 and tree hash verified; a tree the store already holds is
