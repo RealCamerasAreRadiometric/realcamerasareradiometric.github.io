@@ -2,7 +2,7 @@
     "schema": "rc/run_parameters/v3.0",
     "generator": {
         "name": "VisualGeometryToolkitIO",
-        "version": "0.10.5"
+        "version": "0.11.2"
     },
     "units": {
         "length": "m",
@@ -972,7 +972,7 @@
             "weight": 0.1,
             "cost": {
                 "init": 0.0,
-                "final": 6.450926971891798e-6
+                "final": 6.6557971196393296e-6
             },
             "beta": null,
             "selection": null
@@ -980,6 +980,7 @@
         "start_perturbation": null
     },
     "vignetting_options": null,
+    "focus_options": null,
     "resolution_used": [
         5208,
         3476
@@ -1004,23 +1005,23 @@
     "linearize": false,
     "material_fixed": false,
     "material_mu_start": 0.5,
-    "mu_linear": 0.47482009849818596,
+    "mu_linear": 0.47431993977843834,
     "cost": {
         "init": {
-            "cost": 5.078971437910175,
-            "rel_rms": 0.26861329746159246
+            "cost": 5.074424987570717,
+            "rel_rms": 0.26657916872807474
         },
         "after_linear_solve": {
-            "cost": 4.9540999438967255,
-            "rel_rms": 0.2652906872800622
+            "cost": 4.931025570093097,
+            "rel_rms": 0.2627855122085668
         },
         "after_refinement": {
-            "cost": 4.285234445632708,
-            "rel_rms": 0.24673281663622731
+            "cost": 4.352524958361566,
+            "rel_rms": 0.24688995809102973
         }
     },
     "printed_edge": {
-        "sdf": "geometric_accuracy/data/target/siemens_1m/distance_map/distance_map.json",
+        "sdf": "/tmp/rcrec/rc/experiments/test/pipeline/work/run-20261122-124048/siemens_coarse_full/distance_maps/prepare/5e6e6dfea1ccd4d2/distance_map.json",
         "start": {
             "ink_spread": 0.0,
             "print_blur": 2.5e-5
@@ -1063,13 +1064,13 @@
             0.0
         ]
     },
-    "focus_distance": 11.749571362441491,
+    "focus_distance": 11.749567733054503,
     "focus_support_nodes": 25,
     "bearing_error": {
         "init_median": 0.009082496113786614,
         "init_p90": 0.01726295498209874,
-        "refined_median": 0.06800662712854079,
-        "refined_p90": 0.2142705543522519
+        "refined_median": 0.05911965836523477,
+        "refined_p90": 0.18894130561899258
     },
     "sensor_characterisation": "",
     "sensor_models": [
@@ -1100,11 +1101,11 @@
         "present": null
     },
     "camera_moved": [
-        0.005330296562688032,
-        0.0058714520982652875
+        0.005613516283198631,
+        0.004065110495397133
     ],
     "iterations": 1,
-    "seconds": 138.0,
+    "seconds": 137.0,
     "stopped": "IterationCap",
     "retcode": "MaxIters",
     "stop_rule": "IterationCap",
