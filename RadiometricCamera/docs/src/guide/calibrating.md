@@ -36,7 +36,7 @@ b = 𝔟(ds.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])
 sz = extent(ds.lens₀)                             # the image is the camera's
 camera = RadiometricCameraModel(ds.lens₀; focus = ds.focus₀, aperture_radius = ds.r₀,
-                                vignetting = RadialVignetting(16, Point2(sz[1] / 2, sz[2] / 2), hypot(sz[1], sz[2]) / 2))
+                                vignetting = RadialVignetting(16, centroid(Rect(sz)), hypot(sz[1], sz[2]) / 2))
 s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # VisualRadiometryToolkitCore's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ

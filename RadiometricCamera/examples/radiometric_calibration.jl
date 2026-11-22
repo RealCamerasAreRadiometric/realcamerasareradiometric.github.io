@@ -51,7 +51,7 @@ W₀, H₀ = ds.extent; W, H = Tuple(VgtkCore.extent(ds.lens₀))               
 # its K the Schöps model's gauge (the pinhole at the pixel imaging the optical axis).
 
 g_schoeps = schoeps_gridlens(joinpath(EXP, "night_stars", "data", "fx3-fisheye", "schoeps", "intrinsics0.yaml"), W₀, H₀)
-@printf("Schöps → grid model %d × %d; central ray %s\n", grid_dims(g_schoeps)..., string(round.(normalize(VgtkCore.backproject(g_schoeps, SVector(W₀ / 2, H₀ / 2))); digits = 4)))
+@printf("Schöps → grid model %d × %d; central ray %s\n", grid_dims(g_schoeps)..., string(round.(normalize(VgtkCore.backproject(g_schoeps, SVector(VgtkCore.centroid(VgtkCore.Rect(0, 0, W₀, H₀))...))); digits = 4)))
 
 # **(c) Any VisualGeometryToolkitCore lens** (Kannala–Brandt, Brown–Conrady, equidistant, pinhole…) as VisualGeometryToolkitCore's pixel camera: a
 # `BoundedCamera` of `CameraModel(LogicalIntrinsics(K), lens)` with K in pixels of the image, whose parameters are Core's parameter
