@@ -299,3 +299,11 @@ lazy = true
     [[rc_targets_20261122.download]]
     sha256 = "0f7389a3ebe2041d90e74b9871f0d275a478730449900a6dd074f95a64d84332"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_targets_20261122.tar.gz?download=1"
+
+[rc_sensor_frames_20261121]
+git-tree-sha1 = "4be53e0be63a9234799c068c0a3526ce3f5ac925"
+lazy = true
+
+    [[rc_sensor_frames_20261121.download]]
+    sha256 = "35d59cbdb0efee6f38e517f86b05a06465962c22d5d6c5ea469bb65a3cdf1a53"
+    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_sensor_frames_20261121.tar.gz?download=1"
