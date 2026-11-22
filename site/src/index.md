@@ -73,8 +73,9 @@ accurately estimated.
 
 ## Install
 
-RadiometricCamera requires Julia 1.13 or later. It is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl), with the
-Visual Radiometry Toolkit packages it builds on; add that registry once, beside General, then the packages:
+RadiometricCamera requires Julia 1.13 or later. It is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl). The
+Visual Geometry Toolkit packages it builds on are in General; CauRegistry also serves the Visual Radiometry Toolkit packages until
+they are registered in General. Add that registry once, beside General, then the packages:
 
 ```julia-repl
 pkg> registry add General https://github.com/prittjam/CauRegistry.jl
@@ -93,11 +94,11 @@ photographs and recovers the lighting, the vignetting and the material from them
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
-using VisualRadiometryToolkitCore: Material
+using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel
+using VisualRadiometryToolkitCore: Material, 𝔟
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
-# camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
+# camera (VisualGeometryToolkitCore's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                               # the image, in pixels

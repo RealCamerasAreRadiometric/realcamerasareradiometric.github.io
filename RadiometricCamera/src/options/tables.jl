@@ -106,7 +106,7 @@ Base.@kwdef struct CameraOptions <: AbstractOptionsTable
                                                      #   once by `sensor_model_mode`): "auto" (a record present is used, none: the file's black),
                                                      #   "on" (a record required), "off" (a record present is NOT used: a loud warning)
 end
-"""The RETIRED value of `camera.sensor_characterisation` that stated there is none (RC ≤ 0.11.1): refused since 0.11.2, naming
+"""The RETIRED value of `camera.sensor_characterisation` that stated there is none (an earlier release's): refused, naming
 `camera.sensor_model = "off"` (a record present, not used) — a run that names no record leaves the key empty."""
 const NO_SENSOR_CHARACTERISATION = "none"
 """The `camera.lens_coverage` that states a lens lighting the whole sensor: the coverage is the sensor's rectangle (Core's default
@@ -199,7 +199,7 @@ Base.@kwdef struct VignettingOptions <: AbstractOptionsTable
     boundary_order::Int = _option_default(VignettingOptions, :boundary_order)                           # the dependent nodes' extrapolation past the supported nodes, 2 Δ²c = 0 | 3 Δ³c = 0 (`BOUNDARY_ORDERS`)
     chart::Symbol = _option_default(VignettingOptions, :chart)                           # the chart of the normalized radius (Core's `RADIAL_CHARTS`, 2026-11-10): linear ρ = d / r_max, uniform
                                                      #   knots over the imaged region | projective ρ = d / (r_max + d) (VisualRadiometryToolkitCore's `RadialVignetting(…; chart = :projective)`: the linear chart's pixel
-                                                     #   spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1 (Core 0.10.11): no pixel is ever clamped)
+                                                     #   spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1 (VisualGeometryToolkitCore's rule): no pixel is ever clamped)
 end
 
 """`[warping]`: the board warping h (thin plate spline through nodal heights) and the in-plane print error (Core's `Aspect ∘ Skew`)."""

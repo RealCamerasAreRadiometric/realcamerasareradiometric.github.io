@@ -24,7 +24,7 @@ a mixed set is refused; no ellipse found is an error (the set's config must then
 frames). Returns `(; lens_coverage, extent, frames, center_scale, axes_scale, inliers, candidates, rim_gap, cut, seconds)`, the fields
 of the record ([`save_image_region`](@ref)).
 The measurement is GEOMETRIC (a rim threshold on log-brightness drops): its frames are read under the file's black, no sensor model —
-exempt from the observation model (RC 0.11.1; every photograph a camera is calibrated on or predicts goes through `photo_set`).
+exempt from the observation model (every photograph a camera is calibrated on or predicts goes through `photo_set`).
 """
 function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,
                               device = VgtkCore.default_device(), detect = VgtkFeatures.detect_image_circle)

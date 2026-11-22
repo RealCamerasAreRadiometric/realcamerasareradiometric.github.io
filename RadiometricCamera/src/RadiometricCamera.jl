@@ -20,9 +20,9 @@ the same quadrature):
 Identifier ↔ paper symbol (section):
 
 ```text
-Core's backproject, in_domain              π⁻¹(𝐩; Θ_d), the geometric model              (Radiometric Camera Model)
+chief_ray (VRTK Core's), in_domain        π⁻¹(𝐩; Θ_d), the geometric model's chief ray  (Radiometric Camera Model)
 RadiometricCameraModel (VRTK Core's)       Θ_d, Θ_f, r and Θ_v                             (Radiometric Camera Model)
-View (pose, the camera's parts)            Θ_e + the camera, as the renderer evaluates it  (Radiometric Camera Model)
+View(pose, camera)                         Θ_e + the camera, as the renderer evaluates it  (Radiometric Camera Model)
 chief_direction, 𝔣, π̂⁻¹                    π⁻¹/‖π⁻¹‖, 𝔣(𝐩), π̂⁻¹(𝐩, 𝐚)                      (Radiometric Camera Model)
 Focus, t̂, 𝔱, FocusSpline (VRTK Core's)     t̂ = 1/t, the thin plate spline (Core's)         (Focus surface)
 𝔭                                          the centre of projection 𝔭                     (Radiometric Camera Model)
@@ -31,7 +31,7 @@ VRTK Core's RadialVignetting (P)          V(𝐩) = Σ_i N_{i,p}(‖𝐩 − �
 VRTK Core's EnvironmentLight (𝔟, r_SH, a)  L_c^SVSH on the sphere (𝔟, r_SH), a_{c,l}^m     (Lighting)
 Material, cook_torrance                    Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}, f_c^CT  (SVBSDF and Monte Carlo Estimation)
 VRTK Core's ggx_distribution, ggx_masking_shadowing, fresnel_dielectric, visible_normal_density   D, G₂, F_c, D^v   (SVBSDF and Monte Carlo Estimation)
-VRTK Core's TexturedTarget, its state's h   𝓑 (Core's posed target + the print) and its warping h  (Board Warping)
+VRTK Core's TexturedTarget, its state's h   𝓑 (VisualGeometryToolkitCore's posed target + the print) and its warping h  (Board Warping)
 Φ_pixel, L_c                               Φ_c(𝐮), L_c(𝐱, ω)                              (Image Formation)
 PerViewResidual                            ϕ − Φ(Θ̄); V(0) = 1 held by `gauge_basis`        (Calibration Pipeline)
 computeresjac, _PartsAt                    the pathwise Jacobian; the Θ_v, Θ_l, μ columns  (Second Order Optimization)
@@ -47,7 +47,7 @@ camera models, the run's outputs, RC's records).
 """
 module RadiometricCamera
 
-# every name imported explicitly (ExplicitImports: no implicit import, none stale; RC 0.11.0)
+# every name imported explicitly (ExplicitImports: no implicit import, none stale)
 using LinearAlgebra: LinearAlgebra, ColumnNorm, Diagonal, I, UniformScaling, cross, dot, norm, normalize, qr, qr!, rank
 using StaticArrays: StaticArrays, MVector, SMatrix, SVector, StaticArray, StaticVector
 using Statistics: Statistics, cov, mean, median, quantile, std
@@ -125,7 +125,7 @@ include("target/target_radiometry.jl")               # the target's radiometry a
 include("image_formation/radiance.jl")
 # image formation, the calibration (the state, the closed form, the LM over all blocks on the device), the loaders
 include("image_formation/flux.jl")
-include("camera/observation_model.jl")          # the observation model: a calibrated camera's sensor record, photograph kind and channel (RC 0.11.1)
+include("camera/observation_model.jl")          # the observation model: a calibrated camera's sensor record, photograph kind and channel
 include("calibration/weighting.jl")                 # the rows' weights: whitened residuals under the sensor noise (D14), or as measured
 include("calibration/state.jl")
 include("calibration/precision.jl")

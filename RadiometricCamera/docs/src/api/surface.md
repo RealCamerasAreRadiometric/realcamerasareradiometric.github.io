@@ -19,9 +19,9 @@ reach is `public`: write it qualified (`RadiometricCamera.RenderSettings`) or im
 ## Public
 
 The image formation (`RenderSettings`, `Φ_pixel`, `render_view`: each of the camera at a pose), the camera's and the target's
-parts (`TargetRadiometry`, `RadiometricTarget`, …), the closed-form blocks, the LM's blocks for building a problem of one's own (`build_problem`,
+parts (`TargetRadiometry`, … — `RadiometricTarget` is exported, above), the closed-form blocks, the LM's blocks for building a problem of one's own (`build_problem`,
 `run_lm!`, …), the records (`save_state`, `load_state`, …), the observation model and THE entry point of photographs (`ObservationModel`, `calibrated_camera`, `photo_set`, `observe`), the diagnostics (`selfcheck`, `bearing_px`, …), the option tables and
-the paper's symbols (`Φ_pixel`, `L_c`, …: owner D14, public, not exported). The list is `src/api.jl`'s `public` statement.
+the paper's symbols (`Φ_pixel`, `L_c`, …: public, not exported). The list is `src/api.jl`'s `public` statement.
 
 The generic radiometric types and functions are VisualRadiometryToolkitCore's and are not public names of this package: the camera's
 parts and maps (`geometric`, `focus`, `aperture_radius`, `with_…`, `chief_direction`, `focus_point`, `center_of_projection`, `backproject(camera, 𝐩, 𝐚)`, `world_ray`; the paper's symbols `𝔣`, `𝔭`, `π̂⁻¹`, `t̂`, … are its public aliases of the same functions), the focus surface

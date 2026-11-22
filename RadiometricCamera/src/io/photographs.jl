@@ -38,18 +38,18 @@ _pixel_pitch(s::VgtkCore.Sensor) = VgtkCore.ustrip(VgtkCore.m, VgtkCore.px * s.p
 """
     load_session(records, image_dir; component = 1, lens = :camera, grid_size = (65, 50), focus_init = :thin_lens,
                  image_distance = nothing, downsample = 8, texture_downsample = 8, sensor_width = 7mm, r₀ = 1.7e-3, linearize = true,
-                 focus_grid = 5, load_targets = true, raw_dir = nothing, lens_identity = nothing)
+                 focus_grid = 5, load_targets = true, raw_dir = nothing, lens_identity = nothing) -> NamedTuple
 
 Board, camera parts and initial poses of a calibration session stored as VisualGeometryToolkitIO records (`records`: CaliBlobs'
 `save_calibration`, or its one-time migration of a BlobBoards session export, `scripts/migrate_rc_session.jl`):
 
 * the camera: `load(BoundedCamera, camera.json)` — K in COLMAP pixels, the image extent, e.g. BlobBoards' division camera — bounded
-  by its `Sensor` (`sensor_width` over the record's extent) and moved to the scene's pixels when the photographs are box-averaged by
+  by its `Sensor` (`sensor_width` over the record's extent) and moved to the photographs' pixels when they are box-averaged by
   `downsample` (K re-expressed under the box downsample: Core's `Cameras.reframed_calibration` by the similarity x ↦ x / f): `lens = :camera` that pixel camera, `:grid` the generic grid model of
   `grid_size` sampled from it (`grid_model`);
 * the board: the target of component `component`, `load(Rig, targets_<component>.json)` — Core's planar target with its Canvas and
   the CanvasTexture of the printed image, whose file (`textures/<id>.png`, beside the records) is read by Features' `load_linear_image`
-  and box-averaged by `texture_downsample` — as the `TexturedTarget` of the scene, whose world frame is the target's (metres);
+  and box-averaged by `texture_downsample` — as the board, a `TexturedTarget` whose world frame is the target's (metres);
 * the poses: the frames of `trajectory_<component>.json` (`load(Trajectory, …)`: target → camera per frame, the frames' image names),
   each photograph's camera → world pose (`poses`) its inverse (lengths in metres through FlexUnits);
 * the focus surface: `focus_init = :board_center` (the board centre is in focus: its mean axial distance `d_c`, the lens equation's image
@@ -62,6 +62,18 @@ Board, camera parts and initial poses of a calibration session stored as VisualG
   read by Features' `load_raw_metadata` (the EXIF alone) into Features' `extract_capture_settings` — Core's `CaptureSettings`, frame
   index → exposure and lens settings, with the body and the lens (`lens_identity` where the caller states it: an adapted lens
   EXIF misnames); `nothing` without `raw_dir`. Reading the RAW files is Features' decoder (its LibRaw extension, loaded with this package).
+
+Returns a `NamedTuple`:
+
+- `board` (the `TexturedTarget`), `poses` (each photograph's camera → world `EuclideanMap`, metres), `targets` (the photographs ϕ,
+  `H × W × 3` each, in frame order; empty with `load_targets = false`), `names` (their image names) and `frames` (their frame indices);
+- `lens₀` (the geometric camera on the photographs' pixels: the pixel camera, or its grid model with `lens = :grid`), `focus₀` (the
+  start `Focus` on the `focus_grid × focus_grid` `nodes`, with their chief-ray cosines `cosα`), `r₀` (the aperture radius, metres),
+  `sensor` (the camera's `Sensor` at the photographs' pixels), `𝔱₀` (the start focus distance, metres; `Inf` for none) and `d_s`
+  (the image distance, metres);
+- `board_distances` (per photograph, along its principal ray to the board plane) and `center_distances` (axial, to the board centre);
+- `target_id` (the board's target in the rig), `extent` (the record's image size, before `downsample`), `downsample` and `settings`
+  (the `CaptureSettings`, or `nothing`).
 """
 function load_session(records::AbstractString, image_dir::AbstractString; component::Integer = 1, lens::Symbol = :camera,
                       grid_size::Tuple{Int, Int} = (65, 50), focus_init = :thin_lens, image_distance::Union{Nothing, Symbol, Real} = nothing,
@@ -91,7 +103,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     targets = load_targets ? [photo(n) for n in names] : Array{Float64, 3}[]
     t1 = load_targets ? targets[1] : photo(names[1])
     H, W = size(t1, 1), size(t1, 2); t1 = nothing
-    # the record's camera on the scene's pixels: Features' box downsample by f averages the f × f block of raw pixels j f + 1 … (j + 1) f
+    # the record's camera on the photographs' pixels: Features' box downsample by f averages the f × f block of raw pixels j f + 1 … (j + 1) f
     # (the remainder rows / columns dropped), so a COLMAP coordinate (pixel corners on the integers) is x / f, corners to corners —
     # the similarity of scale 1/f, no translation — and K is re-expressed in that frame by Core's `reframed_calibration`
     (W, H) == (W₀ ÷ downsample, H₀ ÷ downsample) || error("load_session: the photographs are $W × $H, the record's $W₀ × $H₀ downsampled by $downsample is $(W₀ ÷ downsample) × $(H₀ ÷ downsample)")
@@ -306,7 +318,7 @@ end
 _usable(::Nothing) = true
 _usable(defects::AbstractMatrix{Bool}) = .!Array(defects)
 
-# ---- THE entry point of every photograph a camera is calibrated on or predicts (RC 0.11.1) ------------------------------------
+# ---- THE entry point of every photograph a camera is calibrated on or predicts ------------------------------------
 """
     PhotoSet
 

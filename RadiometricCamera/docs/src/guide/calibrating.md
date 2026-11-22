@@ -6,9 +6,11 @@ CurrentModule = RadiometricCamera
 
 ## Plug in a geometric model
 
-The radiometric camera needs one thing from a geometric model: Core's `backproject(camera, 𝐩)`, the ray direction of the sensor
-point 𝐩 in the COLMAP pixels of the image (𝓘 = [0, W] × [0, H], Core's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be
-refined, VisualGeometryToolkitCore's parameter protocol.
+The radiometric camera needs one thing from a geometric model: its chief ray, VisualRadiometryToolkitCore's
+`chief_ray(camera, 𝐩)` (one of its `CONTRACT_GENERICS`), the ray direction of the sensor point 𝐩 in the COLMAP pixels of the image
+(𝓘 = [0, W] × [0, H], VisualGeometryToolkitCore's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be refined,
+VisualGeometryToolkitCore's parameter protocol. For any VisualGeometryToolkitCore camera the chief ray is its `backproject(camera, 𝐩)`;
+a camera type of another package answers `chief_ray` with a method.
 
 Any VisualGeometryToolkitCore lens plugs into the `RadiometricCameraModel` as Core's pixel camera — a `BoundedCamera` of
 `CameraModel(LogicalIntrinsics(K), lens)`, K in the image's pixels (isbits: it travels into the GPU kernels as it is) — whose
@@ -26,9 +28,9 @@ own session, so it is not run here:
 
 ```julia
 # Illustrative: needs a calibration session's records and its photographs.
-using RadiometricCamera, VisualGeometryToolkitCore
-using VisualRadiometryToolkitCore: Material, geometric
-using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
+using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
+using VisualRadiometryToolkitCore: Material, geometric, 𝔟
+using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])

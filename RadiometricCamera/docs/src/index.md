@@ -13,12 +13,13 @@ identifiers.
 
 ## What it provides
 
-- **The radiometric camera** around any chief-ray model: `RadiometricCameraModel` (the geometric camera, the focus surface
-  `Focus`, the aperture radius and the vignetting — VisualRadiometryToolkitCore's `TensorProductVignetting` and `RadialVignetting`,
-  with the calibration's gauge pin [`center_constraint`](@ref)) as one object, a photograph being the camera at a pose
-  ([`render_view`](@ref)), and the radiometric back-projection `π̂⁻¹`.
+- **The radiometric camera** around any chief-ray model: VisualRadiometryToolkitCore's `RadiometricCameraModel`, re-exported
+  here (the geometric camera, the focus surface `Focus`, the aperture radius and the vignetting — `TensorProductVignetting` or
+  `RadialVignetting` — as one object), and its radiometric back-projection `π̂⁻¹`. RadiometricCamera adds the calibration's gauge
+  pin of the vignetting [`center_constraint`](@ref), the render of a photograph — the camera at a pose — [`render_view`](@ref), and
+  the calibration below.
 - **The board**: the printed board, VisualRadiometryToolkitCore's `TexturedTarget`, with its own state (its warping, printed edge and in-plane print error: `TargetState`), its radiometry
-  [`TargetRadiometry`](@ref) (the Cook–Torrance SVBSDF `Material` and the printed edge), and VisualRadiometryToolkitCore's
+  [`TargetRadiometry`](@ref) (VisualRadiometryToolkitCore's Cook–Torrance SVBSDF `Material` and the printed edge), and VisualRadiometryToolkitCore's
   spherical-harmonics `EnvironmentLight`.
 - **Image formation**: the radiant flux of a pixel [`Φ_pixel`](@ref) and the render [`render_view`](@ref), by fixed quadrature
   rules on the pixel and the aperture and a Monte Carlo radiance with common random numbers.
@@ -37,10 +38,10 @@ symbol table, and the data conventions (COLMAP pixels, metres, the camera frame)
 
 ## Installation
 
-RadiometricCamera and the Visual Radiometry Toolkit packages it builds on (VisualRadiometryToolkitCore,
-VisualRadiometryToolkitIO) are registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl); the Visual Geometry Toolkit
-packages are in General. Add that registry once, beside General, then the package and the two stack packages the example uses
-(registration in General is planned):
+RadiometricCamera is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl). The Visual Geometry Toolkit packages
+it builds on are in General; CauRegistry also serves the Visual Radiometry Toolkit packages (VisualRadiometryToolkitCore,
+VisualRadiometryToolkitIO) until they are registered in General. Add that registry once, beside General, then the package and the
+two stack packages the example uses:
 
 ```julia-repl
 pkg> registry add General https://github.com/prittjam/CauRegistry.jl
@@ -58,11 +59,11 @@ board covers, through the camera's aperture and focus surface.
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
-using VisualRadiometryToolkitCore: Material
+using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel
+using VisualRadiometryToolkitCore: Material, 𝔟
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
-# camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
+# camera (VisualGeometryToolkitCore's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                               # the image, in pixels
@@ -101,10 +102,12 @@ count(mask)                     # 76800 = W × H: the board covers every pixel
 
 **Reference**
 - [Camera](api/camera.md), [Target and lighting](api/target.md), [Calibration](api/calibration.md),
-  [Pipeline and options](api/pipeline.md).
+  [Pipeline and options](api/pipeline.md), [API surface](api/surface.md).
 
 ## Role in the stack
 
+RadiometricCamera lifts a Visual Geometry Toolkit camera into VisualRadiometryToolkitCore's `RadiometricCameraModel` and builds on
+the Visual Radiometry Toolkit's VisualRadiometryToolkitCore and VisualRadiometryToolkitIO.
 RadiometricCamera builds on the VisualGeometryToolkit stack: VisualGeometryToolkitCore's cameras, lenses, spline cameras
 (`SplineLens`) and thin-plate splines, VisualGeometryToolkitIO's records,
 VisualGeometryToolkitEstimation's fits and VisualGeometryToolkitFeatures' image readers. It builds on the Visual Radiometry Toolkit for the generic radiometric layer:

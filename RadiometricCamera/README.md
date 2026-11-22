@@ -9,13 +9,15 @@ of a printed board through a full radiometric camera (chief rays, finite apertur
 board's SVBSDF and warping) and minimises the photometric residual jointly over all of its parameters. It refines the
 geometric calibration of a feature-based pipeline (BlobBoards, the generic spline model of Schöps et al.'s pipeline,
 Kalibr, OpenCV, any VisualGeometryToolkitCore lens), for researchers who need a camera's lens, focus and vignetting together.
+It lifts a Visual Geometry Toolkit camera into VisualRadiometryToolkitCore's `RadiometricCameraModel` and builds on the Visual
+Radiometry Toolkit's VisualRadiometryToolkitCore and VisualRadiometryToolkitIO.
 
 ## Installation
 
-RadiometricCamera and the Visual Radiometry Toolkit packages it builds on (VisualRadiometryToolkitCore,
-VisualRadiometryToolkitIO) are registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl); the Visual Geometry Toolkit
-packages are in General. Add that registry once, beside General, then the package and the two stack packages the example uses
-(registration in General is planned):
+RadiometricCamera is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl). The Visual Geometry Toolkit packages
+it builds on are in General; CauRegistry also serves the Visual Radiometry Toolkit packages (VisualRadiometryToolkitCore,
+VisualRadiometryToolkitIO) until they are registered in General. Add that registry once, beside General, then the package and the
+two stack packages the example uses:
 
 ```julia-repl
 pkg> registry add General https://github.com/prittjam/CauRegistry.jl
@@ -33,11 +35,11 @@ board covers, through the camera's aperture and focus surface.
 
 ```julia
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel, 𝔟
-using VisualRadiometryToolkitCore: Material
+using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel
+using VisualRadiometryToolkitCore: Material, 𝔟
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
-# camera (Core's double-sphere lens) 1.5 m in front of it, looking at it.
+# camera (VisualGeometryToolkitCore's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
 W, H = 320, 240                               # the image, in pixels
@@ -72,13 +74,15 @@ manual in `docs/`, also built locally: `julia +1.13 --project=docs --startup-fil
   [set up the data and the hardware](docs/src/guide/setup.md), [run the tests and check a change](docs/src/guide/testing.md).
 - Explanation: [the radiometric camera model](docs/src/guide/model.md), in the paper's symbols.
 - API Reference: [camera](docs/src/api/camera.md), [target and lighting](docs/src/api/target.md),
-  [calibration](docs/src/api/calibration.md), [pipeline and options](docs/src/api/pipeline.md).
+  [calibration](docs/src/api/calibration.md), [pipeline and options](docs/src/api/pipeline.md),
+  [API surface](docs/src/api/surface.md).
 
 The paper's project page is <https://realcamerasareradiometric.github.io>; the paper and its supplement are at
 <https://realcamerasareradiometric.github.io/paper.pdf>.
 
 RadiometricCamera builds on the VisualGeometryToolkit stack: VisualGeometryToolkitCore's cameras, lenses, generic models and
-thin-plate splines, VisualGeometryToolkitIO's records and VisualGeometryToolkitFeatures' image readers. It builds on the Visual Radiometry Toolkit for the generic radiometric layer:
+thin-plate splines, VisualGeometryToolkitIO's records, VisualGeometryToolkitEstimation's fits and VisualGeometryToolkitFeatures'
+image readers. It builds on the Visual Radiometry Toolkit for the generic radiometric layer:
 VisualRadiometryToolkitCore's radiometric camera, focus surface, quadrature, material, textured target, vignetting models and light,
 and VisualRadiometryToolkitIO's records of the vignetting and the light. The experiments that reproduce the
 paper are `experiments/` beside this package in its repository: staged drivers with configs of record

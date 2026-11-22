@@ -30,7 +30,7 @@ _kernel_float(be) = be isa KA.CPU ? Float64 : Float32
     HIGH_FLOAT = Float64
 
 The float type, on every backend, of the nodal heights' path and of the Jacobian chunks that carry the pose's six slots (the chunks
-starting below slot 6; `_chunk_starts`, `_pose_chunk`): the height kernel and a radiance record of its own, the view, the scene, the
+starting below slot 6; `_chunk_starts`, `_pose_chunk`): the height kernel and a radiance record of its own, the view, the board, the
 relief and the estimator all in it, and the pose's chunks with the heights' inputs and record (`_height_inputs`). A height column is
 the radiance's derivative along the ray at the ray's board point; on a printed edge (the Siemens print's σ 0.03 mm) that derivative
 moves by ≈ 1 % when the board point moves by the 0.1 µm a Float32 ray puts on it, and the estimator's α and η derivatives at the edge

@@ -51,7 +51,7 @@ Refine the started radiometric state `state` ([`start_calibration`](@ref) or [`l
 Levenberg–Marquardt over every block the options leave free (`fixed`), on the route the camera's type picks (`lm_route`: per view,
 in a parametric camera's own parameters; per tile for a SplineLens camera), optionally in chunks with a closed-form sweep of the
 lighting, the vignetting and μ between them (`sweep.lm_chunk`), up to `lm.max_iter` iterations and `lm.max_time` seconds. The result's
-estimate is the refined [`CalibrationEstimate`](@ref); its `retcode` / `stop_rule` the LM's termination record (Core 0.11.0: a
+estimate is the refined [`CalibrationEstimate`](@ref); its `retcode` / `stop_rule` the LM's termination record (VisualGeometryToolkitCore's: a
 tolerance stop converged, the rejection cap judged by the stall postcondition at the final state) — `(Failure, ShapeGate)` when the calibrated SplineLens camera still folds over its
 coverage (`fold_termination`: no calibration; the camera is held to the coverage assertion too, [`calibrated_folds`](@ref)) or a focus node of its support runs to t̂ ≤ 0 (`focus_runaway`, the same `validity_gate`), `iterations` the LM iterations, `rms` the final relative RMS over the `n` measured values.
 """
@@ -102,7 +102,7 @@ The Levenberg–Marquardt over Θ̄ from the prepared state: resumes from `resum
 of `sweep.lm_chunk` with a closed-form sweep between them when set), prints the live monitor after every iteration and writes the checkpoints
 (`lens_ckpt.json` / `grid_ckpt.json` every 5 iterations; with `io.checkpoint_each` `lens_it<N>.json` | `grid_it<N>.json`, `poses_it<N>.json`,
 `state_it<N>.json` after every iteration). Returns the NLLSsolver result (the last chunk's; `nothing` without an iteration), the trace,
-and the costs after the linear solve and at the end, the LM's seconds and its termination record (`lm_termination`: Core 0.11.0's
+and the costs after the linear solve and at the end, the LM's seconds and its termination record (`lm_termination`: VisualGeometryToolkitCore's
 verdict at the final state, the one written).
 """
 function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; load_state = RadiometricCamera.load_state)

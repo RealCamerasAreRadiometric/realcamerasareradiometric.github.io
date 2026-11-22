@@ -79,7 +79,7 @@ of the start lens's IMAGED region (Core's `imaged_region`: the sensor ∩ its le
 the region (`in_support`, `_focus_support`) AND inside the lens coverage scaled by `fo.lens_coverage_scale` (`_within_coverage`: the same `_scaled_coverage` as `[masks] lens_coverage_scale`), so
 no node sits on the circle's rim by design, whatever the ellipse's orientation. The focus surface describes the optics over what is
 imaged, so it never reads the start's initialization region (where the start is defined: the pose fits and the self-checks read that
-one). Before (Ties, 2026-11-15): laid over the initialization region ∩ the imaged region's box (RC 0.9.0–0.11.2), the clipped
+one). An earlier release laid it over the initialization region ∩ the imaged region's box: the clipped
 box's four side midpoints lay inside the region, on its border, seen by 8 314–35 955 pixels against 58 893–195 292 for the inner nodes,
 and ran to infinite focus; over the imaged region's own box the same four lay 0.006 px OUTSIDE the rotated circle (rounding alone kept
 9 nodes; an axis-aligned circle kept 13). A runaway node is flagged (`focus_runaway`).
@@ -108,12 +108,12 @@ _support_focus_values(f::Focus, in_support) = [f.t̂_i[i] for i in eachindex(f.t
 The calibrated focus surface's check on output: the nodes of the run's support (`in_support`, fixed at the start) whose inverse depth
 t̂ᵢ is non-finite or ≤ 0 — a focus distance 1/t̂ᵢ at or past infinity, which no lens focused on the target has. A node seen by few
 pixels (one on the border of the imaged region) is free to run there when nothing ties it to its neighbours (`[focus.smoothness]`
-weight 0, the default): the fisheye f/4 regression of RC 0.9.0 (2026-11-15). A runaway node flags the calibration
+weight 0, the default): the fisheye f/4 regression of an earlier release. A runaway node flags the calibration
 non-converged (`validity_gate`), as a fold does (`fold_termination`).
 """
 focus_runaway(f::Focus, in_support) = [i for i in eachindex(f.t̂_i) if in_support(f.nodes[i]) && !(isfinite(f.t̂_i[i]) && f.t̂_i[i] > 0)]
 # with the START surface `f0`: a node at t̂ ≤ 0 is flagged only when it RAN there (its start t̂ > 0) — the start floors a back-facing
-# chief ray's node to t̂ = 0 (`focus_start`), which is no runaway (code review, RC 0.11.4); a non-finite one always. The start's value is
+# chief ray's node to t̂ = 0 (`focus_start`), which is no runaway (code review); a non-finite one always. The start's value is
 # the one AT THE SAME NODE (matched by position): a resumed state or a start record may hold another node set or order than the run's
 # start (owner ruling 2026-11-16), and a node the start does not hold has no start value, so it is flagged as the check above flags it.
 function focus_runaway(f::Focus, in_support, f0::Focus)

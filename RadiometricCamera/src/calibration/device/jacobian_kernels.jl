@@ -313,13 +313,13 @@ function _jacobian_buffers(s::CalibrationState, ncol::Integer, M::Integer)
     return J, view(rb, 1:M)
 end
 
-"""Per-state kernel data (the scene in the kernels' float type, adapted to the backend; the pixel-id lists and their index lists,
+"""Per-state kernel data (the board in the kernels' float type, adapted to the backend; the pixel-id lists and their index lists,
 `_index_list`), built lazily."""
 function _ensure_device!(s::CalibrationState)
     s.device_cache === nothing || return s.device_cache
     be = s.backend
     F = _kernel_float(be)
-    # the CPU backend's kernels read the host scene itself (Float64 already: no copy of the board's maps)
+    # the CPU backend's kernels read the host board itself (Float64 already: no copy of the board's maps)
     board32 = be isa KA.CPU && F === _float_of(s.settings) ? s.board : adapt(be, VgtkCore.convert_eltype(F, s.board))
     px = [adapt(be, UInt32.(UInt32.((getindex.(p, 1) .- 1) .* _image_height(s) .+ getindex.(p, 2)))) for p in s.px]
     idx = [_index_list(be, length(p)) for p in px]
@@ -331,8 +331,8 @@ function _ensure_device!(s::CalibrationState)
     return s.device_cache
 end
 
-"""The scene of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
-kernels' scene itself where the two float types agree)."""
+"""The board of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
+kernels' board itself where the two float types agree)."""
 function _height_board(s::CalibrationState)
     dc = _ensure_device!(s)
     hasproperty(dc, :board_h) && return dc.board_h

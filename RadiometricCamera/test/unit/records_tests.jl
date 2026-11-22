@@ -280,7 +280,7 @@ end
         text = read(f, String)
         for old in ("rc/radiometric_camera/v2", "rc/radiometric_camera/v1")
             g = joinpath(out, "old.json"); write(g, replace(text, "rc/radiometric_camera/v3.1" => old))
-            @test_throws "written by RC ≤ 0.8 on IO 0.9: regenerate it" load_radiometric_camera(g)
+            @test_throws "written by an earlier release, on an earlier VisualGeometryToolkitIO envelope: regenerate it" load_radiometric_camera(g)
         end
         # a camera of RC 0.9–0.11.0 states no observation model: refused (never migrated), naming the refinement step that regenerates it
         d = JSON.parsefile(f; dicttype = Dict{String, Any}); delete!(d, "observation_model"); d["schema"] = "rc/radiometric_camera/v3.0"
@@ -297,10 +297,10 @@ end
                    (joinpath(@__DIR__, "..", "fixtures", "records_v1", "state_fisheye_20261027_refined_v8.json"), "rc/calibration_state/v1"),
                    (joinpath(@__DIR__, "..", "fixtures", "records_v2", "state_blob_kb.json"), "rc/calibration_state/v2"))
         @test VgtkIO.read_record(f).schema == v
-        @test_throws "written by RC ≤ 0.8 on IO 0.9: regenerate it" load_state(f)
+        @test_throws "written by an earlier release, on an earlier VisualGeometryToolkitIO envelope: regenerate it" load_state(f)
     end
     mktempdir() do out
         g = joinpath(out, "target.json"); write(g, "{\"schema\": \"rc/radiometric_target/v1\", \"length_unit\": \"mm\"}")
-        @test_throws "written by RC ≤ 0.8 on IO 0.9: regenerate it" load_radiometric_target(g)
+        @test_throws "written by an earlier release, on an earlier VisualGeometryToolkitIO envelope: regenerate it" load_radiometric_target(g)
     end
 end

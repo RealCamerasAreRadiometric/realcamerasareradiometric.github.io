@@ -3,7 +3,7 @@
 
 The views' poses (camera → world, one per view) as VisualGeometryToolkitIO's trajectory record (`vgio/trajectory/v3`): world → camera
 (`X_cam = R X_world + t`, the inverse of each camera → world pose) per frame k with its image `names[k]`, lengths in mm on disk;
-`world` names the scene's world frame in the provenance.
+`world` names the calibration's world frame in the provenance.
 """
 function save_poses(path::AbstractString, poses::AbstractVector{<:EuclideanMap}, names; world::AbstractString)
     poses = Dict(k => VgtkCore.with_unit(inv(_pose_eltype(Float64, poses[k])), VgtkCore.m) for k in eachindex(names))
@@ -36,7 +36,7 @@ end
     lm_termination(res) -> (ReturnCode.T, StopRule)
 
 The termination record of the refinement's LM: `res` is the last chunk's record (VisualGeometryToolkitCore's `lmsolve_chart!` on the
-LM's `LmProblem`: `(; code, rule, iterations, cost)`), decided at the point the chunk returned (Core 0.11.0): a cost-decrease or
+LM's `LmProblem`: `(; code, rule, iterations, cost)`), decided at the point the chunk returned (VisualGeometryToolkitCore's rule): a cost-decrease or
 step-size tolerance stop (`[lm] ftol`, `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
 cap is `Success` only at a stationary point and `Stalled` otherwise; the iteration and time caps `MaxIters` / `MaxTime`. A run of chunks ends on one
 that did not iterate, at the final state. `nothing` (the LM did not run): `(ReturnCode.Default, NoRule)`.

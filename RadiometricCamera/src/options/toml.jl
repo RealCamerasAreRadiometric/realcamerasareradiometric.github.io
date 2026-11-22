@@ -61,7 +61,7 @@ _option_from_toml(::Type{T}, ::Val{F}, v, key) where {T, F} = _field_from_toml(f
 _field_from_toml(::Type{Bool}, v, key) = read_switch(v, key)
 _field_from_toml(::Type{S}, v, key) where {S} = convert_field(S, v, key)
 
-# ---- the switches: "on" | "off" (RC 0.11.4, owner 2026-11-15) -------------------------------------------------------------------
+# ---- the switches: "on" | "off" -------------------------------------------------------------------
 # A switch of a config is a string, parsed ONCE here into the Bool the code reads (a setting that picks an implementation is a tag of a
 # registry instead): TOML true/false is refused naming the new spelling (src/options/retired.jl), anything else refused.
 """The spellings of a two-way switch and the Bool each reads as (`read_switch`'s default cases)."""
@@ -73,7 +73,7 @@ const SWITCH_SPELLINGS = ("on" => true, "off" => false)
 The switch `key` of a config with TOML value `v`, read through its `cases` (`word => value`): a two-way switch `"on"` → `true`,
 `"off"` → `false`; a switch whose availability is a condition states its own cases, `"auto"` among them, each a concrete value (a
 type: `camera.sensor_model`'s `SENSOR_MODEL_TAGS`), so "auto" is resolved here and the core code never sees a string. TOML's
-`true`/`false` is refused naming the new spelling (`key = true` → use `key = "on"`; RC 0.11.4, no alias), any other value refused
+`true`/`false` is refused naming the new spelling (`key = true` → use `key = "on"`; no alias), any other value refused
 naming the cases. THE ONE reader of every switch: the pipeline's options, the sensor model and the paper project's drivers.
 """
 function read_switch(v, key::AbstractString, cases = SWITCH_SPELLINGS)
@@ -236,12 +236,12 @@ function _check_options(opts::PipelineOptions)
     isempty(opts.camera.lens_coverage) && throw(ArgumentError("`camera.lens_coverage` = \"\": state it — \"sensor\" (the lens lights the whole sensor) " *
                                                               "or the path of the capture set's measured image region (rc/image_region/v1.0)"))
     opts.camera.sensor_characterisation == NO_SENSOR_CHARACTERISATION &&
-        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired (RC 0.11.2): a run that does not use a sensor record present " *
+        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired: a run that does not use a sensor record present " *
                             "states `camera.sensor_model = \"off\"`; a run that names none leaves `camera.sensor_characterisation` empty"))
     sensor_model_mode(opts.camera.sensor_model)                 # one of SENSOR_MODEL_TAGS
-    "grid" in opts.fixed && throw(ArgumentError("\"grid\" in `fixed` is renamed \"camera\" (the geometric camera's own parameters, a grid's or a parametric camera's; RC 0.11.0)"))
+    "grid" in opts.fixed && throw(ArgumentError("\"grid\" in `fixed` is renamed \"camera\" (the geometric camera's own parameters, a grid's or a parametric camera's)"))
     "edge" in opts.fixed && throw(ArgumentError("\"edge\" in `fixed` is refused: the printed edge is never a parameter (its δ and σ_print are held at " *
-                                                "`edge.ink_spread_mm` and `edge.print_sigma_mm`; RC 0.11.0) — delete it"))
+                                                "`edge.ink_spread_mm` and `edge.print_sigma_mm`) — delete it"))
     bad = setdiff(opts.fixed, FIXABLE_BLOCKS)
     isempty(bad) || throw(ArgumentError("`fixed` has unknown block(s) $(bad); allowed: $(collect(FIXABLE_BLOCKS))"))
     _check_lattice(opts)

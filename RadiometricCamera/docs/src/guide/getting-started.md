@@ -8,7 +8,7 @@ This tutorial renders two photographs of a printed board through a radiometric c
 are known, then starts a calibration from wrong values of those three blocks and recovers them from the photographs. Every
 block below runs when the documentation is built.
 
-## The scene and the camera
+## The board and the camera
 
 The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The geometric camera
 `geometric` is VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels,
@@ -19,8 +19,8 @@ runs at the sensor's full resolution. The principal point is the image's centre 
 ```@example tutorial
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
-using VisualRadiometryToolkitCore: Focus, Material, with_vignetting   # the generic radiometric types: the focus surface, the material, a camera's parts
-using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
+using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, 𝔟   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
+using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])

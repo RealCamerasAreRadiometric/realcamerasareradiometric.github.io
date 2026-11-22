@@ -26,8 +26,8 @@ _draw_keys(U, w) = (length(w) == length(U) || throw(DimensionMismatch("_subsampl
     _edge_select(mask, img, n; channels = axes(img, 3), diagonal = false) -> BitMatrix
 
 The `n` masked pixels with the strongest squared gradient |∇ϕ|² of the photo (central differences from the four neighbours, summed
-over the measured `channels` of `img`, H × W × C or one H × W plane; an uncertain image's values): the rule of 2026-10-31 (RC ≤ 0.11.4's `masks.edge_fraction`,
-restored verbatim from RC 0.11.4 for the sampling-strategy experiment, `draw_samples`' `edge_fraction`). Border pixels have no
+over the measured `channels` of `img`, H × W × C or one H × W plane; an uncertain image's values): the rule of 2026-10-31 (an earlier release's `masks.edge_fraction`,
+restored verbatim for the sampling-strategy experiment, `draw_samples`' `edge_fraction`). Border pixels have no
 gradient and rank last. Deterministic, no random draw.
 """
 function _edge_select(mask::AbstractMatrix{Bool}, img::AbstractArray, n::Integer; channels = axes(img, 3), diagonal::Bool = false)
@@ -61,7 +61,7 @@ mode or the count) and the draw reads the keys of the usable ones. Its modes, on
   edge strength over the usable observations (`edge_detector` on `img`'s measured `channels`, `edge_strength` / `edge_rank`, on
   `device`), α = `gradient_bias` (> 0 favours edges, < 0 flat regions): `_subsample`'s weighted generalization (exponential keys of
   the same uniforms). α = 0 is the uniform draw itself (`_subsample`, no detector run), bit for bit;
-- `edge_fraction = q ∈ (0, 1)` (with α = 0): the rule of 2026-10-31 (RC ≤ 0.11.4, verbatim): a uniform pool of ⌈n / q⌉,
+- `edge_fraction = q ∈ (0, 1)` (with α = 0): the rule of 2026-10-31 (an earlier release's, verbatim): a uniform pool of ⌈n / q⌉,
   then its `n` strongest |∇ϕ|² (`_edge_select`; `diagonal` for a RAW photograph's photosites);
 - `addon_samples = M ≥ 1`: the draw above (n ∝ u^α) PLUS M more of the other usable observations ∝ u^β, β = `addon_gradient_bias`,
   from the SAME uniforms: the keys are the first arrivals of Poisson clocks (E = −log(1 − U) ~ Exp(1), at rate w); given the n
@@ -69,7 +69,7 @@ mode or the count) and the draw reads the keys of the usable ones. Its modes, on
   weighted draw — and the n are exactly the n of the draw without the add-on (the same stream: no extra random number, so every
   view's n samples are those of the draw without it, bit for bit).
 
-The mask test (RC 0.11.5, the 0.11.4 review's item 7a): where no weight reads the edge ranks (α = β = 0: the uniform draw, the rule
+The mask test: where no weight reads the edge ranks (α = β = 0: the uniform draw, the rule
 of 2026-10-31's pool, the uniform add-on) the draw is the m smallest keys among the usable observations (m = n + M, or the pool),
 so `valid` tests the candidates in key order, in batches, until m are valid (`_smallest_valid`) — the same m as the test of every
 candidate, at a few times m pixels tested instead of the whole region. A weight that reads the ranks (α ≠ 0 or β ≠ 0) needs every
@@ -90,7 +90,7 @@ function draw_samples(rng, valid, candidates::AbstractMatrix{Bool}, img::Abstrac
     keep = ranked ? findall(valid(cand)) : _smallest_valid(valid, cand, Uc, m)  # the usable candidates (all, or the m smallest keys')
     idx = cand[keep]; U = Uc[keep]; N = length(idx)
     out = falses(size(candidates))
-    if edge_fraction > 0                                              # the rule of 2026-10-31 (RC 0.11.4 verbatim): its uniform pool, the
+    if edge_fraction > 0                                              # the rule of 2026-10-31 (verbatim): its uniform pool, the
         out[idx] .= true                                              #   ⌈n / q⌉ smallest keys among the usable (all when fewer; α = 0)
         return _edge_select(out, img, n; channels, diagonal)
     end

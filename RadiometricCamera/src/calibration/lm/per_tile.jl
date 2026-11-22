@@ -569,7 +569,7 @@ function _unregister_grid_problem!(s::CalibrationState)
             gb.pending[k] = nothing
         end
     end
-    s.device_cache = Base.structdiff(s.device_cache, NamedTuple{(:grid,)})   # the scene, the pixel ids (and the heights' scene) kept
+    s.device_cache = Base.structdiff(s.device_cache, NamedTuple{(:grid,)})   # the board, the pixel ids (and the heights' board) kept
     return nothing
 end
 _grid_batch(s::CalibrationState) = _device_entry(s, :grid)
@@ -661,7 +661,7 @@ end
 """View `k`'s batched device evaluation at the variables `vars` (a tile's, of the trial vector `vec`) as one worker job (`_await` it):
 the flux and, for `need_jac`, the radiance record, the Jacobian chunks, the parts and the height partials,
 all queued on the worker's device queue before it waits once — `(; key, flux, flux_d, px, C, S, parts, heights)` (on the device but the host flux), the view
-cache's entry. One queue: the kernels share the scene's buffers, and a buffer used on another queue waits for the queue that used it
+cache's entry. One queue: the kernels share the board's buffers, and a buffer used on another queue waits for the queue that used it
 last, so separate queues bought little concurrency and made every launch wait for a kernel to end."""
 function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, need_jac::Bool)
     gb = _grid_batch(s)

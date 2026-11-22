@@ -1,6 +1,6 @@
 # The precompile workload (PrecompileTools): tiny but real instances of the package's hot paths, run once while the package image is
 # built, so that their native code is cached in it and a fresh process (a test worker, a pipeline run) does not compile it again.
-# The suite's items spent 89 % of their time compiling (the RC 0.3.0 gate), most of it in these paths. CPU only, no data files, no
+# The suite's items spent 89 % of their time compiling (a release gate), most of it in these paths. CPU only, no data files, no
 # output: a synthetic texture and two views of the 24 × 24 test scene. The types are the ones the tests and the pipeline use
 # (Float64, a 3 × 3 focus spline, a 4 × 4 vignetting surface, lighting of order 2), since compiled code is cached per argument type.
 #

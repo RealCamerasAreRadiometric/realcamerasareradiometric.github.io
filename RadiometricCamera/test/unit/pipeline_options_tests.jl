@@ -390,7 +390,7 @@ end
     # an RC ≤ 0.8 run directory (rc/run_parameters/v1): refused by name, naming how to regenerate it (the run's own options beside it)
     old_dir = mktempdir(); write(joinpath(old_dir, "parameters.json"), "{\"schema\": \"rc/run_parameters/v1\", \"iterations\": 2}")
     m_old = thrown_message(() -> RC.load_pipeline_metrics(old_dir))
-    @test occursin("written by RC ≤ 0.8 on IO 0.9", m_old) && !occursin("--config=", m_old)          # no options of its writer: none named
+    @test occursin("written by an earlier release, on an earlier VisualGeometryToolkitIO envelope", m_old) && !occursin("--config=", m_old)          # no options of its writer: none named
     write(joinpath(old_dir, "pipeline_config.toml"), "[io]\nout = \"$old_dir\"\n")               # its writer's (its io.out is this directory)
     @test occursin("bin/refine.jl --config=$(joinpath(old_dir, "pipeline_config.toml"))", thrown_message(() -> RC.load_pipeline_metrics(old_dir)))
 

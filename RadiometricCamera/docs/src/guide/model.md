@@ -27,7 +27,7 @@ B-spline, `Θ_v = {P_i}` with `P_0 = P_1` so V is smooth at the centre, gauge V(
 free direction is eliminated from the parametrization), the lighting `L_c^SVSH` on
 the sphere `(𝔟, r_SH)` around the board centre with spherical-harmonics coefficients `Θ_l`, the spatially varying Cook–Torrance
 SVBSDF `f_c^CT` (GGX D, height-correlated G₂, dielectric Fresnel `F_c`) with `Θ_m = {α_¬ink, α_ink, η_¬ink, η_ink, μ}` blended
-by the texture value, and the board warping h (a thin plate spline over the board 𝓑, Core's posed height field and its ray root).
+by the texture value, and the board warping h (a thin plate spline over the board 𝓑, VisualGeometryToolkitCore's posed height field and its ray root).
 
 Parameter sets: `Θ_e` poses, `Θ_d` geometric model, `Θ_f` focus, r aperture, `Θ_i = Θ_d ∪ Θ_f ∪ {r}`, `Θ_c = Θ_e ∪ Θ_i`,
 `Θ_r = Θ_l ∪ Θ_m` (and `Θ_v`), Θ̄ = all. The calibration minimises
@@ -66,7 +66,8 @@ src/RadiometricCamera.jl            module (the identifier → paper-symbol tabl
                                     the vignetting fields; the sensor domain ℐ and the quadrature rules; EnvironmentLight; Material
                                     {Θ_m} with D, G₂, F_c, visible-normal sampling and f^CT — the generic radiometric types
 src/camera/                         the geometric camera's chief-ray models and the kernels' view of the radiometric camera
-  models/geometric.jl                 the chief-ray interface: chief_ray, in_domain (on the sensor's COLMAP pixels)
+  models/geometric.jl                 the chief-ray interface: VisualRadiometryToolkitCore's chief_ray (its CONTRACT_GENERICS),
+                                      in_domain (on the sensor's COLMAP pixels)
   models/                             pixel_camera.jl: any VisualGeometryToolkitCore lens as Core's pixel camera (a BoundedCamera of a
                                       CameraModel: Lens(DoubleSphere), KannalaBrandt, Division — BlobBoards' model —, the 14-coefficient
                                       chain, …) and its LM box and scale; grid_camera.jl: Core's spline cameras (a SplineLens camera
@@ -74,7 +75,7 @@ src/camera/                         the geometric camera's chief-ray models and 
   view.jl                             the kernels' View of the camera at a pose (Θ_e): one-line forwards to VisualRadiometryToolkitCore's
                                       maps; flat_vignetting, the calibration's start of V
   vignetting.jl, pose.jl              the vignetting's rules and gauge; the pose
-src/target/                         board.jl (𝓑: VisualRadiometryToolkitCore's TexturedTarget — Core's posed planar target + the print:
+src/target/                         board.jl (𝓑: VisualRadiometryToolkitCore's TexturedTarget — VisualGeometryToolkitCore's posed planar target + the print:
                                     texture, printed edge, and its own state, the warping h — and the calibration's share: the light
                                     sphere, the warping's free parameters, the distance map's reader), target_radiometry.jl
 src/image_formation/                radiance.jl (L_c, the per-basis responses), flux.jl (RenderSettings, Φ_pixel, masks)

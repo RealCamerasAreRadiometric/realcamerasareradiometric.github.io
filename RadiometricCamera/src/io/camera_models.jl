@@ -1,11 +1,11 @@
 # ---------------------------------------------------------------------------
 # The chief-ray models' files — every one read and written by VisualGeometryToolkitIO:
 #
-#   save_lens / load_parametric_lens   a parametric model (Core's pixel camera, a `BoundedCamera` of a `CameraModel`) ↔ a
-#                                       vgio/cameras/v6.0 record of one camera; any Core lens — the record carries the lens's own type
-#   save_grid / load_grid              a grid camera (a bounded SplineLens camera) ↔ a vgio/cameras/v6.0 record (IO 0.10's one camera
-#                                       kind); old vgio/generic_camera files read through IO's migration
-#   schoeps_gridlens                   Schöps et al.'s central intrinsics0.yaml (IO's `load`) resampled into our G_x × G_y grid
+#   save_lens / load_parametric_lens   a parametric model (VisualGeometryToolkitCore's pixel camera, a `BoundedCamera` of a `CameraModel`) ↔ a
+#                                       vgio/cameras/v6.0 record of one camera; any VisualGeometryToolkitCore lens — the record carries the lens's own type
+#   save_grid / load_grid              a grid camera (a bounded SplineLens camera) ↔ a vgio/cameras/v6.0 record (VisualGeometryToolkitIO's one camera
+#                                       kind); old vgio/generic_camera files read through VisualGeometryToolkitIO's migration
+#   schoeps_gridlens                   Schöps et al.'s central intrinsics0.yaml (VisualGeometryToolkitIO's `load`) resampled into our G_x × G_y grid
 #   load_lens(spec)                    "grid:<record>" | "lens:<record>" → the lens object (the start of a refinement)
 #   load_model(spec, W, H)             "grid:" | "lens:" | "schoeps:" spec → (𝐩 ↦ unit direction, label)
 #
@@ -14,8 +14,8 @@
 
 # ---- Schöps et al.'s camera_calibration models ---------------------------------------------------------------------------------
 # Read by VisualGeometryToolkitIO's `load(BoundedCamera, intrinsics0.yaml)` where they are used: a central model as a
-# SplineLens camera, K the lattice's gauge (Core's); the YAML is in SCHOEPS_PIXEL_FRAME
-# (COLMAP's, the frame Core's spline cameras are read into).
+# SplineLens camera, K the lattice's gauge (VisualGeometryToolkitCore's); the YAML is in SCHOEPS_PIXEL_FRAME
+# (COLMAP's, the frame VisualGeometryToolkitCore's spline cameras are read into).
 
 """The spline model of the Schöps run's `yamlpath` (VisualGeometryToolkitIO's reader: a bounded SplineLens camera), refused unless it is a `W × H` model
 (`who` names the caller)."""
@@ -51,14 +51,14 @@ function schoeps_start(yamlpath::AbstractString, W::Integer, H::Integer; coverag
 end
 
 # ---- parametric models ↔ vgio/cameras/v6.0 ---------------------------------------------------------------------------------
-"""The display name of a parametric model's lens (a label of reports and run names): Core's `lens_label`."""
+"""The display name of a parametric model's lens (a label of reports and run names): VisualGeometryToolkitCore's `lens_label`."""
 lens_type_name(c::_PixelCamera) = VgtkCore.lens_label(VgtkCore.lens(c))
 
 """
     save_lens(path, camera; provenance = (;))
 
-A parametric model (Core's pixel camera) as VisualGeometryToolkitIO's camera record (`vgio/cameras/v6.0`, one camera `:cam`): K in COLMAP
-pixels, the lens Core's lens with its own type and coefficients, the image's bound and the lens coverage. `provenance`: the run's labels (the model's name,
+A parametric model (VisualGeometryToolkitCore's pixel camera) as VisualGeometryToolkitIO's camera record (`vgio/cameras/v6.0`, one camera `:cam`): K in COLMAP
+pixels, the lens VisualGeometryToolkitCore's lens with its own type and coefficients, the image's bound and the lens coverage. `provenance`: the run's labels (the model's name,
 the iteration, …).
 """
 save_lens(path::AbstractString, c::_PixelCamera; provenance::NamedTuple = (;)) =
@@ -75,7 +75,7 @@ load_parametric_lens(path::AbstractString) = VgtkIO.load(VgtkCore.BoundedCamera,
 """
     save_grid(path, lens; provenance = (;))
 
-A grid lens as VisualGeometryToolkitIO's camera record (`vgio/cameras/v6.0`, one camera `:cam`; IO 0.10's one camera kind holds
+A grid lens as VisualGeometryToolkitIO's camera record (`vgio/cameras/v6.0`, one camera `:cam`; VisualGeometryToolkitIO's one camera kind holds
 any bounded camera): the bounded SplineLens camera — its K, the lens's `{"spline": …}` body (the nodes it holds) and its lens
 coverage.
 """
@@ -86,7 +86,7 @@ save_grid(path::AbstractString, g::BoundedCamera{<:CameraModel{<:VgtkCore.Abstra
     load_grid(path) -> BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}
 
 The central grid camera of a VisualGeometryToolkitIO record (`load(BoundedCamera, path)`): a camera store's SplineLens camera, an old
-`vgio/generic_camera` file through IO's read migration (never rewritten: its nominal pinhole the K, its `domain` the lens
+`vgio/generic_camera` file through VisualGeometryToolkitIO's read migration (never rewritten: its nominal pinhole the K, its `domain` the lens
 coverage).
 """
 function load_grid(path::AbstractString)
@@ -99,7 +99,7 @@ end
 """
     load_lens(spec) -> BoundedCamera
 
-The lens of a model spec that names a record: `grid:<record>` (a grid camera, `load_grid`) or `lens:<record>` (a camera record: Core's
+The lens of a model spec that names a record: `grid:<record>` (a grid camera, `load_grid`) or `lens:<record>` (a camera record: VisualGeometryToolkitCore's
 pixel camera). The start of a refinement (`io.init` of the pipeline options).
 """
 function load_lens(spec::AbstractString)
@@ -127,9 +127,9 @@ end
 """
     load_camera(spec) -> camera
 
-The bounded Core camera of a model spec (as `load_model`'s), every record as it is: `grid:` the record's camera (IO's
-`load(BoundedCamera, …)`: a bounded SplineLens camera), `lens:` the record's pixel camera, `schoeps:` a Schöps run's spline model as IO reads it
-(a bounded SplineLens camera) — the object Core's `backproject` and `backproject_with_jacobian(camera, 𝐩)` take.
+The bounded VisualGeometryToolkitCore camera of a model spec (as `load_model`'s), every record as it is: `grid:` the record's camera (VisualGeometryToolkitIO's
+`load(BoundedCamera, …)`: a bounded SplineLens camera), `lens:` the record's pixel camera, `schoeps:` a Schöps run's spline model as VisualGeometryToolkitIO reads it
+(a bounded SplineLens camera) — the object VisualGeometryToolkitCore's `backproject` and `backproject_with_jacobian(camera, 𝐩)` take.
 """
 function load_camera(spec::AbstractString)
     kind, rest = split(spec, ":"; limit = 2)
@@ -147,7 +147,7 @@ _schoeps_yaml(r::AbstractString) = isdir(r) ? schoeps_run_file(r, :camera) : r
 The file of the Schöps run `dir` that holds `what` (`:camera` or `:detections`): the run's IMPORT when it has one —
 `camera.json` / `detections.json`, VisualGeometryToolkitIO records in the raw grid's COLMAP pixels, written by a front-end stage
 that imported the tool's run onto the raw grid (the experiments' scripts/frontends.jl; through its decode's frame map) — else the tool's own file,
-`intrinsics0.yaml` / `dataset.bin`. IO's loaders read either form by its content (`load(BoundedCamera, …)`,
+`intrinsics0.yaml` / `dataset.bin`. VisualGeometryToolkitIO's loaders read either form by its content (`load(BoundedCamera, …)`,
 `load(TargetObservations, …)`), so every reader of a run takes its file from here.
 """
 function schoeps_run_file(dir::AbstractString, what::Symbol)

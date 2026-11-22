@@ -24,7 +24,7 @@ end
 
 The workgroup size of a per-pixel kernel on the backend `be`: 16 pixels on the CPU backend, the kernel's `requested` one on a device
 (its register budget; `nothing`: the backend's choice). KernelAbstractions' CPU backend gives each thread whole workgroups, and its
-default group is 1024 items: a view of a run's 8,192 to 16,384 measured pixels then occupies 8 to 16 threads, a test scene's 500
+default group is 1024 items: a view of a run's 8,192 to 16,384 measured pixels then occupies 8 to 16 threads, a test board's 500
 one. A pixel's flux is ≈ 50 µs of work (96 rays, four radiance samples each), so 16 pixels a group cost nothing in scheduling and
 every thread works: the flux kernel of a 1,728-pixel view 49 ms → 5.5 ms on 32 threads (2026-11-20), the same bits (a pixel's value
 does not depend on its group).
@@ -210,8 +210,8 @@ end
 """
     _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32) -> device vector of `RadianceJac`
 
-The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (the kernel's float type) (view `v32`, material, lighting, scene with
-its surface): per ray `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
+The radiance record of every pixel of the device list `px` (`idx` its index list, `_index_list`) at the plain parameters (the kernel's float type) (view `v32`, material, lighting, the board with
+its state): per ray `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (`RadianceRecord`), `n_rays × npx` rows, pixel-major, zeroed where no ray reached. The chunks and
 the height kernel of the same parameters read it (`rays`) instead of carrying their partials through the estimator.
 """
 function _radiance_record_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32)
@@ -293,7 +293,7 @@ _row_type(f::_HeightAt) = SMatrix{3, HEIGHT_NC, _float_of(f.st), 3 * HEIGHT_NC}
                                                   nothing, nothing, HeightRays(f.h), lr))
 end
 """The height partials of every pixel of the device list `px` at the plain view `v32` (the kernel's float type, device-capable),
-material `m32`, vignetting and lighting, on the scene `board32` (plain surface) at the nodal heights `h`, seeded here: `3 HEIGHT_NC`
+material `m32`, vignetting and lighting, on the board `board32` (plain state) at the nodal heights `h`, seeded here: `3 HEIGHT_NC`
 floats per pixel, pixel-major, on the device (queued on this task's queue: `KA.synchronize` before another task reads it). Workgroups of
 128 (the Jacobian kernel's register budget)."""
 _heights_device(be, px, idx, k, H, v32, vig32, m32, l32, board32, st32, h::StaticVector{HEIGHT_NC}; rays) =
