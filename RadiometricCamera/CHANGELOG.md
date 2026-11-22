@@ -14,7 +14,8 @@
   call the methods a package load defines then (world age), so the README, the landing page and Getting Started load it
   (`using CUDA`) and drop `rc_backend("cpu")`; their checks hold to Float32's precision on either device. Loading CUDA forgets a
   default device resolved before it (RadiometricCameraCUDAExt's `__init__`). The drivers are unchanged: they supply the device
-  of their `[compute] backend` (`rc_backend`), and the runs of record with it.
+  of their `[compute] backend` (`rc_backend`), and the runs of record with it. `rc_backend("gpu")` ends in `default_backend()`
+  after loading the vendor packages, so its CPU fallback warns with the same one statement (`fallback = false` still refuses).
 
 - **Tests:** the golden pipeline case (`experiments/test/pipeline/golden/siemens_coarse_full`) is re-recorded on a full B200 (GPU,
   Julia 1.13). Two causes moved it since its recording of 2026-11-16, neither a regression: RC 0.11.5's intended change to the

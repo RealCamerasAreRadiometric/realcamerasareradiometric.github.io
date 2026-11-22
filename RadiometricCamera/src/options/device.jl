@@ -25,7 +25,8 @@ const GPU_VENDOR_PACKAGES = (:CUDA,)
 THE device resolution of RC and its drivers: `backend` a tag of [`BACKEND_TAGS`](@ref) or its type. [`CPUCompute`](@ref) is
 KernelAbstractions' `CPU()`; [`GPUCompute`](@ref) loads the GPU vendor packages (`GPU_VENDOR_PACKAGES`) and takes
 VisualGeometryToolkitCore's vendor-agnostic resolver afresh (`reset_default_device!`, then `default_device`: a functional GPU, else
-the CPU). With no functional GPU it falls back to the CPU with a loud warning, or refuses (`fallback = false`). `inline`: the device
+the CPU): the GPU path ends in [`default_backend`](@ref), whose warning is the one CPU fallback's. With no functional GPU it
+falls back to the CPU with that warning, or refuses (`fallback = false`). `inline`: the device
 backend compiling every call inlined (`always_inline`), RC's kernels' fast build — Core's resolver's non-inlined Jacobian kernel
 needs twice the local memory (1.5x slower at jacobian_chunk 4, 4.4x on the flux). Called at top level by a driver, so its later calls
 run in the world the vendor package's load made.
@@ -38,12 +39,11 @@ function rc_backend(backend; inline::Bool = true, fallback::Bool = true)
         @eval import $pkg
     end
     VgtkCore.reset_default_device!()          # a resolution memoized before the vendor's load (its resolver registers at load) is forgotten
-    d = Base.invokelatest(VgtkCore.default_device)
-    if d isa KernelAbstractions.CPU
-        fallback || error("compute backend \"gpu\": no functional GPU (set it to \"cpu\" to run on the CPU)")
-        @warn "compute backend \"gpu\": NO FUNCTIONAL GPU — running on the CPU, which is very slow"
-        return d
+    if !fallback && Base.invokelatest(VgtkCore.default_device) isa KernelAbstractions.CPU
+        error("compute backend \"gpu\": no functional GPU (set it to \"cpu\" to run on the CPU)")
     end
+    d = Base.invokelatest(default_backend)    # the default device, and its one CPU warning
+    d isa KernelAbstractions.CPU && return d
     return inline ? Base.invokelatest(() -> typeof(d)(; always_inline = true)) : d
 end
 
@@ -60,7 +60,7 @@ script loads it itself, `using CUDA`, before its first call.
 function default_backend()
     d = VgtkCore.default_device()
     d isa KernelAbstractions.CPU &&
-        @warn "RadiometricCamera: no functional GPU — running on the CPU, which is very slow. Load the GPU's package (`using CUDA`) " *
-              "before the first call for the GPU, or supply `backend = CPU()` to choose the CPU." maxlog = 1
+        @warn "RadiometricCamera: no functional GPU — running on the CPU, which is very slow. A GPU needs its package loaded before " *
+              "the first call (`using CUDA`) and a functional device; `backend = CPU()` chooses the CPU without this warning." maxlog = 1
     return d
 end
