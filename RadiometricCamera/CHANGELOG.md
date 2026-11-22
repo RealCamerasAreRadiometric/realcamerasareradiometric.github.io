@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Tests:** the golden pipeline case (`experiments/test/pipeline/golden/siemens_coarse_full`) is re-recorded on a full B200 (GPU,
+  Julia 1.13). Two causes moved it since its recording of 2026-11-16, neither a regression: RC 0.11.5's intended change to the
+  sampling stream, whose golden re-record never reached the release line; and the Float32 rounding of the device Jacobian's chunks
+  after the performance work of round 2 (1c4dc5f, 09551bf, 30ad4c2), which moves the device's result toward the CPU's (the CPU path
+  is unchanged to 1e-13; CPU and GPU differ by 0.13° in the poses on this case). The final rel-RMS against the old golden: 0.24673 →
+  0.24689; the new costs 5.074424987570717 (start), 4.931025570093097 (after the linear solve), 4.352524958361566 (final). The
+  tolerance mode of `compare_outputs.jl` (1e-9) is meaningful only in the recorded environment (Julia, Manifest and device).
+
 - **Changed:** on VisualGeometryToolkitCore 0.13 (`[compat]` `"0.13"`; its removed spherical spline and dilogarithm were
   never called here), in the package and every workspace member.
 
@@ -171,7 +179,8 @@ The records are unchanged, except that a camera or state record of a removed foc
 Performance and composition (2026-11-20; in this release too, and written before the port above: the names it adds —
 `Focus`, `with_geometric`, `with_focus`, `with_aperture_radius`, `geometric`, `focus`, `aperture_radius` — are
 VisualRadiometryToolkitCore's in 0.2.0, and the composed constructor's default vignetting is `NoVignetting`, as stated above). No number of a calibration changes beyond rounding:
-the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10).
+the residuals are the same bits, the Jacobians' columns move by at most 2.2e-14 of their norm (the goldens hold at rtol 1e-10 on the
+CPU, where this was measured; the device Jacobian's chunks round differently in Float32, see the golden re-record under Unreleased).
 
 - **Added:** the radiometric camera composed from its geometric camera: `RadiometricCameraModel(geometric; focus, aperture_radius,
   vignetting)` — the focus surface (a `Focus`, or a distance: focused there everywhere), the aperture radius and the vignetting

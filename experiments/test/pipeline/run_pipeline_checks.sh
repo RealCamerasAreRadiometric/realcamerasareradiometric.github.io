@@ -7,7 +7,8 @@
 #                        material, V and the lighting free (per-tile LM), the printed-edge albedo
 # Usage: bash experiments/test/pipeline/run_pipeline_checks.sh [--record] [case …]      exit code 0 = every case matches
 #   --record   write the golden outputs from the CURRENT code and golden/RECORDED.toml (Julia, Manifest sha256, …) — only on purpose; say why
-#              in the commit. compare_outputs.jl is bit-exact in the recorded environment and a tolerance comparison elsewhere.
+#              in the commit. compare_outputs.jl is bit-exact in the recorded environment and a tolerance comparison elsewhere
+#              (its 1e-9 tolerances are meaningful only in the recorded environment: Julia, Manifest and device).
 # THE GATE OF RECORD is the exact comparison on Julia 1.13 (golden/RECORDED.toml), the stack's one Julia.
 # Each case runs through the paper project's driver on its config of record: experiments/scripts/calibrate.jl
 # --config=experiments/configs/calibration/<case>.toml --stage=start,refine --force, which runs bin/refine.jl --stage=start, then --start=<it> (the package's environment) on
