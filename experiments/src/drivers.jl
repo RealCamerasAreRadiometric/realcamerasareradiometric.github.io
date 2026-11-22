@@ -152,10 +152,11 @@ const CODE_VERSION = VisualGeometryToolkitEval.Experiments.current_code_trees(pr
     config_product(stage, cfg, tables; upstream = (), output) -> Product
 
 The step of a stage keyed by the config of record `cfg`'s `[experiment]` and its tables `tables` (by name), and the keys of the steps
-it reads (`upstream`: `name => product`): [`driver_product`](@ref) of that record.
+it reads (`upstream`: `name => product`): [`driver_product`](@ref) of that record. A `[render]` table keys it as `render_files`
+(VisualGeometryToolkitEval's `Product` refuses a top-level `render`, which a run key excludes: the rendering keys the product here).
 """
 config_product(stage::AbstractString, cfg::AbstractDict, tables; upstream = (), output::AbstractString, threads::Union{Nothing, AbstractString} = execution_threads()) =
-    driver_product(stage, Dict{String, Any}("experiment" => cfg["experiment"], (t => cfg[t] for t in tables)...,
+    driver_product(stage, Dict{String, Any}("experiment" => cfg["experiment"], ((t == "render" ? "render_files" : t) => cfg[t] for t in tables)...,
                                             "upstream" => Dict(k => s.key for (k, s) in upstream)); output, threads)
 
 "The records of a driver's steps: the driver and its config of record (`produce`'s `driver` and `config_source`)."

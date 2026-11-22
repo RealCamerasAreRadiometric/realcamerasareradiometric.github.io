@@ -26,7 +26,7 @@ RadiometricCamera = {path = "../.."}
 
 [compat]
 julia = "1.13"
-VisualGeometryToolkitCore = "0.13"
+VisualGeometryToolkitCore = "0.13.1"
 VisualGeometryToolkitEstimation = "0.12.1"
 VisualGeometryToolkitFeatures = "0.9.9"
 VisualGeometryToolkitIO = "0.11"

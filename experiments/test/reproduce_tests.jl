@@ -357,8 +357,8 @@ end
         (s.gpu || !isempty(s.gres)) && @test "setup" in upstream(s.name)
     end
 
-    # the shipped Slurm profile of the B200 server, named as its --site= argument (no host name is written elsewhere)
-    slurm_site = chopprefix("--site=dgx01", "--site=")
+    # the shipped Slurm profile (VisualGeometryToolkitEval 0.11 ships vcai and desktop)
+    slurm_site = "vcai"
     dry(site, more...) = (io = IOBuffer(); code = reproduce_main(["--graph=$graph", "--site=$site", "--dry-run", more...]; io, env = env0);
                           (code, String(take!(io))))
     data, results = mktempdir(), mktempdir()
@@ -371,7 +371,7 @@ end
         used = sort(unique([m.match for l in submits for m in eachmatch(r"experiments/scripts/slurm/[a-z_]+\.sbatch", l)]))
         @test all(f -> isfile(joinpath(root, f)), used)
         @test used == sort(unique(filter(!isempty, [s.sbatch for s in g.stages if s.name in paper])))
-        @test all(l -> occursin("--partition=gpu", l), submits)
+        @test all(l -> occursin("--exclude=athena", l), submits)          # the vcai profile's sbatch options
         # each stage's own CPUs and memory (configs/reproduce.toml, over the site's 28): one thread count, 8, for every keyed stage
         @test all(l -> occursin("--mem-per-cpu=8480M", l), submits)
         for name in paper
@@ -397,7 +397,7 @@ end
         vcai = load_site("vcai")
         @test occursin("data     $(site_root(vcai, "data_root", g.name))", out) &&
               occursin("results  $(site_root(vcai, "results_root", g.name))", out)
-        @test !haskey(g.site_roots, slurm_site) && !haskey(g.site_roots, "vcai")
+        @test !haskey(g.site_roots, "vcai")
     end
 
     @testset "the dry run on the desktop: the same launchers under bash, device 0 only" begin

@@ -1,7 +1,7 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit from the repository
-# root (`sbatch experiments/scripts/slurm/sensor_characterisation.sbatch`; or `bash experiments/scripts/reproduce/reproduce_results_dgx.sh
+# root (`sbatch experiments/scripts/slurm/sensor_characterisation.sbatch`; or `bash experiments/scripts/reproduce/reproduce_results_vcai.sh
 # --only=sensor_characterisation`); logs go to ./logs/, which must exist before submission.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh) and VGTK_DATA_ROOT_UNPUBLISHED (the inputs of
 # tier "unpublished": the runner sets it from configs/reproduce.toml's site tiers).

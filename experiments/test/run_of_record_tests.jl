@@ -8,8 +8,8 @@
     using DrWatson
     using TOML: TOML
     using VisualGeometryToolkitEval.Reproduce: load_stage_graph, load_site, plan_reproduction, select_stages, site_root, resolve_roots
-    # the shipped Slurm profile of the B200 server, named as a --site= argument (a host name is written nowhere else)
-    const SLURM_SITE = chopprefix("--site=dgx01", "--site=")
+    # the shipped Slurm profile (VisualGeometryToolkitEval 0.11 ships vcai and desktop)
+    const SLURM_SITE = "vcai"
     include(srcdir("run_of_record.jl"))
 
     cfg = load_ror_config(projectdir("configs", "run_of_record.toml"))
@@ -41,7 +41,8 @@
         vcai = load_site("vcai")
         @test ror_results_base(g, vcai; env = Dict{String, String}()) == site_root(vcai, "results_root", g.name)
         @test ror_results_base(g, vcai; env = Dict(g.results_env => "/elsewhere")) == "/elsewhere"
-        @test_throws ArgumentError ror_results_base(g, load_site(SLURM_SITE); env = Dict{String, String}())   # the B200 server's profile has no [storage]
+        nostore = joinpath(mktempdir(), "nostore.toml"); write(nostore, "[site]\nname = \"nostore\"\nbackend = \"slurm\"\n")
+        @test_throws ArgumentError ror_results_base(g, load_site(nostore); env = Dict{String, String}())   # a profile without [storage]
     end
 
     @testset "job names: ror-<driver>-<stage>[-<phase>]" begin

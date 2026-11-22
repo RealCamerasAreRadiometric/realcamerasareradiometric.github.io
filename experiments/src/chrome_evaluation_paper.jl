@@ -183,7 +183,7 @@ to plotsdir(), `produce_figures`): keyed by `[figures]`, `[tables]` and `[render
 """
 chrome_figures_product(P::AbstractDict, runs::AbstractDict) =
     driver_product("figures", Dict{String,Any}("experiment" => P["experiment"], "figures" => get(P, "figures", Dict{String,Any}()),
-                                               "tables" => get(P, "tables", Dict{String,Any}()), "render" => P["render"],
+                                               "tables" => get(P, "tables", Dict{String,Any}()), "render_files" => P["render"],
                                                "upstream" => Dict{String,Any}(k => runs[k].key for k in chrome_paper_sets(P)));
                    output = "numbers.tex", threads = nothing)
 

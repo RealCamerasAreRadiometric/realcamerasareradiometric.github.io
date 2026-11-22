@@ -14,7 +14,7 @@
 #
 #   julia --project=experiments experiments/scripts/focus_surfaces.jl [--config=<toml>] [--plan] [--force]
 #
-# The refinements must exist (scripts/radiometric_refinement.jl; scripts/reproduce/reproduce_results_dgx.sh (configs/reproduce.toml)).
+# The refinements must exist (scripts/radiometric_refinement.jl; scripts/reproduce/reproduce_results_vcai.sh (configs/reproduce.toml)).
 # =============================================================================
 using DrWatson
 @quickactivate "experiments"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit through the runner
-# (`bash experiments/scripts/reproduce/reproduce_results_dgx.sh`: the stages chrome_evaluation and chrome_evaluation_score, their
+# (`bash experiments/scripts/reproduce/reproduce_results_vcai.sh`: the stages chrome_evaluation and chrome_evaluation_score, their
 # phases, the array over the chrome sets and the resources of configs/reproduce.toml); logs go to ./logs/.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh).
 #SBATCH --partition=gpu

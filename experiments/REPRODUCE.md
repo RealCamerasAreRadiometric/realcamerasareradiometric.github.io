@@ -23,15 +23,15 @@ figure and table numbers below are the paper's (main paper Sec. 1–6, supplemen
 Every result, figure, table and number of the paper, from the published inputs, on a machine of record:
 
 ```
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh --dry-run       # the B200 server (Slurm): the job graph, the missing inputs; nothing runs
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh                 # submit it: every stage an sbatch job, chained with afterok
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh status          # per stage: the jobs' states, the log, the first error line
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh --dry-run       # the vcai cluster (Slurm): the job graph, the missing inputs; nothing runs
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh                 # submit it: every stage an sbatch job, chained with afterok
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh status          # per stage: the jobs' states, the log, the first error line
 bash experiments/scripts/reproduce/reproduce_results_desktop.sh --only=texture_recovery   # the desktop (one RTX 4090, no Slurm): here, in order
 ```
 
 The stage graph of record is `configs/reproduce.toml` (which launcher runs which driver on which config of record, after what);
 the runner is VisualGeometryToolkitEval's (Reproduce: `reproduce_main`, its docs' "One command: the runner"), and so are the
-machine profiles (the B200 server's: one Slurm node, 8 × B200, partition `gpu`, one GPU per GPU task; `vcai`: the Slurm cluster, its
+machine profiles (`vcai`: the Slurm cluster, its
 NFS project space; `desktop`: one RTX 4090, no scheduler, `CUDA_VISIBLE_DEVICES=0`). Each stage's CPUs and memory are the graph's (`cpus_per_task`, `mem_per_cpu` per stage).
 Where this project's data and results are on each machine is the site profile's `[storage]` (`data_root`, `results_root`,
 `artifact_store`) — the one place a machine's paths are written — and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_ARTIFACT_STORE`
@@ -276,7 +276,7 @@ the design) are checked by `test/boards_tests.jl` against the package's designs.
 The launchers in `scripts/slurm/` run the paper experiments' drivers on a Slurm cluster, each on its config of record, in
 parallel: one GPU per case of the chrome-board refinements and the f/4 refinements and per texture set. Their resources are those of the B200 server (one node: 224 CPUs, 1900 GB, 8 GPUs, partition
 `gpu`; memory per CPU at the node's ratio, `--mem-per-cpu=8G`). The one command (above) submits them all
-(`reproduce_results_dgx.sh`: `setup.sbatch` — instantiate the workspace and precompile experiments and the package, CUDA and the GPU
+(`reproduce_results_vcai.sh`: `setup.sbatch` — instantiate the workspace and precompile experiments and the package, CUDA and the GPU
 extensions included — and then the others with `--dependency=afterok` on what they read, printing the job ids); each is also
 submitted by hand from the repository root (`sbatch experiments/scripts/slurm/<launcher>.sbatch`, an array with `--array=0-<n-1>`; `case_task.sbatch` with `EXPERIMENT`,
 `STAGES` and `--job-name` as configs/reproduce.toml states them).

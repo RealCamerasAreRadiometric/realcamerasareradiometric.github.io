@@ -11,7 +11,7 @@ generator = "scripts/numbers.jl"
 [runs]
 # In dependency order (scripts/regenerate_paper.jl runs each driver's pending stages, reusing complete runs by key):
 # chrome_evaluation_paper scores every chrome set (scripts/chrome_evaluation_paper.jl, its sets stage: scripts/chrome_evaluation.jl on each set's config) before its tables
-# and figures; focus_surfaces draws the focus surfaces from the refinements (scripts/reproduce/reproduce_results_dgx.sh, configs/reproduce.toml,
+# and figures; focus_surfaces draws the focus surfaces from the refinements (scripts/reproduce/reproduce_results_vcai.sh, configs/reproduce.toml,
 # runs the refinements of radiometric_refinement.toml and radiometric_refinement_vignetting.toml on the GPU before it).
 experiments = [
     "configs/experiments/chrome_evaluation_paper.toml",

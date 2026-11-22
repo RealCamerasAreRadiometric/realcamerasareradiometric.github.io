@@ -9,6 +9,6 @@ RadiometricCamera = {path = ".."}
 
 [compat]
 Documenter = "1"
-VisualGeometryToolkitCore = "0.13"
+VisualGeometryToolkitCore = "0.13.1"
 VisualRadiometryToolkitCore = "0.1.1"
 julia = "1.13"

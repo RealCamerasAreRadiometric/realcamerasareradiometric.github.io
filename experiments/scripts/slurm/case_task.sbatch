@@ -1,7 +1,7 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit from the repository
-# root (`bash experiments/scripts/reproduce/reproduce_results_dgx.sh`: the runner submits prepare.sbatch first where the experiment
+# root (`bash experiments/scripts/reproduce/reproduce_results_vcai.sh`: the runner submits prepare.sbatch first where the experiment
 # has one, and gives EXPERIMENT, STAGES, --array, --job-name and --time from configs/reproduce.toml); by hand
 # `EXPERIMENT=<name> STAGES=<stages> sbatch --array=0-<n-1> --job-name=rc-<name> --time=<hh:mm:ss> experiments/scripts/slurm/case_task.sbatch`.
 # Logs go to ./logs/, which must exist before submission.

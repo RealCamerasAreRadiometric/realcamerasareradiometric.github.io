@@ -1,10 +1,10 @@
 # The stage graph of record of the paper: every result and figure from the published inputs, in one command
 # (VisualGeometryToolkitEval Reproduce, the runner: its docs, "One command: the runner"). This file is data only: which launcher
 # runs which driver on which config of record, after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's,
-# a machine profile shipped with VisualGeometryToolkitEval (configs/sites/: the B200 server's, vcai.toml, desktop.toml; _template.toml to add one);
-# where this project's data and results are on each machine is [sites.<name>] below.
+# a machine profile shipped with VisualGeometryToolkitEval (configs/sites/: vcai.toml, desktop.toml; _template.toml to add one);
+# where this project's data and results are on each machine is the profile's [storage] (the desktop's own binding below).
 #
-#   bash experiments/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#   bash experiments/scripts/reproduce/reproduce_results_vcai.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
 #   bash experiments/scripts/reproduce/reproduce_results_desktop.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
 #
 # Without --only: every stage below that is not `default = false` — the paper's experiments, the regeneration and the results
