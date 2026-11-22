@@ -28,6 +28,7 @@ end
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
+    cpu = RadiometricCamera.KernelAbstractions.CPU()   # chosen: the CPU side runs on the CPU whatever the default device
 
     import VisualGeometryToolkitCore as VgtkCore
 
@@ -66,9 +67,9 @@ end
         @test all(all(isfinite, Φ) for Φ in Φs)
         @test iszero(Φs[1, 1]) && iszero(Φs[24, 24])                               # the corner pixels: every sample outside the domain
         full = [trues(24, 24)]
-        tgt = [render_view(1, cam_in, a.pose, a.mat, a.light, dom_board, a.st, full[1])]
-        s_in = CalibrationState(dom_board, a.st, cam_in, [a.pose], a.mat, a.light, tgt; masks = full)
-        s_out = CalibrationState(dom_board, a.st, cam_out, [a.pose], a.mat, a.light, tgt; masks = full)
+        tgt = [render_view(1, cam_in, a.pose, a.mat, a.light, dom_board, a.st, full[1]; backend = cpu)]
+        s_in = CalibrationState(dom_board, a.st, cam_in, [a.pose], a.mat, a.light, tgt; masks = full, backend = cpu)
+        s_out = CalibrationState(dom_board, a.st, cam_out, [a.pose], a.mat, a.light, tgt; masks = full, backend = cpu)
         c_in = cost(s_in)[1]; c_out = cost(s_out)[1]
         @test isfinite(c_out) && c_out > c_in
     end
@@ -103,9 +104,10 @@ end
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
-        s_cpu = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks)
+        cpu = RadiometricCamera.KernelAbstractions.CPU()                 # the CPU reference, chosen: the default device is the GPU here
+        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = cpu) for p in poses]
+        targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]; backend = cpu) for k in 1:2]
+        s_cpu = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks, backend = cpu)
         s_gpu = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks, backend = CUDABackend())
         # render parity (Float64 CPU vs Float32 GPU; different draw precision → tolerance)
         img_cpu = render_all(s_cpu)[1]; img_gpu = render_all(s_gpu)[1]
@@ -113,7 +115,7 @@ end
         # render_view on the device (its `backend`): the flux kernel in Float32 there, the CPU's image to Float32 rounding
         img_dev = render_view(1, camera_t, poses[1], mat_t, light_t, board, st, masks[1]; backend = CUDABackend())
         @test size(img_dev) == size(targets[1]) && maximum(abs, img_dev .- targets[1]) / maximum(targets[1]) < 2e-3
-        @test render_view(1, camera_t, poses[1], mat_t, light_t, board, st, masks[1]; backend = RadiometricCamera.KernelAbstractions.CPU()) == targets[1]
+        @test render_view(1, camera_t, poses[1], mat_t, light_t, board, st, masks[1]; backend = cpu) == targets[1]
         # residual and Jacobian parity
         prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)
         rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]
@@ -157,8 +159,8 @@ end
         lens_o = cam(VgtkIO.opencv_lens(cv_o), 41.216, (16.32, 15.36), W, H)
         camera_o = RadiometricCameraModel(lens_o, focus_t, 0.0386, vig_t)
         masks_o = [compute_mask(camera_o, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        targets_o = [render_view(k, camera_o, poses[k], mat_t, light_t, board, st, masks_o[k]) for k in 1:2]
-        so_cpu = CalibrationState(board, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o)
+        targets_o = [render_view(k, camera_o, poses[k], mat_t, light_t, board, st, masks_o[k]; backend = cpu) for k in 1:2]
+        so_cpu = CalibrationState(board, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o, backend = cpu)
         so_gpu = CalibrationState(board, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o, backend = CUDABackend())
         po_c, _ = build_problem(so_cpu); po_g, _ = build_problem(so_gpu)
         ro_c = get(po_c.problem.costs, PerViewResidual{9})[1]; ro_g = get(po_g.problem.costs, PerViewResidual{9})[1]
@@ -187,8 +189,8 @@ end
         # (the parts kernel evaluates coefficient_jacobian / V of the radial type) recovers the profile
         vig_r = with_control_points(RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W), [1.0, 1.0, 0.9, 0.75, 0.6])   # P_0 = P_1: the pole tie
         camera_r = RC.with_vignetting(camera_t, vig_r)
-        targets_r = [render_view(k, camera_r, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
-        sr_cpu = CalibrationState(board, st, camera_r, poses, mat_t, light_t, targets_r; masks)
+        targets_r = [render_view(k, camera_r, poses[k], mat_t, light_t, board, st, masks[k]; backend = cpu) for k in 1:2]
+        sr_cpu = CalibrationState(board, st, camera_r, poses, mat_t, light_t, targets_r; masks, backend = cpu)
         sr_gpu = CalibrationState(board, st, camera_r, poses, mat_t, light_t, targets_r; masks, backend = CUDABackend())
         imr_cpu = render_all(sr_cpu)[1]; imr_gpu = render_all(sr_gpu)[1]
         @test maximum(abs, imr_gpu .- imr_cpu) / maximum(imr_cpu) < 2e-3
@@ -225,9 +227,9 @@ end
         end
         # the out-of-domain samples on the device: finite residuals that match the CPU's, and the same higher cost
         let a = dom_args, full = [trues(24, 24)]
-            tgt = [render_view(1, RadiometricCameraModel(kb_in, Focus(3, 1.5, 24, 24), 0.0386, a.vig), a.pose, a.mat, a.light, dom_board, a.st, full[1])]
+            tgt = [render_view(1, RadiometricCameraModel(kb_in, Focus(3, 1.5, 24, 24), 0.0386, a.vig), a.pose, a.mat, a.light, dom_board, a.st, full[1]; backend = cpu)]
             co = RadiometricCameraModel(kb_out, Focus(3, 1.5, 24, 24), 0.0386, a.vig)
-            sc_o = CalibrationState(dom_board, a.st, co, [a.pose], a.mat, a.light, tgt; masks = full)
+            sc_o = CalibrationState(dom_board, a.st, co, [a.pose], a.mat, a.light, tgt; masks = full, backend = cpu)
             sg_o = CalibrationState(dom_board, a.st, co, [a.pose], a.mat, a.light, tgt; masks = full, backend = CUDABackend())
             im_c = render_all(sc_o)[1]; im_g = render_all(sg_o)[1]
             @test all(isfinite, im_g) && maximum(abs, im_g .- im_c) / maximum(im_c) < 2e-3

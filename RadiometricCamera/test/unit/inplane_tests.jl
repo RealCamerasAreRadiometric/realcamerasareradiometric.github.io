@@ -317,7 +317,7 @@ end
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), inplane = true)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
-        s_c = CalibrationState(board_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i)
+        s_c = CalibrationState(board_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i, backend = RadiometricCamera.KernelAbstractions.CPU())
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), inplane = true)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
@@ -338,7 +338,7 @@ end
         RC._unregister_grid_problem!(s_g)
         # the per-view route on the device (a parametric lens)
         s_pg = CalibrationState(board_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = CUDA.CUDABackend())
-        s_pc = CalibrationState(board_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i)
+        s_pc = CalibrationState(board_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = RadiometricCamera.KernelAbstractions.CPU())
         prob_pg, _ = build_problem(s_pg; inplane = true); prob_pc, idx_pc = build_problem(s_pc; inplane = true)
         res_pg = get(prob_pg.problem.costs, PerViewResidual{9})[1]; res_pc = get(prob_pc.problem.costs, PerViewResidual{9})[1]
         rpg, Jpg = RC.NLLSsolver.computeresjac(RC.static(127), res_pg, RC.NLLSsolver.getvars(res_pg, prob_pg.variables)...)
