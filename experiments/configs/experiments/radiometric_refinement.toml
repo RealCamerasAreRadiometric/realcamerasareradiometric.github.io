@@ -10,7 +10,7 @@
 # with it on everywhere each copy equalled its base case verbatim, so it was deleted (no duplicate case, no second prepare).
 #
 # Cases: the 14 mm at ≈ 30 cm (central_30cm: the Siemens board and the chrome board at the same distance; the AprilGrid400) with
-#   Brown–Conrady (5), OpenCV-14, Kannala–Brandt and Double Sphere fitted to the front ends' detections, the central spline of Schöps's pipeline — five models
+#   Brown–Conrady (5), OpenCV-14 and Kannala–Brandt from OpenCV's own calibrations, Double Sphere fitted to the front ends' detections (the AprilGrid's by Kalibr), the central spline of Schöps's pipeline — five models
 #   on each board (the non-central spline is out of the paper, 2026-11-11); the fisheye at ≈ 10 cm (AprilGrid; the chrome board at the boards' distance)
 #   with the same five, the parametric starts OpenCV's own calibrations (cv2.calibrateCamera / cv2.fisheye.calibrate), and the 27.10
 #   fisheye Siemens stars at f/32 with the same five; the Tamron 20 mm with the same five — the Siemens stars at ≈ 17 cm and the
@@ -25,8 +25,9 @@
 # central-generic run from its pinned container on Features' green cells, imported through IO, and the Kannala–Brandt / Double Sphere
 # fits by Estimation, read as [runs] by their keys (owner ruling 2026-11-13). The documented exception, initial guesses from other
 # systems (inputs of record of tier rc_baselines, imported through IO): the AprilGrid sets (Schöps's dense datasets of OpenCV/our
-# corners, Kalibr's Double Sphere), OpenCV's Brown–Conrady / OpenCV-14 / Kannala–Brandt calibrations and the frozen BC5 / OpenCV-14 fits
-# (experiments/frontends_history/ of tag v0.10.0; the folder left the working tree after that tag).
+# corners, Kalibr's Double Sphere) and OpenCV's Brown–Conrady / OpenCV-14 / Kannala–Brandt calibrations
+# (experiments/frontends_history/ of tag v0.10.0; the folder left the working tree after that tag; the later ones experiments/tools/,
+# configs/inputs/opencv_starts_*.toml).
 #
 # Paths are relative to data_root() (VGTK_DATA_ROOT).
 
@@ -105,42 +106,47 @@ path = ""
 stage = "detect"
 provenance = "T. Schöps's central-generic of the 14 mm central_30cm Siemens set made by the project's front end (frontends.toml [schoeps.central30cm_14mm_siemens_w20]: the bilinear green on the raw grid (owner 2026-11-16), cell 150, window 20, the frozen arguments verbatim); replaces the start of record (owner ruling 2026-11-13; validation 0.25 px gauge median, 0.21 px at the record's detections)"
 
-[inputs.aprilgrid400_14mm_ag400_green_bc5_fit_json]
+[inputs.aprilgrid400_14mm_ag_green_bc5_cv2_json]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_bc5_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_bc5_cv2.json"
+sha256 = "52b6e8c3712a0819a83e9405b9c3f81a93b884f1f7045691e5454cb4c1da39fb"   # sha256sum of the record of record (2026-11-24)
 stage = "detect"
-provenance = "2026-11-07 (the paper night): the same front end on ALL photographs of the set (rc-results paper_2026-11-07/tools/paper_fe_chain.sh); before — a camera record (vgio/cameras/v4, migrated from v3 by VisualGeometryToolkitIO.vgio_migrate_tree): fit_lens_detections.jl (branch paper-finalization) fitted to the AprilGrid400 corners of Schöps's dense dataset (views with ≥ 60 corners)"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.calibrateCamera, its default model (k1 k2 p1 p2 k3), on the ArucoDetector corners (cv2.aruco DICT_APRILTAG_36h11, CORNER_REFINE_SUBPIX; cv2.aruco.GridBoard) of the green copies of all 408 photographs of the 14 mm AprilGrid set (the views with >= 4 tags: 404, rms 2.723 px; OpenCV 5.0.0), by T. Harder's experiments/tools/opencv_calibrate_aprilgrid.py (verbatim from v0.10.0 frontends_history/scripts; fe_ag.sh's arguments) and experiments/tools/ocv_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case ag30_bc5_warped, as the Tamron's and the fisheye's case of the model start; it replaces fit_lens_detections.jl's fit records/aprilgrid400_all_min60/14mm_ag400all_green_bc5_fit.json"
 
-[inputs.aprilgrid400_14mm_ag400_green_kb2_fit_json]
+[inputs.aprilgrid400_14mm_ag_green_kb_cv2_json]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_kb_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_kb_cv2.json"
+sha256 = "797859d562c03b29198eb79d998f662fb5f6ee7e5244df93b9f41166fd77dff3"   # sha256sum of the record of record (2026-11-24)
 stage = "detect"
-provenance = "2026-11-07 (the paper night): the same front end on ALL photographs of the set (rc-results paper_2026-11-07/tools/paper_fe_chain.sh); before — a camera record (vgio/cameras/v4, migrated from v3 by VisualGeometryToolkitIO.vgio_migrate_tree): fit_lens_detections.jl (branch paper-finalization) fitted to the AprilGrid400 corners of Schöps's dense dataset (views with ≥ 60 corners)"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.fisheye.calibrate (Kannala–Brandt k1..k4; RECOMPUTE_EXTRINSIC | FIX_SKEW, the start f = 1755 px at the image centre) on the ArucoDetector corners (cv2.aruco DICT_APRILTAG_36h11, CORNER_REFINE_SUBPIX; cv2.aruco.GridBoard) of the green copies of all 408 photographs of the 14 mm AprilGrid set (the views with >= 4 tags: 404, rms 2.724 px; OpenCV 5.0.0), by T. Harder's experiments/tools/opencv_calibrate_aprilgrid.py (verbatim from v0.10.0 frontends_history/scripts; fe_ag.sh's arguments) and experiments/tools/cvfisheye_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case ag30_kb_warped, as the Tamron's and the fisheye's case of the model start; it replaces fit_lens_detections.jl's fit records/aprilgrid400_all_min60/14mm_ag400all_green_kb_fit.json"
 
-[inputs.aprilgrid400_14mm_ag400_green_ocv14_fit_json]
+[inputs.aprilgrid400_14mm_ag_green_ocv14_cv2_json]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_ocv14_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ocv14_cv2.json"
+sha256 = "951eb5eac8da9cecdbbdff864fbd6826d204d992b9be19686c6ff2d939139573"   # sha256sum of the record of record (2026-11-24)
 stage = "detect"
-provenance = "2026-11-07 (the paper night): the same front end on ALL photographs of the set (rc-results paper_2026-11-07/tools/paper_fe_chain.sh); before — a camera record (vgio/cameras/v4, migrated from v3 by VisualGeometryToolkitIO.vgio_migrate_tree): fit_lens_detections.jl (branch paper-finalization) fitted to the AprilGrid400 corners of Schöps's dense dataset (views with ≥ 60 corners)"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL (OpenCV-14) on the ArucoDetector corners (cv2.aruco DICT_APRILTAG_36h11, CORNER_REFINE_SUBPIX; cv2.aruco.GridBoard) of the green copies of all 408 photographs of the 14 mm AprilGrid set (the views with >= 4 tags: 404, rms 2.699 px; OpenCV 5.0.0), by T. Harder's experiments/tools/opencv_calibrate_aprilgrid.py (verbatim from v0.10.0 frontends_history/scripts; fe_ag.sh's arguments) and experiments/tools/ocv_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case ag30_ocv14_warped, as the Tamron's and the fisheye's case of the model start; it replaces fit_lens_detections.jl's fit records/aprilgrid400_all_min60/14mm_ag400all_green_ocv14_fit.json"
 
-[inputs.central30cm_14mm_central30cm_green_si_bc5_fit_json]
+[inputs.central30cm_14mm_si_green_bc5_cv2_json]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_bc5_fit.json"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_bc5_cv2.json"
+sha256 = "fcd3cf5cd7d459594f147867b7ef870066f969e951224787fe89b61765a35036"   # sha256sum of the record of record (2026-11-24)
 stage = "detect"
-provenance = "2026-11-07 (the paper night, the user's layout): the same front end on ALL photographs of the set; before — a camera record (vgio/cameras/v4, migrated from v3 by VisualGeometryToolkitIO.vgio_migrate_tree): fit_lens_detections.jl (branch paper-finalization) fitted to Schöps's detections of the views with ≥ 100 features"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.calibrateCamera, its default model (k1 k2 p1 p2 k3), on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 5.0.0) of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20], dataset.bin: 165 views, rms 1.553 px), by T. Harder's experiments/tools/opencv_calibrate_schoeps.py and experiments/tools/ocv_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case si30_bc5_warped, as the Tamron's case of the model starts; it replaces fit_lens_detections.jl's fit records/central30cm_all/14mm_central30cm_green_si_bc5_fit.json"
 
-[runs.si30_kb_start]
-config = "configs/experiments/frontends.toml"
-run = "fits.central30cm_14mm_kb"
-path = "camera.json"
-stage = "detect"
-provenance = "the Kannala–Brandt camera VisualGeometryToolkitEstimation fitted to the 14 mm set's imported Schöps detections (scripts/frontends.jl, frontends.toml [fits.central30cm_14mm_kb]: find_absolute_pose per view, then refine_camera_and_poses); replaces make_parametric_starts.jl's start and the frozen hand LM's fit (owner ruling 2026-11-13)"
-
-[inputs.central30cm_14mm_central30cm_green_si_ocv14_fit_json]
+[inputs.central30cm_14mm_si_green_kb_cv2_json]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_ocv14_fit.json"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_kb_cv2.json"
+sha256 = "a12ee56756595e1260a5780b97cfe93a2ccffcd37f7a83c2a377a32a34f60baa"   # sha256sum of the record of record (2026-11-24)
 stage = "detect"
-provenance = "2026-11-07 (the paper night, the user's layout): the same front end on ALL photographs of the set; before — a camera record (vgio/cameras/v4, migrated from v3 by VisualGeometryToolkitIO.vgio_migrate_tree): fit_lens_detections.jl (branch paper-finalization) fitted to Schöps's detections of the views with ≥ 100 features"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.fisheye.calibrate (Kannala–Brandt k1..k4; RECOMPUTE_EXTRINSIC | FIX_SKEW, the start f = 1755 px at the image centre) on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 5.0.0) of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20], dataset.bin: 165 views, rms 1.550 px), by T. Harder's experiments/tools/opencv_calibrate_schoeps.py and experiments/tools/cvfisheye_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case si30_kb_warped, as the Tamron's case of the model starts; it replaces Estimation's fit frontends.toml [fits.central30cm_14mm_kb], which stays the index camera of the set's chrome evaluation"
+
+[inputs.central30cm_14mm_si_green_ocv14_cv2_json]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_ocv14_cv2.json"
+sha256 = "02be107abcf945c2b43f00c59893d721bd929310e9b33c8ebac18d5d68c42497"   # sha256sum of the record of record (2026-11-24)
+stage = "detect"
+provenance = "a camera record (vgio/cameras): OpenCV's cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL (OpenCV-14) on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 5.0.0) of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20], dataset.bin: 165 views, rms 1.358 px), by T. Harder's experiments/tools/opencv_calibrate_schoeps.py and experiments/tools/ocv_record.jl (configs/inputs/opencv_starts_20261124.toml): the start of case si30_ocv14_warped, as the Tamron's case of the model starts; it replaces fit_lens_detections.jl's fit records/central30cm_all/14mm_central30cm_green_si_ocv14_fit.json"
 
 # ---- the sets with the chrome board at the boards' distance -----------------------------------------------------------------------------
 [inputs.raw_fisheye_aprilgrid_10cm]
@@ -440,7 +446,7 @@ fx3_tamron_siemens_largeaperture_si = ["DSC00018.png", "DSC00022.png", "DSC00023
 # (views.txt; 89 photographs have ≥ 20 stars there; 2026-11-16: the list stays within the earlier one, so the other front ends' starts of the set keep every view)
 fx3_zoom48_f10_si = ["DSC03526.png", "DSC03528.png", "DSC03529.png", "DSC03530.png", "DSC03531.png", "DSC03533.png", "DSC03540.png", "DSC03578.png", "DSC03579.png", "DSC03580.png", "DSC03581.png", "DSC03582.png", "DSC03583.png", "DSC03584.png", "DSC03585.png", "DSC03586.png", "DSC03587.png", "DSC03588.png", "DSC03589.png", "DSC03590.png", "DSC03591.png", "DSC03592.png", "DSC03593.png", "DSC03594.png", "DSC03595.png", "DSC03596.png", "DSC03597.png", "DSC03598.png", "DSC03599.png", "DSC03600.png", "DSC03601.png", "DSC03602.png", "DSC03603.png", "DSC03604.png", "DSC03605.png", "DSC03608.png", "DSC03609.png", "DSC03610.png", "DSC03611.png", "DSC03612.png", "DSC03613.png", "DSC03614.png", "DSC03615.png", "DSC03628.png", "DSC03629.png", "DSC03630.png", "DSC03631.png", "DSC03633.png", "DSC03634.png", "DSC03635.png", "DSC03636.png", "DSC03637.png", "DSC03638.png", "DSC03653.png", "DSC03654.png", "DSC03655.png", "DSC03656.png", "DSC03657.png", "DSC03658.png", "DSC03659.png", "DSC03660.png", "DSC03661.png", "DSC03662.png", "DSC03663.png", "DSC03664.png", "DSC03665.png", "DSC03666.png", "DSC03667.png", "DSC03668.png", "DSC03669.png", "DSC03670.png", "DSC03672.png", "DSC03673.png", "DSC03674.png", "DSC03675.png", "DSC03676.png", "DSC03677.png", "DSC03678.png", "DSC03679.png", "DSC03680.png", "DSC03682.png", "DSC03683.png", "DSC03684.png", "DSC03685.png", "DSC03686.png", "DSC03687.png", "DSC03688.png", "DSC03693.png", "DSC03694.png"]
 
-# 14 mm · Siemens · Brown–Conrady (k1 k2 k3 p1 p2) fitted to Schöps's detections
+# 14 mm · Siemens · Brown–Conrady (k1 k2 p1 p2 k3): OpenCV's cv2.calibrateCamera
 [cases.si30_bc5_warped]
 kind = "lens"
 images = "fx3_14mm_siemens_central30cm"
@@ -449,7 +455,7 @@ views = "fx3_14mm_siemens_central30cm_si"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_bc5_fit.json"
+init = "lens:geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_bc5_cv2.json"
 [cases.si30_bc5_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "run:fx3_14mm_central30cm_schoeps_green"
@@ -501,7 +507,7 @@ max_time = 36000.0
 backend = "gpu"
 jacobian_chunk = 4
 
-# 14 mm · Siemens · OpenCV-14 fitted to Schöps's detections
+# 14 mm · Siemens · OpenCV-14: cv2.calibrateCamera, rational + thin prism + tilted
 [cases.si30_ocv14_warped]
 kind = "lens"
 images = "fx3_14mm_siemens_central30cm"
@@ -510,7 +516,7 @@ views = "fx3_14mm_siemens_central30cm_si"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_ocv14_fit.json"
+init = "lens:geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_ocv14_cv2.json"
 [cases.si30_ocv14_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "run:fx3_14mm_central30cm_schoeps_green"
@@ -562,7 +568,7 @@ max_time = 36000.0
 backend = "gpu"
 jacobian_chunk = 4
 
-# 14 mm · Siemens · Kannala–Brandt fitted to Schöps's detections (Estimation: frontends.toml [fits.central30cm_14mm_kb])
+# 14 mm · Siemens · Kannala–Brandt: OpenCV's cv2.fisheye.calibrate
 [cases.si30_kb_warped]
 kind = "lens"
 images = "fx3_14mm_siemens_central30cm"
@@ -571,7 +577,7 @@ views = "fx3_14mm_siemens_central30cm_si"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:run:si30_kb_start"
+init = "lens:geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_kb_cv2.json"
 [cases.si30_kb_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "run:fx3_14mm_central30cm_schoeps_green"
@@ -692,7 +698,7 @@ max_time = 36000.0
 backend = "gpu"
 jacobian_chunk = 4
 
-# fisheye · Siemens · Schöps's central-generic grid
+# 14 mm · AprilGrid400 · Brown–Conrady (k1 k2 p1 p2 k3): OpenCV's cv2.calibrateCamera
 [cases.ag30_bc5_warped]
 kind = "lens"
 images = "fx3_14mm_aprilgrid400"
@@ -701,7 +707,7 @@ views = "fx3_14mm_aprilgrid400_ag"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_bc5_fit.json"
+init = "lens:geometric_accuracy/records/aprilgrid400_all/ag400_all_green_bc5_cv2.json"
 [cases.ag30_bc5_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/schoeps_dense_green"
@@ -753,7 +759,7 @@ max_time = 36000.0
 backend = "gpu"
 jacobian_chunk = 4
 
-# 14 mm · AprilGrid400 · OpenCV-14 fitted to the AprilGrid corners (Schöps's dense dataset)
+# 14 mm · AprilGrid400 · OpenCV-14: cv2.calibrateCamera, rational + thin prism + tilted
 [cases.ag30_ocv14_warped]
 kind = "lens"
 images = "fx3_14mm_aprilgrid400"
@@ -762,7 +768,7 @@ views = "fx3_14mm_aprilgrid400_ag"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_ocv14_fit.json"
+init = "lens:geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ocv14_cv2.json"
 [cases.ag30_ocv14_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/schoeps_dense_green"
@@ -814,7 +820,7 @@ max_time = 36000.0
 backend = "gpu"
 jacobian_chunk = 4
 
-# 14 mm · AprilGrid400 · Kannala–Brandt fitted to the AprilGrid corners (Schöps's dense dataset)
+# 14 mm · AprilGrid400 · Kannala–Brandt: OpenCV's cv2.fisheye.calibrate
 [cases.ag30_kb_warped]
 kind = "lens"
 images = "fx3_14mm_aprilgrid400"
@@ -823,7 +829,7 @@ views = "fx3_14mm_aprilgrid400_ag"
 checkpoint_each = "on"
 linearize = "off"
 channel = "G"
-init = "lens:geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_kb_fit.json"
+init = "lens:geometric_accuracy/records/aprilgrid400_all/ag400_all_green_kb_cv2.json"
 [cases.ag30_kb_warped.pipeline.frontend]
 type = "schoeps"
 schoeps = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/schoeps_dense_green"

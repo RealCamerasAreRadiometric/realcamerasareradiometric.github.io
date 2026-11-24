@@ -14,7 +14,7 @@
     rc = TOML.parsefile(projectdir("configs", "experiments", "radiometric_refinement.toml"))
     lensrun(v) = (m = match(r"^lens:run:([A-Za-z0-9_]+)$", v); m === nothing ? nothing : m.captures[1])
     cases = [(n, c) for (n, c) in rc["cases"] if c["kind"] == "lens" && lensrun(c["pipeline"]["io"]["init"]) !== nothing]
-    @test Set(n for (n, _) in cases) == Set(["si30_kb_warped", "si30_ds_warped", "si17ta_ds_warped", "si30fe_kb_warped", "si30fe_ds_warped"])   # (si27fe_ds_warped: the excluded set, configs/excluded.toml; si30fe: 2026-11-16/17)
+    @test Set(n for (n, _) in cases) == Set(["si30_ds_warped", "si17ta_ds_warped", "si30fe_kb_warped", "si30fe_ds_warped"])   # (si27fe_ds_warped: the excluded set, configs/excluded.toml; si30fe: 2026-11-16/17; si30_kb_warped starts from OpenCV's calibration, as the Tamron's)
     for (n, c) in cases
         r = rc["runs"][lensrun(c["pipeline"]["io"]["init"])]
         @test r["config"] == "configs/experiments/frontends.toml" && startswith(r["run"], "fits.") && r["path"] == "camera.json"

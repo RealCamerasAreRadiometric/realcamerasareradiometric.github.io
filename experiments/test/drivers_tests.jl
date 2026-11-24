@@ -293,7 +293,7 @@ end
         c2 = deepcopy(good); c2["prepare"]["fx3_14mm_siemens_central30cm"]["gain"] = 1.0   # its photographs' run moves, so does the case's
         @test k(c2) != k(good)
         # a run is keyed by the inputs its table reads, not by every input of the config
-        other = "aprilgrid400_14mm_ag400_green_bc5_fit_json"                 # ag30_bc5_warped's start, which si30_bc5_warped does not read
+        other = "aprilgrid400_14mm_ag_green_bc5_cv2_json"                    # ag30_bc5_warped's start, which si30_bc5_warped does not read
         c2 = deepcopy(good); c2["inputs"][other]["path"] = "elsewhere/bc5_fit.json"
         @test k(c2) == k(good) && refine_product(c2, "ag30_bc5_warped").key != refine_product(good, "ag30_bc5_warped").key
         # its front end's run (a [runs] entry of frontends.toml) keys it by that run's key: another Schöps run re-keys it

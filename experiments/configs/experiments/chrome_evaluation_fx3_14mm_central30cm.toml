@@ -239,9 +239,10 @@ type = "none"                     # a refine's least squares (optimization_strat
 
 [inputs.bc5_si30]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_bc5_fit.json"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_bc5_cv2.json"
+sha256 = "fcd3cf5cd7d459594f147867b7ef870066f969e951224787fe89b61765a35036"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "2026-11-07 (the paper night, the user's layout): the same front end on ALL photographs of the set; before — the start of case si30_bc5_warped (configs/experiments/radiometric_refinement.toml)"
+provenance = "the start of case si30_bc5_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.calibrateCamera with its default model (k1 k2 p1 p2 k3) on Schöps's star detections of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20]; views >= 20 features); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 
 [runs.ds_si30]
@@ -251,18 +252,19 @@ path = "camera.json"
 stage = "evaluate"
 provenance = "the Double Sphere camera Estimation fitted to the 14 mm set's imported Schöps detections (frontends.toml [fits.central30cm_14mm_ds]); replaces make_parametric_starts.jl's start and the frozen hand LM's fit (owner ruling 2026-11-13)"
 
-[runs.kb_si30]
-config = "configs/experiments/frontends.toml"
-run = "fits.central30cm_14mm_kb"
-path = "camera.json"
+[inputs.kb_si30]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_kb_cv2.json"
+sha256 = "a12ee56756595e1260a5780b97cfe93a2ccffcd37f7a83c2a377a32a34f60baa"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "the Kannala–Brandt camera VisualGeometryToolkitEstimation fitted to the 14 mm set's imported Schöps detections (scripts/frontends.jl, frontends.toml [fits.central30cm_14mm_kb]: find_absolute_pose per view, then refine_camera_and_poses); replaces make_parametric_starts.jl's start and the frozen hand LM's fit (owner ruling 2026-11-13)"
+provenance = "the start of case si30_kb_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.fisheye.calibrate (Kannala–Brandt k1..k4) on Schöps's star detections of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20]; views >= 20 features); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 [inputs.ocv14_si30]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_green_si_ocv14_fit.json"
+path = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_ocv14_cv2.json"
+sha256 = "02be107abcf945c2b43f00c59893d721bd929310e9b33c8ebac18d5d68c42497"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "2026-11-07 (the paper night, the user's layout): the same front end on ALL photographs of the set; before — the start of case si30_ocv14_warped (configs/experiments/radiometric_refinement.toml)"
+provenance = "the start of case si30_ocv14_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL on Schöps's star detections of the set's Schöps run of record (frontends.toml [schoeps.central30cm_14mm_siemens_w20]; views >= 20 features); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 [runs.schoeps_si30]
 config = "configs/experiments/frontends.toml"
@@ -273,9 +275,10 @@ provenance = "T. Schöps's central-generic of the 14 mm central_30cm Siemens set
 
 [inputs.start_ag30_bc5]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_bc5_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_bc5_cv2.json"
+sha256 = "52b6e8c3712a0819a83e9405b9c3f81a93b884f1f7045691e5454cb4c1da39fb"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "the start of case ag30_bc5_warped (configs/experiments/radiometric_refinement.toml): the AprilGrid400 front end (rc-results main_2026-11-05/tools/ag400_chain.sh)"
+provenance = "the start of case ag30_bc5_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.calibrateCamera with its default model (k1 k2 p1 p2 k3) on the ArucoDetector corners of the green copies of all 408 photographs of the 14 mm AprilGrid set (views >= 4 tags); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 [inputs.start_ag30_ds]
 tier = "rc_baselines"
@@ -285,15 +288,17 @@ provenance = "the start of case ag30_ds_warped: Kalibr's Double Sphere (ds-none)
 
 [inputs.start_ag30_kb]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_kb_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_kb_cv2.json"
+sha256 = "797859d562c03b29198eb79d998f662fb5f6ee7e5244df93b9f41166fd77dff3"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "the start of case ag30_kb_warped (configs/experiments/radiometric_refinement.toml): the AprilGrid400 front end (rc-results main_2026-11-05/tools/ag400_chain.sh)"
+provenance = "the start of case ag30_kb_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.fisheye.calibrate (Kannala–Brandt k1..k4) on the ArucoDetector corners of the green copies of all 408 photographs of the 14 mm AprilGrid set (views >= 4 tags); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 [inputs.start_ag30_ocv14]
 tier = "rc_baselines"
-path = "geometric_accuracy/records/aprilgrid400_all_min60/14mm_ag400all_green_ocv14_fit.json"
+path = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ocv14_cv2.json"
+sha256 = "951eb5eac8da9cecdbbdff864fbd6826d204d992b9be19686c6ff2d939139573"   # sha256sum of the record of record (2026-11-24)
 stage = "evaluate"
-provenance = "the start of case ag30_ocv14_warped (configs/experiments/radiometric_refinement.toml): the AprilGrid400 front end (rc-results main_2026-11-05/tools/ag400_chain.sh)"
+provenance = "the start of case ag30_ocv14_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL on the ArucoDetector corners of the green copies of all 408 photographs of the 14 mm AprilGrid set (views >= 4 tags); the step's record: configs/inputs/opencv_starts_20261124.toml"
 
 [inputs.start_ag30_spline]
 tier = "rc_baselines"

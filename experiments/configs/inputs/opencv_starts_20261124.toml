@@ -1,0 +1,84 @@
+# RATIONALE
+#   question:   the Brown–Conrady, OpenCV-14 and Kannala–Brandt cases of the Sigma 14 mm sets (si30_*_warped on the Siemens stars at
+#               ≈ 30 cm, ag30_*_warped on the AprilGrid) started from fits of the project's own estimators — fit_lens_detections.jl's
+#               records and, for si30_kb_warped, Estimation's fit — while the same models start from OpenCV's own calibrations on the
+#               Tamron and on the fisheye. No OpenCV calibration of the two 14 mm sets existed: the AprilGrid set's was called by the
+#               paper night's chain before its script was in place and never repeated (both 14 mm boards were fitted with
+#               fit_lens_detections.jl instead), and the Siemens set's chain is the one of 2026-11-05, a day older than
+#               opencv_calibrate_schoeps.py
+#   hypothesis: none (inputs: the starts, made the way the Tamron sets' OpenCV starts of record were made)
+#   decides:    the inputs of record of the six cases (radiometric_refinement.toml) and of their start rows
+#               (chrome_evaluation_fx3_14mm_central30cm.toml), tier rc_baselines_2026-11-24
+#   evidence:   with the OpenCV of the records of record (5.0.0) the tools reproduce the Tamron sets' calibrations on their own inputs:
+#               opencv_calibrate_schoeps.py the three of the 17 cm Siemens set (rms 0.995519 / 0.942937 / 1.226177 px, each equal to 6
+#               digits; K within 3e-13 px), opencv_calibrate_aprilgrid.py the AprilGrid set of 2026-11-08 (the same 11 427 tags, every
+#               corner equal; Brown–Conrady and Kannala–Brandt rms 2.102225 / 2.156127 px, each equal to 6 digits; K within 4e-8 px),
+#               and the two record writers the six records of record from those calibrations (as pixel maps within 2e-11 px over the
+#               sensor). A second run of the commands gave the same cameras to 1e-8 px, not the same bytes: the records are
+#               pinned by content
+#   date:       2026-11-24
+#
+# The OpenCV front-end step of 2026-11-24 (AUTHOR-SIDE, as opencv_starts_20261117.toml: its outputs are inputs of record, tier
+# rc_baselines_2026-11-24 — the documented exception for initial guesses from other systems, imported through IO). This file is its
+# record: the tools, their versions, their inputs and arguments, their outputs (each pinned where a config reads it). The exact
+# commands: experiments/tools/ocv_starts_20261124.sh. The arguments are those of the Tamron sets' front ends (frontends_history/drivers
+# of tag v0.10.0: fe_si7.sh with MINF = 20, fe_ag.sh); the fisheye model's focal length start is the lens's 1755 px
+# (paper_fe_chain.sh:39). Brown–Conrady and OpenCV-14 ran from OpenCV's own start on both sets (none needed the chains' retry with a
+# focal length start).
+
+[tool]
+siemens = "experiments/tools/opencv_calibrate_schoeps.py"     # from tag v0.10.0, with its siemens_board.py (imported from beside it)
+aprilgrid = "experiments/tools/opencv_calibrate_aprilgrid.py" # T. Harder's script of record of the AprilGrid sets, verbatim from tag v0.10.0 (frontends_history/scripts)
+converter = "experiments/tools/ocv_record.jl"                 # cv2.calibrateCamera's models (opencv_starts_20261117.toml)
+converter_fisheye = "experiments/tools/cvfisheye_record.jl"   # cv2.fisheye.calibrate's model: the port of T. Harder's frontends_history/scripts/cvfisheye_record.jl (v0.10.0)
+commands = "experiments/tools/ocv_starts_20261124.sh"
+opencv = "5.0.0"                                              # cv2 of the records of record of 2026-11-07 … 09
+numpy = "2.2.6"
+python = "3.10.12"
+io = "0.11.0"                                                 # VisualGeometryToolkitIO of the converters (vgio/cameras/v6.0)
+
+# ---- the Siemens stars at ≈ 30 cm: Schöps's detections of the set's Schöps run of record (its dataset.bin, sha256 dd8100fa…f609:
+# 168 photographs, none of the five outside the published set), the 165 views with ≥ 20 features (66 755 features) ----
+[starts.central30cm_bc5]
+schoeps_run = "frontends schoeps/57dd94a82ac869ea ([schoeps.central30cm_14mm_siemens_w20] of configs/experiments/frontends.toml)"
+args = "--texfeat-size 4000 4000 --page-mm 1000 1000 --model pinhole --min-features 20"   # OpenCV's default model (k1 k2 p1 p2 k3): Brown–Conrady
+output = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_bc5_cv2.json"     # 165 views, rms 1.553 px
+md5 = "fb6dc9204d0c314da9b25f0ad0717766"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/opencv_w20/pinhole/calibration.json"
+
+[starts.central30cm_ocv14]
+schoeps_run = "frontends schoeps/57dd94a82ac869ea ([schoeps.central30cm_14mm_siemens_w20] of configs/experiments/frontends.toml)"
+args = "--texfeat-size 4000 4000 --page-mm 1000 1000 --model ocv14 --min-features 20"
+output = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_ocv14_cv2.json"   # 165 views, rms 1.358 px
+md5 = "2211effa0037412c6900849edcc8185d"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/opencv_w20/ocv14/calibration.json"
+
+[starts.central30cm_kb]
+schoeps_run = "frontends schoeps/57dd94a82ac869ea ([schoeps.central30cm_14mm_siemens_w20] of configs/experiments/frontends.toml)"
+args = "--texfeat-size 4000 4000 --page-mm 1000 1000 --model fisheye --f-init 1755 --min-features 20"
+output = "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_kb_cv2.json"      # 165 views, rms 1.550 px: Estimation's fit of the same detections to 1e-4 px over the sensor
+md5 = "1f86831b0c86ba1643ce8365683dcf9d"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-central30cm-all/opencv_w20/fisheye/calibration.json"
+
+# ---- the AprilGrid: the tool's own ArucoDetector corners in the green copies of the 408 photographs (the 8-bit sRGB copies of the paper
+# night's front end, fe_ag.sh's board_srgb_green: the images the set's Schöps start was made on), the 404 views with ≥ 4 tags (32 876 corners) ----
+[starts.aprilgrid400_bc5]
+images = "the green copies of paper-data/geometric-accuracy/14mm/april-grid (408 PNG)"
+args = "--model pinhole --jobs 8"
+output = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_bc5_cv2.json"                  # 404 views, rms 2.723 px
+md5 = "91001dc8af0bd0d55493a9498c2a1327"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/opencv/pinhole/calibration.json"
+
+[starts.aprilgrid400_ocv14]
+images = "the green copies of paper-data/geometric-accuracy/14mm/april-grid (408 PNG)"
+args = "--model ocv14 --jobs 8"
+output = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ocv14_cv2.json"                # 404 views, rms 2.699 px
+md5 = "7f65c0929b63cd0f884807491c259b33"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/opencv/ocv14/calibration.json"
+
+[starts.aprilgrid400_kb]
+images = "the green copies of paper-data/geometric-accuracy/14mm/april-grid (408 PNG)"
+args = "--model fisheye --f-init 1755 --jobs 8"
+output = "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_kb_cv2.json"                   # 404 views, rms 2.724 px, every corner kept (no radius screen)
+md5 = "30827ee67914698d7f6ec9a7a48eab80"
+raw = "geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid400-all/opencv/fisheye/calibration.json"
