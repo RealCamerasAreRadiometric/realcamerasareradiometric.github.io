@@ -5,14 +5,12 @@
 #               learn the same offsets
 #   decides:    the paper's board-warping figure (fig:board-warping) and the measure its text cites: per board and pair of lenses
 #               the length of the difference between the board's offsets learned with the two lenses, nothing fitted or removed
-#   evidence:   the spline refinements of RC 0.11.5 on the session's six sets (2026-11-20), in which the fisheye AprilGrid set had 186
-#               views: the whole difference is 0.53, 0.69 and 0.30 mm RMS on the AprilGrid and 0.62, 0.43 and 0.36 mm RMS on the
+#   evidence:   the spline refinements of RC 0.11.5 on the session's six sets (2026-11-20):
+#               the whole difference is 0.53, 0.69 and 0.30 mm RMS on the AprilGrid and 0.62, 0.43 and 0.36 mm RMS on the
 #               Siemens stars (Sigma 14 mm − Tamron 20 mm, fisheye − Tamron 20 mm, Sigma 14 mm − fisheye), most of it in the plane
 #               (0.12 … 0.64 mm RMS); the heights alone differ by 0.06 … 0.18 mm RMS (0.19 … 0.63 mm at most) once the best-fit
 #               plane of their difference is removed, on surfaces that span −2.5 … +0.6 mm (AprilGrid) and −1.5 … +1.7 mm
-#               (Siemens stars). This config's fisheye AprilGrid case has 181 views (five photographs are excluded from the
-#               set): refined on this stack it gave 0.73 mm RMS for fisheye − Tamron 20 mm and 0.33 mm for Sigma 14 mm − fisheye
-#               against the other lenses' refinements of 2026-11-20
+#               (Siemens stars)
 #   owner:      T. Harder
 #   date:       2026-11-21
 #

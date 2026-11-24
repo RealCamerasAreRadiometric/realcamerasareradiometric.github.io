@@ -680,7 +680,7 @@ provenance = "OpenCV's raw calibration.json and the run logs of the two starts a
 configs = []                      # no config reads them: the records above are the inputs; kept as the step's raw outputs
 
 # The board-warping session (2026-11-19): both printed boards photographed with the three lenses, each board in place for its three
-# sets — the share's folder board-warping, one entry per set (1,246 ARW, 30.0 GiB; the folder's macOS side files, ._* and .DS_Store,
+# sets — the share's folder board-warping, one entry per set (1,251 ARW, 30.2 GiB; the folder's macOS side files, ._* and .DS_Store,
 # are no photographs and no data: the stack's listing leaves them out). The folder is not yet in the share's README.md, MANIFEST.tsv
 # and MD5SUMS. The fisheye AprilGrid set's file numbers run through numbers the 14 mm Siemens-star session of 2026-11-03 used (the
 # camera's counter came round): the two sets are told apart by their folders, never by a file name.
@@ -694,7 +694,7 @@ configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
 [[unpacked.rc_raw_photos]]
 paths = ["paper-data/board-warping/april-board/fisheye"]
 where = "the MDS share //datarepo01.rz.uni-kiel.de/MDS_DATA/HPC_SHARE/tha/radiometric-camera-paper-data (the author's folder; data/DATA_LOCATIONS.md), bound as paper-data/ under data_root()"
-provenance = "184 files, 4.35 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/fisheye), less the five photographs DSC06045 and DSC06052–DSC06055 the author excluded (not in the published set, not in the view list of record)."
+provenance = "189 files, 4.47 GiB; the photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the 8 mm fisheye, the board in place for the session's three lenses, captured on 2026-11-19 (the share's board-warping/april-board/fisheye). The fisheye's set whose file numbers the 14 mm Siemens-star session of 2026-11-03 also used: other photographs, this set's own."
 configs = ["configs/experiments/radiometric_refinement_board_warping.toml"]
 
 [[unpacked.rc_raw_photos]]
