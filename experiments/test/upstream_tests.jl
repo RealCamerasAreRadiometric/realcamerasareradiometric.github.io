@@ -47,6 +47,10 @@
                  ("src/drivers.jl", "idir = init_start_dir(cfg, _start_init(cfg, name), name; driver, config_path)"),       # start ← init start
                  ("src/drivers.jl", "idir = init_start_dir(cfg, _start_init(cfg, case), case; driver, config_path)"),       # refine ← init start
                  ("src/drivers.jl", "produce_upstream(r.product"),                                            # a [runs.<id>] input
+                 ("src/material_grid.jl", "produce_upstream(start_product(cfg, case)"),                       # material grid ← the case's start (GPU)
+                 ("src/material_grid.jl", "require_prepared(cfg, t, \"the material grid of case \$case\"; driver, config_path)"),   # material grid ← decode
+                 ("src/material_grid.jl", "produce_upstream(material_grid_product(cfg, case)"),               # the refinement's start record ← material grid (GPU)
+                 ("src/drivers.jl", "gdir = material_grid_dir(cfg, case; driver, config_path)"),              # refine ← material grid
                  ("scripts/calibrate.jl", "config_source(CFG, id) for id in table_runs(CFG[\"pipeline\"])"),     # golden case ← its distance map ([runs])
                  ("scripts/calibrate.jl", "resolved(table) = resolve_pipeline(CFG"),                          # its [pipeline]'s run:<id>, produced
                  ("src/chrome_evaluation.jl", "chrome_upstream(cfg, path, \"detect\""),                      # index ← detect

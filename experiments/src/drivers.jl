@@ -1155,14 +1155,17 @@ end
 """
     refine_product(cfg, case) -> Product
 
-The refinement of `[cases.<case>]`: keyed by its refine-only settings (`refine_settings`) and the key of its start step
-(`start_product`, which holds every other setting, its inputs and its views) — a refine-only change re-keys the refinement alone and
-loads the start. Its output: the refinement's parameters.json.
+The refinement of `[cases.<case>]`: keyed by its refine-only settings (`refine_settings`) and the key of the start record it refines
+from — a refine-only change re-keys the refinement alone and loads its start. That record is the material grid's of a config that
+states a `[material_grid]` (`material_grid_product`, src/material_grid.jl: keyed by the grid and the key of the case's start), else
+the case's start step (`start_product`, which holds every other setting, its inputs and its views). Its output: the refinement's
+parameters.json.
 """
 function refine_product(cfg::AbstractDict, case::AbstractString)
     t = cfg["cases"][case]
-    rec = Dict{String,Any}("experiment" => cfg["experiment"], "refine" => Dict(case => refine_settings(t)),
-                           "upstream" => Dict{String, Any}("start" => start_product(cfg, case).key))
+    up = haskey(cfg, "material_grid") ? Dict{String, Any}("material_grid" => material_grid_product(cfg, case).key) :
+                                        Dict{String, Any}("start" => start_product(cfg, case).key)
+    rec = Dict{String,Any}("experiment" => cfg["experiment"], "refine" => Dict(case => refine_settings(t)), "upstream" => up)
     return driver_product("refine", rec; output = "parameters.json", experiment = variant_location(cfg, case))
 end
 
@@ -1386,20 +1389,22 @@ const REFINEMENT_DRIVER = "scripts/radiometric_refinement.jl"
     refinement_upstream(rc, rc_path, case, stage, what) -> dir
 
 The start or refine product (`stage`) of `[cases.<case>]` of the refinements' config `rc` (at `rc_path`) another driver (`what`)
-reads, produced on demand (`produce_upstream`): its driver on that case through the stage (`driver_run`: prepare, start[, refine]),
-a GPU's when its [pipeline] runs on one (`runs_on_gpu`).
+reads, produced on demand (`produce_upstream`): its driver on that case through the stage (`driver_run`: prepare, start[,
+material_grid, refine]), a GPU's when its [pipeline] runs on one (`runs_on_gpu`).
 """
 function refinement_upstream(rc::AbstractDict, rc_path::AbstractString, case::AbstractString, stage::AbstractString, what::AbstractString)
     p = stage == "start" ? start_product(rc, case) : stage == "refine" ? refine_product(rc, case) :
         throw(ArgumentError("refinement_upstream: stage start or refine, got $(repr(stage))"))
-    return produce_upstream(p, what; driver_run(REFINEMENT_DRIVER, rc_path, stage == "start" ? "prepare,start" : "prepare,start,refine"; case)...,
+    return produce_upstream(p, what; driver_run(REFINEMENT_DRIVER, rc_path, stage == "start" ? "prepare,start" : "prepare,start,material_grid,refine"; case)...,
                             gpu = runs_on_gpu(rc["cases"][case]))
 end
 """
     run_refine(cfg, case; driver, config_path) -> dir
 
 Stage refine of `[cases.<case>]` on the case's resolved [pipeline] table into its refine product (`refine_product`), produced or
-loaded: with its start produced, bin/refine.jl --start=<the start product> (bin/refine.jl refuses a start of other start options);
+loaded. A config that states a `[material_grid]`: bin/refine.jl --start=<the material grid's product> (`material_grid_dir`: its
+start record, produced on demand with the case's start), the table at the α and η the grid chose (`with_material_start`). Any
+other: with its start produced, bin/refine.jl --start=<the start product> (bin/refine.jl refuses a start of other start options);
 with neither, ONE bin/refine.jl run (`--start-out=<the start product>`) writes the start record into the start product
 (`start_product`, the same key) and refines from it in the same process — one Julia child, the photographs read once.
 """
@@ -1413,7 +1418,12 @@ function run_refine(cfg::AbstractDict, case::AbstractString; driver::AbstractStr
         p = resolve_pipeline(cfg, cfg["cases"][case]; init_dir = idir)
         label = "case $case (product $(s.key))"
         paths = pipeline_input_paths(p)                              # the table's inputs, resolved once (the start reads the same)
-        sdir = if start_reused(st)                                   # the start loaded: the refinement's own child
+        sdir = if haskey(cfg, "material_grid")                       # from the material grid's start record, at the material it chose
+            gdir = material_grid_dir(cfg, case; driver, config_path)
+            run_pipeline(with_material_start(p, gdir), dir; source, label = "$label, its [material] α and η the material grid's ($(basename(gdir)))",
+                         args = ["--start=$gdir"])
+            gdir
+        elseif start_reused(st)                                      # the start loaded: the refinement's own child
             run_pipeline(p, dir; source, label, args = ["--start=$(product_dir(st))"])
             product_dir(st)
         else                                                         # start and refinement in one child, the start in its own product
@@ -1502,3 +1512,5 @@ include("frontends_runs.jl")
 include("image_region.jl")
 # the printed boards' edge distance maps: one keyed step per map, which every edge.sdf / distance_map consumer reads through [runs]
 include("distance_maps.jl")
+# the material start of a refinement: the grid search over the print's roughnesses and indices of refraction, one keyed step per case
+include("material_grid.jl")

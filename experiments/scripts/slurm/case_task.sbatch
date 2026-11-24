@@ -16,7 +16,7 @@ source experiments/scripts/slurm/common.sh
 
 # =============================================================================
 # case_task.sbatch — one array task of a per-case experiment (common.sh experiment_driver, experiment_config, experiment_cases):
-# EXPERIMENT one of radiometric_refinement, radiometric_refinement_vignetting, radiometric_refinement_board_warping, convergence, detector_bias; STAGES its driver's stages of the one case (configs/reproduce.toml: start,refine for the
+# EXPERIMENT one of radiometric_refinement, radiometric_refinement_vignetting, radiometric_refinement_board_warping, convergence, detector_bias; STAGES its driver's stages of the one case (configs/reproduce.toml: start,material_grid,refine for the
 # refinements). One GPU per task.
 #
 # Task i runs case i of the selection, resolved from the config at run time (common.sh run_case_task): the experiment's selection

@@ -104,13 +104,15 @@ job_name = "rc-prepare-radiometric_refinement"
 
 [[stage]]
 name = "radiometric_refinement"
-what = "the geometric-accuracy refinements (tab:refinement-chrome; tab:defocus), one GPU per case"
+what = "the geometric-accuracy refinements (tab:refinement-chrome; tab:defocus): per case its start, its material start by the grid search and its refinement, one GPU per case"
 time = "04:00:00"         # a case measured 50 min (ag10fe_bc5) to over 1 h 30 min (ag08ta, the 50-iteration LM cap) at 8 CPUs, 1 GPU (rehearsal 2026-11-13): ≈ 2× the longest
+                          #   — before the material grid: its 81 candidates take about 0.12-0.14 s per view each, 16 min (89 views) to 1 h 30 min (470 views)
+                          #   a case on an RTX PRO 6000 of another site (not yet measured on this one): check the limit against the first run
 cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM and the closed-form blocks run on the device; the host threads
 mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB (the rehearsal 2026-11-13: peak RSS 3.0-3.7 GB)
 after = ["radiometric_refinement_prepare", "image_regions", "distance_maps"]
 sbatch = "experiments/scripts/slurm/case_task.sbatch"
-env = { EXPERIMENT = "radiometric_refinement", STAGES = "start,refine" }
+env = { EXPERIMENT = "radiometric_refinement", STAGES = "start,material_grid,refine" }
 job_name = "rc-refinement-chrome"
 driver = "experiments/scripts/radiometric_refinement.jl"
 config = "experiments/configs/experiments/radiometric_refinement.toml"
@@ -217,7 +219,7 @@ cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM an
 mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB (the rehearsal 2026-11-13: peak RSS 3.0-3.7 GB)
 after = ["radiometric_refinement_vignetting_prepare", "image_regions", "distance_maps"]
 sbatch = "experiments/scripts/slurm/case_task.sbatch"
-env = { EXPERIMENT = "radiometric_refinement_vignetting", STAGES = "start,refine" }
+env = { EXPERIMENT = "radiometric_refinement_vignetting", STAGES = "start,material_grid,refine" }
 job_name = "rc-refinement-chrome-vignetting"
 driver = "experiments/scripts/radiometric_refinement.jl"
 config = "experiments/configs/experiments/radiometric_refinement_vignetting.toml"
@@ -248,7 +250,7 @@ cpus_per_task = 8       # GPU stage: 1 GPU (the site's gres) + 8 CPUs: the LM an
 mem_per_cpu = "8480M"   # only scatter device rows into NLLSsolver's Jacobian. 68 GB
 after = ["radiometric_refinement_board_warping_prepare", "image_regions", "distance_maps"]
 sbatch = "experiments/scripts/slurm/case_task.sbatch"
-env = { EXPERIMENT = "radiometric_refinement_board_warping", STAGES = "start,refine" }
+env = { EXPERIMENT = "radiometric_refinement_board_warping", STAGES = "start,material_grid,refine" }
 job_name = "rc-refinement-board-warping"
 driver = "experiments/scripts/radiometric_refinement.jl"
 config = "experiments/configs/experiments/radiometric_refinement_board_warping.toml"

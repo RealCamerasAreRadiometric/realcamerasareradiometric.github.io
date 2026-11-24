@@ -7,6 +7,9 @@
 # bin/refine.jl into refine-<key>/), as in night_stars; the evaluation is not here: each lens's chrome photographs are a config of
 # scripts/chrome_evaluation.jl whose [evaluate] models name these cases.
 #
+# `[material_grid]`: the grid the material start of every case is searched on (stage material_grid, src/material_grid.jl), required:
+# per quantity its range and its number of cells, or `source`, the config that states them.
+#
 # `[pending]`: what the config of record does not hold yet — a value or an input of the run of record that is not in this repository
 # (each entry `<what> = "<why, and where it is>"`). Description, not a setting: it keys no run. While it is not empty the config
 # loads and plans, and the refine stage refuses to run (`refuse_pending`): a run with a stand-in value would be a run of another
@@ -14,7 +17,7 @@
 # =============================================================================
 
 "The tables of configs/experiments/radiometric_refinement.toml."
-const REFINEMENT_CHROME_TABLES = ("experiment", "inputs", "image_regions", "runs", "prepare", "views", "cases", "pending")
+const REFINEMENT_CHROME_TABLES = ("experiment", "inputs", "image_regions", "runs", "prepare", "views", "material_grid", "cases", "pending")
 "The keys of a `[cases.<name>]` table: the model kind it writes (lens | grid), its photographs (a [prepare] set), its views (a [views] name) and its [pipeline]."
 const REFINEMENT_CHROME_CASE_KEYS = ("kind", "images", "views", "pipeline")
 
@@ -22,7 +25,8 @@ const REFINEMENT_CHROME_CASE_KEYS = ("kind", "images", "views", "pipeline")
     load_radiometric_refinement_config(path) -> Dict
 
 The config of record of the chrome-table refinements, every table and key checked (`load_driver_config`; every case key required,
-its photographs a [prepare] set, its views a [views] list, its kind lens | grid; `[pending]` a table of strings).
+its photographs a [prepare] set, its views a [views] list, its kind lens | grid; `[material_grid]` required and resolved,
+`material_grid_table`; `[pending]` a table of strings).
 """
 function load_radiometric_refinement_config(path::AbstractString)
     c = load_driver_config(path, "radiometric_refinement"; tables = REFINEMENT_CHROME_TABLES, case_keys = REFINEMENT_CHROME_CASE_KEYS)
@@ -44,6 +48,7 @@ function load_radiometric_refinement_config(path::AbstractString)
         haskey(c["prepare"], t["images"]) || throw(ArgumentError("$where: no [prepare.$(t["images"])]"))
         t["views"] isa AbstractString && haskey(c["views"], t["views"]) || throw(ArgumentError("$where: views must name a [views] list"))
     end
+    c["material_grid"] = material_grid_table(c, path)               # the resolved grid: its own keys, whichever config states them
     p = get(c, "pending", Dict{String,Any}())
     p isa AbstractDict && all(v -> v isa AbstractString && !isempty(v), values(p)) ||
         throw(ArgumentError("$path [pending]: each entry is `<what> = \"<why, and where it is>\"`"))

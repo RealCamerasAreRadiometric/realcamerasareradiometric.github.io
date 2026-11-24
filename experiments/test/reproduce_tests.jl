@@ -389,7 +389,7 @@ end
             name in ("setup", "results_branch", "texture_recovery") || startswith(name, "frontends_") || @test s.cpus_per_task == 8
         end
         chrome = sort(collect(keys(TOML.parsefile(projectdir("configs", "experiments", "radiometric_refinement.toml"))["cases"])))
-        @test occursin("CHROME_CASES=$(join(chrome, ",")) EXPERIMENT=radiometric_refinement STAGES=start,refine sbatch --parsable --dependency=afterok:\$radiometric_refinement_prepare", out)
+        @test occursin("CHROME_CASES=$(join(chrome, ",")) EXPERIMENT=radiometric_refinement STAGES=start,material_grid,refine sbatch --parsable --dependency=afterok:\$radiometric_refinement_prepare", out)
         @test occursin("--array=0-$(length(chrome) - 1) --time=", out)
         @test occursin("EXPERIMENT=radiometric_refinement sbatch --parsable --dependency=afterok:\$setup", out)
         @test occursin("sbatch --parsable --dependency=afterok:\$radiometric_refinement:\$texture_recovery:\$radiometric_refinement_vignetting:\$chrome_evaluation_score", out)

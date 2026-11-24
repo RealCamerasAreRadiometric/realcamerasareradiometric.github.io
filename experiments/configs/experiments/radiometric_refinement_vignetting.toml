@@ -17,6 +17,9 @@ name = "radiometric_refinement"
 [kinds]
 source = "configs/experiments/radiometric_refinement.toml"   # the samples per view of every spline case (owner 2026-11-16 23:30), stated there once
 
+[material_grid]
+source = "configs/experiments/radiometric_refinement.toml"   # the grid every case's material start is searched on (stage material_grid), stated there once
+
 
 [runs.siemens_1m_distance_map]
 config = "configs/experiments/distance_maps.toml"

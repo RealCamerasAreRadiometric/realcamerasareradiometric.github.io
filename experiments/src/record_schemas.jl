@@ -14,6 +14,7 @@ const EXPERIMENT_RECORD_SCHEMAS = (
     detector_bias_scores = "experiments/detector_bias_scores/v1.0",
     evaluation_fixture = "experiments/evaluation_fixture/v1.0",
     exif = "experiments/exif/v1.0",
+    material_grid = "experiments/material_grid/v1.0",
     night_stars = "experiments/night_stars/v1.0",
     panorama_maps = "experiments/panorama_maps/v1.0",
     panoramas = "experiments/panoramas/v1.0",

@@ -18,12 +18,15 @@
 #   detect    the detections, geometric calibrations and start fits of record (tier rc_baselines), present
 #   start     per case, its start (bin/refine.jl --stage=start): keyed by every setting but the refinement-only ones
 #             (RadiometricCamera.REFINE_ONLY_KEYS), so a refine-only change loads it
-#   refine    per case, the radiometric refinement from its start (bin/refine.jl --start, a checkpoint per iteration); keyed by the
-#             refinement-only settings and the start's key; refused while the config has [pending]
+#   material_grid  per case, its material start (scripts/material_grid.jl, src/material_grid.jl): the start's closed-form solves at
+#             every candidate (α_ink, α_¬ink, η_ink, η_¬ink) of the config's [material_grid], the candidate of the lowest cost kept
+#             as a start record; keyed by [material_grid] and the start's key
+#   refine    per case, the radiometric refinement from its material start (bin/refine.jl --start, a checkpoint per iteration);
+#             keyed by the refinement-only settings and the material grid's key; refused while the config has [pending]
 #
 #   julia --project=experiments experiments/scripts/radiometric_refinement.jl [--config=<toml>] [--plan] [--stage=NAME[,NAME]] [--case=a,b] [--force]
 #
-# --case restricts refine to the named cases. Data: VGTK_DATA_ROOT binds data_root() (REPRODUCE.md); the raw photographs are the
+# --case restricts start, material_grid and refine to the named cases. Data: VGTK_DATA_ROOT binds data_root() (REPRODUCE.md); the raw photographs are the
 # tier rc_raw_photos, the start fits and Schöps's runs rc_baselines, the boards rc_calibration (configs/data_artifacts.toml).
 # =============================================================================
 using DrWatson
@@ -42,17 +45,20 @@ detect() = (require_stage_inputs(CFG, "detect"); nothing)
 
 const R = (; driver = DRIVER, config_path = CFG_PATH)
 
-# The stages that run the GPU: start (the starts) and refine hand the cases' [pipeline] tables to bin/refine.jl (their compute.backend).
-const GPU_STAGES = gpu_stages(:start => [CFG["cases"][c] for c in CASES], :refine => [CFG["cases"][c] for c in CASES])
+# The stages that run the GPU: start (the starts) and refine hand the cases' [pipeline] tables to bin/refine.jl, material_grid to
+# scripts/material_grid.jl (their compute.backend).
+const GPU_STAGES = gpu_stages(:start => [CFG["cases"][c] for c in CASES], :material_grid => [CFG["cases"][c] for c in CASES],
+                              :refine => [CFG["cases"][c] for c in CASES])
 
 const STAGES = [
     Stage(:prepare, "the board photographs decoded (Features' load_raw)";
           items = () -> SETS, product = s -> prepare_product(CFG, s), run = s -> run_prepare(CFG, s; R...)),
     Stage(:detect, "the detections, calibrations and start fits of record (tier rc_baselines)"; check = detect),
     Stage(:start, "the start of every case (bin/refine.jl --stage=start: its start record, keyed without the refinement-only options)";
-          items = () -> CASES, product = c -> start_product(CFG, c),
-          run = c -> start_with_refine(CFG, c) || run_start(CFG, c; R...)),   # with its refinement to run: one child, the refine stage's
-    Stage(:refine, "the radiometric refinement of every case from its start (bin/refine.jl --start)";
+          items = () -> CASES, product = c -> start_product(CFG, c), run = c -> run_start(CFG, c; R...)),
+    Stage(:material_grid, "the material start of every case (scripts/material_grid.jl: the start's closed-form solves at every candidate of [material_grid], the lowest cost kept)";
+          items = () -> CASES, product = c -> material_grid_product(CFG, c), run = c -> run_material_grid(CFG, c; R...)),
+    Stage(:refine, "the radiometric refinement of every case from its material start (bin/refine.jl --start)";
           items = () -> CASES, product = c -> refine_product(CFG, c),
           run = c -> (produced(refine_product(CFG, c)) || refuse_pending(CFG, CFG_PATH); run_refine(CFG, c; R...))),   # [pending] blocks new work only
 ]

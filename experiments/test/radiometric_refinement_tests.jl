@@ -151,7 +151,7 @@
     end
 
     @testset "--plan of both drivers lists their stages" begin
-        for (script, config, stages) in (("radiometric_refinement", rpath, ("prepare", "detect", "start", "refine")),
+        for (script, config, stages) in (("radiometric_refinement", rpath, ("prepare", "detect", "start", "material_grid", "refine")),
                                          ("chrome_evaluation", tpath, ("detect", "index", "evaluate")))
             cmd = `$(Base.julia_cmd()) --project=$(projectdir()) $(projectdir("scripts", "$script.jl")) --config=$config --plan`
             out = IOBuffer()
