@@ -205,15 +205,18 @@ end
 end
 
 
-# The board warping across lenses (configs/supplement/board_warping_lenses.toml, the same driver; the drawing code
-# src/paper_figures/board_warping_lenses.jl): the config of record loads with the session's six cases and names its drawing code;
-# and the drawing and the tables from REDUCED height fields (fixtures/paper_figures/board-warping-lenses/: every 5th sample of each
-# of the six fields, 13 kB each) are what the Python generator (board_warping_lenses.py) wrote from the same data, every line but
-# the first, which names the generator.
-@testitem "board warping across lenses: the config of record; the figure and the tables from reduced height fields, as the Python generator wrote them" default_imports = false begin
+# The board warping across lenses (configs/supplement/board_warping_lenses.toml, the same driver): the paper's figure, drawn by
+# src/paper_figures/board_warping_offsets.jl — per board the planar board plus the board's offsets learned with each lens as
+# surfaces, and maps of the difference between the offsets learned with two lenses. The config of record loads with the session's
+# six cases and that drawing's settings, and a setting that does not fit is refused; and the drawing and the tables from REDUCED
+# height fields (fixtures/paper_figures/board-warping-lenses/: every 5th sample of each of the six fields, 13 kB each) are the
+# stored files (expected/offsets, expected/offsets-tables: what the Python generator board_warping_offsets.py wrote from the same
+# data, in one folder), every line but the first, which names the generator, and every pixel of the six maps.
+@testitem "board warping across lenses: the config of record; the board's offsets as surfaces and maps from reduced height fields, as the Python generator wrote them" default_imports = false begin
     using Test
     using DrWatson
     using TOML: TOML
+    using SHA: sha256
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
     include(srcdir("radiometric_refinement.jl"))
@@ -222,29 +225,106 @@ end
 
     path = projectdir("configs", "supplement", "board_warping_lenses.toml")
     cfg = load_board_warping_config(path); fig = cfg["figure"]
-    F = projectdir("test", "fixtures", "paper_figures", "board-warping-lenses"); data = joinpath(F, "data"); E = joinpath(F, "expected")
+    F = projectdir("test", "fixtures", "paper_figures", "board-warping-lenses"); data = joinpath(F, "data"); E = joinpath(F, "expected", "offsets")
     quietly(f) = redirect_stdout(f, devnull)
     # two text files with the same lines but the first, which names the generator
     same(a, b) = (la = readlines(a); lb = readlines(b); length(la) == length(lb) && la[2:end] == lb[2:end])
     files_under(dir) = sort([relpath(joinpath(r, f), dir) for (r, _, fs) in walkdir(dir) for f in fs])
     edited(f) = (c = TOML.parsefile(path); f(c); p = joinpath(mktempdir(), "board_warping_lenses.toml"); open(io -> TOML.print(io, c), p, "w"); p)
+    refused(f) = try load_board_warping_config(edited(f)); false catch err; err isa ArgumentError end
 
-    @testset "the config of record: the session's six cases, its drawing code, a product of its own" begin
+    @testset "the config of record: the session's six cases, the drawing of the board's offsets, a product of its own" begin
         cases = board_warping_cases(cfg); rc = board_warping_refinements(cfg)
-        @test [c.set for c in cases] == ["bw_ag_14mm", "bw_ag_fisheye", "bw_ag_tamron", "bw_si_14mm", "bw_si_fisheye", "bw_si_tamron"]
+        @test [c.set for c in cases] == ["bw_ag_14mm", "bw_ag_tamron", "bw_ag_fisheye", "bw_si_14mm", "bw_si_tamron", "bw_si_fisheye"]   # the figure's rows, one after the other
         @test all(c -> c.case == "$(c.set)_spline_warped" && c.model == "spline", cases)
         @test sort(collect(keys(rc["cases"]))) == sort([c.case for c in cases])                              # the session's config holds these six cases alone
-        @test fig["drawing"] == "board-warping-lenses" && fig["asset_dir"] == "board-warping-lenses" && haskey(PaperFigures.FIGURES, fig["drawing"])
+        @test fig["drawing"] == "board-warping-offsets" && fig["asset_dir"] == "board-warping-lenses" && haskey(PaperFigures.FIGURES, fig["drawing"])
+        @test sort(collect(keys(fig))) == sort(collect((BOARD_WARPING_FIGURE_KEYS..., BOARD_WARPING_DRAWINGS["board-warping-offsets"]...)))
+        @test board_warping_pairs(fig) == [((1, 2), ("Sigma 14\\,mm \$-\$", "Tamron 20\\,mm")), ((3, 2), ("Fisheye \$-\$", "Tamron 20\\,mm")), ((1, 3), ("Sigma 14\\,mm \$-\$", "Fisheye"))]
+        @test fig["lenses"] == ["Sigma 14\\,mm", "Tamron 20\\,mm", "fisheye"] && fig["offset_enlargement"] == 50 && fig["view_azimuth_elevation_deg"] == [20, 25]
+        @test fig["map_width_share"] == 0.4 && fig["map_band_heights_mm"] == [0.1, 0.2] && fig["map_max_bands"] == 8 && fig["map_pixels_per_sample"] == 3 &&
+              fig["box_margin_rounding_mm"] == 0.5
         @test sort([String.(split(l, '\t')[1:3]) for l in readlines(joinpath(data, "cases.tsv"))[2:end]]) == sort([[c.case, c.set, c.model] for c in cases])   # the fixture's
-        @test load_board_warping_config(edited(identity))["figure"] == fig                                    # the copy itself loads
-        @test_throws ArgumentError load_board_warping_config(edited(c -> delete!(c["figure"], "drawing")))     # the drawing code is the config's to name
-        @test_throws ArgumentError load_board_warping_config(edited(c -> c["figure"]["drawing"] = "vignetting"))   # a generator, but none of this driver's
         other = load_board_warping_config(projectdir("configs", "supplement", "board_warping.toml"))
         p = board_warping_figures_product(cfg)
         @test p.experiment == "supplement/board_warping" && p.key != board_warping_figures_product(other).key && length(p.record["upstream"]) == 6
     end
 
+    @testset "a drawing that is not the driver's, a key of another drawing, a setting that does not fit: refused" begin
+        @test load_board_warping_config(edited(identity))["figure"] == fig                                    # the copy itself loads
+        @test refused(c -> delete!(c["figure"], "drawing"))                                                   # the drawing code is the config's to name
+        @test refused(c -> c["figure"]["drawing"] = "vignetting")                                             # a generator, but none of this driver's
+        @test refused(c -> c["figure"]["height_exaggeration"] = 50)                                           # the heights' drawings' key: this drawing enlarges the whole offset
+        @test refused(c -> delete!(c["figure"], "pairs")) && refused(c -> delete!(c["figure"], "map_width_share"))
+        @test refused(c -> pop!(c["figure"]["lenses"]))                                                       # one lens per column
+        @test refused(c -> c["figure"]["pairs"][1]["columns"] = [1, 1]) && refused(c -> c["figure"]["pairs"][1]["columns"] = [1, 4])
+        @test refused(c -> c["figure"]["pairs"][1]["header"] = ["Sigma 14\\,mm"]) && refused(c -> c["figure"]["pairs"][1]["label"] = "x")
+        @test refused(c -> c["figure"]["offset_enlargement"] = 0) && refused(c -> c["figure"]["box_margin_rounding_mm"] = -0.5)
+        @test refused(c -> c["figure"]["map_band_heights_mm"] = [0.2, 0.1]) && refused(c -> c["figure"]["map_max_bands"] = 0)
+        @test refused(c -> c["figure"]["map_width_share"] = 1.5) && refused(c -> c["figure"]["map_pixels_per_sample"] = 2.5)
+    end
+
+    @testset "the figure: the surfaces, the maps and their pixels, the two keys, the frame, the caption" begin
+        # cases.tsv names each refine product relative to the data folder (products/<key>): the drawing reads its radiometric_target.json
+        out = mktempdir()
+        cd(() -> quietly(() -> board_warping_drawing(data, out, fig; model = "spline")), data)
+        maps = filter(endswith(".png"), files_under(out))
+        @test length(maps) == 6 && sort(vcat(filter(!endswith(".png"), files_under(out)), "pixels.sha256")) == files_under(E)
+        for f in filter(f -> !endswith(f, ".png") && f != "board-warping-lenses-caption.tex", files_under(out))
+            @test same(joinpath(out, f), joinpath(E, f))
+        end
+        @test read(joinpath(out, "board-warping-lenses-caption.tex")) == read(joinpath(E, "board-warping-lenses-caption.tex"))   # one line
+        # the maps' pixels (expected/pixels.sha256: 8-bit RGB, row by row, three bytes per pixel)
+        stored = Dict(String(r[3]) => (String(r[1]), String(r[2])) for r in (split(l) for l in eachline(joinpath(E, "pixels.sha256")) if !isempty(strip(l)) && !startswith(l, "#")))
+        @test sort(collect(keys(stored))) == maps
+        for f in maps
+            img = PaperFigures.load_png(joinpath(out, f))
+            @test (bytes2hex(sha256(vec(permutedims(img, (3, 2, 1))))), "$(size(img, 2))x$(size(img, 1))") == stored[f]
+        end
+        frame = read(joinpath(out, "board-warping-lenses.tex"), String)
+        @test occursin("surfaces: the planar board plus the board offsets learned with this lens", frame) &&
+              occursin("maps: length of the difference between the board offsets learned with two lenses", frame)
+    end
+
+    @testset "the tables (meta.toml): the three-lens tables and, per board and pair, the difference between the board's offsets" begin
+        out = mktempdir()
+        cd(() -> quietly(() -> board_warping_tables(data, out, fig)), data)
+        @test same(joinpath(out, "meta.toml"), joinpath(F, "expected", "offsets-tables", "meta.toml"))
+        meta = TOML.parsefile(joinpath(out, "meta.toml"))
+        @test sort(collect(keys(meta))) == ["boards", "cases", "offsets"] && sort(collect(keys(meta["offsets"]))) == ["aprilgrid", "siemens_stars"]
+        @test sort(collect(keys(meta["offsets"]["aprilgrid"]["bw_ag_14mm - bw_ag_tamron"]))) == ["inplane_rms_mm", "max_mm", "normal_rms_mm", "rms_mm"]
+        generate(; options...) = cd(() -> quietly(() -> PaperFigures.generate("board-warping-offsets"; data, out = mktempdir(), options...)), data)
+        @test_throws UndefKeywordError generate(; part = "tables", rows = board_warping_layout(fig).rows)     # the pairs of lenses are the caller's to state
+        @test_throws ErrorException generate(; part = "figure")                                               # the one drawing is `figure3d`
+    end
+end
+
+# The session's HEIGHTS alone (the drawing src/paper_figures/board_warping_lenses.jl, which a config may name): the board-warping
+# figure's panels under the session's caption and tables with the lenses' agreement per board, from the same reduced height fields,
+# are what the Python generator (board_warping_lenses.py) wrote from them (expected/3d, expected/tables), every line but the first,
+# which names the generator. No config of record names this drawing: its settings are stated here.
+@testitem "board warping across lenses: the session's heights alone, the figure and the tables from reduced height fields, as the Python generator wrote them" default_imports = false begin
+    using Test
+    using DrWatson
+    include(srcdir("experiments.jl"))
+    include(srcdir("drivers.jl"))
+    include(srcdir("radiometric_refinement.jl"))
+    include(srcdir("paper_figures", "PaperFigures.jl"))
+    include(srcdir("board_warping.jl"))
+
+    # the board-warping figure's bands, mesh, view and exaggeration (configs/supplement/board_warping.toml), the session's sets
+    fig = merge(load_board_warping_config(projectdir("configs", "supplement", "board_warping.toml"))["figure"],
+                Dict{String, Any}("drawing" => "board-warping-lenses", "asset_dir" => "board-warping-lenses",
+                                  "rows" => [Dict("label" => "AprilGrid", "sets" => ["bw_ag_14mm", "bw_ag_fisheye", "bw_ag_tamron"]),
+                                             Dict("label" => "Siemens stars", "sets" => ["bw_si_14mm", "bw_si_fisheye", "bw_si_tamron"])]))
+    F = projectdir("test", "fixtures", "paper_figures", "board-warping-lenses"); data = joinpath(F, "data"); E = joinpath(F, "expected")
+    quietly(f) = redirect_stdout(f, devnull)
+    # two text files with the same lines but the first, which names the generator
+    same(a, b) = (la = readlines(a); lb = readlines(b); length(la) == length(lb) && la[2:end] == lb[2:end])
+    files_under(dir) = sort([relpath(joinpath(r, f), dir) for (r, _, fs) in walkdir(dir) for f in fs])
+
     @testset "the figure, panels as 3-D surfaces" begin
+        @test fig["columns"] == ["Sigma 14\\,mm lens", "Fisheye lens", "Tamron 20\\,mm lens"] && haskey(BOARD_WARPING_DRAWINGS, fig["drawing"])
         out = mktempdir()
         quietly(() -> board_warping_drawing(data, out, fig; model = "spline"))
         @test files_under(out) == files_under(joinpath(E, "3d")) && !any(endswith(".png"), files_under(out))  # a surface panel has no image file

@@ -27,7 +27,8 @@ for n in names(@__MODULE__; all = true)                     # everything defined
 end
 
 "The figures' files beside this one, each with the name of the module it is loaded into, in the order they are loaded."
-const FIGURE_FILES = (:BoardWarping => "board_warping.jl", :BoardWarpingLenses => "board_warping_lenses.jl", :DetectorBias => "detector_bias.jl",
+const FIGURE_FILES = (:BoardWarping => "board_warping.jl", :BoardWarpingLenses => "board_warping_lenses.jl", :BoardWarpingOffsets => "board_warping_offsets.jl",
+                      :DetectorBias => "detector_bias.jl",
                       :FocusSurfaces => "focus_surfaces.jl", :TextureLearned => "texture_learned.jl", :Vignetting => "vignetting.jl",
                       :Panoramas => "panoramas.jl",
                       :Teaser => "teaser.jl")

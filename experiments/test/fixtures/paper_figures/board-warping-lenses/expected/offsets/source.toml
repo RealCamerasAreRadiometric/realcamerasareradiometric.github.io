@@ -1,0 +1,85 @@
+# what board-warping-lenses was drawn from; written by experiments/src/paper_figures/board_warping_offsets.jl
+model = "spline"
+offset_enlargement = 50
+view_azimuth_elevation_deg = [20, 25]
+mesh_stride = 10
+height_band_mm = 0.5
+height_limit_mm = 3
+box_margin_mm = 75
+map_width_share = 0.4
+map_band_mm = 0.2
+map_range_mm = [0, 1.2]
+removed = "nothing: no best-fit plane, no rigid motion"
+
+[bw_ag_14mm]
+refine_product = "products/7ac8910486894d01"
+page_mm = [979.000, 979.000]
+inplane_aspect = -0.000592973
+inplane_skew = 0.00054125
+inplane_offset_x_mm = [-1.1099, 0.0000]
+inplane_offset_y_mm = [-0.5807, 0.0000]
+inplane_offset_largest_mm = 1.2526
+height_mm = [-2.1916, 0.4409]
+pgfplots_view_elevation_deg = 60.3237
+
+[bw_ag_tamron]
+refine_product = "products/1613c14e5a386dd0"
+page_mm = [979.000, 979.000]
+inplane_aspect = -0.000335327
+inplane_skew = -0.000133903
+inplane_offset_x_mm = [-0.3282, 0.1310]
+inplane_offset_y_mm = [-0.3283, 0.0000]
+inplane_offset_largest_mm = 0.3830
+height_mm = [-2.2787, 0.4344]
+pgfplots_view_elevation_deg = 60.3237
+
+[bw_ag_fisheye]
+refine_product = "products/a5e6f046cb30cffd"
+page_mm = [979.000, 979.000]
+inplane_aspect = -0.000684528
+inplane_skew = 0.000655855
+inplane_offset_x_mm = [-1.3116, 0.0000]
+inplane_offset_y_mm = [-0.6704, 0.0000]
+inplane_offset_largest_mm = 1.4730
+height_mm = [-2.5216, 0.5591]
+pgfplots_view_elevation_deg = 60.3237
+
+[bw_si_14mm]
+refine_product = "products/0d17e0c3a2fdbd97"
+page_mm = [1000.000, 1000.000]
+inplane_aspect = 0.000470767
+inplane_skew = -5.98609e-05
+inplane_offset_x_mm = [0.0000, 0.5308]
+inplane_offset_y_mm = [0.0000, 0.4707]
+inplane_offset_largest_mm = 0.7094
+height_mm = [-1.2443, 1.6421]
+pgfplots_view_elevation_deg = 60.7758
+
+[bw_si_tamron]
+refine_product = "products/2ddf016ec88be607"
+page_mm = [1000.000, 1000.000]
+inplane_aspect = -5.45202e-05
+inplane_skew = 0.000409712
+inplane_offset_x_mm = [-0.4642, 0.0000]
+inplane_offset_y_mm = [-0.0545, 0.0000]
+inplane_offset_largest_mm = 0.4674
+height_mm = [-1.2975, 1.6202]
+pgfplots_view_elevation_deg = 60.7758
+
+[bw_si_fisheye]
+refine_product = "products/3ca456c8d4327789"
+page_mm = [1000.000, 1000.000]
+inplane_aspect = 0.000238045
+inplane_skew = 8.17842e-05
+inplane_offset_x_mm = [-0.0818, 0.2381]
+inplane_offset_y_mm = [0.0000, 0.2380]
+inplane_offset_largest_mm = 0.2847
+height_mm = [-1.5358, 1.7003]
+pgfplots_view_elevation_deg = 60.7758
+
+"bw_ag_14mm - bw_ag_tamron" = { height_rms_mm = 0.0686, height_max_abs_mm = 0.1743, offset_rms_mm = 0.5275, offset_max_mm = 0.9471, inplane_rms_mm = 0.5230 }
+"bw_ag_fisheye - bw_ag_tamron" = { height_rms_mm = 0.2653, height_max_abs_mm = 0.7951, offset_rms_mm = 0.6948, offset_max_mm = 1.1816, inplane_rms_mm = 0.6422 }
+"bw_ag_14mm - bw_ag_fisheye" = { height_rms_mm = 0.2789, height_max_abs_mm = 0.9643, offset_rms_mm = 0.3041, offset_max_mm = 0.9650, inplane_rms_mm = 0.1212 }
+"bw_si_14mm - bw_si_tamron" = { height_rms_mm = 0.0792, height_max_abs_mm = 0.2287, offset_rms_mm = 0.6247, offset_max_mm = 1.1252, inplane_rms_mm = 0.6197 }
+"bw_si_fisheye - bw_si_tamron" = { height_rms_mm = 0.2030, height_max_abs_mm = 0.6079, offset_rms_mm = 0.4281, offset_max_mm = 0.7281, inplane_rms_mm = 0.3769 }
+"bw_si_14mm - bw_si_fisheye" = { height_rms_mm = 0.2661, height_max_abs_mm = 0.7877, offset_rms_mm = 0.3614, offset_max_mm = 0.7899, inplane_rms_mm = 0.2446 }

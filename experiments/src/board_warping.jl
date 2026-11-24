@@ -5,9 +5,12 @@
 # code: T. Harder's figure generators, ported; board_warping.py is src/paper_figures/board_warping.jl).
 #
 # A second config of record of the driver, configs/supplement/board_warping_lenses.toml, draws the sets of ONE session, in which
-# each board stayed in place while it was photographed with the three lenses: the same heights, lattice and panels, and tables that
-# also state how far the lenses' surfaces of a board differ (its drawing code: board_warping_lenses.py, ported as
-# src/paper_figures/board_warping_lenses.jl). A config names its drawing code (`[figure] drawing`).
+# each board stayed in place while it was photographed with the three lenses — the paper's figure: per board the planar board plus
+# the board's offsets learned with each lens (along the normal the height, in the plane the print's aspect and skew) as surfaces,
+# and maps of the difference between the offsets learned with two lenses, which its tables state per board and pair (its drawing
+# code: board_warping_offsets.py, ported as src/paper_figures/board_warping_offsets.jl). The same session's heights alone, drawn as
+# the first config draws them with tables of the lenses' agreement, are the drawing board_warping_lenses.py
+# (src/paper_figures/board_warping_lenses.jl). A config names its drawing code (`[figure] drawing`).
 #
 # Nothing is estimated here. A refinement writes its calibrated target as radiometric_target.json (RadiometricCamera's
 # `load_radiometric_target`): the geometric target with its printed page and the warping's nodal heights. The surface over the page
@@ -23,7 +26,8 @@
 #   dump/<case>.f64          the height field on a lattice over the page
 #   dump/<case>_nodes.tsv    the warping's nodes: where they lie, their stored heights and the surface there
 #   meta.toml                per case the page's size and the surface's range and RMS (the sets of one session: also the in-plane
-#                            aspect and skew, and per board how far the lenses' surfaces differ)
+#                            aspect and skew, and per board how far the lenses' surfaces differ — the heights alone, and for the
+#                            paper's figure the board's whole offsets)
 # and the drawing itself: assets/<asset_dir>.tex with its panels in assets/<asset_dir>/ (published to plotsdir()), the generated
 # caption and source.toml beside them in the product (the paper's caption is written by hand).
 # =============================================================================
@@ -35,15 +39,21 @@ using StaticArrays: SVector
 const BOARD_WARPING_TABLES = ("experiment", "inputs", "upstream", "heights", "sets", "figure")
 "The keys of `[heights]`, every one required: the number of samples per page axis."
 const BOARD_WARPING_HEIGHTS_KEYS = ("samples",)
-"""The keys of `[figure]`, every one required: the drawing code (`drawing`), the name of the figure's files under plotsdir()
-(`asset_dir`), the layout — the columns' labels and, per row, its label and its sets — and what the panels draw: the candidates of
-a colour band's height and the most bands on each side of zero, the mesh's stride, the view and the heights' exaggeration."""
-const BOARD_WARPING_FIGURE_KEYS = ("drawing", "asset_dir", "columns", "rows", "band_heights_mm", "max_bands", "mesh_stride", "view_azimuth_elevation_deg",
-                                   "height_exaggeration")
-"""The drawing codes a config may name (`[figure] drawing`, each a generator of src/paper_figures: `PaperFigures.FIGURES`): the
-boards' surfaces from capture sets of any sessions, and the surfaces of ONE session's sets, whose tables also compare the sets of a
-row (the lenses that photographed the board in place)."""
-const BOARD_WARPING_DRAWINGS = ("board-warping", "board-warping-lenses")
+"""The keys of `[figure]` every drawing takes, each required: the drawing code (`drawing`), the name of the figure's files under
+plotsdir() (`asset_dir`), the layout — the columns' labels and, per row, its label and its sets — and what the surfaces draw: the
+candidates of a colour band's height and the most bands on each side of zero, the mesh's stride and the view."""
+const BOARD_WARPING_FIGURE_KEYS = ("drawing", "asset_dir", "columns", "rows", "band_heights_mm", "max_bands", "mesh_stride", "view_azimuth_elevation_deg")
+"""The drawing codes a config may name (`[figure] drawing`, each a generator of src/paper_figures: `PaperFigures.FIGURES`), each
+with the keys of `[figure]` it takes beside `BOARD_WARPING_FIGURE_KEYS`, every one required: the boards' heights from capture sets
+of any sessions and the heights of ONE session's sets, whose tables also compare the sets of a row (the lenses that photographed
+the board in place) — both with the heights' exaggeration; and the session's boards with their whole offsets (the paper's figure) —
+the columns' lenses in running text, the pairs of lenses its maps compare, the offsets' enlargement, the rounding of the box's
+margin, and the maps' band candidates, most bands, width and pixels per sample."""
+const BOARD_WARPING_DRAWINGS = Dict("board-warping" => ("height_exaggeration",), "board-warping-lenses" => ("height_exaggeration",),
+                                    "board-warping-offsets" => ("lenses", "pairs", "offset_enlargement", "box_margin_rounding_mm", "map_band_heights_mm",
+                                                                "map_max_bands", "map_width_share", "map_pixels_per_sample"))
+"The keys of one entry of `[figure] pairs`: the two columns whose lenses a map compares (the first minus the second) and the two lines of its header."
+const BOARD_WARPING_PAIR_KEYS = ("columns", "header")
 "The keys of one entry of `[figure] rows`: the row's label and its sets, one per column."
 const BOARD_WARPING_ROW_KEYS = ("label", "sets")
 
@@ -74,9 +84,10 @@ board_warping_refinements(cfg::AbstractDict) = load_radiometric_refinement_confi
 
 The config of record of the board-warping figure, every table and key checked: `[upstream] radiometric_refinement` a refinement
 config of record; `[heights] samples` an integer ≥ 2; `[sets]` per capture set its case of the upstream config, the cases distinct
-and of one camera model (`board_warping_model`); `[figure]` a drawing code of `BOARD_WARPING_DRAWINGS`, a name for the files, a
-layout whose rows name one set per column and every set of `[sets]` once, and what the panels draw: ascending positive band
-heights, a positive band count, mesh stride and height exaggeration, a view within 0 … 90° of azimuth and of elevation.
+and of one camera model (`board_warping_model`); `[figure]` a drawing code of `BOARD_WARPING_DRAWINGS` with that drawing's keys, a
+name for the files, a layout whose rows name one set per column and every set of `[sets]` once, and what the surfaces draw:
+ascending positive band heights, a positive band count and mesh stride, a view within 0 … 90° of azimuth and of elevation, and a
+positive height exaggeration or, for the board's whole offsets, the settings `check_board_warping_offsets` checks.
 """
 function load_board_warping_config(path::AbstractString)
     c = load_driver_config(path, "board_warping"; tables = BOARD_WARPING_TABLES)
@@ -96,9 +107,9 @@ function load_board_warping_config(path::AbstractString)
     allunique(values(c["sets"])) || throw(ArgumentError("$path [sets]: two sets name the same case"))
     board_warping_model(c["sets"]; where = "$path [sets]")
     f = c["figure"]; where = "$path [figure]"
-    check_required_keys(f, BOARD_WARPING_FIGURE_KEYS, where)
-    f["drawing"] in BOARD_WARPING_DRAWINGS && haskey(PaperFigures.FIGURES, f["drawing"]) ||
-        throw(ArgumentError("$where drawing must name the figure's drawing code, one of $(join(BOARD_WARPING_DRAWINGS, ", ")), got $(repr(f["drawing"]))"))
+    haskey(BOARD_WARPING_DRAWINGS, get(f, "drawing", nothing)) && haskey(PaperFigures.FIGURES, f["drawing"]) ||
+        throw(ArgumentError("$where drawing must name the figure's drawing code, one of $(join(sort(collect(keys(BOARD_WARPING_DRAWINGS))), ", ")), got $(repr(get(f, "drawing", nothing)))"))
+    check_required_keys(f, (BOARD_WARPING_FIGURE_KEYS..., BOARD_WARPING_DRAWINGS[f["drawing"]]...), where)
     f["asset_dir"] isa AbstractString && !isempty(f["asset_dir"]) || throw(ArgumentError("$where asset_dir must be a non-empty string, got $(repr(f["asset_dir"]))"))
     f["columns"] isa AbstractVector && !isempty(f["columns"]) && all(x -> x isa AbstractString && !isempty(x), f["columns"]) ||
         throw(ArgumentError("$where columns must be a non-empty array of labels"))
@@ -121,9 +132,50 @@ function load_board_warping_config(path::AbstractString)
     v = f["view_azimuth_elevation_deg"]                                       # the drawing code computes a panel's height for a view from this quadrant
     v isa AbstractVector && length(v) == 2 && all(x -> x isa Real && 0 <= x <= 90, v) ||
         throw(ArgumentError("$where view_azimuth_elevation_deg must be [azimuth, elevation] in degrees, each within 0 … 90, got $(repr(v))"))
-    f["height_exaggeration"] isa Real && f["height_exaggeration"] > 0 ||
-        throw(ArgumentError("$where height_exaggeration must be a positive number, got $(repr(f["height_exaggeration"]))"))
+    if f["drawing"] == "board-warping-offsets"
+        check_board_warping_offsets(f, where)
+    else
+        f["height_exaggeration"] isa Real && f["height_exaggeration"] > 0 ||
+            throw(ArgumentError("$where height_exaggeration must be a positive number, got $(repr(f["height_exaggeration"]))"))
+    end
     return c
+end
+
+"""
+    check_board_warping_offsets(f, where)
+
+The settings of `[figure]` `f` that the drawing of the board's whole offsets takes beside the common ones, each checked
+(`where` names the table): `lenses` one text per column; `pairs` a non-empty array of {columns, header}, a pair's two columns
+distinct and within the columns, its header two lines; a positive `offset_enlargement` and `box_margin_rounding_mm`; ascending
+positive `map_band_heights_mm` and a positive `map_max_bands`; `map_width_share` within 0 … 1; `map_pixels_per_sample` a positive
+integer. An `ArgumentError` otherwise.
+"""
+function check_board_warping_offsets(f::AbstractDict, where::AbstractString)
+    nc = length(f["columns"])
+    f["lenses"] isa AbstractVector && length(f["lenses"]) == nc && all(x -> x isa AbstractString && !isempty(x), f["lenses"]) ||
+        throw(ArgumentError("$where lenses must name each column's lens in running text ($nc), got $(repr(f["lenses"]))"))
+    f["pairs"] isa AbstractVector && !isempty(f["pairs"]) || throw(ArgumentError("$where pairs must be a non-empty array of {columns, header}"))
+    for p in f["pairs"]
+        check_required_keys(p, BOARD_WARPING_PAIR_KEYS, "$where pairs")
+        k = p["columns"]
+        k isa AbstractVector && length(k) == 2 && all(x -> x isa Integer && 1 <= x <= nc, k) && k[1] != k[2] ||
+            throw(ArgumentError("$where pairs: a pair's columns are two different columns (1 … $nc), got $(repr(k))"))
+        h = p["header"]
+        h isa AbstractVector && length(h) == 2 && all(x -> x isa AbstractString && !isempty(x), h) ||
+            throw(ArgumentError("$where pairs: a pair's header is two lines of text, got $(repr(h))"))
+    end
+    for k in ("offset_enlargement", "box_margin_rounding_mm")
+        f[k] isa Real && f[k] > 0 || throw(ArgumentError("$where $k must be a positive number, got $(repr(f[k]))"))
+    end
+    b = f["map_band_heights_mm"]
+    b isa AbstractVector && !isempty(b) && all(x -> x isa Real && x > 0, b) && issorted(b) && allunique(b) ||
+        throw(ArgumentError("$where map_band_heights_mm must be a non-empty array of positive lengths in mm, ascending, got $(repr(b))"))
+    for k in ("map_max_bands", "map_pixels_per_sample")
+        f[k] isa Integer && f[k] >= 1 || throw(ArgumentError("$where $k must be a positive integer, got $(repr(f[k]))"))
+    end
+    f["map_width_share"] isa Real && 0 < f["map_width_share"] <= 1 ||
+        throw(ArgumentError("$where map_width_share must be a map's width in units of a surface's, within 0 … 1, got $(repr(f["map_width_share"]))"))
+    return nothing
 end
 
 """
@@ -242,16 +294,24 @@ function write_board_warping_data(dir::AbstractString, cases; samples::Integer)
     return dir
 end
 
+"The pairs of lenses the maps of `[figure]` `figure` compare, as the drawing code takes them: per pair its two columns and the two lines of its header."
+board_warping_pairs(figure::AbstractDict) =
+    [((Int(p["columns"][1]), Int(p["columns"][2])), (String(p["header"][1]), String(p["header"][2]))) for p in figure["pairs"]]
+
 """
     board_warping_tables(data, out, figure; writer = nothing) -> paths
 
 The tables of the drawing code of `[figure]` `figure` (its `drawing`) from the data folder `data` into `out`: meta.toml, per case
-the page's size and the surface's range and RMS — and, for the sets of one session ("board-warping-lenses", whose tables take the
-layout's rows: the boards and their sets), each case's in-plane aspect and skew and per board how far the lenses' surfaces differ.
-`writer` is what the file names as its writer (a driver's stage names itself; `nothing`: the drawing code's own file).
+the page's size and the surface's range and RMS — and, for the sets of one session (whose tables take the layout's rows: the
+boards and their sets), each case's in-plane aspect and skew and per board how far the lenses' surfaces differ; for the board's
+whole offsets ("board-warping-offsets", whose tables also take the pairs of lenses) the difference between the offsets learned
+with two lenses as well. `writer` is what the file names as its writer (a driver's stage names itself; `nothing`: the drawing
+code's own file).
 """
 function board_warping_tables(data::AbstractString, out::AbstractString, figure::AbstractDict; writer::Union{Nothing, AbstractString} = nothing)
-    compared = figure["drawing"] == "board-warping-lenses" ? (; rows = board_warping_layout(figure).rows) : (;)   # the sets its tables compare, row by row
+    rows = board_warping_layout(figure).rows                                 # the sets its tables compare, row by row
+    compared = figure["drawing"] == "board-warping-offsets" ? (; rows, pairs = board_warping_pairs(figure)) :
+               figure["drawing"] == "board-warping-lenses" ? (; rows) : (;)
     return PaperFigures.generate(String(figure["drawing"]); data, out, part = "tables", compared..., named_writer(writer)...)
 end
 
@@ -261,18 +321,23 @@ named_writer(writer::Union{Nothing, AbstractString}) = writer === nothing ? (;) 
 """
     board_warping_drawing(data, out, figure; model, writer = nothing) -> paths
 
-The figure of the drawing code of `[figure]` `figure` (its `drawing`: src/paper_figures/board_warping.jl, or
-board_warping_lenses.jl with the same panels and its own caption), from the data folder `data` into `out`: `<asset_dir>.tex`, its panels (each the height field as a surface over the page) and colour key in `<asset_dir>/`,
-`<asset_dir>-caption.tex` and source.toml — the refinements of the camera model `model` (`board_warping_model`), laid out in the
-table's rows and columns (`board_warping_layout`), with its bands, mesh, view and exaggeration. `writer` is what the files' first
-lines name as their generator (a driver's stage names itself; `nothing`: the drawing code's own file).
+The figure of the drawing code of `[figure]` `figure` (its `drawing`: src/paper_figures/board_warping.jl, board_warping_lenses.jl
+with the same panels and its own caption, or board_warping_offsets.jl with the board's whole offsets as surfaces and maps), from
+the data folder `data` into `out`: `<asset_dir>.tex`, its panels and colour keys in `<asset_dir>/`, `<asset_dir>-caption.tex` and
+source.toml — the refinements of the camera model `model` (`board_warping_model`), laid out in the table's rows and columns
+(`board_warping_layout`), with its bands, mesh and view and the drawing's own settings (`BOARD_WARPING_DRAWINGS`). `writer` is what
+the files' first lines name as their generator (a driver's stage names itself; `nothing`: the drawing code's own file).
 """
 function board_warping_drawing(data::AbstractString, out::AbstractString, figure::AbstractDict; model::AbstractString,
                                writer::Union{Nothing, AbstractString} = nothing)
+    own = figure["drawing"] == "board-warping-offsets" ?
+          (; lenses = Tuple(String.(figure["lenses"])), pairs = board_warping_pairs(figure), offset_enlargement = figure["offset_enlargement"],
+             box_margin_rounding_mm = figure["box_margin_rounding_mm"], map_band_heights_mm = figure["map_band_heights_mm"], map_max_bands = figure["map_max_bands"],
+             map_width_share = figure["map_width_share"], map_pixels_per_sample = figure["map_pixels_per_sample"]) :
+          (; height_exaggeration = figure["height_exaggeration"])
     return PaperFigures.generate(String(figure["drawing"]); data, out, part = "figure3d", asset_dir = String(figure["asset_dir"]), model, board_warping_layout(figure)...,
                                  band_heights_mm = figure["band_heights_mm"], max_bands = figure["max_bands"], mesh_stride = figure["mesh_stride"],
-                                 view_azimuth_elevation_deg = figure["view_azimuth_elevation_deg"], height_exaggeration = figure["height_exaggeration"],
-                                 named_writer(writer)...)
+                                 view_azimuth_elevation_deg = figure["view_azimuth_elevation_deg"], own..., named_writer(writer)...)
 end
 
 """

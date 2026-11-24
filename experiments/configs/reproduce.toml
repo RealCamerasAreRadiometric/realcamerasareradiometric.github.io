@@ -258,7 +258,7 @@ default = false
 
 [[stage]]
 name = "board_warping_lenses"
-what = "the supplement's board warping across lenses: the six refinements' height fields, their tables (each page and surface, the lenses' agreement per board) and the figure into plots/"
+what = "the paper's board-warping figure (the three-lens session): the six refinements' height fields, their tables (each page and surface, the lenses' agreement per board, the difference between the board's offsets learned with two lenses) and the figure into plots/"
 time = "00:10:00"         # the six fields at 201 × 201 samples, the tables and the drawing: 80 s with the load (2 threads, another site): with margin
 cpus_per_task = 8       # CPU only, at the launch's one thread count (8, above): it finds the six refinements by their keys, thread count included
 mem_per_cpu = "8480M"

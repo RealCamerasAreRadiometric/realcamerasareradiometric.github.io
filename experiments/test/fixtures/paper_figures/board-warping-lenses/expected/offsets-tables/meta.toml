@@ -1,0 +1,100 @@
+# the estimated board warping per case and the lenses' agreement per board; written by experiments/src/paper_figures/board_warping_offsets.jl
+
+[cases.bw_si_14mm_spline_warped]
+set = "bw_si_14mm"
+model = "spline"
+refine_product = "0d17e0c3a2fdbd97"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.2443
+surface_max_mm = 1.6421
+surface_rms_mm = 0.6448
+surface_rms_without_plane_mm = 0.5424
+inplane_aspect = 0.000470767
+inplane_skew = -5.98609e-05
+
+[cases.bw_si_fisheye_spline_warped]
+set = "bw_si_fisheye"
+model = "spline"
+refine_product = "3ca456c8d4327789"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.5358
+surface_max_mm = 1.7003
+surface_rms_mm = 0.6521
+surface_rms_without_plane_mm = 0.6188
+inplane_aspect = 0.000238045
+inplane_skew = 8.17842e-05
+
+[cases.bw_si_tamron_spline_warped]
+set = "bw_si_tamron"
+model = "spline"
+refine_product = "2ddf016ec88be607"
+page_mm = [1000.000, 1000.000]
+surface_min_mm = -1.2975
+surface_max_mm = 1.6202
+surface_rms_mm = 0.6405
+surface_rms_without_plane_mm = 0.5635
+inplane_aspect = -5.45202e-05
+inplane_skew = 0.000409712
+
+[cases.bw_ag_14mm_spline_warped]
+set = "bw_ag_14mm"
+model = "spline"
+refine_product = "7ac8910486894d01"
+page_mm = [979.000, 979.000]
+surface_min_mm = -2.1916
+surface_max_mm = 0.4409
+surface_rms_mm = 0.7099
+surface_rms_without_plane_mm = 0.5021
+inplane_aspect = -0.000592973
+inplane_skew = 0.00054125
+
+[cases.bw_ag_fisheye_spline_warped]
+set = "bw_ag_fisheye"
+model = "spline"
+refine_product = "a5e6f046cb30cffd"
+page_mm = [979.000, 979.000]
+surface_min_mm = -2.5216
+surface_max_mm = 0.5591
+surface_rms_mm = 0.8907
+surface_rms_without_plane_mm = 0.5686
+inplane_aspect = -0.000684528
+inplane_skew = 0.000655855
+
+[cases.bw_ag_tamron_spline_warped]
+set = "bw_ag_tamron"
+model = "spline"
+refine_product = "1613c14e5a386dd0"
+page_mm = [979.000, 979.000]
+surface_min_mm = -2.2787
+surface_max_mm = 0.4344
+surface_rms_mm = 0.7215
+surface_rms_without_plane_mm = 0.5306
+inplane_aspect = -0.000335327
+inplane_skew = -0.000133903
+
+[boards.aprilgrid]
+# the difference between two lenses' surfaces of the same board, its best-fit plane removed [mm]: RMS over the page, largest absolute value
+"bw_ag_14mm - bw_ag_tamron" = { rms_mm = 0.0651, max_abs_mm = 0.1982 }
+"bw_ag_14mm - bw_ag_fisheye" = { rms_mm = 0.1898, max_abs_mm = 0.6281 }
+"bw_ag_tamron - bw_ag_fisheye" = { rms_mm = 0.1416, max_abs_mm = 0.5038 }
+
+[boards.siemens_stars]
+# the difference between two lenses' surfaces of the same board, its best-fit plane removed [mm]: RMS over the page, largest absolute value
+"bw_si_14mm - bw_si_tamron" = { rms_mm = 0.0614, max_abs_mm = 0.1869 }
+"bw_si_14mm - bw_si_fisheye" = { rms_mm = 0.1442, max_abs_mm = 0.4192 }
+"bw_si_tamron - bw_si_fisheye" = { rms_mm = 0.1030, max_abs_mm = 0.3279 }
+
+[offsets.aprilgrid]
+# the difference between the board's offsets learned with two lenses (in the plane and along the normal), nothing removed [mm]: its RMS over the page,
+# the RMS of its part in the plane and of its part along the normal, its largest value
+"bw_ag_14mm - bw_ag_tamron" = { rms_mm = 0.5275, inplane_rms_mm = 0.5230, normal_rms_mm = 0.0686, max_mm = 0.9471 }
+"bw_ag_fisheye - bw_ag_tamron" = { rms_mm = 0.6948, inplane_rms_mm = 0.6422, normal_rms_mm = 0.2653, max_mm = 1.1816 }
+"bw_ag_14mm - bw_ag_fisheye" = { rms_mm = 0.3041, inplane_rms_mm = 0.1212, normal_rms_mm = 0.2789, max_mm = 0.9650 }
+
+[offsets.siemens_stars]
+# the difference between the board's offsets learned with two lenses (in the plane and along the normal), nothing removed [mm]: its RMS over the page,
+# the RMS of its part in the plane and of its part along the normal, its largest value
+"bw_si_14mm - bw_si_tamron" = { rms_mm = 0.6247, inplane_rms_mm = 0.6197, normal_rms_mm = 0.0792, max_mm = 1.1252 }
+"bw_si_fisheye - bw_si_tamron" = { rms_mm = 0.4281, inplane_rms_mm = 0.3769, normal_rms_mm = 0.2030, max_mm = 0.7281 }
+"bw_si_14mm - bw_si_fisheye" = { rms_mm = 0.3614, inplane_rms_mm = 0.2446, normal_rms_mm = 0.2661, max_mm = 0.7899 }
+

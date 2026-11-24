@@ -9,9 +9,11 @@
 # boards above their plane as the radiometric refinements of record estimated it, the targets in rows and the lenses in columns.
 # Config of record: configs/supplement/board_warping.toml (a supplement experiment: its products under
 # results_root()/supplement/board_warping/) (src/board_warping.jl; the drawing code src/paper_figures/board_warping.jl).
-# With --config=configs/supplement/board_warping_lenses.toml: the boards as the three lenses' refinements estimated them from the
-# photographs of ONE session, each board in place for its three sets (board-warping-lenses.tex; the drawing code
-# src/paper_figures/board_warping_lenses.jl), and how far the lenses' surfaces of a board differ (meta.toml).
+# With --config=configs/supplement/board_warping_lenses.toml: the paper's figure — both boards as the calibration with each of three
+# lenses reconstructs them from the photographs of ONE session, each board in place for its three sets: the planar board plus the
+# board's offsets learned with each lens as surfaces, and maps of the difference between the offsets learned with two lenses
+# (board-warping-lenses.tex; the drawing code src/paper_figures/board_warping_offsets.jl); the difference per board and pair of
+# lenses in meta.toml.
 #
 # STAGES (each a product keyed by its config record and the keys of the products it reads; <results>/supplement/board_warping/<stage>/<key>/)
 #   figures   per set of [sets] the height field over the page and the warping's nodes, from the calibrated target of its case's

@@ -34,16 +34,15 @@ function bwl_inplane(product::AbstractString)
 end
 
 """
-    bwl_tables(data, out; rows, generator) -> [path]
+    bwl_table_lines(data; rows, generator) -> Vector{String}
 
-Writes `out`/meta.toml: per case of the data folder its set, camera model and refine product, the page's size, the surface's range
+The lines of meta.toml: per case of the data folder its set, camera model and refine product, the page's size, the surface's range
 and RMS (as it is, and without its least-squares plane) and the refinement's in-plane aspect and skew; per target — a row of `rows`,
 its label and its sets, one per lens — how far the surfaces of two lenses differ: the RMS and the largest absolute value of the
 difference of the two height fields after its least-squares plane is removed (a plane belongs to the poses, not to the warping).
-board_warping_lenses.py wrote this file into the data folder; the figure does not read it. `generator` is what the file names as
-its writer.
+`generator` is what the first line names as the file's writer.
 """
-function bwl_tables(data::AbstractString, out::AbstractString; rows, generator::AbstractString)
+function bwl_table_lines(data::AbstractString; rows, generator::AbstractString)
     C = bw_cases(data); dump = joinpath(data, "dump"); case = Dict(q.set => q.case for q in C)
     L = ["# the estimated board warping per case and the lenses' agreement per board; written by $generator", ""]
     Z = Dict{String, Matrix{Float64}}()
@@ -70,8 +69,16 @@ function bwl_tables(data::AbstractString, out::AbstractString; rows, generator::
             println(" "^14, " $a − $b: RMS $(fixed(rms, 3)) mm, largest $(fixed(most, 3)) mm (plane removed)")
         end
     end
-    return [write_lines(joinpath(out, "meta.toml"), L)]
+    return L
 end
+
+"""
+    bwl_tables(data, out; rows, generator) -> [path]
+
+Writes `out`/meta.toml (`bwl_table_lines`). board_warping_lenses.py wrote this file into the data folder; the figure does not read it.
+"""
+bwl_tables(data::AbstractString, out::AbstractString; rows, generator::AbstractString) =
+    [write_lines(joinpath(out, "meta.toml"), bwl_table_lines(data; rows, generator))]
 
 """
     bwl_figure(data, out; asset_dir, model, rows, height_exaggeration, generator, settings...) -> paths
