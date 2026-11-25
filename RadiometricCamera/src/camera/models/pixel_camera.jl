@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # The parametric chief-ray models ARE VisualGeometryToolkitCore's pixel cameras: a `BoundedCamera` of a `CameraModel(LogicalIntrinsics(K),
 # lens)` — K in COLMAP pixels of the run's image, any Core lens (`Lens(DoubleSphere(ξ, α))`, `KannalaBrandt(k1, k2, k3, k4)`,
-# BlobBoards' `Division(d1, d2)`, the 14-coefficient chain of VisualGeometryToolkitIO's `opencv_camera`, `Pinhole()`, …) — bounded by
+# BlobBoards' `Division(d1, d2)`, the 14-coefficient chain of VisualGeometryToolkitIO's `opencv_camera`, `Lens(Perspective())`, …) — bounded by
 # the image's extent or its `Sensor`; isbits, so it travels into a device kernel as it is. Every fact of the model is Core's: π⁻¹ is its
 # `backproject` (NaN where the lens does not image the point), the forward projection its `project`, the parameters its
 # `parameter_vector` / `parameter_names` / `with_parameters` (`f, aspect, skew, cx, cy` in pixels, then the lens's), the domain its

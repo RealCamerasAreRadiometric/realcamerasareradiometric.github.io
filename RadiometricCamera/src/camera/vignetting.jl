@@ -190,8 +190,8 @@ end
 The centre of the radial vignetting profile of `camera`: its PRINCIPAL POINT, fixed (owner ruling 2026-11-11: the centre is no
 parameter of the fit, and V(𝐜) = 1 is held there exactly, `gauge_basis`), COLMAP pixels — the one source of truth: `K`'s
 principal point. A parametric camera's `K` is physical; a SplineLens start is on its optical axis (`grid_model`: Estimation's
-`fit_camera` turns its source onto the axis, Core's `axis_gauged`, K's principal point the axis's pixel), so its `K`'s principal
-point is the axis too — no separate `optical_axis` fit here (a start whose axis fit did not converge, `grid_model`, is
+regression (`CameraRegression`) turns its source onto the axis, Core's `axis_gauged`, K's principal point the axis's pixel), so its `K`'s principal
+point is the axis too — no separate `OpticalAxis` fit here (a start whose axis fit did not converge, `grid_model`, is
 not axis-gauged: its `K`'s principal point, not the axis, for that run).
 """
 function vignetting_center(camera::VgtkCore.BoundedCamera{<:CameraModel})

@@ -14,7 +14,7 @@
 
 # ---- Schöps et al.'s camera_calibration models ---------------------------------------------------------------------------------
 # Read by VisualGeometryToolkitIO's `load(BoundedCamera, intrinsics0.yaml)` where they are used: a central model as a
-# SplineLens camera, K the lattice's gauge (VisualGeometryToolkitCore's); the YAML is in SCHOEPS_PIXEL_FRAME
+# SplineLens camera, K the lattice's gauge (VisualGeometryToolkitCore's); the YAML is in PixelFrame{:colmap}
 # (COLMAP's, the frame VisualGeometryToolkitCore's spline cameras are read into).
 
 """The spline model of the Schöps run's `yamlpath` (VisualGeometryToolkitIO's reader: a bounded SplineLens camera), refused unless it is a `W × H` model

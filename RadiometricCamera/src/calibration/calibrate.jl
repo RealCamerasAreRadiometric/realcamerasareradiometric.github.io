@@ -74,7 +74,8 @@ function refine_calibration!(state::CalibrationState; options::PipelineOptions, 
     meta = CalibrationMetadata(convert(Vector{NamedTuple}, trace), costs.linear[1], costs.linear[2], costs.final[1], costs.final[2],
                                Float64(costs.seconds), res, copy(state.run.scrubbed), folds, runaway)
     estimate = CalibrationEstimate(calibrated_camera(state), copy(state.poses), radiometric_target(state), state.light)
-    return VgtkCore.FitResult(estimate, code, rule, count(t -> t.phase == :lm, trace), costs.final[2], sum(length, state.ϕ; init = 0), meta)
+    return VgtkCore.FitResult(estimate, code, rule, VgtkCore.SolveStats(; nsteps = count(t -> t.phase == :lm, trace)), costs.final[2],
+                              sum(length, state.ϕ; init = 0), meta)
 end
 
 """

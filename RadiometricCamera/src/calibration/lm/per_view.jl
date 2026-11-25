@@ -860,7 +860,7 @@ absolute one `xtol` (Core's of record, `CORE_LM_XTOL`, unless a caller states it
 Core's of record; the residual norm the data resolve, the photographs' RAW quantisation in the cost's norm, never the noise level
 (`lm_abstol`)."""
 _lm_stops(s, maxiters, maxtime, reldcost, xtol_rel, xtol = CORE_LM_XTOL) =
-    VgtkCore.LmStops(; max_iter = maxiters, ftol = reldcost, xtol, xtol_rel, max_time = Float64(maxtime), damping = LM_DAMPING,
+    VgtkCore.LmStops(; max_iter = maxiters, ftol = reldcost, xtol, xtol_rel, max_time = Float64(maxtime),
                      residual_resolution = lm_abstol(s))
 """
     _lm_log(cb, ϕ², path) -> callback

@@ -55,7 +55,7 @@ directory `io.out`, each through VisualGeometryToolkitIO:
 function save_radiometric_calibration(state::CalibrationState, result::VgtkCore.FitResult{<:CalibrationEstimate, <:CalibrationMetadata}; options::PipelineOptions)
     m = result.metadata
     costs = (; linear = (m.linear_cost, m.linear_rms), final = (m.final_cost, m.final_rms), seconds = m.seconds,
-               termination = (VgtkCore.retcode(result), VgtkCore.stop_rule(result)), m.folds)
+               termination = (result.retcode, result.stop_rule), m.folds)
     return _write_calibration(state, state.start, options, m.solver, m.trace, costs)
 end
 function _write_calibration(s::CalibrationState, meta, opts::PipelineOptions, res, trace, costs)

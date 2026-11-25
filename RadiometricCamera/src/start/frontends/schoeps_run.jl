@@ -3,7 +3,7 @@
     dataset_features(path) -> [(image name, [(x, y, id)])]
 
 The detections of a Schöps `dataset.bin` (a run's, or the texture's own detector run) in file order: COLMAP px (Schöps' pixel-corner
-convention is COLMAP's, `SCHOEPS_PIXEL_FRAME`), 0-based feature ids — VisualGeometryToolkitIO's `load(TargetObservations, path; target)`;
+convention is COLMAP's, `PixelFrame{:colmap}`), 0-based feature ids — VisualGeometryToolkitIO's `load(TargetObservations, path; target)`;
 or a run's import, `detections.json` ([`schoeps_run_file`](@ref): a vgio observations file in COLMAP px — v3.0, or an earlier
 target_points2d/v1 read through IO's version step — which names its targets itself, so IO's reader takes no `target`). The ids are
 one target's point indices: a file holding the detections of more than one target is refused (two targets' ids would collide).
