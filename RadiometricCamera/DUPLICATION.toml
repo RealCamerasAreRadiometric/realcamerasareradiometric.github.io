@@ -4,40 +4,6 @@
 # one-line proof. An entry that stops matching anything is itself a finding: remove it. Paths are relative
 # to this file.
 
-# ---- the backend branches: one kernel, a parameter per backend -------------------------------------------------
-
-[[backend]]
-file = "src/calibration/device/workers.jl"
-function = "_jac_chunk"
-reason = "not a CPU/GPU twin of any computation: the same Jacobian kernel runs on every backend; only its dual-chunk width is chosen per backend (all slots in one sweep on the CPU, the state's jacobian_chunk on a device for register pressure)"
-
-[[backend]]
-file = "src/calibration/device/workers.jl"
-function = "_kernel_float"
-reason = "not a CPU/GPU twin of any computation: the same kernels run on every backend; only their float type is chosen per backend (Float64 on the CPU, Float32 on a device)"
-
-[[backend]]
-file = "src/calibration/device/flux_kernels.jl"
-function = "_pixel_workgroup"
-reason = "not a CPU/GPU twin of any computation: the same per-pixel kernels run on every backend; only their workgroup size is chosen per backend (16 pixels on the CPU so that every thread works on a small view, the kernel's register budget on a device)"
-
-[[backend]]
-file = "src/calibration/device/jacobian_kernels.jl"
-function = "_ensure_device!"
-reason = "a transfer skip, not a second implementation: on the CPU backend with the settings' float the kernels read the host scene itself instead of an adapted copy; every backend then runs the same kernels"
-
-[[backend]]
-file = "src/calibration/lm/per_view.jl"
-function = "_window_width"
-reason = "not a CPU/GPU twin of any computation: the same blocks run on every backend; only how many run concurrently is chosen per backend (the CPU's threads; a device's kernel occupancy and free memory, owner ruling 2026-11-13)"
-
-[[backend]]
-file = "src/options/device.jl"
-function = "rc_backend"
-reason = "the device resolver's fallback, not a twin: it reports (loudly) that Core's resolver returned the CPU where a GPU was asked for; the kernels are the same on either backend"
-
-# ---- input fixtures ----------------------------------------------------------------------------------------------
-
 [[pattern]]
 use = "tex_macro_writer"
 file = "experiments/test/reproduce_tests.jl"
@@ -50,10 +16,3 @@ use = "sensor_component"
 file = "experiments/src/sensor_characterisation.jl"
 reason = "the record's producer composes Core's measured components (master_dark, defect_onsets, photon_transfer) into a SensorCharacterisation; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: deleted when Core gains a public builder (a characterisation from darks + flats)"
 
-# ---- awaiting their owner (TEMPORARY: each entry goes when its item lands) ----------------------------------------------------
-
-[[similar]]
-functions = ["test/unit/fixture_camera.jl::saddle", "VisualGeometryToolkitCore:test/fixtures/height_surface/generate.jl::sad"]
-reason = "TEMPORARY (HOIST, wave item \"Core synthetic: the saddle board height\"): Core's fixture generator copies this test saddle; it is hoisted into Core's synthetic module and both call it; remove this entry then"
-
-# ---- not the same concept -------------------------------------------------------------------------------------------------

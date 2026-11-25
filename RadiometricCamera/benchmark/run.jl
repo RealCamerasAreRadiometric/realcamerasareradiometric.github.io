@@ -46,6 +46,7 @@ using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore,
 using VisualGeometryToolkitCore: cost
 import JSON, NLLSsolver, Profile
 import KernelAbstractions as KA
+import VisualGeometryToolkitCore as VgtkCore
 const RC = RadiometricCamera
 
 option(key, default) = (i = findfirst(a -> startswith(a, key * "="), ARGS); i === nothing ? default : String(split(ARGS[i], "="; limit = 2)[2]))
@@ -71,8 +72,7 @@ function benchmark_board()
     f = 30.9 * W / 24
     K = CameraCalibrationMat(f, 0.0, 0.0, 0.0, f, 0.0, W / 2, H / 2, 1.0)
     lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
-    saddle(𝐛) = (q = 𝐛 .- 0.5; 0.08 * q[1]^2 - 0.04 * q[1] * q[2] + 0.06 * q[2]^2)       # the tests' saddle (metres on the 2 m board)
-    surface = WARP ? RC.TargetState(; h = SVector{RC.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])) : RC.TargetState{Float64}()
+    surface = WARP ? RC.TargetState(; h = SVector{RC.HEIGHT_NC}(VgtkCore.Synthetic.saddle_height.(RC.HEIGHT_NODES))) : RC.TargetState{Float64}()
     board = RC.with_state(board, surface)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:VIEWS]
@@ -205,7 +205,7 @@ end
 function inferred_types(c)
     k = 1; s = c.state()
     view = RC.View(c.poses[k], c.camera)
-    F = RC._kernel_float(BE)
+    F = VgtkCore.kernel_float(BE)
     flux = RC._FluxAt(Int32(k), Int32(H), view, c.camera.vignetting, c.mat, c.light, c.board, c.settings)
     return Dict{String, Any}(
         "View(pose, camera)" => inferred(RC.View, c.poses[k], c.camera),
@@ -225,16 +225,11 @@ end
 
 # ---- the run -----------------------------------------------------------------------------------------------------------------------
 
-function device_name()
-    BE isa KA.CPU && return "CPU ($(Sys.CPU_NAME), $(Threads.nthreads()) threads)"
-    cuda = get(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"), nothing)   # (loaded by rc_backend)
-    return cuda === nothing ? string(typeof(BE)) : string(Base.invokelatest(cuda.name, Base.invokelatest(cuda.device)))
-end
 
 function main()
     c = benchmark_board()
     npx = sum(count, c.masks)
-    @printf("RadiometricCamera benchmark: %d × %d, %d views, %d masked pixels, %s, Julia %s%s\n", W, H, VIEWS, npx, device_name(), VERSION,
+    @printf("RadiometricCamera benchmark: %d × %d, %d views, %d masked pixels, %s, Julia %s%s\n", W, H, VIEWS, npx, first(VgtkCore.device_names(BE)), VERSION,
             isempty(LABEL) ? "" : ", " * LABEL)
     results = Dict{String, Any}[]
     @printf("%-30s %12s %12s %14s  %s\n", "stage", "first (s)", "best (s)", "bytes", "value")
@@ -259,7 +254,7 @@ function main()
     if !isempty(OUT)
         commit = try readchomp(`git -C $(@__DIR__) rev-parse --short HEAD`) catch; "" end
         record = Dict{String, Any}("schema" => "rc/benchmark/v1.0", "label" => LABEL, "commit" => commit, "julia" => string(VERSION),
-                                   "threads" => Threads.nthreads(), "backend" => BACKEND, "device" => device_name(), "size" => [W, H], "views" => VIEWS,
+                                   "threads" => Threads.nthreads(), "backend" => BACKEND, "device" => first(VgtkCore.device_names(BE)), "size" => [W, H], "views" => VIEWS,
                                    "masked_pixels" => npx, "pixels" => PIXELS, "grid" => collect(GRID), "warp" => WARP, "heights" => HEIGHT_DEGREE, "reps" => REPS, "stages" => results,
                                    "inferred" => Dict(n => Dict("type" => v.type, "concrete" => v.concrete) for (n, v) in inf))
         open(io -> JSON.print(io, record, 2), OUT, "w")

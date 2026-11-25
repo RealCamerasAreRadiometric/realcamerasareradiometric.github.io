@@ -143,7 +143,7 @@ struct RadianceRays{A}
 end
 struct RadianceTag end
 const RAD_NL = 8
-"""A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` in the kernels' float type `T` (`_kernel_float`: Float32 on a device, Float64 on the CPU backend): the
+"""A ray's `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` in the kernels' float type `T` (Core's `kernel_float`: Float32 on a device, Float64 on the CPU backend): the
 radiance and its `RAD_NL` local partials, then the ray's hit: its board point 𝐱 and the board surface's normal 𝐧 there (`_ray_hit`;
 any length, 𝐧 ⋅ 𝐝 = 1)."""
 const RadianceJac{T} = SMatrix{3, RAD_NL + 3, T, 3 * (RAD_NL + 3)}
@@ -362,7 +362,7 @@ masked_pixels(mask::AbstractMatrix{Bool}) = [(I[2], I[1]) for I in findall(mask)
 
 `H × W × 3` image of photograph `k`, `camera` (a `RadiometricCameraModel`) at `pose` (camera → world), zeros outside the
 mask: the flux kernel (`_FluxAt`, device/jacobian_kernels.jl) on `backend` (by default [`default_backend`](@ref): the GPU when one is
-functional, else the CPU with a warning), in the backend's kernel float as a state's kernels (`_kernel_float`: Float64 on the CPU backend, Float32 on a
+functional, else the CPU with a warning), in the backend's kernel float as a state's kernels (Core's `kernel_float`: Float64 on the CPU backend, Float32 on a
 device, where the image agrees with the CPU's to Float32 rounding). `k` is the photograph's index: it keys the common random numbers
 of the radiance, so photograph `k` of a state renders with its index.
 """
@@ -377,7 +377,7 @@ function _render_view(k::Integer, view::View, vig::AbstractVignetting, mat::Mate
     px = masked_pixels(mask)
     img = zeros(Float64, H, W, 3)
     isempty(px) && return img
-    F = _kernel_float(backend)
+    F = VgtkCore.kernel_float(backend)
     ids = adapt(backend, [UInt32((u - 1) * H + v) for (u, v) in px])
     as(x) = F === _float_of(st) ? x : VgtkCore.convert_eltype(F, x)          # (arguments already in the kernels' float: as they are, no copy)
     flux = _FluxAt(Int32(k), Int32(H), adapt(backend, as(view)), as(vig), as(mat), as(light), adapt(backend, as(board)), as(st))

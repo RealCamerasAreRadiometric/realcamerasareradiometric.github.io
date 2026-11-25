@@ -17,7 +17,7 @@
 
     """A board of `aspect` = height / width (2 m wide), seen from z > 0."""
     page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
-    hh = SVector{HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
+    hh = SVector{HEIGHT_NC}(VgtkCore.Synthetic.saddle_height.(RC.HEIGHT_NODES))
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a two-view scene of the blob fixture; the truth = a saddle with a 2 % sag of the board width at the edge (≈ 0.6 px at 40°)
     tex_h = fixture_board()

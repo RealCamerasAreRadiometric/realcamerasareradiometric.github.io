@@ -3,8 +3,8 @@
 # heights and the analytic parts of the linear blocks, as functors of a masked pixel id (`_FluxAt`, `_RecordAt`, `_JacAt`, `_HeightAt`,
 # `_PartsAt`) mapped over the pixel list by VisualGeometryToolkitCore's `pointwise!` on the state's backend VALUE (`OnBackend`, so its
 # `always_inline` holds; a broadcast would launch on a default-built backend): one kernel each, no kernel code here, and this file never
-# references CUDA. ONE implementation (owner policy, 2026-11-11): the CPU backend runs the same functors in Float64 (`_kernel_float`;
-# all dual slots in one chunk, `_jac_chunk`), a device in Float32 — the default (`default_backend`: Core's `default_device()`
+# references CUDA. ONE implementation (owner policy, 2026-11-11): the CPU backend runs the same functors in Float64 (Core's `kernel_float`;
+# all dual slots in one chunk, Core's `dual_chunk`), a device in Float32 — the default (`default_backend`: Core's `default_device()`
 # after `using CUDA`; set CUDA_VISIBLE_DEVICES before loading CUDA), the CPU by `backend = CPU()`. Build a device backend by hand with
 # `always_inline = true`: without it the Jacobian kernel needs twice the local memory per thread and runs 1.5× slower at C = 4 (the
 # flux 4.4×); values move by ≤ 2.2e-7. Flux and Jacobian share the one backend, so the residual stays bitwise the one
@@ -14,18 +14,6 @@
 
 import KernelAbstractions as KA
 
-"""The dual partials per chunk of a Jacobian of `P` slots on the state's backend: the state's `jacobian_chunk`
-(`compute.jacobian_chunk`) on a device (register pressure), all `P` in one chunk on the CPU backend (no registers to spill; one sweep
-over the pixels)."""
-_jac_chunk(s, P::Integer) = s.backend isa KA.CPU ? max(Int(P), 1) : s.jacobian_chunk
-"""
-    _kernel_float(be) -> Float32 | Float64
-
-The float type of the kernels on the backend `be`: Float32 on a device, Float64 on the CPU backend. The flux, the radiance record, the
-Jacobian chunks, the height and the parts kernels are ONE implementation (functors of a pixel run by Core's `pointwise!` on
-`OnBackend(be)`); only their float type depends on the backend.
-"""
-_kernel_float(be) = be isa KA.CPU ? Float64 : Float32
 """
     HIGH_FLOAT = Float64
 
@@ -37,7 +25,7 @@ moves by ≈ 1 % when the board point moves by the 0.1 µm a Float32 ray puts on
 by up to 0.4 % in Float32 (dgx01, 2026-11-11, the paper-like Siemens case: in Float32 the ray parameter, its height partials and the
 accumulation hold to ≤ 7e-6, the radiance's ∂L/∂s does not; Float64 rays with a Float32 estimator leave 0.44 % in a tile). In Float32
 the pose's columns on that case are 0.37–0.82 % off the CPU's (the Float32 board point on the print's 0.03 mm edge, as the heights'
-were); the owner's gate is 0.4 %, stacked and per tile. The other chunks keep `_kernel_float` and their own record.
+were); the owner's gate is 0.4 %, stacked and per tile. The other chunks keep Core's `kernel_float` and their own record.
 """
 const HIGH_FLOAT = Float64
 """Whether the chunk starting at `c0` carries a pose slot (`off_e = 0`: slots 1 … 6)."""
@@ -129,7 +117,7 @@ _shared_read_only!(be, x) = x
 `f(c0)` for every chunk start in `c0s`, results in chunk order. Every chunk runs on a worker of its own (`_on_worker`: a device
 queue each), so on a device the chunks' kernels run concurrently and each worker waits for its own queue once: with 255 registers
 per thread a 25k-px view is less than one wave per launch (+21% there; less on larger views). (On the CPU backend a Jacobian has
-one chunk beside the heights', `_jac_chunk`, and KernelAbstractions' CPU kernels are threaded over pixels.)
+one chunk beside the heights', Core's `dual_chunk`, and KernelAbstractions' CPU kernels are threaded over pixels.)
 """
 function _each_chunk(f, be, c0s)
     jobs = [_on_worker(() -> f(c0)) for c0 in c0s]

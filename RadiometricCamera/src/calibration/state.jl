@@ -50,7 +50,7 @@ mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, T
     weights::Union{Unweighted, Vector{Vector{Float64}}}   # the rows' weights (weighting.jl): Unweighted() (as measured), or 1/σ per row of each view's ϕ (whitened)
     vig_rule::Union{Nothing, VgtkCore.BoundaryRule, RadialSupportRule}   # a tensor V's interior / dependent nodes under the imaged region, a radial V's supported / replicating ones under the masks (`vignetting_rule`)
     backend::Any                              # KernelAbstractions.Backend; CPU() = threaded Float64 path
-    jacobian_chunk::Int                       # dual partials per Jacobian kernel launch on a device (`compute.jacobian_chunk`, `_jac_chunk`)
+    jacobian_chunk::Int                       # dual partials per Jacobian kernel launch on a device (`compute.jacobian_chunk`, Core's `dual_chunk`)
     device_cache::Any                         # per-view device data (device/jacobian_kernels.jl); nothing on CPU
     channel::Int                              # 0: the three channels measured (3 residuals per pixel); c ∈ 1:3: channel c alone (1)
     focus_smoothness::Matrix{Float64}         # the focus's bending smoothness rows (`focus_smoothness!`); 0 × 0 = none
@@ -95,7 +95,7 @@ single-channel state ties the other channels' lighting coefficients and refracti
 (`tie_channels`), which no residual reads. The focus's bending smoothness rows, `focus_smoothness`, are set by
 `focus_smoothness!` (none at construction). `mu_bounds` `(lo, hi)` (`material.mu_bounds`; e.g. (0.6, 1.0): paper at most 40 % specular):
 the interval of the diffuse weight μ — the LM steps on the chart μ = lo + (hi − lo) σ(w) (`MaterialVar`), the closed-form solves
-clamp to it. `jacobian_chunk` (`compute.jacobian_chunk`): the dual partials per Jacobian kernel launch on a device (`_jac_chunk`;
+clamp to it. `jacobian_chunk` (`compute.jacobian_chunk`): the dual partials per Jacobian kernel launch on a device (Core's `dual_chunk`;
 the CPU backend takes every slot in one chunk) — 4, not 15: local memory grows ~1.9 KB per partial, and from about 8 partials the
 kernel is bound by spill traffic, so 14 re-traces at 4 beat 4 re-traces at 15 by 4.3× (25,564-px view, RTX 4090, 2026-11-04); 4
 also cuts the driver's local-memory reservation (bytes per thread × resident threads) ~5×. `sensor` and `photo_kind`: the photographs'

@@ -39,11 +39,11 @@ function rc_backend(backend; inline::Bool = true, fallback::Bool = true)
         @eval import $pkg
     end
     VgtkCore.reset_default_device!()          # a resolution memoized before the vendor's load (its resolver registers at load) is forgotten
-    if !fallback && Base.invokelatest(VgtkCore.default_device) isa KernelAbstractions.CPU
+    if !fallback && !KernelAbstractions.isgpu(Base.invokelatest(VgtkCore.default_device))
         error("compute backend \"gpu\": no functional GPU (set it to \"cpu\" to run on the CPU)")
     end
     d = Base.invokelatest(default_backend)    # the default device, and its one CPU warning
-    d isa KernelAbstractions.CPU && return d
+    KernelAbstractions.isgpu(d) || return d
     return inline ? Base.invokelatest(() -> typeof(d)(; always_inline = true)) : d
 end
 
@@ -59,7 +59,7 @@ script loads it itself, `using CUDA`, before its first call.
 """
 function default_backend()
     d = VgtkCore.default_device()
-    d isa KernelAbstractions.CPU &&
+    KernelAbstractions.isgpu(d) ||
         @warn "RadiometricCamera: no functional GPU — running on the CPU, which is very slow. A GPU needs its package loaded before " *
               "the first call (`using CUDA`) and a functional device; `backend = CPU()` chooses the CPU without this warning." maxlog = 1
     return d

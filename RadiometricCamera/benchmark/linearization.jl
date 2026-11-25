@@ -18,13 +18,13 @@ function linearization()
     c = benchmark_board(); s = c.state(); problem, _ = RC.build_problem(s; height_degree = HEIGHT_DEGREE)
     r, vars, flags = first_block(problem, view_blocks(problem))
     pose, dist, foc, ap, m, vg, lt = vars
-    dc = RC._ensure_device!(s); be = s.backend; F = RC._kernel_float(be); G = RC.HIGH_FLOAT
+    dc = RC._ensure_device!(s); be = s.backend; F = VgtkCore.kernel_float(be); G = RC.HIGH_FLOAT
     k = r.k; px = dc.px[k]; idx = dc.idx[k]; npx = length(s.px[k]); Hh = RC._image_height(s)
     NV = Int(RC.n_control_points(VgtkCore.model(vg))); J = Int(RC.sh_count(RC.max_degree(lt.light)))
     NS = length(s.settings.sensor); N = length(VgtkCore.model(foc).t̂_i)
     lay = RC._jacobian_layout(flags, N, NS, VgtkCore.tangent_size(vg), NV, J, VgtkCore.tangent_size(dist); NH = RC.n_height(m), NI = RC.n_inplane(m), fixed = RC.material_fixed(m))
     view0 = RC._view_of(r, pose, dist, foc, ap)
-    stk = VgtkCore.convert_eltype(F, s.settings); C = RC._jac_chunk(s, lay.P)
+    stk = VgtkCore.convert_eltype(F, s.settings); C = VgtkCore.dual_chunk(s.backend, lay.P, s.jacobian_chunk)
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)
     vk = RC.adapt(be, VgtkCore.convert_eltype(F, view0)); mk = VgtkCore.convert_eltype(F, m.mat)
     boardk = RC.with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
