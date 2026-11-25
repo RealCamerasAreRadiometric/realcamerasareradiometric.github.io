@@ -28,6 +28,9 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   `refine_absolute_pose`). Results are read by field (`r.u`, `r.retcode`, `r.stop_rule`, `r.stats.nsteps`, `r.rms`, `r.metadata`,
   `successful_retcode(r)`). RC's LM damping (`LM_DAMPING`) is the `LmProblem`'s and the chart LM's damping argument, no longer an
   `LmStops` field (Core 0.14). The generalized cross-validation is Estimation's `gcv_select` (RC keeps no copy).
+- **Tests:** the README test develops the stack packages the `[sources]` take by path (TEMPORARY, with those entries); the
+  experiments paper project's naming scan is skipped (TEMPORARY, `@test_skip`) until the owner rules whether experiments/ is ported to
+  0.4.0 or stays on the released 0.3.0. The goldens hold unmodified (rtol 1e-10): no calibration number moves.
 - **Dependencies:** VisualGeometryToolkitCore 0.14, VisualGeometryToolkitEstimation 0.13, VisualGeometryToolkitFeatures 0.10,
   VisualGeometryToolkitIO 0.12 (none registered yet: the package's `[sources]` take them by path, TEMPORARY until they are).
 
