@@ -34,7 +34,7 @@ tree_dir = "ror-{version}"
 # where the tree comes from and how it resolves: the repository of record and the registry RadiometricCamera is registered in. The
 # julia and the depot are the machine's (the site profile's setup: `julia` on PATH, or JULIA; JULIA_DEPOT_PATH)
 repository = "https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git"   # the package in its subdirectory RadiometricCamera/
-registry = "CauRegistry"
+registry = "General"
 
 [machine]
 gpus = 8      # the B200 server: 8 × B200 (scontrol show node: Gres=gpu:8)

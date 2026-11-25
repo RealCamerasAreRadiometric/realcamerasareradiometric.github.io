@@ -38,17 +38,12 @@ symbol table, and the data conventions (COLMAP pixels, metres, the camera frame)
 
 ## Installation
 
-RadiometricCamera is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl). The Visual Geometry Toolkit packages
-it builds on are in General; CauRegistry also serves the Visual Radiometry Toolkit packages (VisualRadiometryToolkitCore,
-VisualRadiometryToolkitIO) until they are registered in General. Add that registry once, beside General, then the package and the
-two stack packages and CUDA.jl that the example uses:
+RadiometricCamera is registered in Julia's General registry, as are the Visual Geometry Toolkit and Visual Radiometry
+Toolkit packages it builds on. Add the package, the two stack packages and CUDA.jl that the example uses:
 
 ```julia-repl
-pkg> registry add General https://github.com/prittjam/CauRegistry.jl
 pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore CUDA
 ```
-
-(`registry add` names General too, so that a new Julia installation gets both registries.)
 
 Julia 1.13 or later. A CUDA GPU is the default device once `using CUDA` has loaded its package; without a functional one
 every entry point runs on the CPU, much more slowly, and warns once that it does (KernelAbstractions' `backend = CPU()` chooses the CPU without the

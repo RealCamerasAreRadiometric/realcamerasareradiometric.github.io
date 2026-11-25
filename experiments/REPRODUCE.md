@@ -63,7 +63,7 @@ VGTK_SITE=<site> bash experiments/scripts/slurm/run_of_record.sh <version> --res
 VGTK_SITE=<site> bash experiments/scripts/slurm/run_of_record.sh <version> --results-base=<dir>          # the same, then every stage submitted
 ```
 
-It refuses (nothing runs) unless RadiometricCamera `<version>` is in CauRegistry and resolves in a fresh environment from the
+It refuses (nothing runs) unless RadiometricCamera `<version>` is in General and resolves in a fresh environment from the
 registries alone; it clones the repository at `v<version>` into `<results base>/ror-<version>/tree`, instantiates it in a CPU job
 and runs the runner on the stages of `[launch] stages` into the new results root `<results base>/rc-results-<version>` (the results
 base: `--results-base`, else `VGTK_RESULTS_ROOT`; the site profile's `[storage] results_root` is the value to give). The

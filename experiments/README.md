@@ -8,10 +8,9 @@ produced by a tracked driver under `scripts/` from a config of record under
 (a [DrWatson](https://juliadynamics.github.io/DrWatson.jl/) project, not a
 package). The environment is this project's own (RadiometricCamera from
 `../RadiometricCamera`, its `[sources]`): its Manifest is not tracked, and the stack's packages resolve from
-the registries (the Visual Geometry Toolkit from General; the Visual Radiometry Toolkit from
-[CauRegistry](https://github.com/prittjam/CauRegistry.jl), added once beside General). Until their next releases are
-registered, PanoramaStitching and BlobBoards come from the branches its `[sources]` name
-(each marked TEMPORARY there, with the release it waits for).
+Julia's General registry (the Visual Geometry Toolkit, the Visual Radiometry Toolkit, BlobBoards and
+LocalOptimizationDoneRight). Until its next release is registered, PanoramaStitching comes from the commit its `[sources]` names
+(marked there, with the release it waits for).
 
 Run from the repository root:
 

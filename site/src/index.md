@@ -73,12 +73,10 @@ accurately estimated.
 
 ## Install
 
-RadiometricCamera requires Julia 1.13 or later. It is registered in [CauRegistry](https://github.com/prittjam/CauRegistry.jl). The
-Visual Geometry Toolkit packages it builds on are in General; CauRegistry also serves the Visual Radiometry Toolkit packages until
-they are registered in General. Add that registry once, beside General, then the packages:
+RadiometricCamera requires Julia 1.13 or later. It is registered in Julia's General registry, as are the Visual Geometry
+Toolkit and Visual Radiometry Toolkit packages it builds on:
 
 ```julia-repl
-pkg> registry add General https://github.com/prittjam/CauRegistry.jl
 pkg> add RadiometricCamera VisualGeometryToolkitCore VisualRadiometryToolkitCore CUDA
 ```
 

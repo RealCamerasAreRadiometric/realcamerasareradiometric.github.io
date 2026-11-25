@@ -18,7 +18,7 @@ source experiments/scripts/slurm/common.sh
 # setup.sbatch — the experiments environment, once, before every other job of a launch (they depend on it: --dependency=afterok).
 #
 # Two environments, each with its own untracked Manifest: experiments (the drivers) and the package itself (bin/refine.jl runs in
-# --project=RadiometricCamera). Instantiate resolves each from the registries (CauRegistry for the stack), then both are precompiled
+# --project=RadiometricCamera). Instantiate resolves each from the General registry, then both are precompiled
 # with CUDA and the GPU extensions loaded, at the jobs' own flags. CPU only (dgx01's
 # rule, 2026-11-13: GPU tasks never compile): loading CUDA and its extensions needs no GPU, so every GPU task that follows only
 # loads and runs. CUDA's runtime artifacts are fetched by the first GPU task that initialises the device.

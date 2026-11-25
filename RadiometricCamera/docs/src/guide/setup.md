@@ -4,20 +4,17 @@
 CurrentModule = RadiometricCamera
 ```
 
-The package installs as the [Installation](../index.md#Installation) says, from General and CauRegistry (which serves the package and,
-until they are registered in General, the Visual Radiometry Toolkit packages).
+The package installs as the [Installation](../index.md#Installation) says, from Julia's General registry.
 This page is for what the package does not install: the hardware a calibration runs on, and the data of the experiments.
 
 ## Clone
 
 The repository holds the package (`RadiometricCamera/`), the experiments that reproduce the paper (`experiments/`), the
-manuscript and the project page, and no data. Its environment resolves from the registries, so CauRegistry is added first
-(once per depot; `registry add` names General too, for a new Julia installation):
+manuscript and the project page, and no data. Its environment resolves from Julia's General registry:
 
 ```bash
 git clone https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git
 cd realcamerasareradiometric.github.io
-julia +1.13 -e 'using Pkg; pkg"registry add General https://github.com/prittjam/CauRegistry.jl"'
 julia +1.13 --project=RadiometricCamera -e 'using Pkg; Pkg.instantiate()'
 ```
 
