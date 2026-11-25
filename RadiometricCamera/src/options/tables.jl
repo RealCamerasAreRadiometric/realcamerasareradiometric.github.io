@@ -38,10 +38,10 @@ const INPLANE_KINDS = ("none", "aspect_skew")
 # are `nothing`, which TOML cannot state; the file documents them in a comment.
 using VisualGeometryToolkitCore: toml_default, parse_defaults
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
-# `parse_defaults`/`toml_default`, as every stack package's file is (DUPLICATION.toml: the name is each package's own data).
-const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
+# `parse_defaults`/`toml_default`, as every stack package's file is (its own name: Estimation's parsed file is another package's data).
+const _RC_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
 """The default of the field `f` of the options table `T`: its configs/default.toml value, read as the TOML reader reads a config's."""
-_option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_TOML_DEFAULTS, t, k), "$t.$k"))
+_option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_RC_DEFAULTS, t, k), "$t.$k"))
 """The TOML table of the options table type `T` (its field of `PipelineOptions`)."""
 _table_name(::Type{T}) where {T} = String(only(n for n in fieldnames(PipelineOptions) if fieldtype(PipelineOptions, n) === T))
 
@@ -262,7 +262,7 @@ them). Read from TOML with [`pipeline_options`](@ref), written for the run recor
 A `selfcheck.only` run reads no photograph: it needs no `io.images`.
 """
 Base.@kwdef struct PipelineOptions
-    fixed::Vector{String} = String.(toml_default(_TOML_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
+    fixed::Vector{String} = String.(toml_default(_RC_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
     io::IOOptions = IOOptions()
     frontend::FrontendOptions = FrontendOptions()
     camera::CameraOptions = CameraOptions()

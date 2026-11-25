@@ -57,9 +57,3 @@ functions = ["test/unit/fixture_camera.jl::saddle", "VisualGeometryToolkitCore:t
 reason = "TEMPORARY (HOIST, wave item \"Core synthetic: the saddle board height\"): Core's fixture generator copies this test saddle; it is hoisted into Core's synthetic module and both call it; remove this entry then"
 
 # ---- not the same concept -------------------------------------------------------------------------------------------------
-
-
-[[name]]
-module = "RadiometricCamera"
-name = "_TOML_DEFAULTS"
-reason = "not code but each package's own data (owner D8: configs/default.toml is RC's one statement of its defaults): RC's parsed file and Estimation's are different files with different tables (the refinement's options vs RANSAC/fitting defaults); both are parsed and read through Core's one `parse_defaults`/`toml_default`, the binding name Core's `parse_defaults` docstring prescribes (the monorepo's own entry for Eval's `_TOML_DEFAULTS` is the precedent). RC's `default_config_path` and `_dflt` copies are deleted (0.11.0)"

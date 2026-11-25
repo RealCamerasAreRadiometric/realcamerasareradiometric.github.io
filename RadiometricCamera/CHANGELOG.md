@@ -2,6 +2,9 @@
 
 ## 0.3.0 (2026-11-25; breaking)
 
+- **Removed:** the stubs that refused, by name, the names moved to VisualRadiometryToolkitCore (`with_focus`, `Λ_ggx`, `posed_target`,
+  `ρ_c` and the rest): such a name is now simply not defined here (an `UndefVarError`); call VisualRadiometryToolkitCore's.
+  The package's parsed defaults are `_RC_DEFAULTS` (was `_TOML_DEFAULTS`, VisualGeometryToolkitEstimation's name).
 - **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required
   and is now optional), `start_calibration` and `load_calibration_start` default their device to the new `default_backend()`:
   VisualGeometryToolkitCore's `default_device()`, a functional GPU once its package is loaded (`using CUDA`), else the CPU, with

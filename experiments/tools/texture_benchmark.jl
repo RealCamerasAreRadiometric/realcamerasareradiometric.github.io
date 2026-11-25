@@ -3,13 +3,13 @@
 # (`page_rows`: the footprint kernel and the operators' assembly), the penalized operator on the device, the CGLS solves
 # (`page_solves`) and the refine stage as a whole (`run_page`). Not a driver of the paper: a measurement of the code.
 #
-#   julia -t 8 --project=experiments experiments/tools/texture_benchmark.jl [key=value …]
-#     backend=cpu|gpu   the device (`rc_backend`)                                                [cpu]
-#     scale=4           the image and the page's texels per mm (image 240·scale × 180·scale)     [4]
-#     views=10          the photographs                                                           [10]
-#     fraction=0.5      the share of each photograph's masked pixels sampled                      [0.5]
-#     out=<file.json>   the record                                                                [none]
-#     label=<text>      a label for the record                                                    [""]
+#   julia -t 8 --project=experiments experiments/tools/texture_benchmark.jl [--key=value …]
+#     --backend=cpu|gpu the device (`rc_backend`)                                                [cpu]
+#     --scale=4         the image and the page's texels per mm (image 240·scale × 180·scale)     [4]
+#     --views=10        the photographs                                                           [10]
+#     --fraction=0.5    the share of each photograph's masked pixels sampled                      [0.5]
+#     --out=<file.json> the record                                                                [none]
+#     --label=<text>    a label for the record                                                    [""]
 #
 # The sheet is the tests' (60 × 84 mm, a design of smooth blobs and bars), photographed defocused from 0.30–0.42 m by a double-sphere
 # camera focused at 0.45 m with a 4 mm aperture; the photographs' values are the rows' own prediction of the design. Reported per
@@ -28,13 +28,13 @@ include(srcdir("drivers.jl"))
 include(srcdir("radiometric_refinement.jl"))
 include(srcdir("texture_recovery.jl"))
 
-bench_option(key, default) = (i = findfirst(a -> startswith(a, key * "="), ARGS); i === nothing ? default : String(split(ARGS[i], "="; limit = 2)[2]))
-const BENCH_BACKEND = bench_option("backend", "cpu")
-const BENCH_SCALE = parse(Int, bench_option("scale", "4"))
-const BENCH_VIEWS = parse(Int, bench_option("views", "10"))
-const BENCH_FRACTION = parse(Float64, bench_option("fraction", "0.5"))
-const BENCH_OUT = bench_option("out", "")
-const BENCH_LABEL = bench_option("label", "")
+import VisualGeometryToolkitEval as VgtkEval
+const BENCH_BACKEND = VgtkEval.cli_option(ARGS, "backend", "cpu")
+const BENCH_SCALE = parse(Int, VgtkEval.cli_option(ARGS, "scale", "4"))
+const BENCH_VIEWS = parse(Int, VgtkEval.cli_option(ARGS, "views", "10"))
+const BENCH_FRACTION = parse(Float64, VgtkEval.cli_option(ARGS, "fraction", "0.5"))
+const BENCH_OUT = VgtkEval.cli_option(ARGS, "out", "")
+const BENCH_LABEL = VgtkEval.cli_option(ARGS, "label", "")
 const BENCH_DEVICE = RC.rc_backend(BENCH_BACKEND; inline = false, fallback = false)
 
 function texture_benchmark_scene(dir)

@@ -378,7 +378,7 @@ function pipeline_options(d::AbstractDict; set = ())
     end
     unknown = setdiff(collect(String, keys(d)), allowed_keys(PipelineOptions))
     isempty(unknown) || throw(ArgumentError("unknown table(s) $(sort(unknown)); allowed tables: $(sort(allowed_keys(PipelineOptions)))"))
-    kw = [f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_TOML_DEFAULTS, "", "fixed"))) :
+    kw = [f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_RC_DEFAULTS, "", "fixed"))) :
                 haskey(d, String(f)) ? _read_table(fieldtype(PipelineOptions, f), d[String(f)], String(f)) : fieldtype(PipelineOptions, f)())
           for f in fieldnames(PipelineOptions)]
     return _refuse_inapplicable(d, _check_options(PipelineOptions(; kw...)))

@@ -22,9 +22,9 @@ end
     # the structs' keyword defaults ARE the file (owner D8, 2026-11-15: Core's config_toml mechanism, baked at precompile): no second
     # set of literals to agree with it; a key missing from the file is an error naming it, by design
     path = pkgdir(RC, "configs", "default.toml")                                     # the file, where users find it
-    @test RC._TOML_DEFAULTS == TOML.parsefile(path)
+    @test RC._RC_DEFAULTS == TOML.parsefile(path)
     @test RC.pipeline_options(Dict{String, Any}()) == RC.PipelineOptions()
-    @test_throws KeyError RC.toml_default(RC._TOML_DEFAULTS, "grid", "no_such_key")
+    @test_throws KeyError RC.toml_default(RC._RC_DEFAULTS, "grid", "no_such_key")
     src = read(joinpath(RC_ROOT, "src", "options", "tables.jl"), String)
     @test count("_option_default(", src) >= 75                                     # every table field's default reads the file
     # every key of the struct is in the file (the file documents them all)

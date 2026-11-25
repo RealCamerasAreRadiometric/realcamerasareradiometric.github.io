@@ -99,36 +99,8 @@ _retired_lens_accessor(what) =
                         "a radiometric camera or a calibration state is `VisualRadiometryToolkitCore.geometric($what)`; its lens model `lens(geometric($what))`"))
 VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 
-# ---- moved names (the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
-# imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
-# their replacement (no alias, no forwarding).
-# VisualRadiometryToolkitCore's public names are descriptive; a symbol of the paper is its public alias of the same function, and a
-# plain old spelling has no alias: each row names what to call there.
-_moved_to_radiometry(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
-    "RadiometricCamera.$name moved to VisualRadiometryToolkitCore: $replacement"))
-for (name, replacement) in (
-        :with_geometric => "`with_geometric`", :with_focus => "`with_focus`", :with_aperture_radius => "`with_aperture_radius`",
-        :aperture_samples => "`aperture_samples`", :aperture_border => "`aperture_border`", :luma => "`luma`", :n_nodes => "`n_nodes`",
-        :pixel_of_𝐩 => "`pixel_position` (the paper's symbol stays its alias, `pixel_of_𝐩`)",
-        :ℐ_𝐮 => "`pixel_footprint` (the paper's symbol stays its alias, `ℐ_𝐮`)",
-        :𝔱 => "`focus_distance` (the paper's symbol stays its alias, `𝔱`)",
-        :Λ_ggx => "`ggx_lambda` (the paper's symbol stays its alias, `Λ_ggx`)",
-        :G1_ggx => "`ggx_masking`", :D_ggx => "`ggx_distribution`", :G2_ggx => "`ggx_masking_shadowing`",
-        :F_dielectric => "`fresnel_dielectric`", :D_v => "`visible_normal_density`",
-        :chief_dir => "`chief_direction`", :sample_vndf_caps => "`sample_visible_normal`", :PDF_reflect => "`reflection_pdf`",
-        :f_CT_parts => "`cook_torrance_terms`", :f_CT => "`cook_torrance`",
-        :ae_chart => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `project(Lens(Equidistant()), d)`",
-        :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`",
-        # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
-        :posed_target => "`posed_target(target)` (under its state) or `posed_target(target, state)`", :texture_size => "`texture_size`",
-        :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`", :physical_chart => "`physical_chart`",
-        :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
-        :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
-    @eval begin
-        @doc $("Moved to VisualRadiometryToolkitCore: $replacement.")
-        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)), $replacement)
-    end
-end
+# ---- moved names: the generic radiometric layer is VisualRadiometryToolkitCore's. The names this package uses are imported from
+# there (src/RadiometricCamera.jl) and are not public here; the others are not defined here (no stub, no alias, no forwarding).
 
 # ---- retired names (the board is VisualRadiometryToolkitCore's textured target, and there is no scene). The board's
 # surface parameters are the target's OWN state; the image size is the camera's; a render takes the camera, the pose and the board.
