@@ -1,6 +1,6 @@
 name = "RadiometricCamera"
 uuid = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ties Harder <TiesHarder@icloud.com>"]
 
 [workspace]

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.3.0: breaking)
+## 0.3.0 (2026-11-25; breaking)
 
 - **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required
   and is now optional), `start_calibration` and `load_calibration_start` default their device to the new `default_backend()`:
