@@ -1,11 +1,11 @@
-docs-pass: c2707ab27076f91cddd3ff24c17a5220fd550558
+docs-pass: 60aab7bf2b7c7ee2e65f49d9cb72968a93534213
 landing: site/ of this repository (site/src/index.md, deployed by the Site workflow with the package manual under /docs/): the install paragraph (General, no registry add), the example's `using CUDA`, `sz`, `CameraCalibrationMat(412.0, sz)` and the keyword camera changed in this pass
 
 # RadiometricCamera 0.3.0 docs pass (julia-docs-pass), on the release tree; the first General registration
 
 0.3.0 is breaking: the GPU is the default device (`default_backend()`: VisualGeometryToolkitCore's `default_device()`, a functional
 GPU once `using CUDA` has loaded its package, else the CPU with a warning once per session). The package builds on
-VisualGeometryToolkitCore 0.13.3, Estimation 0.12.2, Features 0.9.11, IO 0.11.2 and VisualRadiometryToolkitCore / IO 0.1.1.
+VisualGeometryToolkitCore 0.13.4, Estimation 0.12.2, Features 0.9.11, IO 0.11.2 and VisualRadiometryToolkitCore / IO 0.1.1.
 
 [x] Public API since the 0.2.x docs pass (c7bd5f9): one name added, `default_backend` (public, documented, in api/pipeline.md
     through options/device.jl); none removed. `compute_mask`'s `backend` is optional; every docstring that named the CPU default
@@ -27,3 +27,8 @@ VisualGeometryToolkitCore 0.13.3, Estimation 0.12.2, Features 0.9.11, IO 0.11.2 
     a CI run on main (the release commit is merged to main before registration). Manual items: the name has no confusable General
     neighbour (closest Damerau-Levenshtein distance 8); SVBSDF and REPRODUCE are an acronym and a file name; native libraries from
     JLLs (LibRaw_jll); the environment variables are documented.
+[x] Since c2707ab: the moved-name refusal stubs are deleted (an old name is undefined here; the API surface and camera-model
+    items check it; CHANGELOG); `_TOML_DEFAULTS` is `_RC_DEFAULTS`; the per-backend choices are VisualGeometryToolkitCore 0.13.4's
+    (`kernel_float`, `dual_chunk`, `OnBackend`'s `host_workgroupsize`, `device_resident_threads(backend)`,
+    `on_device(F, S, backend, board)`, `device_names(backend)`, KernelAbstractions' `isgpu`) and the tests' saddle is
+    `Synthetic.saddle_height`: no public name changed; every comment and docstring that named RC's deleted helpers names Core's.
