@@ -14,6 +14,7 @@
 # the CPU's (the device's Float64 height path: ≤ 2.2e-12, on a B200, 2026-11-11); the pose's the same (its chunks in Float64,
 # `HIGH_FLOAT`: ≤ 1.8e-12; Float32 chunks were 0.37–0.67 % stacked and 1.6 % in a tile); the residuals bitwise the flux kernel's.
 using RadiometricCamera, CUDA, LinearAlgebra, TOML, Printf
+import VisualGeometryToolkitCore as VgtkCore
 const RC = RadiometricCamera
 const NL = RC.NLLSsolver
 
@@ -32,11 +33,12 @@ function jacobian_parity(root, images, nviews = 2)
     opts = RC.pipeline_options(p)
     s = redirect_stdout(devnull) do
         so = RC._start_run_options(opts); g = RC.start_geometry(so); dir = joinpath(opts.io.out, "start")
-        RC.save_calibration_start(dir, RC.start_calibration(g, RC.start_photographs(so, g.names); options = so, device = CUDA.CUDABackend()); options = so)
+        RC.save_calibration_start(dir, VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = CUDA.CUDABackend())),
+                                                   RC.RadiometricCalibration(so)).cache.state; options = so)
         RC.load_calibration_start(dir; options = opts, device = CUDA.CUDABackend())
     end
     meta = s.start
-    # the problem as refine_calibration! builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
+    # the problem as the RadiometricCalibration solve builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
     lp = RC._refinement_lm(opts, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
     problem(st) = RC.build_problem_grid(st; kw...)
     host(st) = (h = typeof(st)(ntuple(i -> getfield(st, i), fieldcount(typeof(st)))...); h.backend = RC.KernelAbstractions.CPU(); h.device_cache = nothing; h)

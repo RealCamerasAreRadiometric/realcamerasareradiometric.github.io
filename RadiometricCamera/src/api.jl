@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # RadiometricCamera's API surface — the one file that states it.
 #
-#   export   the headline API: the verbs of a radiometric calibration (start, refine, the one-call calibrate), their inputs and
-#            result types, the options and their TOML reader. Everything a user writes unqualified.
+#   export   the headline API: the radiometric calibration (its algorithm, solved by VisualGeometryToolkitCore's `init`/`solve!`/`solve`,
+#            and the one-call calibrate), its inputs, cache and result types, the options and their TOML reader. Everything a user writes unqualified.
 #   public   the user-facing names beyond it (the image formation, the camera and target models, the records, the diagnostics, the
 #            LM's blocks for those who build their own problem, the paper's symbols — D14: demoted, names kept), reached qualified
 #            (`RadiometricCamera.name`) or imported by name (`using RadiometricCamera: name`).
@@ -15,7 +15,7 @@
 # `RadiometricCameraModel`, which every verb here takes.
 # ---------------------------------------------------------------------------
 
-export calibrate, start_calibration, refine_calibration!, StartGeometry, start_geometry, load_calibration_start,
+export calibrate, RadiometricCalibration, CalibrationCache, StartGeometry, start_geometry, load_calibration_start,
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        CalibrationState, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
 
@@ -27,8 +27,8 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
        height_basis, height_nparams, sphere_radius, RadianceSampler, SampleKey, draws, key_hash, L_c, RadianceParts,
        radiance_parts, L_from_parts, RenderSettings, pixel_id, Φ_pixel, compute_mask, masked_pixels, render_view,
        masked_vector, n_views, set_surface!, set_vignetting!, set_pose!, render_all, photometric_residuals, PixelParts,
-       pixel_parts, RadiometryParts, all_parts, solve_Θ_l!, solve_Θ_v!, solve_μ!, solve_radiometry_gn!,
-       solve_linear_blocks!, lens_free, lens_manifold, focus_block, ApertureVar, MaterialVar, LightingVar,
+       pixel_parts, RadiometryParts, all_parts, update_lighting!, update_vignetting!, update_diffuse_weight!, radiometry_lmsolve!,
+       update_radiometry!, lens_free, lens_manifold, focus_block, ApertureVar, MaterialVar, LightingVar,
        PerViewResidual, build_problem, read_back!, run_lm!, extract_variables, Θ̄_snapshot, tile_costs,
        build_problem_grid, run_lm_grid!, extract_variables_grid, load_session, thin_lens_focus_distance,
        dataset_features, REFINE_ONLY_KEYS, split_refine_only, start_options, start_pipeline_table, check_start_options,
@@ -42,7 +42,7 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
        sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe,
        SensorStatement, SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel,
        OffSensorModel, sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet,
-       observation_model, sensor_statement, observation_line, names_input_path, PRINT_PLANE, load_distance_map,
+       observation_model, sensor_statement, observation_line, names_input_path, load_distance_map,
        config_dict, write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
        StartPerturbationOptions, FocusOptions, MaskOptions, RenderingOptions, LightingOptions, MaterialOptions,
        VignettingOptions, WarpingOptions, EdgeOptions, LMOptions, SweepOptions, ResumeOptions, SelfcheckOptions,

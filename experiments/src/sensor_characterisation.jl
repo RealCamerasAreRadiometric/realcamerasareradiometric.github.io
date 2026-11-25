@@ -1,11 +1,11 @@
 # =============================================================================
 # src/sensor_characterisation.jl — the config of scripts/sensor_characterisation.jl and its one computation: the Sony ILME-FX3's
 # sensor characterisation at ISO 100 from the campaign of 2026-11-13 (E1/E2 lens-cap dark frames, E4 photon transfer), by Core's
-# estimators alone (owner ruling D12: RC's own dark statistics are deleted in favour of Core's master_dark / defect_onsets):
+# estimators alone (owner ruling D12: RC's own dark statistics are deleted in favour of Core's MasterDark / defect_onsets):
 #   black    Core's `Darks` (owner 2026-11-14: "we took darks at all exposures for a reason"): ONE Dark per E1_E2 burst (Core's
-#            `master_dark`: per photosite the temporal mean and variance, its exposure band the burst's own EXIF exposure), their
+#            `MasterDark`: per photosite the temporal mean and variance, its exposure band the burst's own EXIF exposure), their
 #            shared channel black the E1 master dark's (a measured ChannelBlack ± SE)
-#   noise    a measured PoissonGaussian: the gain K from Core's multi-frame `photon_transfer(groups, darks)` on the E4 series (each
+#   noise    a measured PoissonGaussian: the gain K from Core's multi-frame `PhotonTransfer` (groups, darks) on the E4 series (each
 #            exposure's frames a group; each exposure's E1_E2 darks' ReadNoise its intercept; the E1 dark subtracted and its defects
 #            left out), σ_r per colour index ± SE from the E1 master dark's ReadNoise
 #   defects  ONE DefectList by Core's `defect_onsets` over every E1_E2 exposure's master-dark mask, each site at its onset (EXIF)
@@ -13,7 +13,7 @@
 # the body, the ISO, each burst's exposure — is the frames' EXIF (Features' `exposure_settings`, `body_identity`), never a folder
 # name.
 #
-# Stack functions considered (the duplication gate): Core master_dark, defect_onsets, photon_transfer (raw/sensor_estimators.jl:560,
+# Stack functions considered (the duplication gate): Core MasterDark, defect_onsets, PhotonTransfer (raw/sensor_estimators.jl:560,
 # :617, :290) — used, the only estimators; Core SensorCharacterisation, PoissonGaussian, SensorModel (raw/sensor_model.jl) — the
 # record's constructors, Core Darks the black slot's (this experiment is the record's producer); Features load_raw_mosaic, exposure_settings, body_identity
 # (raw_image.jl) — used; IO save(path, ::SensorCharacterisation) — used. Nothing here estimates.
@@ -29,7 +29,7 @@ const CHARACTERISATION_INPUTS = ("dark_frames", "ptc_frames", "manifest", "recor
 
 The config of record of scripts/sensor_characterisation.jl ([`load_driver_config`](@ref): tables experiment, inputs, characterise),
 `[characterise]` holding exactly [`CHARACTERISE_KEYS`](@ref) (`dark` the E1 burst's folder of the E1_E2 tree, `false_defects` Core
-`master_dark`'s expected false defects over the sensor, `tier` the campaign's tier name as its MANIFEST.tsv rows state it) and `[inputs]` exactly [`CHARACTERISATION_INPUTS`](@ref), every one of stage
+`MasterDark`'s expected false defects over the sensor, `tier` the campaign's tier name as its MANIFEST.tsv rows state it) and `[inputs]` exactly [`CHARACTERISATION_INPUTS`](@ref), every one of stage
 evaluate.
 """
 function load_sensor_characterisation_config(path::AbstractString)
@@ -82,7 +82,7 @@ THE computation of the experiment (this file's header): the E1 burst `dark_root/
 dark (its Dark, defect mask and read noise; the black slot a `Darks` of them all, the E1 dark's channel black shared; `black` that
 channel black), the E4 series' photon transfer, into ONE `SensorCharacterisation` of the frames' body at their ISO. Each burst
 is read once (Features' `load_raw_mosaic`), keyed by its EXIF exposure (its headers read first, `exposure_index`: two bursts of one
-tree at one exposure are refused). `fit` is photon_transfer's FitResult (its metadata: the
+tree at one exposure are refused). `fit` is Core's PhotonTransfer FitResult (its metadata: the
 range, the Birge ratio).
 """
 function characterise_sensor(dark_root::AbstractString, ptc_root::AbstractString; dark::AbstractString, false_defects::Real)
@@ -92,7 +92,7 @@ function characterise_sensor(dark_root::AbstractString, ptc_root::AbstractString
     exposure_index([d => burst_exposure(dir) for (d, dir) in ptc_bursts], "the photon-transfer tree $ptc_root")
     e1 = load(joinpath(dark_root, dark))
     t1 = burst_exposure(e1)
-    md = VgtkCore.master_dark(e1; exposure_band = (t1, t1), false_defects)
+    md = _master_dark(e1, t1, false_defects)
     body = VgtkFeatures.body_identity(first(e1)); iso = VgtkFeatures.exposure_settings(first(e1)).iso
     e1 = nothing; GC.gc()
     masks = Pair[]; darks = Dict{Any, Any}(); dark_maps = VgtkCore.Dark[]
@@ -102,7 +102,7 @@ function characterise_sensor(dark_root::AbstractString, ptc_root::AbstractString
             continue
         end
         fr = load(dir); t = burst_exposure(fr)
-        m = VgtkCore.master_dark(fr; exposure_band = (t, t), false_defects)
+        m = _master_dark(fr, t, false_defects)
         push!(masks, t => m.defects); darks[t] = m.read_noise; push!(dark_maps, m.dark)
         fr = nothing; GC.gc()
     end
@@ -112,15 +112,24 @@ function characterise_sensor(dark_root::AbstractString, ptc_root::AbstractString
     for (_, dir) in ptc_bursts
         fr = load(dir); groups[burst_exposure(fr)] = fr
     end
-    # the estimator's input: the E1 dark subtracted and its defects left out (photon_transfer reads the black and defect slots only)
+    # the estimator's input: the E1 dark subtracted and its defects left out (PhotonTransfer reads the black and defect slots only)
     model = VgtkCore.SensorModel(md.dark, VgtkCore.NoNoise(), VgtkCore.defect_onsets([t1 => md.defects]))
-    fit = VgtkCore.photon_transfer(Dict(k => v for (k, v) in groups), Dict(k => v for (k, v) in darks); sensor_model = model)   # concrete key and value types
-    K = VgtkCore.estimate(fit)
+    fit = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.PoissonGaussian, Dict(k => v for (k, v) in groups),
+                                                    (; darks = Dict(k => v for (k, v) in darks), sensor_model = model)),   # concrete key and value types
+                         VgtkCore.PhotonTransfer())
+    K = fit.u
     noise = VgtkCore.PoissonGaussian(K.gain, md.read_noise.σ, (gain = K.std_error.gain, σ = md.read_noise.std_error);
                                      source = VgtkCore.SensorSource.measured)
     c = VgtkCore.SensorCharacterisation(body; entries = [iso => (; black, noise, defects)])
     return (; characterisation = c, fit, black = md.dark.black, read_noise = md.read_noise, defects,
             exposures = sort!(collect(keys(darks)); by = t -> VgtkCore.ustrip(VgtkCore.parse_unit("s"), t)))
+end
+
+"""The master dark of one burst `frames` at its exposure `t` (Core's `MasterDark` on `EstimationProblem(Dark, frames, (; exposure_band =
+(t, t)))`): its `dark`, `read_noise` and `defects`."""
+function _master_dark(frames, t, false_defects)
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.Dark, frames, (; exposure_band = (t, t))), VgtkCore.MasterDark(; false_defects))
+    return (; dark = r.u, r.metadata.read_noise, r.metadata.defects)
 end
 
 """The SHA-256 of a set's rows of the tier's MANIFEST.tsv (`<tier>/<set>/…` rows, in the file's order, newline-joined): the record's

@@ -498,7 +498,7 @@ record = "rc_vig_derived"
 tier = "unpublished"
 required = true
 what = "the Sony ILME-FX3's sensor characterisation of record at ISO 100 (IO's vgio/sensor_characterisation record fx3.sensor_characterisation.gain-exifband-alldarks.json and its 42 dark rasters, band 1…21 dark_offset and dark_variance), the input fx3_sensor_characterisation of the refinements and chrome evaluations"
-provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_frames (Core 0.10.3's master_dark, photon_transfer and defect_onsets; 2026-11-14); the configs' tier `unpublished` names it (a run key's tier, kept)"
+provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_frames (Core 0.10.3's master dark, photon transfer and defect onsets (MasterDark, PhotonTransfer, defect_onsets since Core 0.14); 2026-11-14); the configs' tier `unpublished` names it (a run key's tier, kept)"
 
 [artifacts.rc_sensor_frames_20261121]
 kind = "tree"

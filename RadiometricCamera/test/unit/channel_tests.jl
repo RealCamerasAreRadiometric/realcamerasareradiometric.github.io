@@ -8,7 +8,7 @@
     @test RC.masked_vector(img, px; channel = 2) == Float64[img[v, u, 2] for (u, v) in px]
     @test RC.masked_vector(img[:, :, 2], px; channel = 2) == RC.masked_vector(img, px; channel = 2)   # a plane is one channel
     @test_throws ArgumentError RC.masked_vector(img[:, :, 2], px)
-    @test RC._fit_channels(0) == (1, 2, 3) && RC._fit_channels(2) == (2,)
+    @test RC._residual_channels(0) == (1, 2, 3) && RC._residual_channels(2) == (2,)
     @test RC._channel_rows(collect(1.0:9.0), 0) == collect(1.0:9.0) && RC._channel_rows(collect(1.0:9.0), 2) == [2.0, 5.0, 8.0]
     # the option is validated with the others, and the key is a string option that names no path
     @test RC._check_options(RC.PipelineOptions(; io = RC.IOOptions(; channel = "G"))).io.channel == "G"

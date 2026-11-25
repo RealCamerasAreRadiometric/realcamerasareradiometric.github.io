@@ -74,7 +74,7 @@ end
 
 THE [`PixelParts`](@ref) of Julia's 1-based pixel `(u, v)` of photograph `k`, `camera` (a `RadiometricCameraModel`) at
 `pose` (camera → world), in the settings' float type: the sensor and aperture quadratures evaluated once, so the closed-form solves
-of `Θ_l`, `Θ_v` and μ ([`solve_linear_blocks!`](@ref)) need no re-rendering. The sample keys are `k`'s, so the Monte Carlo radiance
+of `Θ_l`, `Θ_v` and μ ([`update_radiometry!`](@ref)) need no re-rendering. The sample keys are `k`'s, so the Monte Carlo radiance
 matches [`Φ_pixel`](@ref)'s. The vignetting is not applied: it is one of the parts' linear factors.
 """
 pixel_parts(u::Integer, v::Integer, k::Integer, camera::RadiometricCameraModel, pose::EuclideanMap, mat::Material, light::EnvironmentLight,
@@ -311,7 +311,7 @@ function _radiometry_lm(s::CalibrationState, parts::RadiometryParts, lay)
     be = s.backend
     Z = adapt(be, Matrix{Float64}(vignetting_basis(s)))
     return _RadiometryLm(parts.parts, parts.ϕ, parts.w, VgtkCore.convert_eltype(Float64, s.camera.vignetting),
-                         SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light)), Float64(s.mat.diffuse_weight), Z, fit_channels(s), lay,
+                         SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light)), Float64(s.mat.diffuse_weight), Z, residual_channels(s), lay,
                          VgtkCore.device_zeros(Float64, be, 1 + lay.N + lay.N^2, _reduction_items(length(parts))))
 end
 
@@ -326,7 +326,7 @@ VgtkCore.residual_normal_equations!(_, _J, lm::_RadiometryLm, x::SVector{N, Floa
     radiometry_normal_equations(s, parts; light = true, vignetting = true, mu = true, chart = true) -> (½‖r‖², Jᵀr, JᵀJ)
 
 The normal equations of the closed-form blocks at the state's parameters (the chart origin): one reduction kernel on the state's
-backend (`_radiometry_normal_row!`). The unknowns are laid out as [`solve_radiometry_gn!`](@ref)'s (`_radiometry_layout`).
+backend (`_radiometry_normal_row!`). The unknowns are laid out as [`radiometry_lmsolve!`](@ref)'s (`_radiometry_layout`).
 """
 function radiometry_normal_equations(s::CalibrationState, parts::RadiometryParts; light::Bool = true, vignetting::Bool = true,
                                      mu::Bool = true, chart::Bool = true)
@@ -364,7 +364,7 @@ end
 """The design matrix of the block `blk` (`Val(:light)`, `Val(:vig)`) at the state's parameters: one row per pixel and measured
 channel (`parts`' order), assembled on the backend by `_design_row!` and returned to the host for the QR."""
 function _design_matrix(s::CalibrationState, parts::RadiometryParts, blk::Val)
-    chs = fit_channels(s)
+    chs = residual_channels(s)
     vig = VgtkCore.convert_eltype(Float64, s.camera.vignetting)
     a = SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light))
     n = blk === Val(:light) ? size(a, 2) : n_control_points(vig)
@@ -381,14 +381,14 @@ function _weighted_system(s::CalibrationState, parts::RadiometryParts, blk::Val)
 end
 
 """
-    solve_Θ_l!(s, parts = all_parts(s)) -> s
+    update_lighting!(s, parts = all_parts(s)) -> s
 
-Linear least squares for the SH coefficients (per measured channel, `fit_channels`), all views stacked; a single-channel
+Linear least squares for the SH coefficients (per measured channel, `residual_channels`), all views stacked; a single-channel
 state's other channels follow the measured one (`tie_channels`).
 """
-function solve_Θ_l!(s::CalibrationState, parts::RadiometryParts = all_parts(s))
+function update_lighting!(s::CalibrationState, parts::RadiometryParts = all_parts(s))
     a = Matrix{Float64}(coefficients(s.light))
-    chs = fit_channels(s); nc = length(chs)
+    chs = residual_channels(s); nc = length(chs)
     A, b = _weighted_system(s, parts, Val(:light))
     for (jc, c) in enumerate(chs)
         a[c, :] = qr(A[jc:nc:end, :], ColumnNorm()) \ b[jc:nc:end]
@@ -413,7 +413,7 @@ function vignetting_smoothness(s::CalibrationState)
 end
 
 """
-    solve_Θ_v!(s, parts = all_parts(s); smoothness_weight = 0.0, gcv_record = nothing) -> s
+    update_vignetting!(s, parts = all_parts(s); smoothness_weight = 0.0, gcv_record = nothing) -> s
 
 Linear least squares for the vignetting nodes (channels stacked, achromatic V),
 with the gauge `V(𝐜) = 1` held exactly (the centre's direction absent from `vignetting_basis(s)`, `gauge_basis`). The unknowns are the free directions of `vignetting_basis(s)`: a
@@ -428,8 +428,8 @@ selects β by Estimation's generalized cross-validation (`gcv_curve`, `gcv_selec
 pushes the selection to `gcv_record` (a vector; `nothing`: not recorded). `0` is the unpenalized solve, unchanged; without a window
 of 4 free nodes along either axis there is no row and the solve is the unpenalized one.
 """
-function solve_Θ_v!(s::CalibrationState, parts::RadiometryParts = all_parts(s); smoothness_weight::Union{Real, Symbol} = 0.0, gcv_record = nothing)
-    VgtkEstimation.check_penalty_weight(smoothness_weight, "solve_Θ_v!: smoothness_weight")
+function update_vignetting!(s::CalibrationState, parts::RadiometryParts = all_parts(s); smoothness_weight::Union{Real, Symbol} = 0.0, gcv_record = nothing)
+    VgtkEstimation.check_penalty_weight(smoothness_weight, "update_vignetting!: smoothness_weight")
     n_cp = n_control_points(s.camera.vignetting)
     A, b = _weighted_system(s, parts, Val(:vig))
     # over the free directions Z (`vignetting_basis`: the interior / supported nodes, the dependent ones following them; a
@@ -456,26 +456,26 @@ function solve_Θ_v!(s::CalibrationState, parts::RadiometryParts = all_parts(s);
 end
 
 """
-    solve_μ!(s, parts = all_parts(s)) -> s
+    update_diffuse_weight!(s, parts = all_parts(s)) -> s
 
 Affine one-parameter least squares for μ: `Φ = S + μ (D − S)`, clamped to the state's `mu_bounds`: one Gauss–Newton step (exact: Φ is affine
 in μ) of the μ-only normal equations, the reduction kernel's (`radiometry_normal_equations`, the additive chart).
 """
-function solve_μ!(s::CalibrationState, parts::RadiometryParts = all_parts(s))
+function update_diffuse_weight!(s::CalibrationState, parts::RadiometryParts = all_parts(s))
     _, g, H = radiometry_normal_equations(s, parts; light = false, vignetting = false, mu = true, chart = false)
     H[1, 1] > 0 && (s.mat = with_μ(s.mat, clamp(s.mat.diffuse_weight - g[1] / H[1, 1], s.mu_bounds...)))
     return s
 end
 
 """
-    solve_radiometry_gn!(s, parts; light = true, vignetting = true, mu = true, max_iter = 40, ftol = 1e-12, verbose = false)
+    radiometry_lmsolve!(s, parts; light = true, vignetting = true, mu = true, max_iter = 40, ftol = 1e-12, verbose = false)
         -> (ReturnCode.T, StopRule)
 
 JOINT least squares over the closed-form blocks — lighting `Θ_l`, vignetting `Θ_v` (on the null space of the gauge V(𝐜) = 1, always
 held) and μ — by the stack's Levenberg–Marquardt, Core's chart LM (`lmsolve_chart!`: NLLSsolver, Levenberg's λ·I, `LM_DAMPING`), on the
 precomputed `parts` (no re-rendering). Its normal equations are one reduction kernel on the state's backend
 (`_radiometry_normal_row!`; the precedent of Estimation's camera-regression refine): only the `N × N` step is the host's.
-The flux is BILINEAR in (`Θ_v`, `Θ_l`) and affine in μ, so block coordinate descent (`solve_Θ_l!` → `solve_Θ_v!` → `solve_μ!`) creeps
+The flux is BILINEAR in (`Θ_v`, `Θ_l`) and affine in μ, so block coordinate descent (`update_lighting!` → `update_vignetting!` → `update_diffuse_weight!`) creeps
 along the coupled direction: on synthetic data generated by the model itself it stopped 8 % away from the true V after 10 sweeps
 (FX3 fisheye, 2026-10-13); the joint step converges quadratically near the minimum. Exact Jacobian rows from the parts (`_linear_rows`,
 the parts kernel's): `∂Φ_c/∂P_q = Σ_s w_s B_q(𝐩_s) I_{s,c}`, `∂Φ_c/∂a[c,j] = (μ M_d + (1−μ) M_s)[c,j]`,
@@ -484,13 +484,13 @@ the parts kernel's): `∂Φ_c/∂P_q = Σ_s w_s B_q(𝐩_s) I_{s,c}`, `∂Φ_c/�
 postcondition's tolerance Core's of record (`[lm] stationarity_tol`). Returns the stack's termination record (Core's `ReturnCode` and `StopRule`);
 with nothing free, `(ReturnCode.Success, ClosedForm)`.
 """
-function solve_radiometry_gn!(s::CalibrationState, parts::RadiometryParts; light::Bool = true, vignetting::Bool = true, mu::Bool = true,
+function radiometry_lmsolve!(s::CalibrationState, parts::RadiometryParts; light::Bool = true, vignetting::Bool = true, mu::Bool = true,
                               max_iter::Integer = 40, ftol::Real = 1e-12, verbose::Bool = false)
     Z = vignetting_basis(s)                                             # the free directions (interior nodes / the pole tie; the gauge's centre direction absent)
     lay = _radiometry_layout(vignetting ? size(Z, 2) : 0, sh_count(max_degree(s.light)), n_channels(s); light, mu, chart = true, s.mu_bounds)
     lay.N == 0 && return (VgtkCore.ReturnCode.Success, VgtkCore.ClosedForm)
     lm = _radiometry_lm(s, parts, lay)
-    x, iterations, record = _solve_radiometry(lm, Val(lay.N), Int(max_iter), Float64(ftol), lm_abstol(s))
+    x, iterations, record = _radiometry_chart_lm(lm, Val(lay.N), Int(max_iter), Float64(ftol), lm_abstol(s))
     # the solution onto the state, as the kernels' trial: V's nodes P₀ + Z y, the measured channels' SH coefficients (the
     # others follow them), μ on its chart
     vignetting && set_vignetting!(s, with_control_points(s.camera.vignetting, vec(Matrix{Float64}(control_points(s.camera.vignetting))) + Z * x[1:lay.nv]))
@@ -505,7 +505,7 @@ function solve_radiometry_gn!(s::CalibrationState, parts::RadiometryParts; light
 end
 # The chart LM at N unknowns — a function barrier static in N; `abstol` the absolute residual-norm tolerance (`lm_abstol`). The workspace holds no rows: the state's reductions keep them on its
 # device (one placeholder row, NLLSsolver's problem needs one), as Estimation's camera-regression refine.
-function _solve_radiometry(lm::_RadiometryLm, ::Val{N}, max_iter::Int, ftol::Float64, abstol::Float64) where {N}
+function _radiometry_chart_lm(lm::_RadiometryLm, ::Val{N}, max_iter::Int, ftol::Float64, abstol::Float64) where {N}
     ews = VgtkCore.ManifoldLmWorkspace(1, Val(N))
     x, _, _, iterations, record = VgtkCore.lmsolve_chart!(ews, lm, VgtkCore.LmStops(; max_iter, ftol, residual_resolution = abstol),
                                                    LM_DAMPING)
@@ -513,31 +513,31 @@ function _solve_radiometry(lm::_RadiometryLm, ::Val{N}, max_iter::Int, ftol::Flo
 end
 
 """
-    solve_linear_blocks!(s; parts = all_parts(s), light = true, vignetting = true, mu = true, sweeps = 1, reltol = 1e-4,
+    update_radiometry!(s; parts = all_parts(s), light = true, vignetting = true, mu = true, sweeps = 1, reltol = 1e-4,
                          verbose = false, joint = false) -> s
 
-Block coordinate descent over the closed-form blocks, `Θ_l` → `Θ_v` → μ per sweep (or the joint LM of `solve_radiometry_gn!` when
+Block coordinate descent over the closed-form blocks, `Θ_l` → `Θ_v` → μ per sweep (or the joint LM of `radiometry_lmsolve!` when
 `joint`), on parts rendered once (the geometry, material and quadrature are fixed, so every run is exact for the current state; a
 caller that solves twice on one state gives its `parts`). The blocks are coupled (the flux is bilinear in V and Θ_l), hence
 `sweeps` > 1 until the parts cost falls by less than `reltol` of its value. One sweep starts every run.
-`vignetting_smoothness` and `gcv_record` are `solve_Θ_v!`'s `smoothness_weight` and `gcv_record`; the joint LM has no smoothness
+`vignetting_smoothness` and `gcv_record` are `update_vignetting!`'s `smoothness_weight` and `gcv_record`; the joint LM has no smoothness
 penalty, so `joint` with a nonzero weight is an `ArgumentError`.
 """
-function solve_linear_blocks!(s::CalibrationState; parts::RadiometryParts = all_parts(s), light::Bool = true, vignetting::Bool = true, mu::Bool = true,
+function update_radiometry!(s::CalibrationState; parts::RadiometryParts = all_parts(s), light::Bool = true, vignetting::Bool = true, mu::Bool = true,
                               sweeps::Integer = 1, reltol::Real = 1e-4, verbose::Bool = false, joint::Bool = false,
                               vignetting_smoothness::Union{Real, Symbol} = 0.0, gcv_record = nothing)
-    VgtkEstimation.check_penalty_weight(vignetting_smoothness, "solve_linear_blocks!: vignetting_smoothness")
+    VgtkEstimation.check_penalty_weight(vignetting_smoothness, "update_radiometry!: vignetting_smoothness")
     joint && vignetting && vignetting_smoothness != 0 &&
-        throw(ArgumentError("solve_linear_blocks!: the joint solve (sweep.joint) has no vignetting smoothness penalty; vignetting_smoothness = $(repr(vignetting_smoothness))"))
+        throw(ArgumentError("update_radiometry!: the joint solve (sweep.joint) has no vignetting smoothness penalty; vignetting_smoothness = $(repr(vignetting_smoothness))"))
     c_prev = sweeps > 1 || verbose ? parts_cost(s, parts) : NaN
     verbose && @printf("      sweep: parts cost %.6e at the start\n", c_prev)
     for sweep in 1:sweeps
         if joint                                   # lighting, V and μ jointly (Levenberg–Marquardt on the parts): no creeping along the V × lighting direction
-            solve_radiometry_gn!(s, parts; light, vignetting, mu, verbose)
+            radiometry_lmsolve!(s, parts; light, vignetting, mu, verbose)
         else
-            light && solve_Θ_l!(s, parts)
-            vignetting && solve_Θ_v!(s, parts; smoothness_weight = vignetting_smoothness, gcv_record)
-            mu && solve_μ!(s, parts)
+            light && update_lighting!(s, parts)
+            vignetting && update_vignetting!(s, parts; smoothness_weight = vignetting_smoothness, gcv_record)
+            mu && update_diffuse_weight!(s, parts)
         end
         (sweeps > 1 || verbose) || break
         c_now = parts_cost(s, parts)

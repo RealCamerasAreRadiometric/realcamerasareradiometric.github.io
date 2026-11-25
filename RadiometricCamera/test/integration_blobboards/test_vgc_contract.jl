@@ -25,7 +25,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
     @testset "the Core types and functions RadiometricCamera builds on" begin
         for name in (:AbstractLensModel, :LogicalIntrinsics, :CameraCalibrationMat, :CameraModel, :EuclideanMap, :LeftRigidManifold6,
                      :backproject, :project, :parameter_vector, :parameter_names, :with_parameters, :convert_eltype, :direction_tangents,
-                     :KannalaBrandt, :Perspective, :Additive, :Radial, :Tangential, :Pinhole, :DoubleSphere, :Division, :Lens, :SplineLens, :PlanarTarget, :Canvas)
+                     :KannalaBrandt, :Perspective, :Additive, :Radial, :Tangential, :DoubleSphere, :Division, :Lens, :SplineLens, :PlanarTarget, :Canvas)
             @test isdefined(VgtkCore, name)
         end
         for l in (cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), 24, 24), cam(VgtkCore.Division(0.144, -0.293), 32.4, (12.24, 11.52), 24, 24; f_y = 18.24))
@@ -62,7 +62,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "Core lens models as pixel cameras vs Core's own pixel back-projection" begin
         W₀, H₀ = 1200, 900
-        for lens in (VgtkCore.KannalaBrandt(-0.02, 0.004, -0.0007, 0.00008), VgtkCore.Lens(VgtkCore.Perspective(), VgtkCore.Additive(VgtkCore.Radial((-0.12, 0.03)), VgtkCore.Tangential(0.0005, -0.0003))), VgtkCore.Pinhole())
+        for lens in (VgtkCore.KannalaBrandt(-0.02, 0.004, -0.0007, 0.00008), VgtkCore.Lens(VgtkCore.Perspective(), VgtkCore.Additive(VgtkCore.Radial((-0.12, 0.03)), VgtkCore.Tangential(0.0005, -0.0003))), VgtkCore.Lens(VgtkCore.Perspective()))
             K = VgtkCore.CameraCalibrationMat(SMatrix{3, 3, Float64}(900.0, 0.0, 0.0, 0.0, 900.0, 0.0, W₀ / 2 + 3.0, H₀ / 2 - 2.0, 1.0))
             cm = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), lens)        # K in COLMAP px
             l = VgtkCore.BoundedCamera(cm, VgtkCore.Size2(W₀, H₀))
@@ -121,7 +121,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         off = cam(VgtkCore.Division(0.0, 0.0), 200.0, (60.0, 40.0), 100, 100; f_y = 50.0)
         @test chief_ray(off, SVector(80.0, 60.0)) ≈ normalize(SVector((80.0 - 60.0) / 200.0, (60.0 - 40.0) / 50.0, 1.0))
         # a pinhole Core lens with f = 900 px and the principal point at the image centre of a 1200 × 900 image
-        pv = cam(VgtkCore.Pinhole(), 900.0, (600.0, 450.0), 1200, 900)
+        pv = cam(VgtkCore.Lens(VgtkCore.Perspective()), 900.0, (600.0, 450.0), 1200, 900)
         @test chief_ray(pv, SVector(900.0, 450.0)) ≈ normalize(SVector(300 / 900, 0.0, 1.0)) atol = 1e-12
     end
 

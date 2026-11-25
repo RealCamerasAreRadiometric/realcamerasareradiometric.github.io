@@ -138,11 +138,11 @@ end
         # the start's initialization region: the whole 24 × 24 image (a stored grid start is defined on its region; every detection inside)
         g = RC.StartGeometry(glens, poses, obs, board; names = basename.(photos), init_region = VgtkCore.Rect2{Float64}(0, 0, W, H))
         so = RC.start_options(opts)
-        s = RC.start_calibration(g, photos; options = RC.pipeline_options(merge(RC.config_dict(so), Dict("io" => merge(RC.config_dict(so)["io"], Dict("out" => out))))),
-                                 device = RC.KernelAbstractions.CPU())
+        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, photos), (; device = RC.KernelAbstractions.CPU())), RC.RadiometricCalibration(opts))
+        s = c.cache.state                                                # the start (the start options, the run's io.out)
         RC.save_start(sdir, s, s.start, so)                              # the start record: iteration 0
-        fit = RC.refine_calibration!(s; options = opts)
-        n = VgtkCore.iterations(fit)
+        fit = VgtkCore.solve!(c)
+        n = fit.stats.nsteps
         @test n == 2
         its = convergence_iterations(out, 1)
         series = bearing_series(sdir, out, its; geometry = g)

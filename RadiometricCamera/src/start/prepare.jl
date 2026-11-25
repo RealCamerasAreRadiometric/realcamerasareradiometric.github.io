@@ -183,7 +183,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
         # THE entry point (`observe`): what the photograph contributes, by the observation model's TYPE — a RAW mosaic the photosites of its
         # channel's colour filter on the raw grid (uncensored, defects masked), a decoded image its pixels — never a flag (owner ruling 2026-11-13)
         img, masks[k] = observe(pset::PhotoSet, k, masks[k]; name = names[k])   # the candidates the model keeps (a start record's: its samples)
-        chs = ndims(img) == 2 ? (1,) : _fit_channels(ch)                   # the edge selection reads the measured channels
+        chs = ndims(img) == 2 ? (1,) : _residual_channels(ch)                   # the edge selection reads the measured channels
         start === nothing && (masks[k] = draw_samples(rng, BoardValidity(mask_views[k], board, st; δ = 0.01, backend), masks[k], img, N;
                                                       gradient_bias = α, edge_detector = mo.edge_detector, mo.edge_fraction, mo.addon_samples,
                                                       mo.addon_gradient_bias, channels = chs, diagonal = photosites, device = backend))
@@ -252,11 +252,11 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     # the same pixels cannot fail): the closed-form Θ_l solve sets the lighting's scale (no scalar light gain), then ONE closed-form
     # sweep of Θ_l, Θ_v, μ. Every solve is exact on these pixels, so the cost cannot rise.
     parts = all_parts(s)
-    solve_linear_blocks!(s; parts, light = true, vignetting = false, mu = false)
+    update_radiometry!(s; parts, light = true, vignetting = false, mu = false)
     c0, rms0 = cost(s)
     @printf("lighting solve; init cost %.4e rel-RMS %.4f\n", c0, rms0); flush(stdout)
     t1 = time()
-    solve_linear_blocks!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint,
+    update_radiometry!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint,
                          vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
     c1, rms1 = cost(s); μ_lin = s.mat.diffuse_weight

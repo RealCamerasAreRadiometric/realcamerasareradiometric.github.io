@@ -262,7 +262,7 @@ end
 
 The board's frame on the sheet's page: the rigid map (VisualGeometryToolkitCore's `EuclideanMap`, mm) from BlobBoards' `:world` frame
 of the board (`blobs(bundle, :world)`: centred, y up, z = 0, in the bundle's blob order) to the page's (mm from the design's top-left
-corner, x right, y down, z = 0 — `page_frame`'s, in mm): Estimation's least-squares `fit_rigid_alignment` of the board's blobs onto the
+corner, x right, y down, z = 0 — `page_frame`'s, in mm): Estimation's least-squares `ReweightedLeastSquares` (its class default: one solve) on `EuclideanMap{3}` of the board's blobs onto the
 sheet's blob table (`read_sheet`, by blob index), and its per-blob residuals (mm). The y flip is the rotation by π about x.
 """
 function board_page_map(bundle, sheet)
@@ -271,8 +271,8 @@ function board_page_map(bundle, sheet)
     length(idx) >= 3 || throw(ArgumentError("board_page_map: the sheet holds $(length(idx)) of the board's $(length(W)) blobs (≥ 3, not collinear)"))
     pairs = [SVector(Float64(VgtkCore.centroid(W[j])[1]), Float64(VgtkCore.centroid(W[j])[2]), 0.0) => SVector(sheet.blobs[j][1], sheet.blobs[j][2], 0.0)
              for j in idx]
-    fit = VgtkEstimation.fit_rigid_alignment(pairs)
-    return (; map = VgtkCore.estimate(fit), residuals_mm = fit.metadata.residuals)
+    fit = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.EuclideanMap{3}, pairs), VgtkEstimation.ReweightedLeastSquares())
+    return (; map = fit.u, residuals_mm = fit.metadata.residuals)
 end
 
 """

@@ -463,7 +463,7 @@ function _observe(::Decoded, img::AbstractArray, mask::AbstractMatrix{Bool}, nam
 end
 
 """The state's `channel` of `io.channel`: 0 for `"RGB"` (three residuals per pixel), 1 / 2 / 3 for `"R"` / `"G"` / `"B"` (that
-channel alone: ONE residual per measured pixel, `fit_channels`)."""
+channel alone: ONE residual per measured pixel, `residual_channels`)."""
 function _io_channel(channel::AbstractString)
     channel == "RGB" && return 0
     k = findfirst(==(channel), CHANNEL_NAMES)

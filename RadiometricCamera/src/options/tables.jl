@@ -194,7 +194,7 @@ Base.@kwdef struct VignettingOptions <: AbstractOptionsTable
     support_min::Float64 = _option_default(VignettingOptions, :support_min)                        # a node with less than this share of the mean data weight Σ N_i(ρ)² is dependent
                                                      #   (continues the supported ones with `boundary_order`; 0 = any masked pixel supports; 2026-10-30, the order 2026-11-07)
     smoothness::AbstractSmoothness = _option_default(VignettingOptions, :smoothness)     # [vignetting.smoothness]: pspline, the closed-form solve's Δ³ penalty over the free
-                                                     #   nodes (`solve_Θ_v!`; its weight normalized as the grid's; 0 = none; "gcv" = chosen
+                                                     #   nodes (`update_vignetting!`; its weight normalized as the grid's; 0 = none; "gcv" = chosen
                                                      #   by GCV per solve, 2026-11-04) | none
     boundary_order::Int = _option_default(VignettingOptions, :boundary_order)                           # the dependent nodes' extrapolation past the supported nodes, 2 Δ²c = 0 | 3 Δ³c = 0 (`BOUNDARY_ORDERS`)
     chart::Symbol = _option_default(VignettingOptions, :chart)                           # the chart of the normalized radius (Core's `RADIAL_CHARTS`, 2026-11-10): linear ρ = d / r_max, uniform
@@ -230,7 +230,7 @@ end
 Base.@kwdef struct SweepOptions <: AbstractOptionsTable
     lm_chunk::Int = _option_default(SweepOptions, :lm_chunk)                                 # LM iterations between sweeps (0 = no sweeps)
     iterations::Int = _option_default(SweepOptions, :iterations)                               # block-solve iterations of one sweep
-    joint::Bool = _option_default(SweepOptions, :joint)                               # the closed-form blocks jointly (solve_radiometry_gn!)
+    joint::Bool = _option_default(SweepOptions, :joint)                               # the closed-form blocks jointly (radiometry_lmsolve!)
 end
 
 """`[resume]`: continuing a finished run."""

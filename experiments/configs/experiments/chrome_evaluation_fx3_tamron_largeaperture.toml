@@ -24,7 +24,7 @@ tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "detect"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw]
 tier = "rc_raw_photos"
@@ -282,7 +282,7 @@ type = "irls"
 loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
 max_iter = 10
 
-# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# The photograph's pixel refine after RANSAC (register_grid): Core's LevenbergMarquardt on Estimation's AbsolutePoseProblem through the camera on the final
 # Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
 # is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
 [index.refine_strategy]
@@ -302,7 +302,7 @@ provenance = "T. Schöps's central-generic of the Tamron f/8 Siemens set made by
 [evaluate]
 index = "stage"
 target = "target"
-optimization_strategy = { type = "triggs", loss = "huber" }   # the rotation-centre refine (src/chrome_evaluation.jl evaluate_grid_models: Estimation's refine_camera_and_poses on RotationCenterViews, the camera held): the Triggs-corrected Huber LM at the efficiency table's Huber constant for d = 2 (Core's efficiency_constant(HuberShape, 2)) × the index stage's pooled noise scale (a refine estimates none)
+optimization_strategy = { type = "triggs", loss = "huber" }   # the rotation-centre refine (src/chrome_evaluation.jl evaluate_grid_models: Core's LevenbergMarquardt on Estimation's CameraPosesProblem of RotationCenterViews, the camera held): the Triggs-corrected Huber LM at the efficiency table's Huber constant for d = 2 (Core's efficiency_constant(HuberShape, 2)) × the index stage's pooled noise scale (a refine estimates none)
 iterations = 80
 profile_bins = 10
 lens_coverage = "sensor"        # the chrome set's lens lights the whole sensor (src/image_region.jl): the radial profile about the sensor's centre out to its half-diagonal (2128, 1424; 2560.5 px as stated before 2026-11-15)

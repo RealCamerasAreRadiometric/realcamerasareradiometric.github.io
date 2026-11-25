@@ -402,7 +402,7 @@ flux kernel — all kept on the device and assembled by the row kernel (`_jacobi
 rows) and the residual `res` on the backend, the flux (device), the layout and the column map `T` to the problem's coordinates
 (`_column_map`).
 """
-function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist::_LensBlock,
+function _view_jacobian(varflags, r::PerViewResidual{N}, pose::VgtkCore.LeftRigidManifold6{Float64}, dist::_LensBlock,
                         foc::_FocusBlock, ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar) where {N}
     _count_device_call!(r.state, :jac)
     s = r.state
@@ -454,7 +454,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     # dual kernel differs from the plain flux kernel in its last bits. So take it from the flux kernel.
     flux = _launch_rows(_flux_functor(s, r.k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, dc.px[r.k])
     Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), dc.idx[r.k]) : (nothing, nothing)
-    chs = fit_channels(s)
+    chs = residual_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
     VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,

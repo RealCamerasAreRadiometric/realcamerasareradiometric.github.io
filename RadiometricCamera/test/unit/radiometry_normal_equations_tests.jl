@@ -42,7 +42,7 @@
     """The normal equations of the lighting and vignetting blocks (μ held) assembled on the host from the design-row kernel's rows:
     J = [A_v Z | the lighting columns per measured channel], r = Φ − ϕ with Φ the lighting rows times the coefficients."""
     function ne_host(s, parts)
-        chs = RC.fit_channels(s); nc = length(chs)
+        chs = RC.residual_channels(s); nc = length(chs)
         Al = RC._design_matrix(s, parts, Val(:light)); Av = RC._design_matrix(s, parts, Val(:vig)); ϕ = Array(parts.ϕ)
         Z = RC.vignetting_basis(s); a = Matrix(coefficients(s.light)); J9 = size(Al, 2)
         Jl = zeros(size(Al, 1), nc * J9); Φ = zeros(size(Al, 1))
@@ -58,7 +58,7 @@
 end
 
 @testitem "closed-form blocks: device normal equations" setup = [NEScene] begin
-    using RadiometricCamera: all_parts, chart, solve_μ!
+    using RadiometricCamera: all_parts, chart, update_diffuse_weight!
     using StaticArrays, LinearAlgebra
     for channel in (0, 2)                                   # the colour state and a single-channel one (its J coefficients)
         s = ne_state(; channel); parts = all_parts(s)
@@ -68,16 +68,16 @@ end
         @test c ≈ RC.parts_cost(s, parts) rtol = 1e-14       # the cost kernel's cost at the chart origin
         # the full layout (μ on its chart): the gradient is the cost kernel's central differences
         c, g, H = RC.radiometry_normal_equations(s, parts)
-        lm = RC._radiometry_lm(s, parts, RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.fit_channels(s)); light = true, mu = true, chart = true, s.mu_bounds))
+        lm = RC._radiometry_lm(s, parts, RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.residual_channels(s)); light = true, mu = true, chart = true, s.mu_bounds))
         N = length(g); h = 1e-6
         e(q) = SVector{N, Float64}(ntuple(i -> i == q ? h : 0.0, Val(N)))
         fd = [(RC.VgtkCore.residual_cost!(nothing, lm, e(q)) - RC.VgtkCore.residual_cost!(nothing, lm, -e(q))) / 2h for q in 1:N]
         @test norm(fd - g) / norm(g) < 1e-6
         @test issymmetric(Matrix(H)) && isposdef(Symmetric(Matrix(H)))
     end
-    # μ alone (the additive chart): solve_μ!'s one Gauss–Newton step is exact (Φ is affine in μ): the step's gradient vanishes
+    # μ alone (the additive chart): update_diffuse_weight!'s one Gauss–Newton step is exact (Φ is affine in μ): the step's gradient vanishes
     s = ne_state(); parts = all_parts(s)
-    solve_μ!(s, parts)
+    update_diffuse_weight!(s, parts)
     _, g, H = RC.radiometry_normal_equations(s, parts; light = false, vignetting = false, chart = false)
     @test abs(g[1]) < 1e-10 * sqrt(H[1, 1]) * sqrt(2 * RC.parts_cost(s, parts))
 end
@@ -89,7 +89,7 @@ end
     using StaticArrays
     import VisualGeometryToolkitCore as VgtkCore
     s = ne_state(); parts = all_parts(s)
-    lay = RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.fit_channels(s)); light = true, mu = true, chart = true, s.mu_bounds)
+    lay = RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.residual_channels(s)); light = true, mu = true, chart = true, s.mu_bounds)
     lm = RC._radiometry_lm(s, parts, lay)
     N = lay.N
     x = SVector{N, Float64}(ntuple(i -> 1e-3 * sin(i), Val(N)))
@@ -104,7 +104,7 @@ end
 end
 
 @testitem "closed-form blocks: device normal equations (GPU)" tags = [:gpu] setup = [RCGPU, NEScene] begin
-    using RadiometricCamera: all_parts, solve_linear_blocks!, solve_radiometry_gn!
+    using RadiometricCamera: all_parts, update_radiometry!, radiometry_lmsolve!
     using StaticArrays, LinearAlgebra
     using CUDA: CUDABackend
     require_gpu()
@@ -116,9 +116,9 @@ end
         nc_ = RC.radiometry_normal_equations(sc, pc); ng = RC.radiometry_normal_equations(sg, pg)
         @test relerr(ng[1], nc_[1]) < 1e-10 && relerr(Vector(ng[2]), Vector(nc_[2])) < 1e-10 && relerr(Matrix(ng[3]), Matrix(nc_[3])) < 1e-10
         # the block sweep and the joint solve on the device land where the CPU's do
-        for (s_, p_) in ((sc, pc), (sg, pg)); solve_linear_blocks!(s_; parts = p_, sweeps = 2); end
+        for (s_, p_) in ((sc, pc), (sg, pg)); update_radiometry!(s_; parts = p_, sweeps = 2); end
         @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.diffuse_weight - sc.mat.diffuse_weight) < 1e-10
-        rc = solve_radiometry_gn!(sc, pc; max_iter = 80); rg = solve_radiometry_gn!(sg, pg; max_iter = 80)
+        rc = radiometry_lmsolve!(sc, pc; max_iter = 80); rg = radiometry_lmsolve!(sg, pg; max_iter = 80)
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success
         @test relerr(vec(Matrix(control_points(sg.camera.vignetting))), vec(Matrix(control_points(sc.camera.vignetting)))) < 1e-8
     end

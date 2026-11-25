@@ -43,8 +43,9 @@ function _trajectory(path)
     return Dict(tr.images[k] => (p = VgtkCore.ustrip(VgtkCore.m, tr.poses[k]); (SMatrix{3, 3, Float64}(p.R), SVector{3, Float64}(p.t)))
                 for k in keys(tr.poses))
 end
-# The rotation R with `b ≈ R a` over the vector pairs (Kabsch/Wahba, VisualGeometryToolkitCore's `kabsch`; not centred).
-_rotation(a, b) = SMatrix{3, 3, Float64}(VgtkCore.kabsch([SVector{3, Float64}(a[i]) => SVector{3, Float64}(b[i]) for i in eachindex(a)]))
+# The rotation R with `b ≈ R a` over the vector pairs (Kabsch/Wahba, VisualGeometryToolkitCore's `Kabsch`; not centred).
+_rotation(a, b) = SMatrix{3, 3, Float64}(VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.Rotations.RotMatrix{3}, [SVector{3, Float64}(a[i]) => SVector{3, Float64}(b[i]) for i in eachindex(a)]),
+                                                                VgtkCore.Kabsch()).u)
 """
     _forward(lens, X, 𝐩₀) -> SVector{2}
 

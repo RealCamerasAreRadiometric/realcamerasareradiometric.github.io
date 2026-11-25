@@ -246,7 +246,7 @@
         out = [[(𝐩, X) for (𝐩, X) in fk if keep(𝐩, X, poses[k][1], poses[k][2])] for (k, fk) in enumerate(feats)]
         return out, sum(length, feats; init = 0) - sum(length, out; init = 0)
     end
-    # The detections as one vector of correspondences `X => 𝐩` per view: the `views` of VisualGeometryToolkitEstimation's refine_camera_and_poses.
+    # The detections as one vector of correspondences `X => 𝐩` per view: the correspondences of VisualGeometryToolkitEstimation's CameraPosesProblem.
     views_in_pixels(feats) = [[SVector{3, Float64}(X) => SVector{2, Float64}(𝐩) for (𝐩, X) in fk] for fk in feats]
     end
     using Random: MersenneTwister
@@ -439,7 +439,7 @@
         fwd_r = [classify_forward(l) for l in rs]
         @test mergewith(+, first.(fwd_r)...) == Dict(:both_finite => 37540, :nan_behind => 270976, :nan_past_fold => 52732)
         @test maximum(last, vcat(fwd, fwd_r)) < 1e-12
-        # The experiments' joint LM (VisualGeometryToolkitEstimation's refine_camera_and_poses, on the views of lens_tools.jl's
+        # The experiments' joint LM (Core's LevenbergMarquardt on VisualGeometryToolkitEstimation's CameraPosesProblem, on the views of lens_tools.jl's
         # views_in_pixels) is given only the detections with a ray and a finite projection under the view's pose (imaged_features), so its
         # reprojection residual stays finite; it refuses a point the guess does not image: one imaged detection, one past the fold, one behind
         X_in = SVector(0.05, -0.04, 1.0); X_fold = SVector(0.6, 0.5, 1.0); X_back = SVector(0.1, 0.1, -1.0)
@@ -450,7 +450,8 @@
         cam_t = VgtkCore.model(lf); P_t = VgtkCore.EuclideanMap(poses_t[1]...; check = false)
         rows(fs) = [VgtkCore.reprojection_error(cam_t, P_t, first(c), last(c)) for c in only(LensToolsTest.views_in_pixels(fs))]
         @test any(r -> any(isnan, r), rows(feats_t)) && all(r -> all(isfinite, r), rows(kept))
-        @test_throws ArgumentError VgtkEstimation.refine_camera_and_poses(cam_t, [P_t], LensToolsTest.views_in_pixels(feats_t); free = ())
+        @test_throws ArgumentError VgtkCore.solve(VgtkCore.RefineProblem(VgtkEstimation.CameraPosesProblem(LensToolsTest.views_in_pixels(feats_t)), (; camera = cam_t, poses = [P_t])),
+                                                  VgtkCore.LevenbergMarquardt())
         # Float32 (the GPU precision): through the same Core chain
         l32 = VgtkCore.convert_eltype(Float32, l14)
         @test chief_ray(l32, SVector{2, Float32}(972.0, 252.0)) isa SVector{3, Float32} &&

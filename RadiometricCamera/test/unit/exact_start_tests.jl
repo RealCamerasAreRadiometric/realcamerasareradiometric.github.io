@@ -1,4 +1,4 @@
-# The exact start of a SplineLens source (RC 0.11.0: Estimation's fit_camera(SplineLens, source, sensor ∩ coverage); never subdivided, RC 0.11.4):
+# The exact start of a SplineLens source (RC 0.11.0: Estimation's CameraRegression of a SplineLens on CameraRegressionProblem(SplineLens, source, sensor ∩ coverage); never subdivided, RC 0.11.4):
 # the start covers the sensor ∩ its lens coverage (the set-level coverage assertion), the source's present nodes are kept bit for bit
 # (through the axis turn), the subdivision reaches the target cell, the record of the resample round-trips through the start record's
 # reader; and the fold policy on output — a calibrated camera that still folds is flagged non-converged.
@@ -17,8 +17,8 @@
     # coverage) — the exact start itself never subdivides (m = 1, RC 0.11.4)
     import RadiometricCamera
     const Core_ = RadiometricCamera.VgtkCore
-    subdivided(src, m; region = RadiometricCamera.coverage_region(src)) = Core_.with_model(src, Core_.estimate(RadiometricCamera.VgtkEstimation.fit_camera(Core_.SplineLens, src, region;
-        lattice_spacing = Float64(Core_.lattice_spacing(Core_.model(src))[1]) / m * Core_.px, tolerance = Inf, forward = false)))
+    subdivided(src, m; region = RadiometricCamera.coverage_region(src)) = Core_.with_model(src, RadiometricCamera._spline_regression(src, region;
+        lattice_spacing = Float64(Core_.lattice_spacing(Core_.model(src))[1]) / m * Core_.px).u)
     export schoeps_yaml, subdivided
 end
 

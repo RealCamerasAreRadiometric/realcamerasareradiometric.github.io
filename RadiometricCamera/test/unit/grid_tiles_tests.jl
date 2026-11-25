@@ -51,6 +51,7 @@ end
 
 @testitem "grid lens / per-tile blocks" setup = [RCFixtures, GridTilesScene] begin
     using RadiometricCamera: cost, grid_angular_error, grid_model, run_lm_grid!
+    import Rotations
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
@@ -107,7 +108,7 @@ end
     # the rays compared after Core's Kabsch rotation between the two lenses' rays
     let probe = [SVector(x, y) for x in 2.0:4.0:22.0 for y in 2.0:4.0:22.0]
         a = [normalize(RC.chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC.chief_ray(s2.camera.geometric, p)) for p in probe]
-        R = SMatrix{3, 3, Float64}(VgtkCore.kabsch([a[i] => b[i] for i in eachindex(a)]))
+        R = SMatrix{3, 3, Float64}(VgtkCore.solve(VgtkCore.EstimationProblem(Rotations.RotMatrix{3}, [a[i] => b[i] for i in eachindex(a)]), VgtkCore.Kabsch()).u)
         @test maximum(VgtkCore.angle_between(R' * b[i], a[i]) for i in eachindex(a)) < 5e-4
     end
     # trace entries carry the standard fields

@@ -14,7 +14,7 @@ function render_dump!(s::CalibrationState, names, out::AbstractString, label::Ab
                 mean(Mk[paper]) / mean(Pk[paper]), mean(Mk[ink]) / mean(Pk[ink]))
     end
     @printf("all views: rel-RMS %.4f (%.0f %% of the squared residual is a per-view level)\n", sqrt(sse_all / ϕ2), 100 * (1 - sse_gain / sse_all)); flush(stdout)
-    chs = fit_channels(s); nc = length(chs); g1 = something(findfirst(==(2), chs), 1)   # the green channel's entry (a single channel: its own)
+    chs = residual_channels(s); nc = length(chs); g1 = something(findfirst(==(2), chs), 1)   # the green channel's entry (a single channel: its own)
     for k in 1:K
         P = fill(NaN32, _image_height(s), _image_width(s)); M = fill(NaN32, _image_height(s), _image_width(s))
         for (i, (u, v)) in enumerate(s.px[k]); e = nc * (i - 1) + g1; P[v, u] = s.ϕ[k][e]; M[v, u] = s.ϕ[k][e] + r[k][e]; end

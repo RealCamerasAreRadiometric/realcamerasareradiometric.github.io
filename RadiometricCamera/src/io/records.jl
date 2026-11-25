@@ -56,9 +56,9 @@ const RECORD_SCHEMAS = (radiometric_camera = "rc/radiometric_camera/v3.1", radio
                         # the measured image region of a capture set (its keyed step: start/image_region.jl; camera.lens_coverage)
                         image_region = "rc/image_region/v1.0")
 
-const _COLMAP = VgtkCore.PixelFrame{:colmap}       # the pixel frame RC's models are in (frames rule 1); every record declares it
+# the pixel frame RC's models are in (frames rule 1), `PixelFrame{:colmap}`: every record declares it
 # The style of an RC record with lengths in `u`: its `units` object (VisualGeometryToolkitIO's envelope) declares `u` and the COLMAP pixel frame.
-_style(u) = VgtkIO.VgioStyle(; length_unit = u, pixel_frame = _COLMAP)
+_style(u) = VgtkIO.VgioStyle(; length_unit = u, pixel_frame = VgtkCore.PixelFrame{:colmap})
 # The focus surface's type in a record: the thin plate spline over the sensor (its nodes COLMAP pixels). The types of the removed
 # focus surfaces on the chief directions are refused by name (`_focus_from_body`).
 const FOCUS_TYPE = "sensor_thin_plate_spline"
@@ -82,7 +82,7 @@ function _lens_from_body(s, b, aperture)
     haskey(aperture, :radius_grid) && throw(ArgumentError(
         "the record holds a non-central camera (its aperture has a `radius_grid`): the non-central spline model is removed, every camera " *
         "is central; regenerate the record from a central start"))
-    return VgtkIO.camera_from_json(VgtkCore.BoundedCamera, b, _COLMAP; length_unit = s.length_unit)
+    return VgtkIO.camera_from_json(VgtkCore.BoundedCamera, b, VgtkCore.PixelFrame{:colmap}; length_unit = s.length_unit)
 end
 
 _focus_body(f::Focus) = (type = FOCUS_TYPE, nodes = [Float64[n[1], n[2]] for n in f.nodes], parameters = Float64.(collect(f.t̂_i)),
@@ -101,26 +101,24 @@ end
 # (RC's own functions, not methods of JSON.lower / JSON.lift: the camera type is VisualRadiometryToolkitCore's and the style VisualGeometryToolkitIO's — a
 # method here would be type piracy; the kind `rc/radiometric_camera` is RC's)
 _camera_body(s::VgtkIO.VgioStyle, c::RadiometricCameraModel) = (
-    camera = VgtkIO.camera_json(c.geometric, _COLMAP; length_unit = s.length_unit), aperture = _aperture_body(s.length_unit, c), focus = _focus_body(c.focus),
+    camera = VgtkIO.camera_json(c.geometric, VgtkCore.PixelFrame{:colmap}; length_unit = s.length_unit), aperture = _aperture_body(s.length_unit, c), focus = _focus_body(c.focus),
     vignetting = c.vignetting,
 )
 # A blur block's PLANE (VisualGeometryToolkitIO's blur body names it; its covariance's frame in memory): the print's blur is on the board's printed
-# plane, `PRINT_PLANE` (a length², the record's `units.length`²). RC holds it unlabeled in memory (one board): the plane is stated at
+# plane, `TargetPlaneFrame{:board}` (a length², the record's `units.length`²; RC's one target). RC holds it unlabeled in memory (one board): the plane is stated at
 # the record's boundary and checked on read, so a block of another plane never lifts into it.
-"""The plane a radiometric target's print blur is recorded on: the printed board's (`TargetPlaneFrame{:board}`; RC's one target)."""
-const PRINT_PLANE = VgtkCore.TargetPlaneFrame{:board}
 _plane(::VgtkCore.CovMat{N, T, M, F}) where {N, T, M, F} = F
 _on_plane(::Type{F}, b::VgtkCore.GaussianBlur) where {F} = VgtkCore.GaussianBlur(VgtkCore.relabel(F, cov(b)))
 _unlabeled(b::VgtkCore.GaussianBlur) = _on_plane(VgtkCore.UnlabeledFrame{2}, b)
 _plane_name(F) = F <: VgtkCore.PixelFrame ? "the pixel frame $(VgtkIO.pixel_frame_name(F))" : string(nameof(F), F isa DataType && !isempty(F.parameters) ? "{$(repr(F.parameters[1]))}" : "")
 function _print_blur(s, b)
     blur = JSON.lift(s, VgtkCore.GaussianBlur, b)
-    _plane(cov(blur)) === PRINT_PLANE ||
+    _plane(cov(blur)) === VgtkCore.TargetPlaneFrame{:board} ||
         throw(ArgumentError("print_blur: a blur on the print is on the board's plane (\"frame\": \"target:board\"), got $(_plane_name(_plane(cov(blur))))"))
     return _unlabeled(blur)
 end
 function _check_pixel_frame(path, r)
-    r.units.pixel == VgtkIO.pixel_frame_name(_COLMAP) ||
+    r.units.pixel == VgtkIO.pixel_frame_name(VgtkCore.PixelFrame{:colmap}) ||
         throw(ArgumentError("$path: RadiometricCamera's models are in COLMAP pixels, the record states the pixel frame $(repr(r.units.pixel))"))
     return r
 end
@@ -166,7 +164,7 @@ function JSON.lower(s::VgtkIO.VgioStyle, t::RadiometricTarget)
                  t.aspect === nothing ? (;) : (warping_aspect = t.aspect,),
                  iszero(t.inplane) ? (;) : (inplane_print_error = _inplane_body(s, t.inplane),),
                  (material = _material_body(r.material), ink_spread = VgtkIO.write_length(r.ink_spread, u),
-                  print_blur = _on_plane(PRINT_PLANE, r.print_blur)))   # VisualGeometryToolkitIO's blur block on the board's plane, lengths² in u²
+                  print_blur = _on_plane(VgtkCore.TargetPlaneFrame{:board}, r.print_blur)))   # VisualGeometryToolkitIO's blur block on the board's plane, lengths² in u²
 end
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{RadiometricTarget}, b)
     u = s.length_unit

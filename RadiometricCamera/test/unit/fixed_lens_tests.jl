@@ -18,7 +18,7 @@
     bc = Lens(Perspective(), Additive(Radial((-0.12, 0.03)), Tangential(0.0005, -0.0003)))   # Brown–Conrady k₁, k₂, p₁, p₂
     rng = MersenneTwister(7)
     px = [SVector(0.08W₀ + 0.84W₀ * rand(rng), 0.08H₀ + 0.84H₀ * rand(rng)) for _ in 1:25]
-    for (lens, name) in ((kb, "Kannala–Brandt"), (bc, "Brown–Conrady"), (Lens(Equidistant()), "equidistant"), (VgtkCore.Pinhole(), "pinhole"))
+    for (lens, name) in ((kb, "Kannala–Brandt"), (bc, "Brown–Conrady"), (Lens(Equidistant()), "equidistant"), (VgtkCore.Lens(VgtkCore.Perspective()), "pinhole"))
         l = cam(lens, f_px, c_px, W₀, H₀)
         @test pinhole_θ(l) == SVector(f_px, f_px, c_px[1], c_px[2])
         @test last(RC.lens_free(l; fixed = VgtkCore.parameter_names(VgtkCore.model(l)))) && !last(RC.lens_free(l))

@@ -393,7 +393,7 @@ end
 
 The observed vector `ϕ` of the masked pixels `px`, in the residual's layout (`𝔯 = Φ − ϕ`): for `channel = 0` the three channels of
 `img` (H × W × 3) per pixel, channel fastest (index `3(i−1)+c`); for `channel = c` that channel alone, ONE entry per pixel
-(`fit_channels`). A single plane `img` (H × W: one measurement per pixel, the green photosites) is one entry per pixel and
+(`residual_channels`). A single plane `img` (H × W: one measurement per pixel, the green photosites) is one entry per pixel and
 needs a single-channel state (`channel` 1–3).
 """
 function masked_vector(plane::AbstractMatrix{<:Real}, px::AbstractVector; channel::Integer = 0)

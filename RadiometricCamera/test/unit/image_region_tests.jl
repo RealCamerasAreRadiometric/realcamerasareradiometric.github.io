@@ -75,7 +75,7 @@
     @test all(p -> !inside(region, p) || full(SVector(p...)) ≈ junk(SVector(p...)), raster)
 
     # no image circle (the lens lights the whole sensor): the region is the sensor's rect, every grid node interior
-    pin = cam(VgtkCore.Pinhole(), 416.0, (260.0, 174.0), W, H; f_y = 417.6)
+    pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), 416.0, (260.0, 174.0), W, H; f_y = 417.6)
     rp = VgtkCore.imaged_region(pin)
     @test !(VgtkCore.lens_coverage(pin) isa VgtkCore.Ellipse) && all(inside(rp, p) for p in raster)
     gp = grid_model(pin, 10, 10)

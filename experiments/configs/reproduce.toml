@@ -343,7 +343,7 @@ default = false
 
 [[stage]]
 name = "sensor_characterisation"
-what = "the FX3's sensor characterisation at ISO 100 by Core's estimators (master_dark, defect_onsets, photon_transfer): the record the refinements read"
+what = "the FX3's sensor characterisation at ISO 100 by Core's estimators (MasterDark, defect_onsets, PhotonTransfer): the record the refinements read"
 cpus_per_task = 8       # CPU: one task decoding the campaign's 569 E1_E2 and E4 frames one burst at a time, at the project's thread count
 mem_per_cpu = "8480M"   # 68 GB: the largest burst (1.2 GB of codes) and the E4 series (2.7 GB) many times over
 after = ["setup"]

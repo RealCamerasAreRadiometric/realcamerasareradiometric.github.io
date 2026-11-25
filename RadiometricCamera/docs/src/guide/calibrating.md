@@ -30,7 +30,7 @@ own session, so it is not run here:
 # Illustrative: needs a calibration session's records and its photographs.
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualRadiometryToolkitCore: Material, geometric, 𝔟
-using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius
+using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, update_radiometry!, sphere_radius
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])
@@ -39,7 +39,7 @@ camera = RadiometricCameraModel(ds.lens₀; focus = ds.focus₀, aperture_radius
                                 vignetting = RadialVignetting(16, centroid(Rect(sz)), hypot(sz[1], sz[2]) / 2))
 s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # VisualRadiometryToolkitCore's light
-solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
+update_radiometry!(s)              # closed-form Θ_l, Θ_v, μ
 run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)
 save_grid("grid.json", geometric(s))
 ```
@@ -55,8 +55,8 @@ with the options of [`PipelineOptions`](@ref) read from one TOML file (`bin/refi
 `configs/default.toml` lists every key with its default). It writes `grid.json` / `lens.json` (a grid with its start's `initialization_region.json` beside it, so that every grid it writes, the checkpoints included, starts another run), `state.json`, `radiometric_camera.json`, `radiometric_target.json`, the poses,
 `parameters.json` and the run's options (`pipeline_config.toml`), and, with `[io] checkpoint_each = "on"`, a lens / poses /
 state file after every iteration (the convergence monitors of the experiments read them). It uses the GPU when CUDA is
-functional; `[compute] backend = "cpu"` forces the CPU ([`start_calibration`](@ref)'s and [`load_calibration_start`](@ref)'s
-default device is [`default_backend`](@ref): the GPU when one is functional, else the CPU with a warning).
+functional; `[compute] backend = "cpu"` forces the CPU (the default device of a [`RadiometricCalibration`](@ref)'s start and of [`load_calibration_start`](@ref)
+is [`default_backend`](@ref): the GPU when one is functional, else the CPU with a warning).
 
 A run on RAW photographs names the camera's sensor characterisation: `[camera] sensor_characterisation` is the path of the
 body's `vgio/sensor_characterisation` record (VisualGeometryToolkitCore's `SensorCharacterisation`, read by
@@ -74,10 +74,12 @@ the model's identity ([`sensor_record`](@ref RadiometricCamera.sensor_record)). 
 refused.
 
 Its stages are the API: [`pipeline_options`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
-calibration through VisualGeometryToolkitIO, [`start_calibration`](@ref) lifts it into a radiometric state (the masks, the
-photographs' observations, the closed-form start), [`save_calibration_start`](@ref) writes it as a start record
+calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into a radiometric state (the masks, the
+photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, (geometry, photographs)),
+RadiometricCalibration(options))`, a [`CalibrationCache`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
 (`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's state from one (`--start=<dir>`),
-[`refine_calibration!`](@ref) runs the sweeps and the LM (a `FitResult` of a [`CalibrationEstimate`](@ref)), and
+`solve!` of the cache — or `solve(EstimationProblem(CalibrationEstimate, state), RadiometricCalibration(options))` of a loaded state —
+runs the sweeps and the LM (a `FitResult` of a [`CalibrationEstimate`](@ref), [`RadiometricCalibration`](@ref)), and
 [`save_radiometric_calibration`](@ref) writes the records; [`calibrate`](@ref) is the start and the refinement in one call. A run
 with neither flag computes its start, writes it (into `io.out/start/`, or `--start-out=<dir>`) and refines from it in the same
 process, the photographs read once (the start's streamed observations handed to `load_calibration_start`).

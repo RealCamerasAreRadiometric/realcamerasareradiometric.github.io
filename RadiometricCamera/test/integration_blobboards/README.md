@@ -35,7 +35,7 @@ neither BlobBoards nor CaliBlobs. Absolute checks plus the comparison with `gold
 | 1 | `camera.json` → the division camera as Core's pixel camera (a `BoundedCamera` of a `Division` camera model) | the session's residual median (provenance) < 0.15 px | f 0.5 %, centre 3 px, k 0.01, residual 0.03 px |
 | 3 | the 35 × 35 grid init sampled from that camera (`GridLens`) | vs the division camera inside ρ ≤ 0.4: median < 0.05 mrad, p95 < 1 mrad | — |
 | 4 | `target_poses.json` → Blender world (similarity on the board frame) vs the manifest's true poses (centre at the entrance pupil) | rotation < 0.5°, centre < 10 mm, board similarity residual < 1e-9 | 0.1°, 3 mm |
-| 6 | held-out evaluation of the division camera and the grid on `val1`–`val3`: dense lattice of true board points, pose refit per view (VisualGeometryToolkitEstimation's `refine_absolute_pose`), bearing error × f_px | median < 0.6 px, > 85 % of the lattice kept | median ≤ 1.5 × golden + 0.02 |
+| 6 | held-out evaluation of the division camera and the grid on `val1`–`val3`: dense lattice of true board points, pose refit per view (Core's `LevenbergMarquardt` on VisualGeometryToolkitEstimation's `BearingPoseProblem`), bearing error × f_px | median < 0.6 px, > 85 % of the lattice kept | median ≤ 1.5 × golden + 0.02 |
 
 Not in stage C any more (2026-10-28): the blob detections (the session's IO observations record observations.json, not yet written by its producer; the blob front end refuses a session without it), the CGM
 samples (not migrated: a function of the camera), `load_blobboards_session` and the blob front-end refinement smoke of
@@ -47,7 +47,7 @@ which the package pins separately (`[compat] VisualGeometryCore = "0.6"`, the pa
 - the imported names exist (`AbstractLensModel`, `AbstractIntrinsics`, `LogicalIntrinsics`, `CameraCalibrationMat`,
   `CameraModel`, `Camera`, `EuclideanMap`, `Plane3D`, `Point3`, `Vec3`, `FinitePupil`, `backproject`, `project`,
   `has_distortion`, `pupil_style`, `has_closed_form_inverse`, `undistort_normalized`, `lens`, `is_central`, and the lens
-  types the adapter wraps: `KannalaBrandt`, OpenCV's `Lens(Perspective(), Additive(Radial(…), Tangential(…)))`, `Pinhole`, `Lens(Equidistant())`); the four lenses subtype
+  types the adapter wraps: `KannalaBrandt`, OpenCV's `Lens(Perspective(), Additive(Radial(…), Tangential(…)))`, `Lens(Perspective())`, `Lens(Equidistant())`); the four lenses subtype
   `AbstractLensModel`;
 - the interface methods the package adds for `DoubleSphere`, the pixel camera (Division) and `VGCLens` still dispatch: `camera(lens, ext)`
   builds a `VGC.Camera` whose `backproject` equals `π⁻¹`, the functor / `undistort_normalized` pair inverts, `project`;

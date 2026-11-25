@@ -1,14 +1,14 @@
 # ---------------------------------------------------------------------------
 # The refinement of a radiometric calibration (paper §Second Order Optimization): Levenberg–Marquardt over every block of the started
-# state (`refine_calibration!`: the route's LM, `run_lm!` per view or `run_lm_grid!` per tile, by the camera's type; in chunks with a
+# state (`RadiometricCalibration`'s solve: the route's LM, `run_lm!` per view or `run_lm_grid!` per tile, by the camera's type; in chunks with a
 # closed-form sweep between them, with the live monitor and the per-iteration checkpoints), its result a Core FitResult whose estimate
-# is the `CalibrationEstimate` (the calibrated camera, the poses, the radiometric target, the light); `calibrate` = start + refine.
+# is the `CalibrationEstimate` (the calibrated camera, the poses, the radiometric target, the light); `calibrate` = its solve.
 # ---------------------------------------------------------------------------
 
 """
     CalibrationEstimate(camera, poses, target, light)
 
-The estimate of a radiometric calibration ([`refine_calibration!`](@ref), [`calibrate`](@ref)): the calibrated camera (a
+The estimate of a radiometric calibration ([`RadiometricCalibration`](@ref), [`calibrate`](@ref)): the calibrated camera (a
 [`CalibratedCamera`](@ref): the `RadiometricCameraModel` — the geometric camera, the focus surface, the aperture radius and
 the vignetting — with the observation model its photographs were read under and its render settings), the poses (camera →
 world, one per photograph), the radiometric target (the printed target, its warping, its material and print) and the light.
@@ -45,18 +45,75 @@ struct CalibrationMetadata{S}
 end
 
 """
-    refine_calibration!(state; options) -> FitResult{CalibrationEstimate, CalibrationMetadata}
+    RadiometricCalibration(options::PipelineOptions)
 
-Refine the started radiometric state `state` ([`start_calibration`](@ref) or [`load_calibration_start`](@ref)) in place: the
+The radiometric calibration of the paper, a fit (`FitKind`: it seeds itself, from the geometric calibration): `options` the run's
+([`pipeline_options`](@ref)). Solved on `EstimationProblem(CalibrationEstimate, data[, (; device)])` (`device` the compute backend,
+[`default_backend`](@ref) by default), `data` either
+
+- `(geometry, photographs)`: a [`StartGeometry`](@ref) and the photographs' files, `photographs[k]` the file of view `k` (a RAW
+  photograph by its file, its green photosites, or a decoded image). The START lifts the geometric camera into a radiometric
+  state, with the start's options (`start_options(options)`, the run's output directory kept): the focus surface through the mean
+  target centre, the aperture from the f-number, the image circle measured where the run names its frames, the masks, the
+  photographs' observations streamed, the vignetting and the lighting by the closed-form start, the grid smoothness;
+- a started [`CalibrationState`](@ref) ([`load_calibration_start`](@ref)'s, or a caller's), refined in place.
+
+`init` returns the start, a [`CalibrationCache`](@ref) (its `state`); `solve!` of it, as `solve`, the REFINEMENT: the
 Levenberg–Marquardt over every block the options leave free (`fixed`), on the route the camera's type picks (`lm_route`: per view,
 in a parametric camera's own parameters; per tile for a SplineLens camera), optionally in chunks with a closed-form sweep of the
-lighting, the vignetting and μ between them (`sweep.lm_chunk`), up to `lm.max_iter` iterations and `lm.max_time` seconds. The result's
-estimate is the refined [`CalibrationEstimate`](@ref); its `retcode` / `stop_rule` the LM's termination record (VisualGeometryToolkitCore's: a
-tolerance stop converged, the rejection cap judged by the stall postcondition at the final state) — `(Failure, ShapeGate)` when the calibrated SplineLens camera still folds over its
-coverage (`fold_termination`: no calibration; the camera is held to the coverage assertion too, [`calibrated_folds`](@ref)) or a focus node of its support runs to t̂ ≤ 0 (`focus_runaway`, the same `validity_gate`), `iterations` the LM iterations, `rms` the final relative RMS over the `n` measured values.
+lighting, the vignetting and μ between them (`sweep.lm_chunk`), up to `lm.max_iter` iterations and `lm.max_time` seconds. The result
+is a `FitResult{CalibrationEstimate, CalibrationMetadata}`: `u` the refined [`CalibrationEstimate`](@ref); `retcode` / `stop_rule`
+the LM's termination record (VisualGeometryToolkitCore's: a tolerance stop converged, the rejection cap judged by the stall
+postcondition at the final state) — `(Failure, ShapeGate)` when the calibrated SplineLens camera still folds over its coverage
+(`fold_termination`: no calibration; the camera is held to the coverage assertion too, [`calibrated_folds`](@ref)) or a focus node of
+its support runs to t̂ ≤ 0 (`focus_runaway`, the same `validity_gate`); `stats.nsteps` the LM iterations; `rms` the final relative
+RMS over the `n` measured values.
+
+```julia
+c = init(EstimationProblem(CalibrationEstimate, (geometry, photographs)), RadiometricCalibration(options))   # the start
+r = solve!(c)                                                                                                 # the refinement
+```
+
+Every input is a value: the pipeline's front ends read theirs through VisualGeometryToolkitIO ([`start_geometry`](@ref)); a caller
+with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camera and observations with IO's importers itself
+(`VisualGeometryToolkitIO.load(BoundedCamera, …)`, `load(TargetObservations, …)`) and builds the [`StartGeometry`](@ref) — RC reads
+no foreign format.
 """
-function refine_calibration!(state::CalibrationState; options::PipelineOptions, load_state = RadiometricCamera.load_state)
-    state.start === nothing && throw(ArgumentError("refine_calibration!: the state has no start (start_calibration / load_calibration_start lift a geometric calibration into one)"))
+struct RadiometricCalibration <: VgtkCore.AbstractEstimationAlgorithm
+    options::PipelineOptions
+end
+VgtkCore.estimator_kind(::RadiometricCalibration) = VgtkCore.FitKind()
+
+"""
+    CalibrationCache
+
+The cache of a [`RadiometricCalibration`](@ref) (`init`'s; Core's `EstimationCache` holds it as its `cache`): the started
+`state` ([`CalibrationState`](@ref): its `start` holds what the refinement and its records read — the start views, the
+observations, the costs of the start) and the run's `options`. `solve!` refines the state in place.
+"""
+mutable struct CalibrationCache{S <: CalibrationState}
+    state::S
+    options::PipelineOptions
+end
+
+# the context of a calibration problem: the compute backend (`(; device)`), or none (the default backend)
+_calibration_device(::VgtkCore.NullParameters) = default_backend()
+_calibration_device(p::NamedTuple{(:device,)}) = p.device
+
+function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:Tuple{StartGeometry, AbstractVector{<:AbstractString}}},
+                         alg::RadiometricCalibration)
+    geometry, photographs = prob.f
+    state = _start_state(geometry, photographs, _start_run_options(alg.options), nothing; backend = _calibration_device(prob.p))
+    return CalibrationCache(state, alg.options)
+end
+VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:CalibrationState, VgtkCore.NullParameters}, alg::RadiometricCalibration) =
+    CalibrationCache(prob.f, alg.options)
+VgtkCore.solve!(c::CalibrationCache) = _calibrate!(c.state, c.options)
+
+"""The refinement of the started state `state` under `options` ([`RadiometricCalibration`](@ref)'s `solve!`); `load_state` the
+resume's state reader (a test's hook)."""
+function _calibrate!(state::CalibrationState, options::PipelineOptions; load_state = RadiometricCamera.load_state)
+    state.start === nothing && throw(ArgumentError("RadiometricCalibration: the state has no start (its `init` on a StartGeometry, or load_calibration_start, lift a geometric calibration into one)"))
     res, trace, costs = _refine_calibration!(state, state.start, options; load_state)
     # the calibrated camera on output (the fold policy, 2026-11-15): held to the coverage assertion, and a remaining fold flags the
     # calibration non-converged — no calibration is accepted with a folded camera
@@ -80,18 +137,19 @@ end
 
 """
     calibrate(geometry::StartGeometry, photographs; options, device = default_backend()) -> FitResult{CalibrationEstimate, CalibrationMetadata}
-    calibrate(camera, poses, observations, photographs; target, options, device = default_backend())
+    calibrate(camera, poses, observations, photographs; target, options, device = default_backend(), names = basename.(photographs))
 
-A radiometric calibration in one call: [`start_calibration`](@ref) (with the start's options, `start_options(options)`), then
-[`refine_calibration!`](@ref) of that state. The state refined is the one a start record rebuilds (`save_calibration_start` →
-`load_calibration_start`, bin/refine.jl's path): the start reads no refinement-only key (`REFINE_ONLY_KEYS`), and a record carries
-the start's values bit for bit.
+A radiometric calibration in one call (a task verb): `solve(EstimationProblem(CalibrationEstimate, (geometry, photographs),
+(; device)), RadiometricCalibration(options))` — the start, then the refinement of that state ([`RadiometricCalibration`](@ref)).
+The second form takes the geometric calibration as data (`StartGeometry(camera, poses, observations, target; names)`). The state
+refined is the one a start record rebuilds (`save_calibration_start` → `load_calibration_start`, bin/refine.jl's path): the start
+reads no refinement-only key (`REFINE_ONLY_KEYS`), and a record carries the start's values bit for bit.
 """
-function calibrate(args...; options::PipelineOptions, device = default_backend(), kwargs...)
-    so = _start_run_options(options)
-    s = start_calibration(args...; options = so, device, kwargs...)
-    return refine_calibration!(s; options)
-end
+calibrate(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions, device = default_backend()) =
+    VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, (geometry, photographs), (; device)), RadiometricCalibration(options))
+calibrate(camera::VgtkCore.BoundedCamera, poses::AbstractVector, observations::AbstractVector, photographs::AbstractVector{<:AbstractString};
+          target::TexturedTarget, options::PipelineOptions, device = default_backend(), names = basename.(photographs)) =
+    calibrate(StartGeometry(camera, poses, observations, target; names), photographs; options, device)
 """The start's options of the run `options` (`start_options`: the refinement-only keys at their defaults), written to the run's `io.out`."""
 _start_run_options(options::PipelineOptions) =
     (d = config_dict(start_options(options)); pipeline_options(merge(d, Dict{String, Any}("io" => merge(d["io"], Dict{String, Any}("out" => options.io.out))))))
@@ -135,7 +193,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
                 vig_ok ? "" : "; the state's vignetting ($(nameof(typeof(sv))), $(join(size(control_points(sv)), " × "))$(sv isa RadialVignetting ? ", r_max $(round(VrtkCore.field_radius(sv); digits = 1)) px" : "")) is not the run's ($(meta.vig_desc)) → V flat"); flush(stdout)
         if !vig_ok || opts.resume.sweep                      # the closed-form start of the linear blocks on the resumed geometry (and material)
             tsw = time()
-            solve_linear_blocks!(s; light = !("lighting" in opts.fixed), vignetting = !("vignetting" in opts.fixed), mu = !pinned_material,
+            update_radiometry!(s; light = !("lighting" in opts.fixed), vignetting = !("vignetting" in opts.fixed), mu = !pinned_material,
                                  sweeps = max(opts.sweep.iterations, 1), verbose = true, joint = opts.sweep.joint,
                                  vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
             c1, rms1 = cost(s)
@@ -202,7 +260,7 @@ function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; 
             it_done[] += length(trace) - n_before
             length(trace) == n_before && break               # the LM did not iterate (converged / out of time)
             ts = time(); cb, rmsb = cost(s); camera_b, light_b, mat_b = s.camera, s.light, s.mat
-            solve_linear_blocks!(s; light = blocks.lighting, vignetting = blocks.vignetting, mu = blocks.material, sweeps = opts.sweep.iterations, verbose = true,
+            update_radiometry!(s; light = blocks.lighting, vignetting = blocks.vignetting, mu = blocks.material, sweeps = opts.sweep.iterations, verbose = true,
                                  joint = opts.sweep.joint, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
             ca, rmsa = cost(s)
             if ca < cb

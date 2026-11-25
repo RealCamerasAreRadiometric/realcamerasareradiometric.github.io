@@ -1,5 +1,5 @@
 # Config of record of the sensor characterisation (scripts/sensor_characterisation.jl; owner ruling D12: the experiment renamed,
-# its dark statistics replaced by Core's master_dark / defect_onsets): the Sony ILME-FX3 at ISO 100, the campaign of
+# its dark statistics replaced by Core's MasterDark / defect_onsets): the Sony ILME-FX3 at ISO 100, the campaign of
 # 2026-11-13 of David Nakath's protocol (raw_noise_experiments_outline.md, raw_noise_characterization.md and the notes
 # raw_noise_experiments_13_11_2026.md beside the sets in the tier), the Tamron 20 mm (EXIF LensModel "E 20mm F2.8 F050") at f/10,
 # 14-bit uncompressed RAW, long-exposure and high-ISO noise reduction off on every frame:
@@ -25,7 +25,7 @@ name = "sensor_characterisation"
 [characterise]
 dark = "1_8000"                 # E1: the protocol's black-level and read-noise burst (50 frames at the shortest exposure, 1/8000 s: no dark
                                 # current), its folder of the E1_E2 tree; its exposure as its frames' EXIF state it
-false_defects = 0.01            # Core master_dark's expected false defects over the whole sensor (its default, the record of record's): a
+false_defects = 0.01            # Core MasterDark's expected false defects over the whole sensor (its default, the record of record's): a
                                 # Gaussian photosite is flagged at z = Φ⁻¹(1 − 0.01/(2N)), N = 12.2 M photosites (z ≈ 6.0)
 tier = "rc_sensor_characterisation_20261113"   # the campaign's tier name as its MANIFEST.tsv rows state it (paths <tier>/<set>/…: the
                                 # record's provenance names each set it read by the SHA-256 of those rows; the tier of 2026-11-13)

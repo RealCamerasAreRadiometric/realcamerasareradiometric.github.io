@@ -118,7 +118,7 @@ type = "irls"
 loss = "gaussian"                 # plain least squares (the Gaussian shape: no width); its posterior iteration weighs the consensus set alone from Estimation 0.11.2
 max_iter = 10
 
-# The photograph's pixel refine after RANSAC (register_grid): Estimation's refine_absolute_pose through the camera on the final
+# The photograph's pixel refine after RANSAC (register_grid): Core's LevenbergMarquardt on Estimation's AbsolutePoseProblem through the camera on the final
 # Hungarian's matches, plain least squares (owner 2026-11-14: no robust loss in the index). The MAD scale of its pixel residuals
 # is recorded as the photograph's, pooled per set by the evaluate stage (its Huber width).
 [index.refine_strategy]

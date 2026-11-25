@@ -3,7 +3,7 @@
 # provenance: every product writes _config.toml and _provenance.toml (VisualGeometryToolkitEval produce) beside its results.
 # =============================================================================
 # scripts/sensor_characterisation.jl — the Sony ILME-FX3's sensor characterisation at ISO 100 (owner ruling D12: the experiment renamed; its
-# dark statistics replaced by Core's master_dark / defect_onsets), from the campaign of 2026-11-13 (E1/E2 lens-cap
+# dark statistics replaced by Core's MasterDark / defect_onsets), from the campaign of 2026-11-13 (E1/E2 lens-cap
 # darks, E4 photon transfer): src/sensor_characterisation.jl's `characterise_sensor`, Core's estimators alone.
 #
 # STAGES (keyed by the config record and the inputs it reads; <results>/sensor_characterisation/evaluate-<key>/)
@@ -45,7 +45,7 @@ function _evaluate(dir, srcs)
                                                                                    E4 = manifest_sha(srcs["manifest"], TIER, "E4"))))
     back = VgtkIO.load(VgtkCore.SensorCharacterisation, path)
     of_record = VgtkIO.load(VgtkCore.SensorCharacterisation, srcs["record_of_record"])
-    K = VgtkCore.estimate(r.fit); m = r.fit.metadata
+    K = r.fit.u; m = r.fit.metadata
     write_tsv(joinpath(dir, "channels.tsv"), CHARACTERISATION_COLUMNS,
               [(c - 1, r.black.values[c], r.black.std_error[c], r.read_noise.σ[c], r.read_noise.std_error[c]) for c in 1:4];
               comments = ["the E1 master dark's channel black and read noise per colour index (LibRaw's 0–3), codes"])

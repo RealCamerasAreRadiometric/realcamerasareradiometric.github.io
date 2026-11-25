@@ -84,9 +84,9 @@ src/calibration/                    state.jl (CalibrationState), weighting.jl (t
                                     problem_spec.jl (the problem from the options), lm/ (per_view.jl: variable blocks, PerViewResidual,
                                     the pathwise computeresjac; per_tile.jl, per_tile_smoothness.jl: the grid models' per-tile blocks),
                                     device/ (workers.jl, flux_kernels.jl, jacobian_kernels.jl: the KernelAbstractions functors, one
-                                    kernel per backend), calibrate.jl (refine_calibration!, calibrate), resume.jl
+                                    kernel per backend), calibrate.jl (RadiometricCalibration, calibrate), resume.jl
 src/start/                          the start: frontends/ (calibration_session.jl, schoeps_run.jl), start_poses.jl, image_region.jl,
-                                    focus_start.jl, masks.jl, radiometric_start.jl, start_calibration.jl (StartGeometry, start_calibration, load_calibration_start), prepare.jl,
+                                    focus_start.jl, masks.jl, radiometric_start.jl, start_calibration.jl (StartGeometry, start_geometry, load_calibration_start), prepare.jl,
                                     start_record.jl (the start record)
 src/diagnostics/                    monitor.jl, selfcheck.jl, render.jl
 src/options/                        tables.jl, toml.jl (PipelineOptions from TOML: pipeline_options, config_dict), device.jl, retired.jl

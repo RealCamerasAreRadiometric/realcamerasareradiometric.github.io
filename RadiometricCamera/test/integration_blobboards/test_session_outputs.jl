@@ -9,7 +9,7 @@
 #   4 target_poses.json → Blender world (similarity on the board frame) vs the true poses                      vs golden
 #   5 load_session (the photo pipeline's loader of the records) for every lens option
 #   6 held-out evaluation of the division camera and the grid init on 3 test views: dense lattice of true board points, pose refit
-#     per view (VisualGeometryToolkitEstimation's refine_absolute_pose on RC's bearing correspondences), bearing error in px  vs golden
+#     per view (RC's _refined_pose on its bearing correspondences: Core's LevenbergMarquardt on Estimation's BearingPoseProblem), bearing error in px  vs golden
 #   7 RC_MIG_REFINE=1: a radiometric refinement from the records (RC_MIG_REFINE_ITERATIONS iterations, default 2; the held-out error per
 #     iteration from its checkpoints) (bin/refine.jl --config, blob front-end, GPU): rel-RMS not
 #     increasing, small grid drift                                                                              vs golden
@@ -153,7 +153,7 @@ function truth_lattice(nm; stride = 6)
     return 𝐩s, Xs
 end
 """Hold-out score of a lens on one view: true board points `Xs` (world) seen at pixel positions `𝐩s`; the pose is refit through
-the lens (Estimation's refine_absolute_pose from (R0, t0), trimmed at 5 × median), the error is the bearing angle × f_px — the metric of the
+the lens (RC's _refined_pose from (R0, t0), trimmed at 5 × median), the error is the bearing angle × f_px — the metric of the
 experiments' hold-out tables. Returns (errors in px, fraction of points kept)."""
 function holdout_errors(lens, f_px, 𝐩s, Xs, R0, t0)
     vs = [normalize(chief_ray(lens, 𝐩)) for 𝐩 in 𝐩s]
@@ -164,11 +164,11 @@ function holdout_errors(lens, f_px, 𝐩s, Xs, R0, t0)
     return err(keep), length(keep) / length(Xs)
 end
 
-"""The world → camera pose `(R, t)` refined against unit rays: VisualGeometryToolkitEstimation's refine_absolute_pose on the package's
-bearing correspondences."""
+"""The world → camera pose `(R, t)` refined against unit rays: RC's `_refined_pose` (Core's LevenbergMarquardt on
+Estimation's BearingPoseProblem) on the package's bearing correspondences."""
 function refine_pose(Xs, vs, R0, t0)
     guess = VgtkCore.EuclideanMap(SMatrix{3, 3, Float64}(R0), SVector{3, Float64}(t0); check = false)
-    p = VgtkCore.estimate(RC.VgtkEstimation.refine_absolute_pose(guess, RC._ray_correspondences(Xs, vs); optimization_strategy = nothing))
+    p = RC._refined_pose(guess, RC._ray_correspondences(Xs, vs))
     return SMatrix{3, 3, Float64}(p.R), SVector{3, Float64}(p.t)
 end
 

@@ -92,7 +92,7 @@ if isempty(start_dir)
     start_dir = start_only ? opts.io.out : isempty(start_out) ? joinpath(opts.io.out, "start") : start_out
     ts = @timed begin
         g = RC.start_geometry(so)
-        start_calibration(g, RC.start_photographs(so, g.names); options = so, device = backend)
+        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), RadiometricCalibration(so)).cache.state
     end
     s0 = ts.value
     if !isempty(so.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
@@ -144,13 +144,13 @@ for r in 1:repeat
     obs = computed; global computed = nothing                               # the start's streamed observations: handed to repeat 1 only, then released
     tp = @timed load_calibration_start(start_dir; options = opts, device = backend, observations = obs); obs = nothing
     global s = tp.value
-    tr = @timed refine_calibration!(s; options = opts)
+    tr = @timed VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, s), RadiometricCalibration(opts))
     global result = tr.value
     tw = @timed save_radiometric_calibration(s, result; options = opts)
     println("TIMING $r/$repeat refine_s=$(tr.time) save_s=$(tw.time) refine_gc_s=$(tr.gctime) refine_compile_s=$(tr.compile_time) ",
-            "save_compile_s=$(tw.compile_time) iterations=$(VgtkCore.iterations(result)) lm_seconds=$(result.metadata.seconds)")
+            "save_compile_s=$(tw.compile_time) iterations=$(result.stats.nsteps) lm_seconds=$(result.metadata.seconds)")
     println(join(("REPEAT $r/$repeat", "load_calibration_start $(round(tp.time; digits = 1)) s ($(round(tp.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tp.gctime; digits = 1)) s, compile $(round(tp.compile_time; digits = 1)) s)",
-                  "refine_calibration! $(round(tr.time; digits = 1)) s ($(round(tr.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tr.gctime; digits = 1)) s, compile $(round(tr.compile_time; digits = 1)) s)"), "; "))
+                  "refinement $(round(tr.time; digits = 1)) s ($(round(tr.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tr.gctime; digits = 1)) s, compile $(round(tr.compile_time; digits = 1)) s)"), "; "))
     flush(stdout)
 end
 repeat > 1 && _print_free_parameters(s, opts)                               # a timing measurement's context, after every timed span

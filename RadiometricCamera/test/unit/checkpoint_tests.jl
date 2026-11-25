@@ -34,8 +34,8 @@
                                         "lm" => lm, "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
-        start_only && return RC.start_calibration(glens, poses, obs, photos; target = board, options = opts,
-                                                  device = RC.KernelAbstractions.CPU())
+        start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
+                                                                      (; device = RC.KernelAbstractions.CPU())), RC.RadiometricCalibration(opts)).cache.state
         fit = RC.calibrate(glens, poses, obs, photos; target = board, options = opts, device = RC.KernelAbstractions.CPU())
         return (; fit, out, photos)
     end
@@ -45,7 +45,7 @@ end
 @testitem "checkpoint: a checkpointed refinement runs 2 LM iterations; each state round-trips through save_state / load_state" setup = [RCFixtures, CheckpointScene] begin
     mktempdir() do dir
         (; fit, out, photos) = run_board(dir, Dict("max_iter" => 2, "ftol" => 0.0, "xtol_rel" => 0.0), fixture_board(), cam)
-        @test VgtkCore.iterations(fit) == 2
+        @test fit.stats.nsteps == 2
         for it in 1:2
             f = joinpath(out, "state_it$(it).json")
             @test isfile(f) && isfile(joinpath(out, "poses_it$(it).json"))
@@ -64,13 +64,13 @@ end
 @testitem "LM stop: [lm] ftol stops a converged run before the cap; tolerances that never fire reach it (MaxIters)" setup = [RCFixtures, CheckpointScene] begin
     mktempdir() do dir
         early = run_board(dir, Dict("max_iter" => 6, "ftol" => 0.5), fixture_board(), cam; checkpoint = "off").fit           # the start is the truth: the first step decreases < 50 %
-        @test VgtkCore.iterations(early) < 6 && VgtkCore.stop_rule(early) == VgtkCore.CostDecrease
-        @test VgtkCore.retcode(early) == VgtkCore.ReturnCode.Success
+        @test early.stats.nsteps < 6 && early.stop_rule == VgtkCore.CostDecrease
+        @test early.retcode == VgtkCore.ReturnCode.Success
     end
     mktempdir() do dir
         capped = run_board(dir, Dict("max_iter" => 3, "ftol" => 0.0, "xtol_rel" => 0.0), fixture_board(), cam; checkpoint = "off").fit   # no tolerance can fire
-        @test VgtkCore.iterations(capped) == 3 && VgtkCore.stop_rule(capped) == VgtkCore.IterationCap
-        @test VgtkCore.retcode(capped) == VgtkCore.ReturnCode.MaxIters && !VgtkCore.successful_retcode(VgtkCore.retcode(capped))
+        @test capped.stats.nsteps == 3 && capped.stop_rule == VgtkCore.IterationCap
+        @test capped.retcode == VgtkCore.ReturnCode.MaxIters && !VgtkCore.successful_retcode(capped)
     end
     @test RC.PipelineOptions().lm.ftol == 5.0e-4 && RC.PipelineOptions().lm.xtol_rel == 1.0e-8    # configs/default.toml's (the owner's, 2026-11-15)
     @test RC.PipelineOptions().lm.max_iter == 50                                                     # the safety cap (owner ruling 2026-11-11)
@@ -83,7 +83,7 @@ end
 @testitem "LM stop: [lm] xtol_rel, Core's relative step test, stops an RC fit (IncrementSize); [lm] xtol is refused, xtol_rel named" setup = [RCFixtures, CheckpointScene] begin
     mktempdir() do dir      # a relative tolerance every first step meets: the run stops at it, before the cap, by the step-size rule
         f = run_board(dir, Dict("max_iter" => 6, "ftol" => 0.0, "xtol_rel" => 0.5), fixture_board(), cam; checkpoint = "off").fit
-        @test VgtkCore.iterations(f) < 6 && VgtkCore.stop_rule(f) == VgtkCore.IncrementSize
+        @test f.stats.nsteps < 6 && f.stop_rule == VgtkCore.IncrementSize
     end
     @test RC.PipelineOptions().lm.xtol_rel == 1.0e-8 && !hasfield(RC.LMOptions, :xtol)
     e = try RC.pipeline_options(Dict("lm" => Dict("xtol" => 1.0e-8))); nothing catch err; err end

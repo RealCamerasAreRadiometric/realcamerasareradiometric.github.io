@@ -21,7 +21,6 @@
 
 # The pose block of a view: VisualGeometryToolkitCore's `LeftRigidManifold6` on its camera → world map, an NLLSsolver variable through
 # Core's manifold adapter (6 coordinates (ω, ρ); `update` re-anchors with Core's `recenter`); its pose is `model(block)`.
-const _PoseBlock = VgtkCore.LeftRigidManifold6{Float64}
 
 # The lens block of a parametric model: VisualGeometryToolkitCore's `ParameterManifold` of its pixel camera's model with the LM's search
 # box (`lm_box`) and the image-size coordinate scale (`lm_scale`), `restrict`ed to the free parameters (`lens_free`) — an NLLSsolver
@@ -257,7 +256,7 @@ end
 
 THE bounded chart of μ (decision 2026-10-31): `μ′ = lo + (hi − lo) σ(w₀ + w)`, `w₀` the logit of μ on `(lo, hi)` (clamped 1e-9 inside,
 so a μ at a bound stays movable): the calibration LM's material block (`MaterialVar`) and the closed-form joint solve
-(`solve_radiometry_gn!`) step μ on it. Device-safe.
+(`radiometry_lmsolve!`) step μ on it. Device-safe.
 """
 @inline function _μ_chart(μ, w, lo, hi)
     t = clamp((μ - lo) / (hi - lo), 1e-9, 1 - 1e-9)
@@ -318,18 +317,18 @@ NLLSsolver.ndeps(::PerViewResidual) = static(7)
 NLLSsolver.nres(r::PerViewResidual) = n_channels(r.state) * length(r.state.px[r.k])   # one residual per measured channel and pixel
 NLLSsolver.varindices(r::PerViewResidual) = r.idx
 NLLSsolver.getvars(r::PerViewResidual{N}, vars::Vector) where {N} =
-    (vars[r.idx[1]]::_PoseBlock, vars[r.idx[2]]::_LensBlock, vars[r.idx[3]]::_FocusBlock,
+    (vars[r.idx[1]]::VgtkCore.LeftRigidManifold6{Float64}, vars[r.idx[2]]::_LensBlock, vars[r.idx[3]]::_FocusBlock,
      vars[r.idx[4]]::ApertureVar{Float64}, vars[r.idx[5]]::MaterialVar{Float64}, vars[r.idx[6]]::VgtkCore.LinearSubspaceManifold, vars[r.idx[7]]::LightingVar)
 
 """View of the residual's variables (element type generic)."""
-@inline function _view_of(r::PerViewResidual, pose::_PoseBlock, dist::_LensBlock, foc::_FocusBlock, ap::ApertureVar)
+@inline function _view_of(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{Float64}, dist::_LensBlock, foc::_FocusBlock, ap::ApertureVar)
     c = r.state.camera
     return View(VgtkCore.model(pose), VgtkCore.with_model(c.geometric, VgtkCore.model(dist)), VgtkCore.model(foc), ap.r)
 end
 
 """The per-view residual on every backend (NLLSsolver's `computeresidual`, per_tile.jl): the flux kernel (device/jacobian_kernels.jl, `_flux_device`)
 minus the observed vector."""
-function _block_residual(r::PerViewResidual, pose::_PoseBlock, dist::_LensBlock, foc::_FocusBlock,
+function _block_residual(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{Float64}, dist::_LensBlock, foc::_FocusBlock,
                         ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar)
     is_valid(m) || return fill(NaN, NLLSsolver.nres(r))      # a step the material block could not represent: rejected
     s = r.state
@@ -690,7 +689,7 @@ _hold_material(blocks_held, rides::Bool) =
     build_problem(s::CalibrationState; fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
 
 The per-view LM problem at the state `s`: VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`) with one pose
-variable (`_PoseBlock`) per view, the shared distortion / focus / aperture / material / vignetting / lighting variables and one
+variable (`VgtkCore.LeftRigidManifold6{Float64}`) per view, the shared distortion / focus / aperture / material / vignetting / lighting variables and one
 `PerViewResidual` per view. `fixed` is the one holding keyword: the blocks it names (of `(:poses, :distortion, :focus, :aperture,
 :material, :vignetting, :lighting)`) are held — the problem's `fixed` variables, `idx.free` the free mask; `:material` holds Θ_m alone
 while a free surface parameter rides the block (`_hold_material`) —, the surface parameters it
@@ -737,7 +736,7 @@ function extract_variables(s::CalibrationState, vars::Vector, idx)
     mv = vars[idx.material]::MaterialVar
     camera = RadiometricCameraModel(lens_new, VgtkCore.model(vars[idx.focus]::_FocusBlock), (vars[idx.aperture]::ApertureVar).r,
                                     VgtkCore.model(vars[idx.vignetting]::VgtkCore.LinearSubspaceManifold))
-    poses = [VgtkCore.model(vars[k]::_PoseBlock) for k in idx.poses]
+    poses = [VgtkCore.model(vars[k]::VgtkCore.LeftRigidManifold6{Float64}) for k in idx.poses]
     return camera, poses, mv.mat, mv.surface, (vars[idx.lighting]::LightingVar).light
 end
 

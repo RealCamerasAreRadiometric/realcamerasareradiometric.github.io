@@ -35,7 +35,7 @@
         meta = (; names = ["a", "b"], W₀ = W, H₀ = H, fpx = 41.216, lens0 = s.camera.geometric, views0 = nothing,
                 features = nothing, costs = (; linear = (0.0, 0.0)), grid_smoothness = nothing)
         s.start = meta
-        @test_throws "stop" RC.refine_calibration!(s; options = opts, load_state = _ -> error("stop"))
+        @test_throws "stop" RC._calibrate!(s, opts; load_state = _ -> error("stop"))
 
         # the next problem of the session: the material free, μ on (0, 1), no LM log
         s2 = fresh()

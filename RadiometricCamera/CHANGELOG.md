@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.0 (unreleased; breaking)
+
+RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
+(CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
+
+- **Breaking: the calibration is an algorithm.** `start_calibration` and `refine_calibration!` are removed (check_naming R15: a
+  `refine_` name is a kind, never a function), replaced by `RadiometricCalibration(options)` (a fit, `FitKind`) on
+  `EstimationProblem(CalibrationEstimate, (geometry, photographs)[, (; device)])`:
+  - `start_calibration(geometry, photographs; options, device)` → `init(EstimationProblem(CalibrationEstimate, (geometry,
+    photographs), (; device)), RadiometricCalibration(options))`, its cache a `CalibrationCache` (new: the started `state` and the
+    run's `options`); the start reads `start_options(options)` with the run's `io.out`, as `calibrate` did. The four-argument form
+    builds its `StartGeometry(camera, poses, observations, target; names)` first;
+  - `refine_calibration!(state; options)` → `solve!(cache)`, or `solve(EstimationProblem(CalibrationEstimate, state),
+    RadiometricCalibration(options))` of a started state (`load_calibration_start`'s);
+  - `calibrate` (a task verb) is that `solve` in one call, unchanged.
+- **Breaking: the closed-form block updates are named `update_<block>!`** (check_naming R19: no identifier begins `solve_`):
+  `solve_Θ_l!` → `update_lighting!`, `solve_Θ_v!` → `update_vignetting!`, `solve_μ!` → `update_diffuse_weight!`,
+  `solve_linear_blocks!` → `update_radiometry!` (the composite block: its parts' updates per sweep, or the joint LM); the joint LM
+  `solve_radiometry_gn!` → `radiometry_lmsolve!` (a step named by its mechanism, as Core's `lmsolve_chart!`). Same arguments.
+- **Breaking:** `fit_channels(s)` → `residual_channels(s)` (R15); the public constant `PRINT_PLANE` is removed (R20: a `const`
+  naming one concrete stack type) — the print blur's plane is `VisualGeometryToolkitCore.TargetPlaneFrame{:board}`, spelled.
+- **Changed: Estimation's estimators through `solve`.** The SplineLens starts (`grid_model`, `region_start`, `exact_start`) fit by
+  `CameraRegression(; tolerance = Inf, grid_size | lattice_spacing, forward = false)` on `CameraRegressionProblem(SplineLens,
+  source, region; support, device)` (one helper, `_spline_regression`; was `fit_camera`); a view's pose from its rays by Core's
+  `LevenbergMarquardt(; optimization_strategy = nothing)` on `BearingPoseProblem(cs)` (one helper, `_refined_pose`; was
+  `refine_absolute_pose`). Results are read by field (`r.u`, `r.retcode`, `r.stop_rule`, `r.stats.nsteps`, `r.rms`, `r.metadata`,
+  `successful_retcode(r)`). RC's LM damping (`LM_DAMPING`) is the `LmProblem`'s and the chart LM's damping argument, no longer an
+  `LmStops` field (Core 0.14). The generalized cross-validation is Estimation's `gcv_select` (RC keeps no copy).
+- **Dependencies:** VisualGeometryToolkitCore 0.14, VisualGeometryToolkitEstimation 0.13, VisualGeometryToolkitFeatures 0.10,
+  VisualGeometryToolkitIO 0.12 (none registered yet: the package's `[sources]` take them by path, TEMPORARY until they are).
+
 ## 0.3.0 (2026-11-25; breaking)
 
 - **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required

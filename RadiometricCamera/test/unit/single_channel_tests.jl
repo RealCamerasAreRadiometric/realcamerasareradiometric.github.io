@@ -52,7 +52,7 @@ end
     using LinearAlgebra
     f = single_channel_board()
     ref, one, c = f.ref, f.one, f.c
-    @test RC.fit_channels(one) == (c,) && RC.n_channels(one) == 1 && RC.fit_channels(ref) == (1, 2, 3)
+    @test RC.residual_channels(one) == (c,) && RC.n_channels(one) == 1 && RC.residual_channels(ref) == (1, 2, 3)
     @test all(k -> length(one.ϕ[k]) == length(one.px[k]) == length(ref.ϕ[k]) ÷ 3, 1:2)
     @test all(k -> one.ϕ[k] == ref.ϕ[k][c:3:end], 1:2)                                 # the measured entries, once
     # the other channels' lighting and η follow the measured channel

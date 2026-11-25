@@ -8,7 +8,7 @@
 # undefined.
 
 @testitem "README: the install line names what the examples load; the examples run in a fresh environment" begin
-    using Test, RadiometricCamera
+    using Test, RadiometricCamera, TOML
     using VisualGeometryToolkitCore: julia_blocks         # Core's README helper (its Test extension): the fenced julia blocks of a page
     root = pkgdir(RadiometricCamera)
     illustrative(block) = startswith(block, "# Illustrative")
@@ -39,11 +39,14 @@
 
     env = mktempdir()
     write(joinpath(env, "readme_example.jl"), join(example, "\n"))
-    registered = filter(!=("RadiometricCamera"), String.(packages))
+    # TEMPORARY (the Core 0.14 solve branch, RC 0.4.0): a stack package the package's [sources] takes by path is developed from that
+    # path, not added from the registries; remove with the [sources] entries when Core 0.14 etc. are registered
+    developed = Dict(n => v["path"] for (n, v) in get(TOML.parsefile(joinpath(root, "Project.toml")), "sources", Dict()) if v isa AbstractDict && haskey(v, "path"))
+    registered = filter(n -> n != "RadiometricCamera" && !haskey(developed, n), String.(packages))
     script = joinpath(env, "run.jl")
     write(script, """
     using Pkg
-    Pkg.develop(path = $(repr(root)); io = devnull)
+    Pkg.develop([[Pkg.PackageSpec(path = p) for p in values($(repr(developed)))]; Pkg.PackageSpec(path = $(repr(root)))]; io = devnull)
     isempty($(repr(registered))) || Pkg.add($(repr(registered)); io = devnull)
     readme = Module(:ReadmeSandbox)
     Base.include(readme, $(repr(joinpath(env, "readme_example.jl"))))

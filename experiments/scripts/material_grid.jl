@@ -3,7 +3,7 @@
 # parameters and the lighting"): from an init state (a start record's state.json, bin/refine.jl --stage=start: the start geometry, focus and board warping; V flat)
 # every candidate (α_ink, α_¬ink, η_ink, η_¬ink; η grey over the channels) of the α × α × η × η grid is scored on the config's masked
 # pixels — the parts rendered once on the CPU (threaded), μ scanned over 0:0.1:1 with the closed-form lighting Θ_l at each value, then from
-# the best μ solve_Θ_l! / solve_μ! alternating until the cost changes < 1e-7 relative: the exact cost of the candidate (parts_cost).
+# the best μ update_lighting! / update_diffuse_weight! alternating until the cost changes < 1e-7 relative: the exact cost of the candidate (parts_cost).
 # Writes <out>/grid.tsv (one row per candidate), <out>/state.json (the init state with the best material, μ and lighting; V flat) — the
 # start of the joint LM (bin/refine.jl's `resume.state`) — and the options as pipeline_config.toml.
 #   julia --project=experiments experiments/scripts/material_grid.jl --config=<run.toml> --init=<state.json> --out=<dir> [--set table.key=value …]
@@ -13,7 +13,7 @@
 #     --alphas, --etas  the candidate values, comma lists (the defaults are the values of record)
 #     --limit           evaluate only the first n candidates (a timing probe)
 using RadiometricCamera, Printf, StaticArrays
-using RadiometricCamera: all_parts, cost, Material, material, set_vignetting!, solve_Θ_l!, solve_μ!, with_μ
+using RadiometricCamera: all_parts, cost, Material, material, set_vignetting!, update_lighting!, update_diffuse_weight!, with_μ
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
 const RC = RadiometricCamera
@@ -52,7 +52,8 @@ sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
     so = RC._start_run_options(opts); g = RC.start_geometry(so)
-    RC.save_calibration_start(joinpath(out, "start"), RC.start_calibration(g, RC.start_photographs(so, g.names); options = so, device = RC.KernelAbstractions.CPU()); options = so)
+    RC.save_calibration_start(joinpath(out, "start"), VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = RC.KernelAbstractions.CPU())),
+                                                                RC.RadiometricCalibration(so)).cache.state; options = so)
 end
 s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.start
 RC.load_state_into!(s, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
@@ -70,12 +71,12 @@ relrms(c) = sqrt(2c / ϕ²)
 function fit_light_mu!(s, parts)
     best = (Inf, 0.5)
     for μ in 0.0:0.1:1.0
-        s.mat = with_μ(s.mat, μ); solve_Θ_l!(s, parts); c = RC.parts_cost(s, parts)
+        s.mat = with_μ(s.mat, μ); update_lighting!(s, parts); c = RC.parts_cost(s, parts)
         c < best[1] && (best = (c, μ))
     end
-    s.mat = with_μ(s.mat, best[2]); solve_Θ_l!(s, parts); c = RC.parts_cost(s, parts)
+    s.mat = with_μ(s.mat, best[2]); update_lighting!(s, parts); c = RC.parts_cost(s, parts)
     for _ in 1:100
-        solve_μ!(s, parts); solve_Θ_l!(s, parts); c1 = RC.parts_cost(s, parts)
+        update_diffuse_weight!(s, parts); update_lighting!(s, parts); c1 = RC.parts_cost(s, parts)
         done = c - c1 < 1e-7 * c; c = min(c, c1); done && break
     end
     return c

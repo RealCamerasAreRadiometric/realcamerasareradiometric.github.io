@@ -150,7 +150,7 @@
             ts = range(0.0, 0.5, length = 26)
             θs = [acos(clamp(normalize(chief_ray(gl, SVector(320 + 640t, 320 + 640t)))[3], -1.0, 1.0)) for t in ts]
             inside = [in_domain(src, SVector(320 + 640t, 320 + 640t)) for t in ts]
-            # outward past the source's edge: since 2026-11-04 the grid is the P-spline fit (Estimation's pspline_grid) over the source's
+            # outward past the source's edge: since 2026-11-04 the grid is the P-spline fit (Estimation's PSpline) over the source's
             # valid domain, whose nodes outside it carry the third-difference penalty's continuation (the curvature carried on) instead of
             # the quasi-interpolation's linear extrapolation — on 14 × 14 it turns back by 1.3° past the fold (27.2° → 25.9° at the
             # corner), at points outside the grid's domain, which no pixel reads; bounded here at 2°

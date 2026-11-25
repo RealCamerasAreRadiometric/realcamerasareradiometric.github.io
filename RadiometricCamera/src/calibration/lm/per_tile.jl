@@ -116,7 +116,7 @@ NLLSsolver.varindices(r::PerTileResidual) = r.idx
 # accumulation is inferred over the whole variable-type union across all 10 slots — a compiler
 # memory explosion (the per-view path never hits this because its getvars asserts every slot).
 NLLSsolver.getvars(r::PerTileResidual{N, S, GP, AV}, vars::Vector) where {N, S, GP, AV} =
-    (vars[r.idx[1]]::_PoseBlock, vars[r.idx[2]]::GP, vars[r.idx[3]]::GP,
+    (vars[r.idx[1]]::VgtkCore.LeftRigidManifold6{Float64}, vars[r.idx[2]]::GP, vars[r.idx[3]]::GP,
      vars[r.idx[4]]::GP, vars[r.idx[5]]::GP, vars[r.idx[6]]::_FocusBlock,
      vars[r.idx[7]]::AV, vars[r.idx[8]]::MaterialVar{Float64},
      vars[r.idx[9]]::VgtkCore.LinearSubspaceManifold, vars[r.idx[10]]::LightingVar)
@@ -201,7 +201,7 @@ Shared by the CPU, device and batched paths (identical arithmetic).
 end
 
 """The residual of a tile (`computeresidual`): its view batch's flux (`_view_batch!`) or its own batch's, minus the observed values."""
-function _block_residual(r::PerTileResidual, pose::_PoseBlock, p00::_Patch, p10::_Patch,
+function _block_residual(r::PerTileResidual, pose::VgtkCore.LeftRigidManifold6{Float64}, p00::_Patch, p10::_Patch,
                            p01::_Patch, p11::_Patch, foc::_FocusBlock, ap::ApertureVar,
                            m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar)
     is_valid(m) || return fill(NaN, NLLSsolver.nres(r))      # a step the material block could not represent: rejected
@@ -431,7 +431,7 @@ function extract_variables_grid(s::CalibrationState, vars::Vector, idx)
     lens_new = _assemble_lens(lens0, vars, idx.patches)
     mv = vars[idx.material]::MaterialVar
     camera = RadiometricCameraModel(lens_new, VgtkCore.model(vars[idx.focus]::_FocusBlock), ap.r, VgtkCore.model(vars[idx.vignetting]::VgtkCore.LinearSubspaceManifold))
-    poses = [VgtkCore.model(vars[k]::_PoseBlock) for k in idx.poses]
+    poses = [VgtkCore.model(vars[k]::VgtkCore.LeftRigidManifold6{Float64}) for k in idx.poses]
     return camera, poses, mv.mat, mv.surface, (vars[idx.lighting]::LightingVar).light
 end
 
@@ -500,7 +500,7 @@ _tile_batch(r::PerTileResidual, vars, need_jac::Bool) =
 A tile's device Jacobian at its variables (`_tile_jacobian`) from its view's batch (`_view_batch!`), or from the tile's own batch
 (`_tile_batch`) when the view has none; `flux` the batch's host flux and `ivs` the tile's pixels in it (`_tile_residual`).
 """
-function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::_PoseBlock, p00::_Patch{PX, PY},
+function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::VgtkCore.LeftRigidManifold6{Float64}, p00::_Patch{PX, PY},
                            p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
                            ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar) where {N, PX, PY}
     s = r.state
@@ -767,7 +767,7 @@ columns × the measured rows) and the residual `res` on the backend, the column 
 entries are scrubbed where the blocks are formed (`_gauss_newton_blocks`, `_host_jacobian`). The same kernels' values and the same
 per-entry arithmetic as the host assembly it replaced.
 """
-function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::_Patch{PX, PY},
+function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::VgtkCore.LeftRigidManifold6{Float64}, p00::_Patch{PX, PY},
                         p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
                         ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold,
                         lt::LightingVar; ivs = r.pix) where {N, PX, PY}
@@ -784,7 +784,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
     td = _tile_dev!(r)
     bufidx = ivs === r.pix ? td.pix : td.idx                # the tile's pixels among the buffer's: the view's (batched) or its own
     Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
-    chs = fit_channels(s)
+    chs = residual_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
                            _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
@@ -798,10 +798,10 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::_PoseBlock, p00::
 end
 
 """The residual of tile `r` from a view's flux `flux` (three channels per pixel, the kernels'; the tile's pixels at the view pixels
-`ivs`): the measured channels' entries (`fit_channels`) minus the tile's observed `ϕt`, one per measured channel and pixel, under
+`ivs`): the measured channels' entries (`residual_channels`) minus the tile's observed `ϕt`, one per measured channel and pixel, under
 the rows' weights `ωt` (`_whiten`; the row kernel's product)."""
 function _tile_residual(flux::AbstractVector, r::PerTileResidual, ivs)
-    chs = fit_channels(r.state); nc = length(chs)
+    chs = residual_channels(r.state); nc = length(chs)
     out = Vector{Float64}(undef, nc * length(r.pix))
     @inbounds for (i, iv) in enumerate(ivs), (j, c) in enumerate(chs)
         e = nc * (i - 1) + j

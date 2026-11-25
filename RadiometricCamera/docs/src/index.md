@@ -24,12 +24,12 @@ identifiers.
 - **Image formation**: the radiant flux of a pixel [`Φ_pixel`](@ref) and the render [`render_view`](@ref), by fixed quadrature
   rules on the pixel and the aperture and a Monte Carlo radiance with common random numbers.
 - **Calibration**: the [`CalibrationState`](@ref), the closed-form solves of the blocks the flux is linear in
-  ([`solve_linear_blocks!`](@ref)), and the joint Levenberg–Marquardt with pathwise Jacobians ([`run_lm!`](@ref),
+  ([`update_radiometry!`](@ref)), and the joint Levenberg–Marquardt with pathwise Jacobians ([`run_lm!`](@ref),
   [`run_lm_grid!`](@ref)) on a CUDA GPU (the default device) or the CPU, its residuals whitened when a RAW photograph's sensor model
   has a noise variance law ([`photo_set`](@ref RadiometricCamera.photo_set): VisualGeometryToolkitCore's `SensorModel` resolved by the
   photograph's EXIF).
-- **The pipeline**: real sessions in, through a start ([`start_calibration`](@ref), its record [`save_calibration_start`](@ref) /
-  [`load_calibration_start`](@ref)), the refinement ([`refine_calibration!`](@ref)) and its records out
+- **The pipeline**: real sessions in, through the calibration ([`RadiometricCalibration`](@ref), solved by VisualGeometryToolkitCore's
+  `init` — the start, its record [`save_calibration_start`](@ref) / [`load_calibration_start`](@ref) — and `solve!`, the refinement) and its records out
   ([`save_radiometric_calibration`](@ref)) — or [`calibrate`](@ref) in one call — configured by one TOML file ([`PipelineOptions`](@ref),
   defaults `configs/default.toml`); the driver is `bin/refine.jl`; the API surface: [API surface](api/surface.md).
 

@@ -7,12 +7,12 @@ reach is `public`: write it qualified (`RadiometricCamera.RenderSettings`) or im
 
 <!-- the suite checks this list equals `names(RadiometricCamera)` (test/unit/api_surface_tests.jl) -->
 - [`calibrate`](@ref) — a radiometric calibration in one call
-- [`start_calibration`](@ref), [`StartGeometry`](@ref), [`start_geometry`](@ref), [`start_photographs`](@ref) — the start: the geometric calibration lifted into a radiometric state
+- [`RadiometricCalibration`](@ref) — the calibration, an algorithm of VisualGeometryToolkitCore's `solve` / `init` / `solve!` on `EstimationProblem(CalibrationEstimate, (geometry, photographs))`: `init` lifts the geometric calibration into a radiometric state (the start, a [`CalibrationCache`](@ref)), `solve!` refines it (a `FitResult`)
+- [`StartGeometry`](@ref), [`start_geometry`](@ref), [`start_photographs`](@ref) — the start's inputs: the geometric calibration and the photographs
 - [`save_calibration_start`](@ref), [`load_calibration_start`](@ref) — the start record
-- [`refine_calibration!`](@ref) — the refinement, a `FitResult`
-- [`CalibrationEstimate`](@ref), [`CalibrationMetadata`](@ref) — its estimate and diagnostics (read with Core's accessors: `estimate`, `retcode`, `converged`, `iterations`, `rms`, `metadata`)
+- [`CalibrationEstimate`](@ref), [`CalibrationMetadata`](@ref) — its estimate and diagnostics (a Core `FitResult` read by field: `r.u`, `r.retcode`, `r.stop_rule`, `r.stats.nsteps`, `r.rms`, `r.metadata`; `successful_retcode(r)`)
 - [`save_radiometric_calibration`](@ref) — the run's records
-- [`CalibrationState`](@ref), `RadiometricCameraModel` (re-exported: VisualRadiometryToolkitCore's radiometric camera), [`RadiometricTarget`](@ref) — the state and the models
+- [`CalibrationCache`](@ref), [`CalibrationState`](@ref), `RadiometricCameraModel` (re-exported: VisualRadiometryToolkitCore's radiometric camera), [`RadiometricTarget`](@ref) — the state and the models
 - [`CalibratedCamera`](@ref) — the complete calibration: the camera model with its observation model (the sensor record its photographs were read under) and render settings; every photograph it predicts is read through `photo_set` / `observe`
 - [`PipelineOptions`](@ref), [`pipeline_options`](@ref) — the options and their TOML reader (defaults: `configs/default.toml`)
 

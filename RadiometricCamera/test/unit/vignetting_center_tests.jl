@@ -16,16 +16,16 @@
     # 1. the centre of a parametric camera: K's principal point
     kb = cam(VgtkCore.KannalaBrandt(-0.05, 0.01, 0.0, 0.0), 300.0, (331.5, 228.25), W, H)
     @test RC.vignetting_center(kb) == SVector(331.5, 228.25)
-    # 2. of a SplineLens start: its K's principal point, which is the optical axis — the start is fitted by Estimation's fit_camera,
+    # 2. of a SplineLens start: its K's principal point, which is the optical axis — the start is fitted by Estimation's CameraRegression,
     # which turns its source onto the axis (RC 0.11.0): the lattice of a radially symmetric lens about (331.5, 228.25), and a resample
-    # of that lattice onto another (a SplineLens source: turned by optical_axis first)
+    # of that lattice onto another (a SplineLens source: turned by OpticalAxis first)
     g = RC.grid_model(kb, 13, 10)
     @test RC.vignetting_center(g) == SVector{2, Float64}(VgtkCore.principal_point(VgtkCore.model(g).intrinsics)...)
     @test RC.vignetting_center(g) ≈ SVector(331.5, 228.25) atol = 0.05
     r = RC.exact_start(g).camera                                                       # a SplineLens source: resampled exactly on its own lattice (m = 1)
-    axfit = VgtkEstimation.optical_axis(r)
-    @test VgtkCore.converged(axfit)                                                    # the axis converged here: the K tests below hold
-    ax = VgtkCore.estimate(axfit)                                                      # the resample's K principal point == its optical axis
+    axfit = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkEstimation.CameraRegressionProblem(r)), VgtkEstimation.OpticalAxis())
+    @test VgtkCore.successful_retcode(axfit)                                           # the axis converged here: the K tests below hold
+    ax = axfit.u                                                                       # the resample's K principal point == its optical axis
     @test RC.vignetting_center(r) ≈ SVector{2, Float64}(VgtkCore.principal_point(ax.intrinsics)...) atol = 0.05
     @test RC.vignetting_center(r) ≈ SVector(331.5, 228.25) atol = 0.05
     # a bare model has no bound; anything else is no camera with a principal point the stack fits: refused with the reason

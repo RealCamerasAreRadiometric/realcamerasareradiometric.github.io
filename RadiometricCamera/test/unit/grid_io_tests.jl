@@ -67,7 +67,7 @@
         @test norm(unp(100.0, 100.0) - unp(100.5, 100.0)) < 1e-2
         g = schoeps_gridlens(path, W, H)                                     # his 160 px cells, never subdivided (m = 1, RC 0.11.4)
         @test g isa VgtkCore.BoundedCamera{<:VgtkCore.CameraModel{<:VgtkCore.AbstractIntrinsics, <:VgtkCore.SplineLens}} && grid_dims(g) == (10, 10)   # his 7 × 6, padded to the patch multiple (RC 0.11.2)
-        # the source turned onto its optical axis (Estimation's fit_camera, RC 0.11.0): K's principal point the axis's pixel (here the
+        # the source turned onto its optical axis (Estimation's CameraRegression, RC 0.11.0): K's principal point the axis's pixel (here the
         # radially symmetric source's centre), the rays the source's (below)
         @test SVector(VgtkCore.principal_point(VgtkCore.model(g).intrinsics)...) ≈ SVector(320.0, 240.0) atol = 0.05
         worst = 0.0

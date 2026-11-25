@@ -48,7 +48,7 @@ reason = "input fixtures, not a writer: the tests write a hand-made numbers frag
 [[pattern]]
 use = "sensor_component"
 file = "experiments/src/sensor_characterisation.jl"
-reason = "the record's producer composes Core's measured components (master_dark, defect_onsets, photon_transfer) into a SensorCharacterisation; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: deleted when Core gains a public builder (a characterisation from darks + flats)"
+reason = "the record's producer composes Core's measured components (MasterDark, defect_onsets, PhotonTransfer) into a SensorCharacterisation; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: deleted when Core gains a public builder (a characterisation from darks + flats)"
 
 # ---- awaiting their owner (TEMPORARY: each entry goes when its item lands) ----------------------------------------------------
 

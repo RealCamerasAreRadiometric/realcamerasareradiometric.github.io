@@ -180,7 +180,7 @@ log = ""             # EXPERIMENT (nlls5): append a per-iteration line of the LM
 [sweep]
 lm_chunk = 0         # LM iterations between closed-form (lighting, vignetting, μ) sweeps; 0 = no sweeps
 iterations = 5       # block-solve iterations of one sweep
-joint = "off"        # solve the closed-form blocks jointly (solve_radiometry_gn!)
+joint = "off"        # solve the closed-form blocks jointly (radiometry_lmsolve!)
 
 [resume]
 state = ""             # continue from this state file (state.json)

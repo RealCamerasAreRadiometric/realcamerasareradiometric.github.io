@@ -25,7 +25,7 @@ using CUDA                                      # the GPU, when there is one: Ra
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
 using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, 𝔟   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
-using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius
+using RadiometricCamera: RenderSettings, compute_mask, render_view, update_radiometry!, sphere_radius
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
@@ -92,12 +92,12 @@ cost(s)
 
 The flux is linear in the lighting `Θ_l` with the vignetting held, linear in the vignetting `Θ_v` with the lighting held
 (bilinear in the two together) and affine in μ, so each block alone has a closed-form solve. Block by block, the solves creep
-along the coupling of `Θ_l` and `Θ_v`; [`solve_linear_blocks!`](@ref) with `joint = true` solves the three together instead (the
-pixel quadratures run once, into [`PixelParts`](@ref); then [`solve_radiometry_gn!`](@ref), a Levenberg–Marquardt on those
+along the coupling of `Θ_l` and `Θ_v`; [`update_radiometry!`](@ref) with `joint = true` solves the three together instead (the
+pixel quadratures run once, into [`PixelParts`](@ref); then [`radiometry_lmsolve!`](@ref), a Levenberg–Marquardt on those
 parts) and reproduces the photographs exactly:
 
 ```@example tutorial
-solve_linear_blocks!(s; joint = true)
+update_radiometry!(s; joint = true)
 cost(s)[2] < 1e-4, isapprox(s.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
 ```
 

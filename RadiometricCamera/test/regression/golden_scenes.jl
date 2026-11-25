@@ -11,7 +11,7 @@
 using RadiometricCamera, StaticArrays, LinearAlgebra
 using RadiometricCamera: all_parts, aperture_radius, TargetState, build_problem, build_problem_grid, compute_mask, cost, focus,
                          Focus, FocusSpline, height_basis, HEIGHT_NFREE, geometric, material, Material, PerViewResidual,
-                         TexturedTarget, render_all, RenderSettings, residuals, run_lm!, solve_radiometry_gn!, sphere_radius, t̂,
+                         TexturedTarget, render_all, RenderSettings, residuals, run_lm!, radiometry_lmsolve!, sphere_radius, t̂,
                          View, with_sdf, with_μ, Φ_pixel, 𝔟
 const RCg = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
@@ -111,7 +111,7 @@ function gold_outputs()
     W = H = GOLD_W
     kb = cam(RCg.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
     # the recorded scene's grid lens: Core's quasi-interpolation of the double sphere at the 10 × 10 nodes, as grid_model built it
-    # when the goldens were recorded (grid_model fits by Estimation's pspline_grid since 2026-11-04 — a different start, not what
+    # when the goldens were recorded (grid_model fits by Estimation's P-spline fit (PSpline) since 2026-11-04 — a different start, not what
     # these goldens of the flux and Jacobian pin)
     ds = cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H)
     # (Core 0.9: the SplineLens camera of that function, re-gauged to the double sphere's K — a pixel's lattice coordinate, so its
@@ -135,7 +135,7 @@ function gold_outputs()
     r = get(prob.problem.costs, PerViewResidual{9})[1]
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
     out["perview_residual"] = res; out["perview_jacobian"] = jac_summary(J)
-    s2 = deepcopy(s); parts = all_parts(s2); solve_radiometry_gn!(s2, parts; max_iter = 20); c = RCg.parts_cost(s2, parts)
+    s2 = deepcopy(s); parts = all_parts(s2); radiometry_lmsolve!(s2, parts; max_iter = 20); c = RCg.parts_cost(s2, parts)
     out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.camera.vignetting))), a = vec(Matrix(coefficients(s2.light))), μ = s2.mat.diffuse_weight)
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
     s3 = deepcopy(s); cost0 = cost(s3)[1]; run_lm!(s3; maxiters = 3, reldcost = 1e-12, xtol = 1e-14)

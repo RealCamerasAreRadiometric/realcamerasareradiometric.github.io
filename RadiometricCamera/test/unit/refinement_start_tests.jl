@@ -111,7 +111,7 @@
             @test !isdefined(RC, n)
         end
         @test !any(m -> m.module === RC, methods(RC.VgtkCore.refine!))
-        @test isdefined(RC, :start_calibration) && isdefined(RC, :refine_calibration!) && isdefined(RC, :calibrate)
+        @test isdefined(RC, :RadiometricCalibration) && isdefined(RC, :CalibrationCache) && isdefined(RC, :calibrate)
         @test !(:save_init in fieldnames(RC.IOOptions)) && !("io.save_init" in RC.PIPELINE_OUTPUT_KEYS)
     end
     end

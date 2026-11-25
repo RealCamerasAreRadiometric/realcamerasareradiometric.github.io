@@ -5,7 +5,7 @@
 
 @testitem "penalties: the vignetting solve's Δ³ penalty, fixed and by GCV" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
-                             solve_linear_blocks!, solve_Θ_v!, sphere_radius, with_vignetting, 𝔟
+                             update_radiometry!, update_vignetting!, sphere_radius, with_vignetting, 𝔟
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
@@ -29,30 +29,30 @@
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) .* (1 .+ 0.02 .* randn(rng, H, W, 3)) for k in 1:2]   # noisy photographs
     state() = CalibrationState(board, st, camera_0, poses, mat_t, light_t, targets; masks)
     s0 = state(); parts = all_parts(s0)
-    solve_Θ_v!(s0, parts)
-    s1 = state(); solve_Θ_v!(s1, parts; smoothness_weight = 0.0)
+    update_vignetting!(s0, parts)
+    s1 = state(); update_vignetting!(s1, parts; smoothness_weight = 0.0)
     @test s1.camera.vignetting.P == s0.camera.vignetting.P                                           # weight 0: the unpenalized solve, bit for bit
     # a dominating weight: the field's nodes become Δ³-free (quadratic along each axis); the data fit worsens
     D, m̄ = RC.vignetting_smoothness(s1)
     @test size(D) == (2 * 6 * 3, 36) && m̄ > 0
-    s2 = state(); solve_Θ_v!(s2, parts; smoothness_weight = 1e6)
+    s2 = state(); update_vignetting!(s2, parts; smoothness_weight = 1e6)
     @test norm(D * vec(Matrix(s2.camera.vignetting.P))) < 1e-4 * norm(D * vec(Matrix(s0.camera.vignetting.P)))
     @test RC.parts_cost(s2, parts) > RC.parts_cost(s0, parts)
     @test s2.camera.vignetting(center(s2.camera.vignetting)) ≈ 1 atol = 1e-12           # the hard pin holds under the penalty
     # by GCV: β inside the bracket, recorded with the curve's minimum; the solve is the fixed-weight solve at that β
     rec = NamedTuple[]
-    s3 = state(); solve_Θ_v!(s3, parts; smoothness_weight = :gcv, gcv_record = rec)
+    s3 = state(); update_vignetting!(s3, parts; smoothness_weight = :gcv, gcv_record = rec)
     @test length(rec) == 1 && isfinite(rec[1].gcv) && 0 < rec[1].dof <= rec[1].n_free && rec[1].rows == 36
     @test rec[1].log10_β_bracket == [-8.0, 4.0] && 1e-8 <= rec[1].β <= 1e4 && !rec[1].at_bracket_end      # Estimation's gcv_select
-    s4 = state(); solve_Θ_v!(s4, parts; smoothness_weight = rec[1].β)
+    s4 = state(); update_vignetting!(s4, parts; smoothness_weight = rec[1].β)
     @test s4.camera.vignetting.P ≈ s3.camera.vignetting.P rtol = 1e-10
     # through the block sweep; the joint solve has no penalty
     rec2 = NamedTuple[]
-    s5 = state(); solve_linear_blocks!(s5; parts, light = false, mu = false, vignetting_smoothness = :gcv, gcv_record = rec2)
+    s5 = state(); update_radiometry!(s5; parts, light = false, mu = false, vignetting_smoothness = :gcv, gcv_record = rec2)
     @test length(rec2) == 1 && s5.camera.vignetting.P ≈ s3.camera.vignetting.P
-    @test_throws ArgumentError solve_linear_blocks!(state(); parts, joint = true, vignetting_smoothness = 0.1)
-    @test_throws ArgumentError solve_Θ_v!(state(), parts; smoothness_weight = -1.0)
-    @test_throws ArgumentError solve_Θ_v!(state(), parts; smoothness_weight = :aic)
+    @test_throws ArgumentError update_radiometry!(state(); parts, joint = true, vignetting_smoothness = 0.1)
+    @test_throws ArgumentError update_vignetting!(state(), parts; smoothness_weight = -1.0)
+    @test_throws ArgumentError update_vignetting!(state(), parts; smoothness_weight = :aic)
     # the boundary order: 2 is the natural rule (Δ²c = 0), 3 the curvature-preserving Δ³c = 0 — Core's BoundaryRule(m, region; order)
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
     sr = CalibrationState(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 2)

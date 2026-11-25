@@ -64,21 +64,21 @@ mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, T
 end
 
 """
-    fit_channels(s) -> Tuple
+    residual_channels(s) -> Tuple
 
 The channels a residual reads per pixel: `(1, 2, 3)` for a colour photograph (`channel = 0`), `(c,)` for a single-channel run
 (`io.channel` "R"/"G"/"B", the green photosites): ONE residual per measured pixel or photosite. The kernels evaluate the three
 channels of the flux (one kernel on every backend); a single-channel residual takes channel `c`'s rows, and the lighting and
 the refractive indices η of the other channels are not estimated (they follow channel `c`: `LightingVar`, `MaterialVar`).
 """
-fit_channels(s::CalibrationState) = _fit_channels(s.channel)
+residual_channels(s::CalibrationState) = _residual_channels(s.channel)
 """The observation model of a state's photographs (its `sensor`, `photo_kind` and `channel`): what its records state."""
 observation_model(s::CalibrationState) = ObservationModel(s.sensor, s.photo_kind, _channel_symbol(s.channel))
 """The calibrated camera of a state: its camera, its photographs' observation model and its render settings."""
 calibrated_camera(s::CalibrationState) = CalibratedCamera(s.camera, observation_model(s), s.settings)
-_fit_channels(c::Integer) = c == 0 ? (1, 2, 3) : (Int(c),)
-"""The residual rows per pixel (`length(fit_channels(s))`)."""
-n_channels(s::CalibrationState) = length(fit_channels(s))
+_residual_channels(c::Integer) = c == 0 ? (1, 2, 3) : (Int(c),)
+"""The residual rows per pixel (`length(residual_channels(s))`)."""
+n_channels(s::CalibrationState) = length(residual_channels(s))
 """The rows of the measured channels of a flux vector `x` laid out three channels per pixel (pixel-major): `x` itself for a colour
 photograph, every third entry from `c` for channel `c` alone."""
 _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
@@ -90,7 +90,7 @@ _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
                      sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
                      sensor = NoSensorRecord(), photo_kind = Decoded(false))
 
-`channel` (0: the three channels; 1–3: that channel alone, ONE residual per measured pixel, `fit_channels`): a
+`channel` (0: the three channels; 1–3: that channel alone, ONE residual per measured pixel, `residual_channels`): a
 single-channel state ties the other channels' lighting coefficients and refractive indices η to channel `channel`'s
 (`tie_channels`), which no residual reads. The focus's bending smoothness rows, `focus_smoothness`, are set by
 `focus_smoothness!` (none at construction). `mu_bounds` `(lo, hi)` (`material.mu_bounds`; e.g. (0.6, 1.0): paper at most 40 % specular):

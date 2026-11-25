@@ -316,9 +316,9 @@ label_counts(points) = (count(==(:circular), points.attributes.label), count(==(
 #      (`BoardCorrespondences`), the Hungarian never re-run inside the local optimization.
 # Under the final pose the Hungarian runs once more (same window, same dustbin): its matches are the photograph's correspondences —
 # the set the one-connected-component rule checks (owner, 2026-11-14: more than one 8-connected component of matched nodes is
-# refused, never resolved) and on which the pose is refined in PIXELS through the camera ([index.refine_strategy], Estimation's
-# `refine_absolute_pose`, plain least squares: no robust loss anywhere in the index). The MAD scale of the refined pose's pixel
-# residuals (Core's `mad_scale`) is the photograph's recorded noise scale (its `noise_scale` and `dof`, pooled per set for the
+# refused, never resolved) and on which the pose is refined in PIXELS through the camera ([index.refine_strategy], Core's
+# `LevenbergMarquardt` on Estimation's `AbsolutePoseProblem`, plain least squares: no robust loss anywhere in the index). The MAD scale of the refined pose's pixel
+# residuals (Core's `MedianNormScale`) is the photograph's recorded noise scale (its `noise_scale` and `dof`, pooled per set for the
 # evaluation's rotation-centre refine, whose Huber width it sets, px; MSAC estimates none). The record's cols × rows grid is the final window: the board
 # is matched against an INFINITE lattice under a free pose, so a whole-pitch shift of the window is another pose with the same
 # residuals, never a refusal; where the photographs are linked — the evaluate stage's one rotation centre — each one's offset is
@@ -332,16 +332,17 @@ label_counts(points) = (count(==(:circular), points.attributes.label), count(==(
 # it was assigned to (0: unassigned) and its reprojection residual, px); targets.json (vgio/rig: the record's target, gauged on its
 # own frame — the definition the point indices resolve in) and summary.tsv.
 # =============================================================================
-using VisualGeometryToolkitCore: points, ustrip, m, mm, model, project, backproject, P3P, Extrinsics3, rotation,
-    translation, iterations, correspondences, estimate, converged, found_model, unlabel, with_unit,
+using VisualGeometryToolkitCore: points, ustrip, m, mm, model, project, backproject, P3P, rotation,
+    translation, correspondences, found_model, successful_retcode, unlabel, with_unit,
+    solve, EstimationProblem, RefineProblem, MinimalProblem, LevenbergMarquardt, MedianNormScale, NoiseScale,
     EuclideanMap, TargetFrame, CameraFrame, PixelFrame, PosedTarget, Rig, TargetObservations, TargetPoses, Uncertain, CovMat,
     AbstractTarget, Cameras
-import VisualGeometryToolkitCore: solve, data_size, codimension, model_type, test_model, mahalanobis_distances!, refine!, residual_rows!
+import VisualGeometryToolkitCore: data_size, codimension, model_type, test_model, mahalanobis_distances!, refine!, residual_rows!
 using VisualGeometryToolkitCore: Triggs, Irls             # the core strategies: Core owns them (a2-reexport)
-using VisualGeometryToolkitEstimation: ransac, RansacConfig, AbstractRansacProblem, AbstractSampler,
-    refine_absolute_pose, optimization_strategy_from_toml, CountedLO
-import VisualGeometryToolkitEstimation: draw!, reset!, sampler
-using VisualGeometryToolkitEstimation: refine_camera_and_poses, RotationCenterViews, n_without_bearing, without_bearing   # the rotation-centre refine (stage evaluate): bearings, its dots without one counted
+using VisualGeometryToolkitEstimation: Ransac, RansacConfig, AbstractRansacProblem, AbstractSampler,
+    AbsolutePoseProblem, optimization_strategy_from_toml, CountedLO
+import VisualGeometryToolkitEstimation: draw!, reset!, sampler, sample_models
+using VisualGeometryToolkitEstimation: CameraPosesProblem, RotationCenterViews   # the rotation-centre refine (stage evaluate): bearings, its dots without one counted (its metadata)
 using VisualGeometryToolkitCore: FitResult
 using Random: AbstractRNG
 using VisualGeometryToolkitEval.Stats: bootstrap_ci      # the stack's one bootstrap interval (the paired photograph bootstrap of stage evaluate)
@@ -361,7 +362,7 @@ const CHROME_INDEX_KEYS = ("target", "camera", "camera_name", "target_id", "labe
 # configs of record state `{ type = "msac" }`; no type is the code's), read by Estimation's `scoring_from_toml`. Its width is NOT the table's: the threshold is half the record's pitch, in mm (the
 # board-space residual's unit; the assignment's dustbin), derived from the target record's spacing, so a table stating
 # `threshold` (or `outlier_halfwidth`) is refused.
-# `[index.refine_strategy]`: the photograph's pixel refine after RANSAC (Estimation's `refine_absolute_pose`), plain least squares:
+# `[index.refine_strategy]`: the photograph's pixel refine after RANSAC (Core's `LevenbergMarquardt` on Estimation's `AbsolutePoseProblem`), plain least squares:
 # `{ type = "none" }` (a refine's least squares, `optimization_strategy = nothing`).
 "The keys of `[index.ransac]` (VisualGeometryToolkitEstimation's RansacConfig)."
 const RANSAC_KEYS = ("success_prob", "max_trials", "min_trials")
@@ -571,14 +572,14 @@ struct GridPoseProblem{C} <: AbstractRansacProblem{3}
     rows::Int
     seed_tolerance::Float64
     sampler::GridSeedSampler
-    correspondences::BoardCorrespondences{Extrinsics3}
+    correspondences::BoardCorrespondences{model_type(P3P())}
 end
 GridPoseProblem(camera, xy::AbstractVector{<:SVector{2}}, g::ThorlabsGrid; seed_tolerance::Real) =
     GridPoseProblem(camera, collect(xy), [SVector{3,Float64}(normalize(backproject(camera, u))) for u in xy], g.spacing, g.cols, g.rows,
-                    Float64(seed_tolerance), GridSeedSampler(xy), BoardCorrespondences{Extrinsics3}())
+                    Float64(seed_tolerance), GridSeedSampler(xy), BoardCorrespondences{model_type(P3P())}())
 data_size(p::GridPoseProblem) = length(p.xy)
 codimension(::Type{<:GridPoseProblem}) = 2
-model_type(::Type{<:GridPoseProblem}) = Extrinsics3
+model_type(::Type{<:GridPoseProblem}) = model_type(P3P())   # P3P's pose type (Core's `CameraExtrinsics`)
 sampler(p::GridPoseProblem) = p.sampler
 "The record point of node `n` as a plain 3-vector on the target plane (z = 0), metres, of a lattice of pitch `x.spacing` (a
 `ThorlabsGrid`, a `GridPoseProblem`)."
@@ -589,8 +590,8 @@ const _MM_PER_M = Float64(ustrip(mm, 1.0 * m))
 dustbin_mm(p::GridPoseProblem) = p.spacing * _MM_PER_M / 2
 
 const _SAMPLE_NODES = (SVector(0, 0), SVector(1, 0), SVector(0, 1))
-solve(p::GridPoseProblem, idx::AbstractVector{Int}) =
-    solve(P3P(), correspondences([_node_point(p, n) for n in _SAMPLE_NODES], p.bearings[idx]), 1:3)
+sample_models(p::GridPoseProblem, idx::AbstractVector{Int}) =
+    solve(MinimalProblem(model_type(P3P()), correspondences([_node_point(p, n) for n in _SAMPLE_NODES], p.bearings[idx]), 1:3), P3P())
 
 function test_model(p::GridPoseProblem, pose, idx::AbstractVector{Int})
     nb = p.sampler.nb[idx[1]]
@@ -882,17 +883,17 @@ end
     register_grid(camera, g, xy, s; name = "the photograph") -> NamedTuple
 
 Register the points `xy` (COLMAP px) against the grid `g` (`thorlabs_grid`) through `camera` (a `CameraModel`) with the settings
-`s` (`index_settings`): VisualGeometryToolkitEstimation's `ransac` on the `GridPoseProblem` (scored in board space by `index_scoring`
+`s` (`index_settings`): VisualGeometryToolkitEstimation's `Ransac` on the `GridPoseProblem` (scored in board space by `index_scoring`
 of `s.scoring`, MSAC at half a pitch, the Hungarian with its dustbin inside the scorer; the local optimization of
 `s.local_optimization_strategy` on the scorer's correspondences, frozen; `s.ransac`'s trial schedule, a StableRNG of `s.rng_seed`).
 Under RANSAC's pose the Hungarian runs once more (`board_assignment`) and the pose is refined on its matches in pixels through the
-camera (`pixel_refit`: Estimation's `refine_absolute_pose`, `s.refine_strategy`, plain least squares), the Hungarian re-run under the
+camera (`pixel_refit`: Core's `LevenbergMarquardt` on Estimation's `AbsolutePoseProblem`, `s.refine_strategy`, plain least squares), the Hungarian re-run under the
 refined pose and the pose refined again until its matches repeat (a cycle refused): the final matches are the photograph's
 correspondences, which must form one 8-connected component of nodes (`component_sizes`). The record's grid is the final window
 (any whole-pitch offset is a pose of its own, chosen across the photographs by the evaluate stage's rotation centre), the pose
 moved to its origin. Returns `(; assignment, pose, residuals, trials, inliers, noise_scale, dof, reassigned, rounds)`: `assignment` record point index → index into `xy`, `pose` the target's pose (target plane, metres →
 camera), `residuals` per record point assigned its reprojection error (px) through the pose, `trials` RANSAC's, `inliers` its
-scorer's inlier count, `noise_scale` and `dof` the MAD scale (px, Core's `mad_scale`) of the refined pose's pixel residuals and their
+scorer's inlier count, `noise_scale` and `dof` the MAD scale (px, Core's `MedianNormScale`) of the refined pose's pixel residuals and their
 degrees of freedom (2k − 6, k dots), `reassigned` the dots whose final match differs
 from the correspondences RANSAC's local optimization fitted (added, dropped or moved; `nothing` when no local optimization fitted
 RANSAC's pose), `rounds` the pixel refines run. Refuses (`ArgumentError`
@@ -902,10 +903,10 @@ dot nearer another node's image than its own under the final pose (`mislabelled_
 """
 function register_grid(camera, g::ThorlabsGrid, xy::AbstractVector{<:SVector{2}}, s; name::AbstractString = "the photograph")
     p = GridPoseProblem(camera, xy, g; s.seed_tolerance)
-    r = ransac(p, index_scoring(p, s.scoring); local_optimization_strategy = s.local_optimization_strategy,
-               config = s.ransac, rng = StableRNG(s.rng_seed))
-    (r === nothing || !found_model(r)) && throw(ArgumentError("$name: RANSAC found no pose of the grid"))
-    pose = estimate(r)
+    r = solve(EstimationProblem(p), Ransac(; scoring = index_scoring(p, s.scoring), local_optimization_strategy = s.local_optimization_strategy,
+                                           config = s.ransac); rng = StableRNG(s.rng_seed))
+    found_model(r) || throw(ArgumentError("$name: RANSAC found no pose of the grid"))
+    pose = r.u
     k = findlast(f -> _same_pose(f.first, pose), p.correspondences.fitted)                      # the LO's correspondences, when it fitted the pose
     fitted = k === nothing ? nothing : Dict(p.correspondences.fitted[k].second)
     # the final correspondences: the Hungarian once more under RANSAC's (locally optimized) pose — same window, same dustbin — and
@@ -934,12 +935,12 @@ function register_grid(camera, g::ThorlabsGrid, xy::AbstractVector{<:SVector{2}}
     isempty(bad) || throw(MislabelledDots("$name: $(length(bad)) labelled dots are nearer another node's image than their own (dots $(join(bad, ", ")))", bad))
     ids = sort(collect(keys(final)))
     e = [SVector{2, Float64}(VgtkCore.reprojection_error(camera, pose, _node_point(p, final[i]), p.xy[i])) for i in ids]   # the pixel residuals
-    σ = Float64(VgtkCore.mad_scale(e))                          # the photograph's noise scale (px), pooled per set by the evaluate stage
+    σ = Float64(solve(EstimationProblem(NoiseScale, e), MedianNormScale()).u)   # the photograph's noise scale (px), pooled per set by the evaluate stage
     o = a.window
     pose = pose ∘ EuclideanMap(SMatrix{3,3,Float64}(I), _node_point(p, o))              # the record's origin is node o
     assignment = Dict(g.index[final[i] - o] => i for i in ids)
     residuals = Dict(g.index[final[i] - o] => norm(ek) for (i, ek) in zip(ids, e))
-    return (; assignment, pose, residuals, trials = iterations(r), inliers = count(VgtkCore.inlier_mask(r)),
+    return (; assignment, pose, residuals, trials = r.stats.nsteps, inliers = count(VgtkCore.inlier_mask(r)),
             noise_scale = σ, dof = 2 * length(ids) - 6, reassigned, rounds)
 end
 
@@ -953,13 +954,13 @@ end
 """
     pixel_refit(p, pose, pairs, strategy; name = "the photograph") -> pose
 
-The pose refined from `pose` on the correspondences `pairs` (point => node) in PIXELS through the problem's camera: Estimation's
-`refine_absolute_pose` (the raw-pixel reprojection error) at `strategy` (`[index] refine_strategy`: plain least squares); an
+The pose refined from `pose` on the correspondences `pairs` (point => node) in PIXELS through the problem's camera: Core's
+`LevenbergMarquardt` on Estimation's `AbsolutePoseProblem` (the raw-pixel reprojection error) at `strategy` (`[index] refine_strategy`: plain least squares); an
 `ArgumentError` naming `name` (the photograph refused) when no pose comes back.
 """
 function pixel_refit(p::GridPoseProblem, pose, pairs::AbstractDict, strategy; name::AbstractString = "the photograph")
     obs = [_node_point(p, nd) => p.xy[i] for (i, nd) in sort(collect(pairs); by = first)]
-    est = estimate(refine_absolute_pose(pose, p.camera, obs; optimization_strategy = strategy))
+    est = solve(RefineProblem(AbsolutePoseProblem(p.camera, obs), pose), LevenbergMarquardt(; optimization_strategy = strategy)).u
     est === nothing && throw(ArgumentError("$name: the pose does not refine in pixels on its $(length(obs)) matches"))
     return convert(typeof(pose), est)
 end

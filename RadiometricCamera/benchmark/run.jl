@@ -161,8 +161,8 @@ function stages(c)
     # closed form
     add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s))))
     add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s); () -> RC.radiometry_normal_equations(s, parts)))
-    add("linear_blocks", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s); cost(s)[1]))
-    add("linear_joint", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s; joint = true); cost(s)[1]))
+    add("linear_blocks", () -> () -> (s = c.state(); RC.update_radiometry!(s); cost(s)[1]))
+    add("linear_joint", () -> () -> (s = c.state(); RC.update_radiometry!(s; joint = true); cost(s)[1]))
     # per view
     function view_setup()
         s = c.state(); problem, _ = RC.build_problem(s; height_degree = HEIGHT_DEGREE)
@@ -198,7 +198,7 @@ function stages(c)
     end)
     add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); RC.solve_linear_blocks!(s; joint = true); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("calibration", () -> () -> (s = c.state(); RC.update_radiometry!(s; joint = true); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
     return list
 end
 

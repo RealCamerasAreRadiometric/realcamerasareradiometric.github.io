@@ -37,7 +37,7 @@ end
 @testitem "focus nodes over the imaged region" setup = [RCFixtures] begin
     using StaticArrays
     W, H = 400, 300
-    pin = cam(VgtkCore.Pinhole(), 300.0, (200.0, 150.0), W, H)       # a W × H pixel camera: the run's region is Core's imaged_region of it
+    pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), 300.0, (200.0, 150.0), W, H)       # a W × H pixel camera: the run's region is Core's imaged_region of it
     fo = RC.PipelineOptions().focus
     # no image circle: the sensor's 5 × 5 grid, every node kept (the sensor's edges are exact)
     @test RC.focus_grid_nodes(VgtkCore.imaged_region(pin)) == VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))

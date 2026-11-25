@@ -61,7 +61,7 @@ end
     const StableRNG = RC.StableRNG
     W, H = 520, 348
     f = 416.0
-    pin = cam(VgtkCore.Pinhole(), f, (260.0, 174.0), W, H)
+    pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), f, (260.0, 174.0), W, H)
     circle = VgtkCore.Ellipse(VgtkCore.Point2{Float64}(260.0, 174.0), 150.0, 150.0, 0.0)
     g = grid_model(pin, 35, 25; coverage = circle)
     dirs(l) = VgtkCore.directions(VgtkCore.model(l))

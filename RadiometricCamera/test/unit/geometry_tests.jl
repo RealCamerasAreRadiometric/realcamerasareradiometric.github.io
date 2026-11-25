@@ -20,13 +20,13 @@
     x = SVector(0.4, -0.3, 2.0); y = p(x)
     J = ForwardDiff.jacobian(v -> RC._seeded_pose(p, z -> z + zero(eltype(v)), v[SVector(1, 2, 3)], v[SVector(4, 5, 6)])(x), zeros(SVector{6}))
     @test J ≈ hcat([0.0 y[3] -y[2]; -y[3] 0.0 y[1]; y[2] -y[1] 0.0], Matrix(1.0I, 3, 3)) atol = 1e-12
-    # a view's pose from its rays (the front-ends' refit): VisualGeometryToolkitEstimation's refine_absolute_pose on the front-ends' bearing
+    # a view's pose from its rays (the front-ends' refit): RC._refined_pose (Core's LevenbergMarquardt on Estimation's BearingPoseProblem) on the front-ends' bearing
     # correspondences, world → camera (X_cam = R X + t), from a perturbed start,
     # to the exact pose
     let R = exp_so3(SVector(0.1, -0.2, 0.05)), t = SVector(0.1, 0.0, 2.0)
         Xs = [SVector(x, y, 0.3 * sin(x + y)) for x in -0.5:0.25:0.5 for y in -0.5:0.25:0.5]
         guess = VgtkCore.EuclideanMap(exp_so3(SVector(0.02, 0.0, -0.01)) * R, t + SVector(0.01, -0.02, 0.05); check = false)
-        p1 = VgtkCore.estimate(RC.VgtkEstimation.refine_absolute_pose(guess, RC._ray_correspondences(Xs, [R * X + t for X in Xs]); optimization_strategy = nothing))
+        p1 = RC._refined_pose(guess, RC._ray_correspondences(Xs, [R * X + t for X in Xs]))
         @test maximum(abs, p1.R - R) < 1e-9 && maximum(abs, p1.t - t) < 1e-9
     end
     # board

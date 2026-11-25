@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # The start of a radiometric calibration: the geometric calibration it starts from (`StartGeometry`: a geometric camera, its poses,
-# the observations of the target, the target) and the step that lifts it into a radiometric state (`start_calibration`). The
+# the observations of the target, the target) and the step that lifts it into a radiometric state (`_start_state`, the `init` of a `RadiometricCalibration`). The
 # pipeline's front ends build the geometry from their inputs through VisualGeometryToolkitIO (`start_geometry`, start/frontends/);
 # a start is written as its record (`save_calibration_start`) and a refinement's state is rebuilt from one (`load_calibration_start`).
 # ---------------------------------------------------------------------------
@@ -60,30 +60,9 @@ function start_geometry(options::PipelineOptions; record = nothing, load_state =
 end
 
 """
-    start_calibration(geometry::StartGeometry, photographs; options, device = default_backend()) -> CalibrationState
-    start_calibration(camera, poses, observations, photographs; target, options, device = default_backend(), names) -> CalibrationState
-
-The start of a radiometric calibration: it lifts the geometric camera of `geometry` (or of `camera`, `poses`, `observations` and
-`target`, the geometric calibration as data) into a radiometric state — the focus surface through the mean target centre, the
-aperture from the f-number, the image circle measured where the run names its frames, the masks, the photographs' observations
-streamed (`photographs[k]` the file of view `k`: a RAW photograph by its file, its green photosites, or a decoded image), the
-vignetting and the lighting by the closed-form start, the grid smoothness. `options` are the start's ([`start_options`](@ref)). The
-state's `start` holds what the refinement and its records read (the start views, the observations, the costs of the start).
-
-Every input is a value: the pipeline's front ends read theirs through VisualGeometryToolkitIO ([`start_geometry`](@ref)); a caller
-with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camera and observations with IO's importers itself
-(`VisualGeometryToolkitIO.load(BoundedCamera, …)`, `load(TargetObservations, …)`) — RC reads no foreign format.
-"""
-start_calibration(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; options::PipelineOptions,
-                  device = default_backend()) = _start_state(geometry, photographs, options, nothing; backend = device)
-start_calibration(camera::VgtkCore.BoundedCamera, poses::AbstractVector, observations::AbstractVector, photographs::AbstractVector{<:AbstractString};
-                  target::TexturedTarget, options::PipelineOptions, device = default_backend(), names = basename.(photographs)) =
-    start_calibration(StartGeometry(camera, poses, observations, target; names), photographs; options, device)
-
-"""
     save_calibration_start(dir, state; options) -> dir
 
-The start `state` ([`start_calibration`](@ref)'s, of the start options `options`) as the start record `dir`: every value a
+The start `state` (the `init` of a [`RadiometricCalibration`](@ref) of the run `options`, its cache's `state`) as the start record `dir`: every value a
 refinement takes from its start (start/start_record.jl), so [`load_calibration_start`](@ref) rebuilds the start's state from the
 photographs and this record without computing it again.
 """
