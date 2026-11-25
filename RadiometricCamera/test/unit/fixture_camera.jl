@@ -15,7 +15,7 @@ pinhole_θ(c) = (K = VgtkCore.model(c).intrinsics.K; VgtkCore.SVector(K[1, 1], K
 `[saddle(𝐛) for 𝐛 in HEIGHT_NODES]` (a pure bending, no affine part to speak of)."""
 # HOIST: the saddle is Core's height-surface fixture's too (VisualGeometryToolkitCore test/fixtures/height_surface/generate.jl
 # `sad`, a copy of this one); it moves into Core's synthetic module (wave item "Core synthetic: the saddle board height") and
-# this test then calls it (DUPLICATION.toml names the item).
+# this test then calls it (the repository root's DUPLICATION.toml names the item).
 saddle(𝐛) = (q = 𝐛 .- 0.5; 0.08 * q[1]^2 - 0.04 * q[1] * q[2] + 0.06 * q[2]^2)
 """`updated_vars(vars, j, u)`: the residual's variables `vars` with block `j` stepped by `u` (NLLSsolver's `update`), the others
 as they are — the central differences of the Jacobian tests."""

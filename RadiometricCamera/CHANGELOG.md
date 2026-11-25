@@ -31,6 +31,13 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
 - **Tests:** the README test develops the stack packages the `[sources]` take by path (TEMPORARY, with those entries); the
   experiments paper project's naming scan is skipped (TEMPORARY, `@test_skip`) until the owner rules whether experiments/ is ported to
   0.4.0 or stays on the released 0.3.0. The goldens hold unmodified (rtol 1e-10): no calibration number moves.
+- **Tests:** the quality suite runs VisualGeometryToolkitCore's `check_duplication(RadiometricCamera)` (zero findings). Its
+  exceptions file moves to the repository root, where the checker reads it (in RadiometricCamera/ no check read it); every
+  remaining entry is TEMPORARY and names its removal (Core 0.13.4's device-policy functions and synthetic saddle, the ruling on
+  experiments/), and the `_TOML_DEFAULTS` entry is gone (Core's per-package infrastructure). Removed duplicates: one Gauss–Newton
+  block function for views and tiles (`_block_normal_equations` over `_block_jacobian` / `_cost_rows`); the moved names' refusals
+  listed in `MOVED_NAMES` (Core's convention; helper `_moved_name_refusal`); the tests' central difference, cache-type check and
+  two-view scene, one copy each.
 - **Dependencies:** VisualGeometryToolkitCore 0.14, VisualGeometryToolkitEstimation 0.13, VisualGeometryToolkitFeatures 0.10,
   VisualGeometryToolkitIO 0.12 (none registered yet: the package's `[sources]` take them by path, TEMPORARY until they are).
 

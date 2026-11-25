@@ -1,6 +1,6 @@
 # The package's tooling gates (package-cleanup Phase 6; RC 0.11.0): the calling conventions (argorder_check, Core's vendored copy,
 # against .argorder_allow — the allow-list only shrinks), Aqua's checks one at a time, ExplicitImports (no implicit import, no stale
-# explicit one) and the JET ratchet (the report count of the package alone may only fall).
+# explicit one), the JET ratchet (the report count of the package alone may only fall) and the stack's no-duplication check.
 
 @testitem "quality: calling conventions (argorder_check)" begin
     using Test, RadiometricCamera
@@ -30,6 +30,17 @@ end
     # not gated (recorded at the RC 0.11.0 baseline): test_ambiguities (2 between RC's methods and the stack's), test_stale_deps
     # (CUDA: a hard dependency only the extension reads — its move to [weakdeps] needs the device resolver's vendor load moved to the
     # driver; a follow-up)
+end
+
+@testitem "quality: no duplication (check_duplication)" begin
+    # Zero duplication, enforced as in every stack package: VisualGeometryToolkitCore's check over the package (name ownership against
+    # the upstream stack, body similarity, whole files, retired patterns, backend branches, CPU/GPU twins) and the repository's files,
+    # its exceptions the repository root's DUPLICATION.toml (every entry TEMPORARY, naming the event that removes it; a stale one fails)
+    using Test, RadiometricCamera
+    import VisualGeometryToolkitCore as VgtkCore
+    found = VgtkCore.check_duplication(RadiometricCamera)
+    isempty(found) || foreach(v -> println(stderr, v), found)
+    @test isempty(found)
 end
 
 @testitem "quality: ExplicitImports" begin

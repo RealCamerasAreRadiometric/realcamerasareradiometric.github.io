@@ -38,7 +38,7 @@ const INPLANE_KINDS = ("none", "aspect_skew")
 # are `nothing`, which TOML cannot state; the file documents them in a comment.
 using VisualGeometryToolkitCore: toml_default, parse_defaults
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
-# `parse_defaults`/`toml_default`, as every stack package's file is (DUPLICATION.toml: the name is each package's own data).
+# `parse_defaults`/`toml_default`, as every stack package's file is (the binding name is per-package infrastructure in Core's check_duplication).
 const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
 """The default of the field `f` of the options table `T`: its configs/default.toml value, read as the TOML reader reads a config's."""
 _option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_TOML_DEFAULTS, t, k), "$t.$k"))
