@@ -19,6 +19,7 @@
 #   env RC_MIG_FIX=<fixture dir> RC_MIG_WORK=<run dir> [RC_MIG_REFINE=1 [RC_MIG_REFINE_ITERATIONS=30]] julia --project=test/integration_blobboards test/integration_blobboards/test_session_outputs.jl
 using Test, RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf
 using RadiometricCamera: chief_ray
+using RadiometricCamera: in_domain, grid_model, grid_dims       # public, not exported (D13)
 import TOML
 import FileIO                                                   # EXR truth maps via ImageIO / OpenEXR (the harness environment)
 const RC = RadiometricCamera
@@ -184,7 +185,7 @@ tposes = VgtkIO.load(VgtkCore.TargetPoses, joinpath(SES, "target_poses.json"))
 try
 @testset "RadiometricCamera consumers of the session records (stage C)" begin
     @testset "0 fixture conventions" begin
-        @test (RW, RH) == (1024, 1024) && String(camj.pixel_frame) == "colmap"
+        @test (RW, RH) == (1024, 1024) && String(camj.units.pixel) == "colmap"   # the envelope's pixel frame (IO 0.11: `units.pixel`, the record read through its migration)
         @test abs(X0 + 65.00933) < 1e-3 && abs(YTOP - 65.00933) < 1e-3 && abs(WP - 130) < 1e-3   # the board-291 export as checked in
         @test chart_of_mm(SVector(X0, YTOP)) ≈ SVector(0.0, 0.0) atol = 1e-12
         @test chart_of_mm(SVector(X0 + WP, YTOP - HP)) ≈ SVector(1.0, 1.0) atol = 1e-12

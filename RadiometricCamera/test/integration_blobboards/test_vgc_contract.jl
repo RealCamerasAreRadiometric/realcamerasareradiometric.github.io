@@ -11,6 +11,10 @@ using RadiometricCamera: chief_ray
 import VisualGeometryToolkitCore as VgtkCore
 using VisualGeometryToolkitCore: exp_so3
 using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
+# the public names of RadiometricCamera (not exported, D13) and the generic radiometric layer's (VisualRadiometryToolkitCore's) the stage uses
+using RadiometricCamera: compute_mask, render_view, RenderSettings, sphere_radius, grid_model
+using VisualRadiometryToolkitCore: TexturedTarget, Focus, FocusSpline, Material, intersect_board, world_point, 𝐩_of_pixel, pixel_of_𝐩, 𝔟
+using VisualGeometryToolkitCore: chart, cost
 const RC = RadiometricCamera
 include(joinpath(@__DIR__, "..", "unit", "fixture_board.jl"))
 include(joinpath(@__DIR__, "..", "unit", "fixture_camera.jl"))       # cam: Core's pixel camera of a test image
