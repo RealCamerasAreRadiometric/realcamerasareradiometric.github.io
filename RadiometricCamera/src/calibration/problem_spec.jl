@@ -25,7 +25,7 @@ THE refinement's LM problem, derived once from the options: `blocks` (`_lm_block
 of the route's builder and LM (`lm_route`: `build_problem` / `run_lm!` per view, `build_problem_grid` / `run_lm_grid!` per tile): the held blocks as `fixed` (`:grid` the
 per-view route's `:distortion`; `:material` whenever "material" is in `fixed` — the builders hold Θ_m alone inside a block that
 stays variable for its free surface parameters, `_hold_material`, as `_material_rides` reports it), the
-surface's holds from `fixed`, the model's structure (`_lm_structure`) and the grid smoothness `smoothness`. `refine_calibration!`, the grid smoothness's GCV, the Jacobian parity
+surface's holds from `fixed`, the model's structure (`_lm_structure`) and the grid smoothness `smoothness`. The calibration's refinement, the grid smoothness's GCV, the Jacobian parity
 check and the tests build their problems from it alone.
 """
 function _refinement_lm(opts::PipelineOptions, route::LmRoute; smoothness = nothing)

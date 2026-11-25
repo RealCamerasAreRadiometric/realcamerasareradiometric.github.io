@@ -11,7 +11,7 @@ const RETIRED_KEYS = (
     ("lm", "iterator")   => "the LM is VisualGeometryToolkitCore's one (`lmsolve_chart!`), its damping Levenberg's λ·I (`LM_DAMPING`), no knob; " *
                             "delete the key",
     ("io", "save_init")  => "the start is a step of its own: `bin/refine.jl --stage=start` writes the start record (start.json, state.json, " *
-                            "grid.json | lens.json, masks/; `start_calibration`), `--start=<dir>` refines from it; delete the key",
+                            "grid.json | lens.json, masks/; a `RadiometricCalibration` start), `--start=<dir>` refines from it; delete the key",
     ("masks", "linear_fraction") => "not read since 2026-10-31: the closed-form start runs on the LM's pixels; delete the key",
     ("masks", "lm_fraction") => "retired: the samples are a fixed count of each view's usable observations, " *
                             "`masks.samples_per_view` (a Bernoulli share of the raw grid gave a RAW photosite run half an RGB run's samples)",

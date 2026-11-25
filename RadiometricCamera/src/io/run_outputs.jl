@@ -46,7 +46,7 @@ lm_termination(res) = res === nothing ? (VgtkCore.ReturnCode.Default, VgtkCore.N
 """
     save_radiometric_calibration(state, result; options)
 
-The records of a radiometric calibration ([`refine_calibration!`](@ref)'s `result` of the state `state`, the run `options`) in the run's
+The records of a radiometric calibration (a [`RadiometricCalibration`](@ref) solve's `result` of the state `state`, the run `options`) in the run's
 directory `io.out`, each through VisualGeometryToolkitIO:
 
 `grid.json` / `lens.json` (+ `grid_init.json` / `lens_init.json`; the model spec of the evaluation scripts is `grid:<file>` | `lens:<file>`),

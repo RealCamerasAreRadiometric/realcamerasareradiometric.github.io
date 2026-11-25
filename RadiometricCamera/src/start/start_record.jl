@@ -2,7 +2,7 @@
 # The refinement's start as its own step (the owner's rule of 2026-11-14: every step of a pipeline caches its intermediate, keyed by
 # ONLY what it reads). The start — the front end (the start lens on the grid, its initialization region, the PnP / page poses), the
 # image circle, the masks, the vignetting centre, the focus start, the closed-form radiometric start and the GCV weights — is computed
-# by `start_calibration` from `start_options(opts)` (the refinement-only options at their defaults: a start never reads them) and written
+# by the start (a `RadiometricCalibration`'s `init`, `_start_state`) from `start_options(opts)` (the refinement-only options at their defaults: a start never reads them) and written
 # as a START RECORD, a directory; every refinement starts from one (`load_refinement_start` → `load_calibration_start(dir; options)`), so
 # a start loaded and a start computed are one code path. bin/refine.jl: `--stage=start` writes it, `--start=<dir>` refines from it.
 #
@@ -22,7 +22,7 @@
 """
     REFINE_ONLY_KEYS
 
-The [`PipelineOptions`](@ref) keys (`table.key`) that only the refinement reads (`refine_calibration!`, after the start): the LM's iteration and
+The [`PipelineOptions`](@ref) keys (`table.key`) that only the refinement reads (the `RadiometricCalibration` solve, after the start): the LM's iteration and
 time caps and its stop tolerances, the per-iteration checkpoints, the closed-form sweeps between LM chunks, a resumed run's iteration offset and its sweep.
 A start is computed from [`start_options`](@ref), which holds them at their defaults, so a change of one never changes (or
 recomputes) a start. `resume.state` is not among them: the front end reads its page frame.
@@ -75,7 +75,7 @@ _mask_file(dir, k) = joinpath(dir, START_MASKS_DIR, "$(k).png")
 """
     save_start(dir, s, meta, opts) -> dir
 
-The start of a refinement (`start_calibration`'s state `s` and `meta`, of the options `opts`, its `start_options`) as the start record
+The start of a refinement (the start's state `s` and `meta`, of the options `opts`, its `start_options`) as the start record
 `dir` (the file header lists its files): every value a refinement takes from its start, so `load_calibration_start(dir; options)` rebuilds
 the start's state from the photographs and this record without recomputing it.
 """

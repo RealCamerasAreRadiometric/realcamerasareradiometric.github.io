@@ -15,7 +15,7 @@
 # Config of record of the timing experiment (scripts/timing.jl; src/timing.jl). WHAT IS TIMED: the radiometric refinement of [timing] case
 # of [upstream] radiometric_refinement, as it is there (the run of record's settings exactly: its config, its samples), from its start
 # record: bin/refine.jl --start=<the case's start product> --repeat=<warmup + 1> (one process: the start and the prepared photographs
-# loaded, untimed; `warmup` untimed solves that compile; then ONE timed solve) — the wall time of `refine_calibration!` (the LM and its
+# loaded, untimed; `warmup` untimed solves that compile; then ONE timed solve) — the wall time of the `RadiometricCalibration` solve (the LM and its
 # per-iteration work, the checkpoints of record included) plus `save_radiometric_calibration` (the calibrated camera record written).
 # EXCLUDED: the decode (prepare), the masks, the geometric start (the initial guess), the chrome scoring. Each replicate is its own Slurm
 # job on its own GPU (no two on one GPU: a shared device would distort the time); the record gathers them.

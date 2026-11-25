@@ -27,7 +27,7 @@ Private = false
 ```@autodocs
 Modules = [RadiometricCamera]
 Pages = ["start/masks.jl", "start/image_region.jl", "start/focus_start.jl", "start/start_poses.jl", "start/radiometric_start.jl",
-         "start/frontends/calibration_session.jl", "start/frontends/schoeps_run.jl", "start/start_calibration.jl", "start/prepare.jl", "start/start_record.jl",
+         "start/frontends/calibration_session.jl", "start/frontends/schoeps_run.jl", "start/calibration_start.jl", "start/prepare.jl", "start/start_record.jl",
          "diagnostics/monitor.jl", "diagnostics/selfcheck.jl", "diagnostics/render.jl", "io/run_outputs.jl"]
 Private = false
 ```

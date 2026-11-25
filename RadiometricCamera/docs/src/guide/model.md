@@ -86,7 +86,7 @@ src/calibration/                    state.jl (CalibrationState), weighting.jl (t
                                     device/ (workers.jl, flux_kernels.jl, jacobian_kernels.jl: the KernelAbstractions functors, one
                                     kernel per backend), calibrate.jl (RadiometricCalibration, calibrate), resume.jl
 src/start/                          the start: frontends/ (calibration_session.jl, schoeps_run.jl), start_poses.jl, image_region.jl,
-                                    focus_start.jl, masks.jl, radiometric_start.jl, start_calibration.jl (StartGeometry, start_geometry, load_calibration_start), prepare.jl,
+                                    focus_start.jl, masks.jl, radiometric_start.jl, calibration_start.jl (StartGeometry, start_geometry, load_calibration_start), prepare.jl,
                                     start_record.jl (the start record)
 src/diagnostics/                    monitor.jl, selfcheck.jl, render.jl
 src/options/                        tables.jl, toml.jl (PipelineOptions from TOML: pipeline_options, config_dict), device.jl, retired.jl

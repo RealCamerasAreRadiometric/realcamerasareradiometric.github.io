@@ -114,7 +114,7 @@ VgtkCore.solve!(c::CalibrationCache) = _calibrate!(c.state, c.options)
 resume's state reader (a test's hook)."""
 function _calibrate!(state::CalibrationState, options::PipelineOptions; load_state = RadiometricCamera.load_state)
     state.start === nothing && throw(ArgumentError("RadiometricCalibration: the state has no start (its `init` on a StartGeometry, or load_calibration_start, lift a geometric calibration into one)"))
-    res, trace, costs = _refine_calibration!(state, state.start, options; load_state)
+    res, trace, costs = _run_refinement!(state, state.start, options; load_state)
     # the calibrated camera on output (the fold policy, 2026-11-15): held to the coverage assertion, and a remaining fold flags the
     # calibration non-converged — no calibration is accepted with a folded camera
     folds = calibrated_folds(state.camera.geometric; device = state.backend)
@@ -155,7 +155,7 @@ _start_run_options(options::PipelineOptions) =
     (d = config_dict(start_options(options)); pipeline_options(merge(d, Dict{String, Any}("io" => merge(d["io"], Dict{String, Any}("out" => options.io.out))))))
 
 """
-    _refine_calibration!(s, meta, opts; load_state = RadiometricCamera.load_state) -> (result, trace, (; linear, final, seconds, termination))
+    _run_refinement!(s, meta, opts; load_state = RadiometricCamera.load_state) -> (result, trace, (; linear, final, seconds, termination))
 
 The Levenberg–Marquardt over Θ̄ from the prepared state: resumes from `resume.state` when given, runs `lm.max_iter` iterations (in chunks
 of `sweep.lm_chunk` with a closed-form sweep between them when set), prints the live monitor after every iteration and writes the checkpoints
@@ -164,7 +164,7 @@ of `sweep.lm_chunk` with a closed-form sweep between them when set), prints the 
 and the costs after the linear solve and at the end, the LM's seconds and its termination record (`lm_termination`: VisualGeometryToolkitCore's
 verdict at the final state, the one written).
 """
-function _refine_calibration!(s::CalibrationState, meta, opts::PipelineOptions; load_state = RadiometricCamera.load_state)
+function _run_refinement!(s::CalibrationState, meta, opts::PipelineOptions; load_state = RadiometricCamera.load_state)
     names = meta.names; K = length(names); W₀ = meta.W₀; H₀ = meta.H₀; fpx = meta.fpx
     lens0 = meta.lens0; route = lm_route(lens0); views0 = meta.views0; features = meta.features
     c1, rms1 = meta.costs.linear

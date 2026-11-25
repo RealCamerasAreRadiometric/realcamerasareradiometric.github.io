@@ -4,8 +4,8 @@
 # and the photographs ϕ to the started radiometric state: the focus plane through the mean target centre (s′ from the thin-lens
 # equation, for the log), r from the f-number, Θ_m, V flat, the masks (the target's validity ∩ the imaged region ∩ a random pixel
 # subset), the streamed observations ϕ, L^SVSH by the closed-form Θ_l solve and one closed-form sweep of Θ_l, Θ_v, μ, the grid
-# smoothness (`_start_state`, behind `start_calibration` and `load_calibration_start`, start/start_calibration.jl). The refinement is
-# `refine_calibration!` (calibration/calibrate.jl), its records `save_radiometric_calibration` (io/run_outputs.jl). Every file is read
+# smoothness (`_start_state`, behind a `RadiometricCalibration`'s `init` and `load_calibration_start`, start/calibration_start.jl). The refinement is
+# the `RadiometricCalibration` solve (calibration/calibrate.jl), its records `save_radiometric_calibration` (io/run_outputs.jl). Every file is read
 # and written through VisualGeometryToolkitIO: the records of Core's values and RC's (records.jl), the reports as JSON documents
 # (`write_record` / `read_record`).
 # ---------------------------------------------------------------------------

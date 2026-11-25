@@ -1,4 +1,4 @@
-# The loss-curve figure of a refinement trace (a FitResult's `metadata.trace`: refine_calibration!'s): research plotting, out of the
+# The loss-curve figure of a refinement trace (a FitResult's `metadata.trace`: the RadiometricCalibration solve's): research plotting, out of the
 # package (the headless rule; RC 0.11.0 moved it from bin/, where bin/refine.jl drew it by `@eval using CairoMakie`, owner D6).
 # Include after `using CairoMakie`. Its input, a run's trace, is not a record yet (a follow-up): call it in the process that refined.
 

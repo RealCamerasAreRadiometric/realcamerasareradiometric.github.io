@@ -3,7 +3,7 @@
 # refinement of record, from its loaded start to its written calibrated camera record, replicated one job per GPU. Included after
 # src/drivers.jl and src/radiometric_refinement.jl.
 #
-# The measurement is bin/refine.jl's own (`--repeat`): its `TIMING r/N key=value …` lines (refine_calibration! and
+# The measurement is bin/refine.jl's own (`--repeat`): its `TIMING r/N key=value …` lines (the RadiometricCalibration solve and
 # save_radiometric_calibration wall seconds, LM iterations and seconds) and its `PARAMETERS key=value …` line (the LM's free
 # parameters per block), read from the replicate's refine.log — one code path, the run of record's program.
 # =============================================================================

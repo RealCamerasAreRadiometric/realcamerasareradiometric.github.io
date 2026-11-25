@@ -60,7 +60,7 @@ mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, T
     sensor::SensorStatement                   # the photographs' sensor statement (observation_model.jl): the characterisation they were read under, or none
     photo_kind::PhotoKind                     # the photographs' kind: RAW photosites or decoded images (with `channel`, the state's `observation_model`)
     run::_LmRun                               # the state's runs: the final-iteration mark, the scrubbed entries, the device calls (`_LmRun`)
-    start::Any                                # the start this state was lifted from (`start_calibration`: its geometry, views, costs, masks' record); nothing for a bare state
+    start::Any                                # the start this state was lifted from (the start, `_start_state`: its geometry, views, costs, masks' record); nothing for a bare state
 end
 
 """

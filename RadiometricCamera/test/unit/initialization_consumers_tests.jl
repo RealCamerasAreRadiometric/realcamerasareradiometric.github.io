@@ -8,7 +8,7 @@
     using RadiometricCamera: bearing_px, BlobFrontend, in_initialization, initialization_region, SchoepsFrontend,
                              vignetting_center
     using Test, RadiometricCamera
-    src = join((read(joinpath(pkgdir(RadiometricCamera), "src", f), String) for f in ("start/prepare.jl", "start/start_calibration.jl", "start/frontends/calibration_session.jl", "start/frontends/schoeps_run.jl", "diagnostics/selfcheck.jl", "io/run_outputs.jl")), "\n")
+    src = join((read(joinpath(pkgdir(RadiometricCamera), "src", f), String) for f in ("start/prepare.jl", "start/calibration_start.jl", "start/frontends/calibration_session.jl", "start/frontends/schoeps_run.jl", "diagnostics/selfcheck.jl", "io/run_outputs.jl")), "\n")
     body(name) = (a = findfirst(name, src); a === nothing && error("no $name"); b = findnext(r"\nend\n", src, last(a)); src[first(a):first(b)])
     pre = body("function _start_state(")
     fronts = [body("function _frontend(::Type{BlobFrontend}"), body("function _frontend(::Type{SchoepsFrontend}")]
