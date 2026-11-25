@@ -118,7 +118,7 @@ end
     ncol_h = 6 + 200 + 9 + 1 + (9 + RC.HEIGHT_NFREE) + 15 + 27          # (15: the hard pin eliminates the centre's vignetting direction)
     @test size(J_h) == (3 * length(r_h.pix), ncol_h)
     @test res_h ≈ RC.NLLSsolver.computeresidual(r_h, vars_h...) atol = 1e-10
-    fdh(j, u) = (RC.NLLSsolver.computeresidual(r_h, updated_vars(vars_h, j, u)...) - RC.NLLSsolver.computeresidual(r_h, updated_vars(vars_h, j, -u)...)) / (2 * norm(u))
+    fdh(j, u) = central_difference(r_h, vars_h, j, u)
     for q in (1, 7, 13, RC.HEIGHT_NFREE)                               # AD columns of the free height parameters vs central differences through `update`
         fd = fdh(8, unit_increment(9 + RC.HEIGHT_NFREE, 9 + q, 1e-5))
         @test norm(fd) > 0

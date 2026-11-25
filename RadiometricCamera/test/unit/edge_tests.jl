@@ -111,7 +111,7 @@ end
     res_e, J_e = RC.NLLSsolver.computeresjac(RC.static(1023), r_e, vars_e...)
     @test size(J_e) == (3 * length(r_e.pix), 6 + 200 + 9 + 1 + 9 + 15 + 27)   # 15 vignetting columns (the hard pin)
     @test res_e ≈ RC.NLLSsolver.computeresidual(r_e, vars_e...) atol = 1e-10
-    fde(j, u) = (RC.NLLSsolver.computeresidual(r_e, updated_vars(vars_e, j, u)...) - RC.NLLSsolver.computeresidual(r_e, updated_vars(vars_e, j, -u)...)) / (2 * norm(u))
+    fde(j, u) = central_difference(r_e, vars_e, j, u)
     # a NaN step (a singular solve's, here of μ) marks the block invalid: every residual of the block is NaN, and so is the problem's
     # cost, which NLLSsolver's LM rejects (a trial is accepted only when its cost is ≤ the best) instead of the refinement aborting
     @test RC.is_valid(vars_e[8]) && !RC.is_valid(RC.NLLSsolver.update(vars_e[8], unit_increment(9, 9, NaN)))

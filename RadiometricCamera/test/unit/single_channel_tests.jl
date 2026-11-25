@@ -14,26 +14,14 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))
+    include(joinpath(@__DIR__, "fixture_scene.jl"))        # two_view_scene
     export single_channel_board
 
     "The calibration fixture's two views; the colour reference (`io.channel` copied into three) and the single-channel state of
     channel `c`, both from the start camera and poses (or the truth) with the lighting and η tied to channel `c`."
     function single_channel_board(; c = 2, W = 24, H = 24, perturbed = false, backend = nothing)
-        tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 1.288 * W, (0.51 * W, 0.48 * H), W, H)
-        tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
-        focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
-        poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-        vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
-        camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
-        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
-        a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
-        light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
-        mat_t = Material(0.12, 0.35, SVector(1.6, 1.65, 1.7), SVector(1.3, 1.33, 1.36), 0.4)   # η differs by channel
-        st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
+        f = two_view_scene(Material(0.12, 0.35, SVector(1.6, 1.65, 1.7), SVector(1.3, 1.33, 1.36), 0.4); W, H)   # η differs by channel
+        (; board, st, poses, camera_t, focus_t, vig_t, mat_t, light_t, masks, renders) = f
         copied = [repeat(r[:, :, c:c], 1, 1, 3) for r in renders]                     # today's io.channel: channel c in all three
         camera0 = perturbed ? RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 1.27 * W, (0.5 * W, 0.49 * H), W, H), focus_t, 0.0386, vig_t) :
                               camera_t

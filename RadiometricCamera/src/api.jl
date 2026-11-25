@@ -104,9 +104,10 @@ VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 # their replacement (no alias, no forwarding).
 # VisualRadiometryToolkitCore's public names are descriptive; a symbol of the paper is its public alias of the same function, and a
 # plain old spelling has no alias: each row names what to call there.
-_moved_to_radiometry(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
+_moved_name_refusal(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
     "RadiometricCamera.$name moved to VisualRadiometryToolkitCore: $replacement"))
-for (name, replacement) in (
+# each moved name with what to call there
+const _MOVED_REPLACEMENTS = (
         :with_geometric => "`with_geometric`", :with_focus => "`with_focus`", :with_aperture_radius => "`with_aperture_radius`",
         :aperture_samples => "`aperture_samples`", :aperture_border => "`aperture_border`", :luma => "`luma`", :n_nodes => "`n_nodes`",
         :pixel_of_𝐩 => "`pixel_position` (the paper's symbol stays its alias, `pixel_of_𝐩`)",
@@ -124,9 +125,14 @@ for (name, replacement) in (
         :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`", :physical_chart => "`physical_chart`",
         :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
         :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
+"""The names this package refuses by name since they moved to VisualRadiometryToolkitCore, each with what to call there (the
+stack's `MOVED_NAMES` convention: VisualGeometryToolkitCore's `check_duplication` reads `MOVED_NAMES` and counts a listed name as a
+refusal, not a definition, so its new owner's is the one definition)."""
+const MOVED_NAMES = map(first, _MOVED_REPLACEMENTS)
+for (name, replacement) in _MOVED_REPLACEMENTS
     @eval begin
         @doc $("Moved to VisualRadiometryToolkitCore: $replacement.")
-        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)), $replacement)
+        $name(args...; kwargs...) = _moved_name_refusal($(QuoteNode(name)), $replacement)
     end
 end
 

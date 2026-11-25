@@ -52,8 +52,7 @@
     # the problem's kept NLLSsolver cache is built for the damping the solve runs (LM_DAMPING), so it is reused across solves, never
     # rebuilt per call (RC 0.9.0 review, finding 1): the cache of `LmProblem(…; damping = LM_DAMPING)`, not of Core's default
     pb, _ = RC.build_problem(perturbed(); fixed = only_poses)
-    same(d) = typeof(VgtkCore.LmProblem(pb.problem.variables, pb.blocks; fixed = findall(!, pb.free), damping = d).cache) == typeof(pb.cache)
-    @test same(RC.LM_DAMPING) && !same(VgtkCore.MarquardtDamping())
+    @test same_cache_type(pb, RC.LM_DAMPING) && !same_cache_type(pb, VgtkCore.MarquardtDamping())
     # no LM iteration: no record (Default, NoRule); the iteration cap is MaxIters
     @test RC.lm_termination(nothing) == (VgtkCore.ReturnCode.Default, VgtkCore.NoRule)
     rc = run_lm!(perturbed(); maxiters = 1, fixed = only_poses)

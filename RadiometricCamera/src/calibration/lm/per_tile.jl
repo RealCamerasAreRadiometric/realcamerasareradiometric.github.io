@@ -858,12 +858,10 @@ function NLLSsolver.computecostgradhess(varflags, r::_DataBlock, vars...)
         return invoke(NLLSsolver.computecostgradhess, Tuple{Any, NLLSsolver.AbstractResidual, Vararg{Any}}, varflags, r, vars...)
     return _windowed((b, v) -> _block_normal_equations(varflags, b, v), r, vars, (:blocks, Int(varflags)))
 end
-"""A tile's `(cost, Jᵀr, JᵀJ)` (`computecostgradhess`): the cost of its batch's flux (`_block_residual`'s, the batch memoized)."""
-function _block_normal_equations(varflags, r::PerTileResidual, vars)
-    t = _tile_jacobian_at(varflags, r, vars...)
-    g, H = _gauss_newton_blocks(t.J, t.res, t.T, t.lay, r.state.run)
-    return 0.5 * Float64(NLLSsolver.sqnorm(_tile_residual(t.flux, r, t.ivs))), g, H
-end
+"""A tile's Jacobian block (`_tile_jacobian_at`, for `_block_normal_equations`) and its cost rows: its batch's flux
+(`_block_residual`'s, the batch memoized)."""
+_block_jacobian(varflags, r::PerTileResidual, vars) = _tile_jacobian_at(varflags, r, vars...)
+_cost_rows(t, r::PerTileResidual) = _tile_residual(t.flux, r, t.ivs)
 
 """All per-tile cost blocks of a grid problem (whatever their patch / aperture block types)."""
 tile_costs(problem::VgtkCore.LmProblem) = tile_costs(problem.problem)

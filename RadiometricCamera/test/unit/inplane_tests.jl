@@ -167,7 +167,7 @@ end
     c0 = 6 + 200 + 9 + 1 + 9                                                           # pose | grid | focus | r | material 8 + μ; then the 2 in-plane columns
     @test size(J_i) == (3 * length(r_i.pix), c0 + INPLANE_NC + 15 + 27)                # (15: the hard pin eliminates the centre's vignetting direction)
     @test res_i ≈ RC.NLLSsolver.computeresidual(r_i, vars_i...) atol = 1e-10
-    fdi(j, u) = (RC.NLLSsolver.computeresidual(r_i, updated_vars(vars_i, j, u)...) - RC.NLLSsolver.computeresidual(r_i, updated_vars(vars_i, j, -u)...)) / (2 * norm(u))
+    fdi(j, u) = central_difference(r_i, vars_i, j, u)
     for q in 1:INPLANE_NC                                                              # the two in-plane columns vs central differences through `update`
         fd = fdi(8, unit_increment(9 + INPLANE_NC, 9 + q, 1e-6))
         @test norm(fd) > 0
@@ -196,7 +196,7 @@ end
     for q in 1:INPLANE_NC
         @test norm(J_hi[:, c0 + HEIGHT_NFREE + q] .- J_i[:, c0 + q]) / norm(J_i[:, c0 + q]) < 1e-10   # the same columns, shifted past the heights
     end
-    fdh(j, u) = (RC.NLLSsolver.computeresidual(r_hi, updated_vars(vars_hi, j, u)...) - RC.NLLSsolver.computeresidual(r_hi, updated_vars(vars_hi, j, -u)...)) / (2 * norm(u))
+    fdh(j, u) = central_difference(r_hi, vars_hi, j, u)
     for q in (1, 7, HEIGHT_NFREE)                                                      # the height columns beside the in-plane block, against central differences
         fd = fdh(8, unit_increment(9 + HEIGHT_NFREE + INPLANE_NC, 9 + q, 1e-5))
         @test norm(fd) > 0
@@ -268,8 +268,7 @@ end
     @test isapprox(rj, r0; atol = 1e-10)
     pv, dv, fv, av, mvv, vv, lv = vars_p
     for q in 1:INPLANE_NC
-        setter(h) = (pv, dv, fv, av, RC.NLLSsolver.update(mvv, unit_increment(9 + INPLANE_NC, 9 + q, h)), vv, lv)
-        fd = (RC.NLLSsolver.computeresidual(res_p, setter(1e-6)...) - RC.NLLSsolver.computeresidual(res_p, setter(-1e-6)...)) / 2e-6
+        fd = central_difference(res_p, vars_p, 5, unit_increment(9 + INPLANE_NC, 9 + q, 1e-6))
         @test norm(fd) > 0
         @test norm(J_p[:, cp + q] - fd) / norm(fd) < 5e-3
     end

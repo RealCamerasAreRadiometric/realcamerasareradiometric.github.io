@@ -16,6 +16,7 @@
     const RC = RadiometricCamera
     include(joinpath(@__DIR__, "fixture_board.jl"))
     include(joinpath(@__DIR__, "fixture_camera.jl"))       # cam
+    include(joinpath(@__DIR__, "fixture_scene.jl"))        # two_view_scene
 
     export photosite_board, mosaic_of, noisy_mosaic, read_photosites
 
@@ -47,25 +48,10 @@
     "The mosaic `m` as the pipeline reads it (the entry point's photosite route, `RC._observe`): its linear photosite values on the raw grid and its valid green mask."
     read_photosites(m) = RC._observe(RC.Photosites(), m, trues(size(m)), "test", VgtkCore.SensorModel(), :G)
 
-    "The calibration fixture's two-view board, the renders and their compute masks."
-    function photosite_board(; W = 24, H = 24)
-        tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-        lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 1.288 * W, (0.51 * W, 0.48 * H), W, H)
-        tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
-        focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
-        poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-        vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
-        camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
-        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
-        a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
-        light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
-        mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
-        st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
-        renders = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
-        return (; board, st, lens_t, tps_t, poses, camera_t, vig_t, mat_t, light_t, a_t, b, r_SH, masks, renders, W, H)
-    end
+    "The calibration fixture's two-view board, the renders and their compute masks (`two_view_scene`)."
+    photosite_board(; W = 24, H = 24) =
+        two_view_scene(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33,
+                                diffuse_weight = 0.4); W, H)
 end
 
 @testitem "photosites: linear values on the raw grid, the valid green photosites the mask" setup = [RCFixtures, PhotositeScene] begin

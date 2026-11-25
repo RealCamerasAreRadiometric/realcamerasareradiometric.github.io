@@ -227,8 +227,7 @@ end
     @test isapprox(rj, r0; atol = 1e-10)
     pv, dv, fv, av, mv, vv, lv = vars
     for q in (1, 7, 13, HEIGHT_NFREE)                                                 # height columns (duals from h₀ = 0) vs central differences through `update`
-        setter(h) = (pv, dv, fv, av, RC.NLLSsolver.update(mv, unit_increment(9 + HEIGHT_NFREE, 9 + q, h)), vv, lv)
-        fd = (RC.NLLSsolver.computeresidual(res, setter(1e-5)...) - RC.NLLSsolver.computeresidual(res, setter(-1e-5)...)) / 2e-5
+        fd = central_difference(res, vars, 5, unit_increment(9 + HEIGHT_NFREE, 9 + q, 1e-5))
         @test norm(fd) > 0
         @test norm(J[:, c0 + q] - fd) / norm(fd) < 5e-3
     end

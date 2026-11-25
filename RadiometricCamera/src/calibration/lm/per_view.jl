@@ -429,14 +429,17 @@ function _material_dual(m::Material, surf::TargetState, sd, off_m::Integer, ::Ty
     return mat_d, surf_d
 end
 
-"""The LM's Gauss–Newton blocks `(cost, Jᵀr, JᵀJ)` of a view (NLLSsolver's `computecostgradhess`, per_tile.jl), formed on the
-state's backend (`_view_jacobian`, `_gauss_newton_blocks`): the Jacobian never reaches the host. The cost is `computecost`'s (½‖r‖² of
-the same residual, read back: `nres` values)."""
-function _block_normal_equations(varflags, r::PerViewResidual, vars)
-    v = _view_jacobian(varflags, r, vars...)
-    g, H = _gauss_newton_blocks(v.J, v.res, v.T, v.lay, r.state.run)
-    return 0.5 * Float64(NLLSsolver.sqnorm(Array(v.res))), g, H
+"""The LM's Gauss–Newton blocks `(cost, Jᵀr, JᵀJ)` of a residual block, a view or a tile (NLLSsolver's `computecostgradhess`,
+per_tile.jl), formed on the state's backend (`_block_jacobian`, `_gauss_newton_blocks`): the Jacobian never reaches the host. The
+cost is `computecost`'s, ½‖r‖² of the block's cost rows (`_cost_rows`)."""
+function _block_normal_equations(varflags, r, vars)
+    b = _block_jacobian(varflags, r, vars)
+    g, H = _gauss_newton_blocks(b.J, b.res, b.T, b.lay, r.state.run)
+    return 0.5 * Float64(NLLSsolver.sqnorm(_cost_rows(b, r))), g, H
 end
+"""A view's Jacobian block (`_view_jacobian`) and its cost rows: the same residual, read back (`nres` values)."""
+_block_jacobian(varflags, r::PerViewResidual, vars) = _view_jacobian(varflags, r, vars...)
+_cost_rows(v, ::PerViewResidual) = Array(v.res)
 
 # ---- the blocks concurrently ------------------------------------------------------------------------------------------------
 # One view's kernels cover a few thousand pixels: a few percent of a device's resident threads (dgx01's B200: 6000 px per launch), so

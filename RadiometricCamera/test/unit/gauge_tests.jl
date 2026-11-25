@@ -21,8 +21,7 @@
     # with the gauge held: every tile's and the smoothness's columns of the held coordinates are exactly zero
     prob1, idx1 = build_problem_grid(sp; patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
     # its kept NLLSsolver cache is built for the solve's damping (LM_DAMPING), so it is reused, never rebuilt per solve (RC 0.9.0 review, finding 1)
-    samecache(d) = typeof(VgtkCore.LmProblem(prob1.problem.variables, prob1.blocks; fixed = findall(!, prob1.free), damping = d).cache) == typeof(prob1.cache)
-    @test samecache(RC.LM_DAMPING) && !samecache(VgtkCore.MarquardtDamping())
+    @test same_cache_type(prob1, RC.LM_DAMPING) && !same_cache_type(prob1, VgtkCore.MarquardtDamping())
     G_x = size(D, 2)
     px_n = 5
     for T in keys(prob1.problem.costs), c in get(prob1.problem.costs, T)

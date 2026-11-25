@@ -22,3 +22,12 @@ as they are — the central differences of the Jacobian tests."""
 updated_vars(vars, j, u) = ntuple(i -> i == j ? RadiometricCamera.NLLSsolver.update(vars[j], u) : vars[i], length(vars))
 """`unit_increment(n, i, h)`: the step `h` along coordinate `i` of an `n`-vector (a block's `update` increment)."""
 unit_increment(n, i, h) = (z = zeros(n); z[i] = h; z)
+"""`central_difference(res, vars, j, u)`: the central difference of the residual block `res` along the step `u` of its variable
+block `j` (`updated_vars` at ±`u`), per unit of `‖u‖`: the reference of an AD Jacobian column."""
+central_difference(res, vars, j, u) =
+    (RadiometricCamera.NLLSsolver.computeresidual(res, updated_vars(vars, j, u)...) -
+     RadiometricCamera.NLLSsolver.computeresidual(res, updated_vars(vars, j, -u)...)) / (2 * RadiometricCamera.LinearAlgebra.norm(u))
+"""`same_cache_type(p, damping)`: whether the LM problem `p`'s kept NLLSsolver cache is the one an `LmProblem` of its variables and
+blocks builds for `damping` (its cache type is the damping's)."""
+same_cache_type(p, damping) =
+    typeof(VgtkCore.LmProblem(p.problem.variables, p.blocks; fixed = findall(!, p.free), damping).cache) == typeof(p.cache)
