@@ -27,7 +27,7 @@ The package itself reads no environment variable. The suite and its harnesses re
 | `RC_TEST_GPU` | `test/runtests.jl` | `0` skips the `:gpu` items even when a functional GPU is visible |
 | `RC_GPU_DECIDED` | the `:gpu` worker | set by the runner (its verdict, handed to the worker); never set by hand |
 | `RC_TEST_PRECOMPILE_ONLY` | `test/runtests.jl` | `1` loads and caches the test environment and runs no item; `check` reports stale caches |
-| `VGTK_RAW_TEST_FILE` | the RAW-decoding items | a RAW photograph to decode; without it the checks that need one are recorded as broken (`@test_skip`), not passed |
+| `VGTK_RAW_TEST_FILE` | the RAW-decoding items | a RAW photograph to decode; without it the checks that need one are recorded as broken (`@test_skip`) |
 | `CUDA_VISIBLE_DEVICES` | CUDA.jl | the device the `:gpu` items see |
 | `RC_MIG_FIX`, `RC_MIG_WORK`, `RC_MIG_GOLDEN`, `RC_MIG_RECORD`, `RC_MIG_REFINE`, `RC_MIG_REFINE_ITERATIONS`, `RC_MIG_VIEWS` | `test/integration_blobboards/` | the integration harness's fixture, work directory and modes (its scripts' headers) |
 | `GOLDEN_OLD_STACK` | `test/regression/` | records the board-space golden from the package before the second migration (record only) |
