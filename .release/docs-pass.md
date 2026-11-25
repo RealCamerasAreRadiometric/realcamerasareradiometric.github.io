@@ -1,4 +1,4 @@
-docs-pass: c72b10a730d3b6b4f31afc2df8db24bbe7f09f6f
+docs-pass: c2707ab27076f91cddd3ff24c17a5220fd550558
 landing: site/ of this repository (site/src/index.md, deployed by the Site workflow with the package manual under /docs/): the install paragraph (General, no registry add), the example's `using CUDA`, `sz`, `CameraCalibrationMat(412.0, sz)` and the keyword camera changed in this pass
 
 # RadiometricCamera 0.3.0 docs pass (julia-docs-pass), on the release tree; the first General registration
