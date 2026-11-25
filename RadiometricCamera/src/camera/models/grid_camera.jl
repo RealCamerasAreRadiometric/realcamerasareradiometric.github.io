@@ -87,7 +87,7 @@ in_initialization(detections, region) = [d for d in detections if SVector{2, Flo
 The SplineLens camera of `G_x × G_y` controls over the image of the parametric camera `src` (a SplineLens source is resampled
 exactly instead, [`exact_start`](@ref); Estimation refuses a `grid_size` for one) by
 Estimation's `CameraRegression(; grid_size = (G_x, G_y), forward = false)` on `CameraRegressionProblem(SplineLens, src, imaged_region(src))`
-([`_spline_regression`](@ref)): the source turned onto its optical axis first (`OpticalAxis`, Core's `axis_gauged`: K's principal point at the axis's pixel — the same camera, its
+(`_spline_regression`): the source turned onto its optical axis first (`OpticalAxis`, Core's `axis_gauged`: K's principal point at the axis's pixel — the same camera, its
 rays rotated), then the backward fitted on Core's full-image lattice of that size to the turned source's rays over its imaged region
 by the penalized least squares of `PSpline` (one solve, no forward spline; a node the region misses held by the penalty). The
 camera is bounded by `src`'s image, its lens coverage `coverage` (the capture set's image region — where light falls, its keyed
@@ -289,7 +289,7 @@ A PARAMETRIC start's lattice: the SplineLens camera of the parametric camera `sr
 square cells laid over the bounding box of the image region — the sensor ∩ the lens coverage `coverage` (the capture set's image
 region; `nothing`, `src`'s own: [`coverage_region`](@ref)) — whose cell (`region_spacing`, an integer px) makes the nodes the
 region supports (Core's present-node rule, `node_mask`) come nearest `node_count`. Its controls are Estimation's public
-`CameraRegression(; grid_size, forward = false)` on `CameraRegressionProblem(SplineLens, src, imaged_region(src))` ([`_spline_regression`](@ref); the source turned onto its optical axis, the
+`CameraRegression(; grid_size, forward = false)` on `CameraRegressionProblem(SplineLens, src, imaged_region(src))` (`_spline_regression`; the source turned onto its optical axis, the
 penalized least squares of `PSpline`, as [`grid_model`](@ref)) on the source in the pixels of the lattice's box, moved back;
 the nodes the region does not support are ABSENT (never read on it, never a parameter); then the lattice is padded at its right and
 bottom edges to the grid route's patch multiple (`pad_lattice`). `spacing` (px), `origin` (the pixel where the lattice's area begins: its first node + one cell) and
@@ -387,7 +387,7 @@ end
     exact_start(source::SplineCamera; node_count = nothing, coverage = nothing, device = default_backend()) -> (; camera, resample)
 
 The start of a SplineLens `source` (Schöps's lattice, `grid.lattice = "derived"`), resampled exactly by Estimation's
-`CameraRegression(; forward = false)` on `CameraRegressionProblem(SplineLens, source, region)` ([`_spline_regression`](@ref)) over `region` = the sensor ∩ the lens coverage
+`CameraRegression(; forward = false)` on `CameraRegressionProblem(SplineLens, source, region)` (`_spline_regression`) over `region` = the sensor ∩ the lens coverage
 (`coverage`, else the source's: [`coverage_region`](@ref)): his lattice extended on his own spacing until every node whose support
 meets the region exists (his present nodes bit for bit, the new ones by Core's bending-energy continuation, marked
 `extrapolated`), subdivided by the integer m whose PRESENT nodes over the region come closest to `node_count` without exceeding it
