@@ -320,7 +320,7 @@ function _ensure_device!(s::CalibrationState)
     be = s.backend
     F = VgtkCore.kernel_float(be)
     # the CPU backend's kernels read the host board itself (Float64 already: no copy of the board's maps)
-    board32 = VgtkCore.on_device(F, be, s.board; from = _float_of(s.settings))
+    board32 = VgtkCore.on_device(F, _float_of(s.settings), be, s.board)
     px = [adapt(be, UInt32.(UInt32.((getindex.(p, 1) .- 1) .* _image_height(s) .+ getindex.(p, 2)))) for p in s.px]
     idx = [_index_list(be, length(p)) for p in px]
     # read by every chunk of every view, written only here: out of the device's per-buffer queue tracking, the lists one by one (an
