@@ -147,8 +147,6 @@ end
             r"stage\[\d+\]\.(default|gpu|results_branch)",                     # VisualGeometryToolkitEval Reproduce's stage graph
             r"stage\[\d+\]\.phases\[\d+\]\.(gpu|per_item)",                   # (the same schema: a stage's phases, the warping ablation's)
             r"results_branch\.assets\[\d+\]\.submitted_only",                  # (the same schema)
-            r"example\.decode\.cache", r"example\.registration\.check_tracks",  # PanoramaStitching's [example] tables
-            r"poses\.find_boards\.geometry\.resolve_pose_ambiguity",            # BlobBoards' [find_boards] table
             r"lenses\.[^.]+\.circle",                                           # a fact: the lens's image does not fill the sensor
             r"require\[\d+\]\.optional"]                                       # a fact of the run of record's required experiment (absent is no error)
     dirs = [joinpath(root, "experiments", "configs"), joinpath(root, "experiments", "test", "fixtures"), joinpath(root, "RadiometricCamera", "configs")]

@@ -186,6 +186,15 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   its stops the problem's with the evaluation's cap), the ray models' best centre (`NearestPoint`), the parametric starts (`Ransac` on
   `AbsolutePoseProblem`, then `CameraPosesProblem`), the sensor characterisation (`MasterDark`, `PhotonTransfer`), the board's page
   map (`ReweightedLeastSquares` on `EuclideanMap{3}`) and Kabsch (`Kabsch`); results read by field.
+- **Changed: BlobBoards 0.8's board finder.** The texture recovery's `sheet_poses` reads `find_boards`' `uid => FoundBoard` pairs (the
+  pose `found.fit.u`, the scored set `found.correspondences`; was the `(uid, model, quality, scored)` tuple). The config of record's
+  `[poses.find_boards]` (texture_recovery_14mm_small.toml) is BlobBoards' run configuration version 2: the arm's find under
+  `[poses.find_boards.geometry.ransac]` (`scoring = { type = "student_t_uniform", outlier_halfwidth = 5.0 }`, its
+  `local_optimization_strategy`), `pose_disambiguation = "none"` (was `resolve_pose_ambiguity = false`); the same configuration
+  value for value (BlobBoards migrates the version-1 table to it). The boolean-switch lint's allowances for
+  `poses.find_boards.geometry.resolve_pose_ambiguity` and PanoramaStitching's `example.decode.cache` and
+  `example.registration.check_tracks` are gone: the first is a tag now, and no config of record holds a PanoramaStitching table
+  (its version 2's `registration.bundle` is a tag, not a boolean).
 - **Renamed** (check_naming R15: the kind words name no function): `fit_start` → `_fit_start`, `fit_rotation_center` →
   `_fit_rotation_center` (its records keep `"method" = "fit_rotation_center"`), `refine_product` → `refinement_product`,
   `refine_settings` → `refinement_settings`, `fit_operator` → `texture_operator`.

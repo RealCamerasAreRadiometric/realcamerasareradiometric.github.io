@@ -51,16 +51,20 @@ images = "board_srgb_14mm_small"
 board_design = "blobboard_6eb_design"
 board = "blobboard_a4_6eb"
 
-# BlobBoards' own [find_boards] table (its keys; read by BlobBoards' FindBoardsConfig(table; camera) with the stack's strategy readers,
-# the camera the refinement's BoundedCamera held fixed). A key not stated is BlobBoards' configs/default.toml, as the front end of
-# record ran it (frontends_history/scripts/blob_detect.jl of tag v0.10.0: FindBoardsConfig(geometry = …) and descriptor_network_path()).
+# BlobBoards' own [find_boards] table (its keys, run configuration version 2; read by BlobBoards' FindBoardsConfig(table; camera) with the
+# stack's strategy readers, the camera the refinement's BoundedCamera held fixed). A key not stated is BlobBoards' configs/default.toml, as
+# the front end of record ran it (frontends_history/scripts/blob_detect.jl of tag v0.10.0: FindBoardsConfig(geometry = …) and
+# descriptor_network_path()). Its version-1 form (BlobBoards 0.7: the arm's outlier_halfwidth, local_optimization_strategy and
+# resolve_pose_ambiguity = false) is the same configuration, value for value (BlobBoards 0.8 migrates it, tested in its suite).
 [poses.find_boards.geometry]
 type = "pose"                                                  # the calibrated arm: P3P and its local optimization through the camera
-outlier_halfwidth = 5.0                                        # px, BlobBoards' pose-arm value (PoseGeometry; its homography arm's too)
 min_inliers = 6                                                # BlobBoards' pose-arm value (one below the homography arm's 7: P3P is tighter)
-resolve_pose_ambiguity = false                                 # BlobBoards' value: the pose of the RANSAC winner
-local_optimization_strategy = { type = "student_t_uniform" }   # BlobBoards' configs/default.toml [find_boards.geometry]
+pose_disambiguation = "none"                                   # BlobBoards' value: the pose of the RANSAC winner
 undistortion = "none"                                          # raw pixels, the full camera in the estimator (BlobBoards' value)
+
+[poses.find_boards.geometry.ransac]                            # the arm's find (Estimation's Ransac); its trial budget BlobBoards' default
+scoring = { type = "student_t_uniform", outlier_halfwidth = 5.0 }   # px, BlobBoards' pose-arm value (PoseGeometry; its homography arm's too)
+local_optimization_strategy = { type = "student_t_uniform" }   # BlobBoards' configs/default.toml [find_boards.geometry.ransac]
 
 [texture]
 split_every = 5                # by index: k % 5 == 0 test, == 1 validation, the rest fit

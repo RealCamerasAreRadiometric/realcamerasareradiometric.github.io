@@ -294,11 +294,11 @@ function sheet_poses(finder, photos; page, log = println)
         VgtkCore.Size2(size(img, 2), size(img, 1)) == VgtkCore.extent(camera) ||
             throw(ArgumentError("sheet_poses: $path is $(size(img, 2)) × $(size(img, 1)) pixels, not the camera's sensor $(VgtkCore.extent(camera))"))
         acc = BlobBoards.find_boards(finder.features, finder.network, img; board_bundles = finder.bundles, config = finder.config, device = finder.device)
-        i = findfirst(a -> a[1] == finder.board.uid, acc)
+        i = findfirst(a -> a.first == finder.board.uid, acc)          # uid => FoundBoard
         if i === nothing
             log("  $name: BlobBoards accepts no pose of board $(finder.board.uid) — left out"); continue
         end
-        _, E, _, cs = acc[i]
+        found = acc[i].second; E = found.fit.u; cs = found.correspondences   # the board's fit (its pose) and its scored set
         T = VgtkCore.ustrip(VgtkCore.m, VgtkCore.with_unit(E ∘ inv(page), VgtkCore.mm))   # page (m) → camera (m)
         R = SMatrix{3, 3, Float64}(VgtkCore.rotation(T)); t = SVector{3, Float64}(VgtkCore.translation(T))
         r = Float64[]; ang = Float64[]; nn = 0

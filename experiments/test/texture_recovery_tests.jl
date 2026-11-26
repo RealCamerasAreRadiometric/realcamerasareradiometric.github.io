@@ -216,8 +216,9 @@ end
     @test maximum(page.residuals_mm) < 1e-9
     @test VgtkCore.rotation(page.map) ≈ Rxyz(π, 0.0, 0.0) atol = 1e-12
     # BlobBoards' pose arm, configured by its own [find_boards] table; a non-pose geometry and a bare model are refused
-    table = Dict{String, Any}("geometry" => Dict{String, Any}("type" => "pose", "outlier_halfwidth" => 5.0, "min_inliers" => 6,
-                                                            "local_optimization_strategy" => Dict{String, Any}("type" => "student_t_uniform")))
+    table = Dict{String, Any}("geometry" => Dict{String, Any}("type" => "pose", "min_inliers" => 6,
+                                                            "ransac" => Dict{String, Any}("scoring" => Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0),
+                                                                                          "local_optimization_strategy" => Dict{String, Any}("type" => "student_t_uniform"))))
     cpu = BlobBoards.KernelAbstractions.CPU()
     finder = board_finder(bjson, spline, table; gallery = joinpath(dir, "gallery.jld2"), device = cpu)
     @test finder.config.geometry isa BlobBoards.PoseGeometry && finder.config.geometry.camera === spline && finder.board.uid == board.uid
