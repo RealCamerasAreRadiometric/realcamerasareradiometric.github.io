@@ -159,8 +159,8 @@ sensor position on a grid lens's lattice (Core's `spline_window` at K⁻¹𝐩; 
 end
 
 
-"""The kernels' copy of a host grid lens: in their float type (`_kernel_float`; `F` another), its arrays adapted to the backend."""
-_lens32(be, g, F = _kernel_float(be)) = adapt(be, VgtkCore.convert_eltype(F, VgtkCore.model(g)))   # a bounded grid's bare model: a kernel reads π⁻¹ only
+"""The kernels' copy of a host grid lens: in their float type (Core's `kernel_float`; `F` another), its arrays adapted to the backend."""
+_lens32(be, g, F = VgtkCore.kernel_float(be)) = adapt(be, VgtkCore.convert_eltype(F, VgtkCore.model(g)))   # a bounded grid's bare model: a kernel reads π⁻¹ only
 
 """
 Bicubic fan-out of one pixel's per-sensor-sample chief-direction sensitivities `dget(ks, comp, c)` (∂Φ_c/∂π⁻¹_comp) onto the patch
@@ -667,7 +667,7 @@ function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, nee
     return _batch_launch(s, k, vars, lensf, vec[first(gb.patches)], s.device_cache.px[k], s.device_cache.idx[k], key, need_jac)
 end
 """One chunk of a view batch's Jacobian (`_batch_launch`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on the
-lens `lens` and the board `board` (its state replaced by the seeded one), both in `F` (`_kernel_float`, or
+lens `lens` and the board `board` (its state replaced by the seeded one), both in `F` (Core's `kernel_float`, or
 `HIGH_FLOAT` for the pose's chunks: `hi`). Returns the `_JacAt` inputs `(view, mat, board, fbase, dbase, hi)`."""
 function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, board, hi::Bool) where {F}
     N = length(VgtkCore.model(foc).t̂_i)
@@ -689,7 +689,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
     m = vars[8]::MaterialVar; vg = vars[9]::VgtkCore.LinearSubspaceManifold; lt = vars[10]::LightingVar
     dc = _ensure_device!(s)
     be = s.backend
-    F = _kernel_float(be)
+    F = VgtkCore.kernel_float(be)
     lens32 = _lens32(be, lensf)
     v32 = View{F, N, typeof(lens32)}(_pose_eltype(F, VgtkCore.model(pose)), lens32, VgtkCore.convert_eltype(F, VgtkCore.model(foc)),
                                      F(ap.r))
@@ -708,7 +708,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
                            fixed = material_fixed(m))
         P = lay.P
         st32 = VgtkCore.convert_eltype(F, s.settings)
-        C = _jac_chunk(s, P)
+        C = VgtkCore.dual_chunk(s.backend, P, s.jacobian_chunk)
         # vignetting and lighting are not differentiated here (their columns are the parts kernel's): plain, not duals with
         # zero partials — the same values and partials, fewer registers
         vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)

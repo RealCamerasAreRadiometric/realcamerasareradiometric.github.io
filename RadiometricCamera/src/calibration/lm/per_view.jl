@@ -468,7 +468,7 @@ function _window_width(s::CalibrationState, list)
     n = length(list)
     n == 0 && return 1
     be = s.backend
-    be isa KA.CPU && return clamp(Threads.nthreads(), 1, n)
+    KA.isgpu(be) || return clamp(VgtkCore.device_resident_threads(be), 1, n)   # the host: its threads (Core's)
     cap = lock(() -> get(_CAPACITY, typeof(be), nothing), _DEVICE_CACHE_LOCK)
     if cap === nothing
         @warn "no resident-thread query for $(typeof(be)): the LM's blocks run one at a time" maxlog = 1

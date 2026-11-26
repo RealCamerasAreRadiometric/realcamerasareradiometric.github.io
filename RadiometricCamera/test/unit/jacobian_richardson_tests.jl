@@ -42,7 +42,7 @@
     tex_r = fixture_board()
     board_r = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_r; facing = [0.0, 0.0, 1.5])
     Wr = Hr = 32
-    h_r = SVector{HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
+    h_r = SVector{HEIGHT_NC}([VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     board_r = RadiometricCamera.with_state(board_r, TargetState(h = h_r))
     focus_r = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wr, Hr))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_r = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]

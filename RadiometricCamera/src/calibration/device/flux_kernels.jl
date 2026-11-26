@@ -20,19 +20,17 @@ function _launch_rows(f, be, px; workgroupsize = nothing)
     return out
 end
 """
-    _pixel_workgroup(be, requested)
+    _pixel_rows_exec(be, requested = nothing)
 
-The workgroup size of a per-pixel kernel on the backend `be`: 16 pixels on the CPU backend, the kernel's `requested` one on a device
-(its register budget; `nothing`: the backend's choice). KernelAbstractions' CPU backend gives each thread whole workgroups, and its
+The launch policy of a per-pixel kernel on the backend `be`, Core's `OnBackend(be; workgroupsize = requested, host_workgroupsize = 16)`:
+16 pixels a workgroup on the host, the kernel's `requested` one on a device (its register budget; `nothing`: the backend's choice). KernelAbstractions' CPU backend gives each thread whole workgroups, and its
 default group is 1024 items: a view of a run's 8,192 to 16,384 measured pixels then occupies 8 to 16 threads, a test board's 500
 one. A pixel's flux is ≈ 50 µs of work (96 rays, four radiance samples each), so 16 pixels a group cost nothing in scheduling and
 every thread works: the flux kernel of a 1,728-pixel view 49 ms → 5.5 ms on 32 threads (2026-11-20), the same bits (a pixel's value
-does not depend on its group).
+does not depend on its group). The policy of `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`,
+`_launch_row_job!`).
 """
-_pixel_workgroup(be, requested) = be isa KA.CPU ? 16 : requested
-"""The launch policy of a per-pixel kernel on the backend `be` (Core's `OnBackend` on `_pixel_workgroup`; `requested` the device's
-group, `nothing` its own choice): `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`, `_launch_row_job!`)."""
-_pixel_rows_exec(be, requested = nothing) = VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, requested))
+_pixel_rows_exec(be, requested = nothing) = VgtkCore.OnBackend(be; workgroupsize = requested, host_workgroupsize = 16)
 
 """A row job (`_launch_row_job!`): `row!(out, i, args...)` writes row `i` of `out`. A per-index functor of Core's `pointwise!`: the
 row function a singleton, `out` and the tuple `args` adapted to the backend as its fields (one kernel argument each); its value

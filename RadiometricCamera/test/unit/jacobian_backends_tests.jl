@@ -12,7 +12,7 @@
     using RadiometricCamera: build_problem_grid, HEIGHT_NC, with_h, with_state
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, ForwardDiff
-    h_w = SVector{HEIGHT_NC}([0.5 * saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
+    h_w = SVector{HEIGHT_NC}([0.5 * VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
     s_c = warped(edge_state(edge_s, targets_e))
     prob, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
@@ -82,7 +82,7 @@ end
 
     require_gpu()
     if RC_GPU_TESTS
-        h_w = SVector{HEIGHT_NC}([0.5 * saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
+        h_w = SVector{HEIGHT_NC}([0.5 * VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
         warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
         pair(; kw...) = (warped(edge_state(edge_s, targets_e; kw...)), warped(edge_state(edge_s, targets_e; backend = CUDA.CUDABackend(), kw...)))
         tile_pair(sc, sg) = begin

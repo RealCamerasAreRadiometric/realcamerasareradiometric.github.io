@@ -61,6 +61,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
 - **Breaking:** `calibrate(camera, poses, observations, photographs, algorithm; target, names)` is removed (keywords are configuration
   only): the geometric calibration is data, `calibrate(StartGeometry(camera, poses, observations, target; names), photographs,
   algorithm; stops, device)`.
+- **Changed: VisualGeometryToolkitCore 0.13.4's device policy.** The backend choices are Core's: `KernelAbstractions.isgpu`,
+  `kernel_float`, `dual_chunk`, `OnBackend(…; host_workgroupsize)`, `device_resident_threads`, `device_names` and
+  `on_device(T, S, device, x)`; the test scenes' board warping is Core's `Synthetic.saddle_height`. The repository's
+  DUPLICATION.toml is gone (no exception left). Same values.
 - **Public:** `PIPELINE_OUTPUT_KEYS`, `START_RECORD_FILE`, `START_MASKS_DIR`, `load_refinement_start`, `masked_observations` and
   `Unweighted` (read by the paper project).
 - **Changed:** the start's per-view pose refit (`_refined_pose`) returns its `FitResult`; a start pose whose refine did not succeed

@@ -18,13 +18,13 @@ function linearization()
     c = benchmark_board(); s = c.state(); problem, _ = RC.build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
     r, vars, flags = first_block(problem, view_blocks(problem))
     pose, dist, foc, ap, m, vg, lt = vars
-    dc = RC._ensure_device!(s); be = s.backend; F = RC._kernel_float(be); G = RC.HIGH_FLOAT
+    dc = RC._ensure_device!(s); be = s.backend; F = VgtkCore.kernel_float(be); G = RC.HIGH_FLOAT
     k = r.k; px = dc.px[k]; idx = dc.idx[k]; npx = length(s.px[k]); Hh = RC._image_height(s)
     NV = Int(RC.n_control_points(VgtkCore.model(vg))); J = Int(RC.sh_count(RC.max_degree(lt.light)))
     NS = length(s.settings.sensor); N = length(VgtkCore.model(foc).t̂_i)
     lay = RC._jacobian_layout(flags, N, NS, VgtkCore.tangent_size(vg), NV, J, VgtkCore.tangent_size(dist); NH = RC.n_height(m), NI = RC.n_inplane(m), fixed = RC.material_fixed(m))
     view0 = RC._view_of(r, pose, dist, foc, ap)
-    stk = VgtkCore.convert_eltype(F, s.settings); C = RC._jac_chunk(s, lay.P)
+    stk = VgtkCore.convert_eltype(F, s.settings); C = VgtkCore.dual_chunk(s.backend, lay.P, s.jacobian_chunk)
     vigk = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); lk = VgtkCore.convert_eltype(F, lt.light)
     vk = RC.adapt(be, VgtkCore.convert_eltype(F, view0)); mk = VgtkCore.convert_eltype(F, m.mat)
     boardk = RC.with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
@@ -42,7 +42,7 @@ function linearization()
         f(); KA.synchronize(be)
         return 1e3 * minimum((t = time_ns(); f(); KA.synchronize(be); (time_ns() - t) / 1e9) for _ in 1:REPS)
     end
-    out = Dict{String, Any}("backend" => BACKEND, "device" => device_name(), "pixels" => npx, "slots" => lay.P, "columns" => lay.ncol, "chunk" => C,
+    out = Dict{String, Any}("backend" => BACKEND, "device" => first(VgtkCore.device_names(BE)), "pixels" => npx, "slots" => lay.P, "columns" => lay.ncol, "chunk" => C,
                             "warp" => WARP, "heights" => HEIGHT_DEGREE, "chunks_low" => count(p -> !p[4], plan), "chunks_high" => count(p -> p[4], plan), "float" => string(F), "label" => LABEL)
     out["flux_ms"] = best(() -> RC._device_rows(RC._flux_functor(s, k, vk, VgtkCore.model(vg), m.mat, lt.light, m.surface), be, px))
     rounded ? (out["record_round_ms"] = best(() -> RC._record_as(F, hrays))) : (out["record_ms"] = best(() -> record(vk, vigk, mk, lk, boardk, stk)))

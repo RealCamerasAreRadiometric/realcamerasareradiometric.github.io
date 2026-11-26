@@ -35,7 +35,7 @@ end
 @testitem "quality: no duplication (check_duplication)" begin
     # Zero duplication, enforced as in every stack package: VisualGeometryToolkitCore's check over the package (name ownership against
     # the upstream stack, body similarity, whole files, retired patterns, backend branches, CPU/GPU twins) and the repository's files,
-    # its exceptions the repository root's DUPLICATION.toml (every entry TEMPORARY, naming the event that removes it; a stale one fails)
+    # no exceptions: the repository has no DUPLICATION.toml (its last TEMPORARY entries went with Core 0.13.4's device policy)
     using Test, RadiometricCamera
     import VisualGeometryToolkitCore as VgtkCore
     found = VgtkCore.check_duplication(RadiometricCamera)

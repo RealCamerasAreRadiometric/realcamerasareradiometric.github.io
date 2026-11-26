@@ -26,7 +26,7 @@ else
 end
 
 const GOLD_TEX = RCg.VgtkFeatures.load_linear_image(joinpath(@__DIR__, "..", "fixtures", "blobboards_256", "blob_pattern_061_ce03e.png"))
-gold_h() = SVector{RCg.HEIGHT_NC}([saddle(𝐛) for 𝐛 in RCg.HEIGHT_NODES])
+gold_h() = SVector{RCg.HEIGHT_NC}([VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RCg.HEIGHT_NODES])
 gold_mat() = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
 
 """Board, scene (with the warping h and the edge parameters as the stack wants them) and the material."""
