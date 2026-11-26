@@ -12,7 +12,8 @@
 # --dry-run lists every entry of record (the retired ones with --only): its files, their bytes, the overlap with the other entries,
 # and the files of data_root() that no entry holds (the catalog's [[unpacked]] files counted apart; a cache directory, a
 # CACHEDIR.TAG, src/data.jl is_cache_dir, skipped). PRIVACY (src/data.jl PRIVATE_PHOTOGRAPHS): an entry holding one of the excluded
-# photographs is refused before anything is packed (Eval packs exactly the files artifact_files selects); --check lists every staged
+# photographs is refused before anything is packed (Eval packs exactly the files artifact_files selects; the five other photographs
+# of the same names, SAME_NAME_PHOTOGRAPHS, are no excluded photographs at exactly their paths); --check lists every staged
 # tarball under --stage against the rule (the step before any upload), exit 1 on a hit. --local-toml writes a copy of the bindings
 # with file:// URLs to the staged tarballs (EXPERIMENTS_ARTIFACTS_TOML names it to scripts/fetch_data.jl, which installs the trees
 # into the artifact store from them; never committed). A staged tarball whose file listing is current is reused.

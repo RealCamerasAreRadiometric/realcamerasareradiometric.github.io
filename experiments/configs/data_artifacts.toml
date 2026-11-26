@@ -16,10 +16,19 @@
 # published, and its trees reach a machine from the artifact store (VisualGeometryToolkitCore's artifact_store: the site profile's
 # store, installed there from the packed tarballs), never from the depot.
 #
+# THE TIERS OF 2026-11-26 (record rc_supp, packed on the author's machine from the files the configs pin): the inputs of the stages
+# that joined with the paper's figures — the board-warping session's six sets, the three rotation sweeps, the fisheye's and the
+# Tamron's diffuser photographs, the two rendered detector-bias sets with their truth and their board, and the external tools'
+# outputs these and the Sigma 14 mm cases start from. Entries of record like the others, in a record of their own.
+#
 # PRIVACY: the photographs DSC06045, DSC06052, DSC06053, DSC06054 and DSC06055 (the 14 mm Siemens-star session of 2026-11-03) show
 # another person and are never in a tier or a record, under any prefix or extension. Every entry of record excludes them by its
 # `!` globs; src/data.jl `private_photographs` is the one rule; scripts/make_artifacts.jl refuses to pack, and its --check mode a
 # staged tarball, that holds one; test/data_tests.jl checks every entry.
+# One exception, by path: the fisheye AprilGrid set of the board-warping session (2026-11-19) holds five OTHER photographs with the
+# same file names (the camera's file counter came round). They show the AprilGrid alone and are published (T. Harder 2026-11-24):
+# the entry rc_raw_board_warping_april_board_fisheye_same_names_20261126, whose filter lists their five paths and no glob
+# (src/data.jl SAME_NAME_PHOTOGRAPHS). The set's other 184 photographs are an entry under the rule as it is.
 #
 # THE RETIRED TIERS (packed 2026-10-29 / 2026-11-02, `retired = true`, not required): the first cut, kept on a private Hugging Face
 # dataset (record `rc`); superseded by the tiers of record and read by no stage. Whether they are deleted from that dataset or kept
@@ -53,6 +62,12 @@ title = "Real Cameras are Radiometric — input data IV: vignetting RAW, targets
 license = "CC-BY-4.0"
 host = "zenodo"
 placeholder = "ZENODO_RC_VIG_DERIVED"
+
+[records.rc_supp]
+title = "Real Cameras are Radiometric — input data V: board warping (two boards, three lenses), rotation sweeps, diffuser flat fields, the rendered detector-bias sets and the external tools' outputs (Sony FX3 RAW, Mitsuba renders)"
+license = "CC-BY-4.0"
+host = "zenodo"
+placeholder = "ZENODO_RC_SUPP"
 
 [records.rc_tools]
 title = "Real Cameras are Radiometric — the external calibrator's container image (published only if its base image's licence allows)"
@@ -526,6 +541,241 @@ required = false
 what = "the enroot image of T. Schöps's camera_calibration (commit 00ef4de, CUDA 12.8, sm_100) the front ends' detect stage runs (configs/experiments/frontends.toml [inputs.schoeps_image], pinned by its sha256); optional"
 provenance = "built from experiments/containers/schoeps.def (2026-11-11); whether it may be published depends on its CUDA base image's licence (the owner's decision): until then its record is never uploaded"
 
+# ---- the tiers of 2026-11-26 (record rc_supp): the inputs of the stages that joined with the paper's figures ----------------------
+[artifacts.rc_raw_board_warping_april_board_14mm_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/april-board/14mm"
+filter = ["paper-data/board-warping/april-board/14mm/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 235
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/april-board/14mm (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 235 AprilGrid photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Sigma 14 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses"
+
+[artifacts.rc_raw_board_warping_april_board_fisheye_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/april-board/fisheye"
+filter = ["paper-data/board-warping/april-board/fisheye/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 184
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/april-board/fisheye (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "184 of the 189 AprilGrid photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the 8 mm fisheye, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses. The set's other five photographs carry the file names of the excluded photographs and are the entry below"
+
+# The one entry without the file-level exclusions: its filter lists the five paths of src/data.jl SAME_NAME_PHOTOGRAPHS and no glob.
+[artifacts.rc_raw_board_warping_april_board_fisheye_same_names_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/april-board/fisheye"
+filter = ["paper-data/board-warping/april-board/fisheye/DSC06045.ARW",
+          "paper-data/board-warping/april-board/fisheye/DSC06052.ARW",
+          "paper-data/board-warping/april-board/fisheye/DSC06053.ARW",
+          "paper-data/board-warping/april-board/fisheye/DSC06054.ARW",
+          "paper-data/board-warping/april-board/fisheye/DSC06055.ARW",
+          "!**/*DSC06045*/**", "!**/*DSC06052*/**", "!**/*DSC06053*/**", "!**/*DSC06054*/**", "!**/*DSC06055*/**"]
+files = 5
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the five photographs of paper-data/board-warping/april-board/fisheye (Sony FX3 ARW, as captured) whose file names the five excluded photographs also carry: the rest of that session folder"
+provenance = "the photographs DSC06045 and DSC06052 to DSC06055 of the fisheye AprilGrid set of the board-warping session, captured on 2026-11-19: the 1 m AprilGrid alone. The camera's file counter came round to the numbers of the five photographs excluded from the 14 mm Siemens-star session of 2026-11-03, which are other files in another folder and are in no tier (T. Harder 2026-11-24; src/data.jl SAME_NAME_PHOTOGRAPHS)"
+
+[artifacts.rc_raw_board_warping_april_board_tamron_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/april-board/tamron"
+filter = ["paper-data/board-warping/april-board/tamron/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 206
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/april-board/tamron (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 206 AprilGrid photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m AprilGrid with the Tamron 20 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses"
+
+[artifacts.rc_raw_board_warping_siemens_board_14mm_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/siemens-board/14mm"
+filter = ["paper-data/board-warping/siemens-board/14mm/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 214
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/siemens-board/14mm (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 214 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Sigma 14 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses (frontends.toml [inputs.raw_14mm_siemens_20261119])"
+
+[artifacts.rc_raw_board_warping_siemens_board_fisheye_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/siemens-board/fisheye"
+filter = ["paper-data/board-warping/siemens-board/fisheye/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 204
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/siemens-board/fisheye (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 204 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the 8 mm fisheye, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses (frontends.toml [inputs.raw_fisheye_siemens_20261119])"
+
+[artifacts.rc_raw_board_warping_siemens_board_tamron_20261126]
+kind = "tree"
+dir = "paper-data/board-warping/siemens-board/tamron"
+filter = ["paper-data/board-warping/siemens-board/tamron/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 203
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/board-warping/siemens-board/tamron (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 203 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Tamron 20 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses (frontends.toml [inputs.raw_tamron_siemens_20261119])"
+
+[artifacts.rc_raw_vignetting_14mm_panorama_20261126]
+kind = "tree"
+dir = "paper-data/vignetting/14mm/panorama"
+filter = ["paper-data/vignetting/14mm/panorama/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 38
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/vignetting/14mm/panorama (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the frames of the Sony FX3 + Sigma 14 mm indoor pure-rotation sweep of 2026-10-29 as captured (14-bit ARW 4256 x 2848; the 11 of the 2026-11-04 run: two rows, pitch ≈ 0° and ≈ +14°, yaw over 360°, the frames of PanoramaStitching's examples/panorama_vignetting config_fx3_14mm.toml)"
+
+[artifacts.rc_raw_vignetting_fisheye_panorama_20261126]
+kind = "tree"
+dir = "paper-data/vignetting/fisheye/panorama"
+filter = ["paper-data/vignetting/fisheye/panorama/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 35
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/vignetting/fisheye/panorama (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 35 raw frames of the indoor pure-rotation sweep (Sony ILME-FX3, Sigma 8 mm F3.5 fisheye at f/4, 14-bit ARW 4256 x 2848), 2026-10-29; Hugging Face panorama_good/fisheye"
+
+[artifacts.rc_raw_vignetting_tamron_panorama_20261126]
+kind = "tree"
+dir = "paper-data/vignetting/tamron/panorama"
+filter = ["paper-data/vignetting/tamron/panorama/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 35
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = false
+what = "the raw photographs of paper-data/vignetting/tamron/panorama (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the 35 raw frames of the indoor pure-rotation sweep (taken in overlapping order), Sony ILME-FX3 + Tamron 20 mm at f/2.8, 14-bit ARW 4256 x 2848, 2026-10-29; the config of record uses all 35 (`frames`)"
+
+[artifacts.rc_raw_vignetting_fisheye_diffuser_20261126]
+kind = "tree"
+dir = "paper-data/vignetting/fisheye/diffuser"
+filter = ["paper-data/vignetting/fisheye/diffuser/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 1
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = true
+what = "the raw photographs of paper-data/vignetting/fisheye/diffuser (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the diffuser flat-field photograph of the Sigma 8 mm fisheye at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
+
+[artifacts.rc_raw_vignetting_tamron_diffuser_20261126]
+kind = "tree"
+dir = "paper-data/vignetting/tamron/diffuser"
+filter = ["paper-data/vignetting/tamron/diffuser/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 1
+mount = "data"
+record = "rc_supp"
+tier = "rc_raw_photos"
+required = true
+what = "the raw photographs of paper-data/vignetting/tamron/diffuser (Sony FX3 ARW, as captured), one session folder of the author's published set"
+provenance = "the diffuser flat-field photograph of the Tamron 20 mm at f/2.8 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
+
+[artifacts.rc_derived_20261126]
+kind = "tree"
+dir = "."
+filter = ["geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_bc5_cv2.json",
+          "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_kb_cv2.json",
+          "geometric_accuracy/records/central30cm_all/14mm_central30cm_si_all_green_ocv14_cv2.json",
+          "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_bc5_cv2.json",
+          "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_kb_cv2.json",
+          "geometric_accuracy/records/aprilgrid400_all/ag400_all_green_ocv14_cv2.json",
+          "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/meta.toml",
+          "geometric_accuracy/night_stars/data/fx3-14mm-textex-20261109-small-g7/texture_learned_photograph/photograph.png",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 8
+mount = "data"
+record = "rc_supp"
+tier = "rc_baselines"
+required = true
+what = "the external tools' outputs the default stages read beside the tiers of 2026-11-21: OpenCV's calibrations of the two Sigma 14 mm sets, the starts of their Brown–Conrady, OpenCV-14 and Kannala–Brandt cases (six camera records, geometric_accuracy/records/), and the band \"training photograph\" of fig:texture-learned with the record of its cut (texture_learned_photograph/)"
+provenance = "the OpenCV front-end step of 2026-11-24 (configs/inputs/opencv_starts_20261124.toml: experiments/tools/, OpenCV 5.0.0) and the author-side step of 2026-11-21 (configs/inputs/texture_learned_photograph_20261121.toml: rawpy 0.27.1, OpenCV 5.0.0 SIFT and RANSAC on the RAW photograph DSC03316.ARW); each file is pinned by its sha256 in the config that reads it"
+
+[artifacts.rc_derived_supp_20261126]
+kind = "tree"
+dir = "."
+filter = ["geometric_accuracy/night_stars/data/fx3-14mm-aprilgrid-bw20261119/schoeps_dense_green/**",
+          "geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-bw20261119/schoeps_dense_aruco_green/**",
+          "geometric_accuracy/night_stars/data/fx3-tamron-aprilgrid-bw20261119/schoeps_dense_green/**",
+          "geometric_accuracy/records/2710/14mm_kb_fit.json",
+          "geometric_accuracy/records/2710/tamron_opencv5_fit.json",
+          "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/schoeps/**",
+          "geometric_accuracy/detector_bias/data/mitsuba/fov/frontend/**",
+          "geometric_accuracy/detector_bias/data/mitsuba/fov/records/start_opencv.json",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 71
+mount = "data"
+record = "rc_supp"
+tier = "rc_baselines"
+required = false
+what = "the external tools' outputs of the stages outside the default launch: T. Schöps's dense AprilGrid datasets of the board-warping session's three AprilGrid sets (17 files each), the two parametric fits the Sigma 14 mm's and the Tamron's rotation sweeps are registered with (geometric_accuracy/records/2710/), and the starts of the two rendered detector-bias sets (the AprilGrid corners as a front-end file, OpenCV's calibration on them as a camera record, T. Schöps's calibration on his star detections)"
+provenance = "the AprilGrid chain of experiments/frontends_history/ of tag v0.10.0 on the session's sets, 2026-11-20 (OpenCV's corners on the green copies, T. Schöps's central-generic, cell 150 px, 4 pyramid levels); fit_lens_detections.jl's fits to Schöps's Siemens detections of 2026-10-27, migrated to vgio/cameras/v4; the author-side preparation of the detector-bias cases (configs/experiments/detector_bias.toml states each input)"
+
+[artifacts.rc_targets_mitsuba_20261126]
+kind = "tree"
+dir = "geometric_accuracy/data/target"
+filter = ["geometric_accuracy/data/target/aprilgrid_mitsuba_exact/board/**",
+          "geometric_accuracy/data/target/aprilgrid_mitsuba_exact/distance_map_10ppm/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 5
+mount = "data"
+record = "rc_supp"
+tier = "rc_calibration"
+required = false
+what = "the rendered AprilGrid of the detector-bias set as a board: board/ (texture.png, texture_features.bin, board.json) and distance_map_10ppm/ (its printed-edge distance map at 10 px per mm, a vgio/raster record)"
+provenance = "built by the author-side preparation of the detector-bias cases from the render pipeline's own texture (11815 px at 300 dpi; 10 × 10 tags 36h11, tag 80.01 mm, spacing 18.203333 mm, on a page of 1016.3476 mm)"
+
+[artifacts.rc_synthetic_detector_bias_20261126]
+kind = "tree"
+dir = "."
+filter = ["paper-data/detector_bias/output_fov_april/images/**",
+          "paper-data/detector_bias/output_fov_april/data.npy",
+          "paper-data/detector_bias/output_ds_siemens/images/**",
+          "paper-data/detector_bias/output_ds_siemens/data.npy",
+          "geometric_accuracy/detector_bias/data/mitsuba/fov/gt/**",
+          "geometric_accuracy/detector_bias/data/mitsuba/ds_siemens/gt/**",
+          "geometric_accuracy/detector_bias/data/mitsuba/ds/circle_rgb/**",
+          "!**/*DSC06045*", "!**/*DSC06045*/**", "!**/*DSC06052*", "!**/*DSC06052*/**", "!**/*DSC06053*", "!**/*DSC06053*/**", "!**/*DSC06054*", "!**/*DSC06054*/**", "!**/*DSC06055*", "!**/*DSC06055*/**"]
+files = 409
+mount = "data"
+record = "rc_supp"
+tier = "rc_synthetic"
+required = false
+what = "the two rendered detector-bias sets as their cases read them: of each set the 200 renders of its [views] (Mitsuba 3.9.0, 4256 × 2848, 8-bit sRGB, by F. Seegräber) and the render pipeline's record data.npy (per render the detections, their true projections and board points), the truth of the 200 views (gt/: poses.json, the true poses trajectory.json and the true camera camera.json beside it) and the image disc of the Double Sphere renders (ds/circle_rgb/F1.png)"
+provenance = "the renders and their records: the author's folder detector_bias/ of the published set (10 000 renders per set, of which a case reads the 200 of configs/experiments/detector_bias.toml [views]; data.npy whole); the truth and the image disc: the author-side preparation of the cases from the render pipeline's records"
+
 [artifacts.rc_raw_photos_20261029]
 kind = "tree"
 dir = "."
@@ -637,36 +887,6 @@ provenance = "the camera's raw files as captured on 2026-11-02 (EXIF: model, len
 # =============================================================================
 
 [[unpacked.rc_raw_photos]]
-paths = ["paper-data/vignetting/14mm/panorama"]
-where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
-provenance = "38 files; the frames of the Sony FX3 + Sigma 14 mm indoor pure-rotation sweep of 2026-10-29 as captured (14-bit ARW 4256 x 2848; the 11 of the 2026-11-04 run: two rows, pitch ≈ 0° and ≈ +14°, yaw over 360°, the frames of PanoramaStitching's examples/panorama_vignetting config_fx3_14mm.toml)"
-configs = []
-
-[[unpacked.rc_raw_photos]]
-paths = ["paper-data/vignetting/fisheye/diffuser"]
-where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
-provenance = "1 files; the diffuser flat-field photograph of the Sigma 8 mm fisheye at f/4 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []
-
-[[unpacked.rc_raw_photos]]
-paths = ["paper-data/vignetting/fisheye/panorama"]
-where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
-provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (Sony ILME-FX3, Sigma 8 mm F3.5 fisheye at f/4, 14-bit ARW 4256 x 2848), 2026-10-29; Hugging Face panorama_good/fisheye"
-configs = []
-
-[[unpacked.rc_raw_photos]]
-paths = ["paper-data/vignetting/tamron/diffuser"]
-where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
-provenance = "1 files; the diffuser flat-field photograph of the Tamron 20 mm at f/2.8 (2026-10-28): the raw photograph vignetting/flat/… (rc_baselines) was made from"
-configs = []
-
-[[unpacked.rc_raw_photos]]
-paths = ["paper-data/vignetting/tamron/panorama"]
-where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
-provenance = "35 files; the 35 raw frames of the indoor pure-rotation sweep (taken in overlapping order), Sony ILME-FX3 + Tamron 20 mm at f/2.8, 14-bit ARW 4256 x 2848, 2026-10-29; the config of record uses all 35 (`frames`)"
-configs = []
-
-[[unpacked.rc_raw_photos]]
 paths = ["paper-data/defocus/fisheye/siemens-stars"]
 where = "the author's folder radiometric-camera-paper-data on the university's MDS share, bound as paper-data/ under the data root of record"
 provenance = "160 files; the 160 Siemens-star photographs of the fisheye at f/4 of 2026-10-28, the same files as vignetting/fisheye/siemens-stars (the defocus experiment's fisheye set: its focus surface is a sphere about the camera); read through vignetting/fisheye/siemens-stars by the configs of record"
@@ -760,18 +980,6 @@ configs = []
 paths = ["geometric_accuracy/night_stars/data/fx3-tamron-siemens-2026-10-28/schoeps"]
 where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (its MANIFEST.tsv and MD5SUMS beside it)"
 provenance = "T. Schöps's camera_calibration (feature detection + central-generic, cell 150 px) on the sRGB copies of the 28.10 photographs (2026-10-28/29; dataset.bin, intrinsics0.yaml)"
-configs = []
-
-[[unpacked.rc_baselines]]
-paths = ["geometric_accuracy/records/2710/14mm_kb_fit.json"]
-where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (its MANIFEST.tsv and MD5SUMS beside it)"
-provenance = "the Kannala–Brandt fit of the FX3 + 14 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/14mm_kb_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree (2026-11-08: the 14 mm panoramas' lens again, the learned grid's registration failed); since 2026-11-12 the source of the 14 mm panoramas' camera record with its lens coverage (configs/inputs/panorama_cameras.toml)"
-configs = []
-
-[[unpacked.rc_baselines]]
-paths = ["geometric_accuracy/records/2710/tamron_opencv5_fit.json"]
-where = "the author's folder on the MDS share: radiometric-camera-paper-data/derived/rc_baselines_2026-11-10/<path> (its MANIFEST.tsv and MD5SUMS beside it)"
-provenance = "the OpenCV-5 fit of the FX3 + Tamron 20 mm to Schöps's 27.10 Siemens detections (fit_lens_detections.jl, branch paper-finalization; rc-results overnight_2026-10-29/records/tamron_opencv5_fit.json), migrated to vgio/cameras/v4 by vgio_migrate_tree; the Tamron panoramas' camera as it is, a full-sensor BoundedCamera (the lens covers the whole sensor: no lens coverage beyond it, owner ruling 2026-11-12)"
 configs = []
 
 [[unpacked.rc_baselines]]

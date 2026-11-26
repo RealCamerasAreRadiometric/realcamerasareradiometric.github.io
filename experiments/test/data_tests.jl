@@ -14,7 +14,7 @@
     include(srcdir("drivers.jl"))
     include(srcdir("calibration.jl"))
     include(srcdir("data.jl"))
-    using .DataTiers: tier_of, entries_of_record, tier_entries, unpacked_entries, PRIVATE_PHOTOGRAPHS, private_photographs
+    using .DataTiers: tier_of, entries_of_record, tier_entries, unpacked_entries, PRIVATE_PHOTOGRAPHS, SAME_NAME_PHOTOGRAPHS, private_photographs
     using VisualGeometryToolkitEval.DataArtifacts: load_catalog, catalog_violations, artifact_files, required_artifacts
     using VisualGeometryToolkitCore: artifact_store
 
@@ -144,7 +144,7 @@ end
 # The privacy rule: the excluded photographs are in no entry and no installed tree; and each installed tree has the catalog's file count.
 @testitem "published data: the excluded photographs are never published" default_imports = false setup = [PublishedData] begin
     using Test
-    using .PublishedData: CATALOG, OF_RECORD, PRIVATE_PHOTOGRAPHS, private_photographs, probe_selection, installed_tree
+    using .PublishedData: CATALOG, OF_RECORD, PRIVATE_PHOTOGRAPHS, SAME_NAME_PHOTOGRAPHS, private_photographs, probe_selection, installed_tree
 
     @testset "the rule: every prefix, directory and extension variant" begin
         names = ["a/b/DSC06045.ARW", "DSC06052.png", "x/_DSC06053.ARW", "x/dsc06054.arw", "DSC06055.ARW.xmp", "y/DSC06055.JPG",
@@ -153,15 +153,34 @@ end
         @test isempty(private_photographs(["DSC06044.ARW", "DSC06046.ARW", "DSC06051.png", "DSC06056.ARW", "DSC06044/x.txt"]))
     end
 
+    @testset "the exception: five other photographs of the same names, at exactly their paths" begin
+        d = "paper-data/board-warping/april-board/fisheye"       # the fisheye AprilGrid set of the board-warping session
+        @test collect(SAME_NAME_PHOTOGRAPHS) == [d * "/" * x * ".ARW" for x in PRIVATE_PHOTOGRAPHS]
+        @test isempty(private_photographs(collect(SAME_NAME_PHOTOGRAPHS)))
+        @test isempty(private_photographs(["./" * p for p in SAME_NAME_PHOTOGRAPHS]))                # a tarball's listing
+        # every other spelling in that directory, and the names in every other directory, stay excluded
+        other = [d * "/_DSC06045.ARW", d * "/DSC06045.png", d * "/dsc06045.arw", d * "/DSC06045.ARW.xmp", d * "/DSC06045/features.png",
+                 d * "/sub/DSC06045.ARW", "/abs/" * first(SAME_NAME_PHOTOGRAPHS), "x/" * first(SAME_NAME_PHOTOGRAPHS),
+                 "paper-data/board-warping/april-board/14mm/DSC06045.ARW", "paper-data/board-warping/siemens-board/fisheye/DSC06052.ARW",
+                 "paper-data/geometric-accuracy/14mm/siemens-stars/DSC06055.ARW"]
+        @test private_photographs(other) == other
+    end
+
     @testset "no entry selects one (Eval's selection of a probe tree holding them in every entry's directory)" begin
         dirs = unique(CATALOG.artifacts[n]["dir"] for n in OF_RECORD)
         sel = probe_selection([normpath(joinpath(d, f)) for d in dirs for x in PRIVATE_PHOTOGRAPHS for f in (x * ".ARW", x * ".png", "a/_" * x * ".JPG", x * "/features.png")])
         for (n, files) in sel
             @test isempty(private_photographs(files))
         end
-        # every entry of record also names the exclusion itself, so a widened include glob cannot let one in
+        # every entry of record also names the exclusion itself, so a widened include glob cannot let one in. The one entry of the
+        # five other photographs of the same names lists exactly their paths and no glob (src/data.jl SAME_NAME_PHOTOGRAPHS)
+        includes(n) = filter(g -> !startswith(g, "!"), CATALOG.artifacts[n]["filter"])
+        same = [n for n in OF_RECORD if includes(n) == collect(SAME_NAME_PHOTOGRAPHS)]
+        @test length(same) == 1 && CATALOG.artifacts[only(same)]["files"] == length(SAME_NAME_PHOTOGRAPHS)
         for n in OF_RECORD
-            @test all(x -> "!**/*$(x)*" in CATALOG.artifacts[n]["filter"] && "!**/*$(x)*/**" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
+            @test all(x -> "!**/*$(x)*/**" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
+            @test n in same || all(x -> "!**/*$(x)*" in CATALOG.artifacts[n]["filter"], PRIVATE_PHOTOGRAPHS)
+            @test n in same || isempty(intersect(includes(n), SAME_NAME_PHOTOGRAPHS))
         end
     end
 

@@ -11,7 +11,7 @@ module DataTiers
 using VisualGeometryToolkitEval.DataArtifacts: DataCatalog
 using TOML: TOML
 
-export tier_of, entries_of_record, tier_entries, unpacked_entries, is_unpacked, is_cache_dir, PRIVATE_PHOTOGRAPHS, private_photographs
+export tier_of, entries_of_record, tier_entries, unpacked_entries, is_unpacked, is_cache_dir, PRIVATE_PHOTOGRAPHS, SAME_NAME_PHOTOGRAPHS, private_photographs
 
 "The tier an entry's files' inputs name in the configs (its `tier`)."
 tier_of(cat::DataCatalog, entry::AbstractString) = String(cat.artifacts[entry]["tier"])
@@ -29,13 +29,26 @@ function tier_entries(cat::DataCatalog)
 end
 
 """The photographs that are never published (owner 2026-11-21: the 14 mm Siemens-star session of 2026-11-03, DSC06045 and
-DSC06052–DSC06055, show another person): no tier, tarball or record may hold one, under any directory, prefix or extension."""
+DSC06052–DSC06055, show another person): no tier, tarball or record may hold one, under any directory, prefix or extension.
+The one exception is [`SAME_NAME_PHOTOGRAPHS`](@ref)."""
 const PRIVATE_PHOTOGRAPHS = ("DSC06045", "DSC06052", "DSC06053", "DSC06054", "DSC06055")
 
+"""Five OTHER photographs that carry the same file names (the camera's file counter came round): the fisheye AprilGrid set of the
+board-warping session of 2026-11-19 holds its own DSC06045 and DSC06052–DSC06055, photographs of the 1 m AprilGrid alone, and they
+are published with their set (T. Harder 2026-11-24). The exception is these five paths and nothing else: relative to data_root(),
+the raw files as captured, spelled exactly so. Every other directory, prefix, extension or case of the names stays excluded."""
+const SAME_NAME_PHOTOGRAPHS = ("paper-data/board-warping/april-board/fisheye/DSC06045.ARW",
+                               "paper-data/board-warping/april-board/fisheye/DSC06052.ARW",
+                               "paper-data/board-warping/april-board/fisheye/DSC06053.ARW",
+                               "paper-data/board-warping/april-board/fisheye/DSC06054.ARW",
+                               "paper-data/board-warping/april-board/fisheye/DSC06055.ARW")
+
 "The paths of `paths` with a component (a file or a directory name) that names a photograph of [`PRIVATE_PHOTOGRAPHS`](@ref)
-(case-insensitive, any prefix or extension)."
+(case-insensitive, any prefix or extension), but the five paths of [`SAME_NAME_PHOTOGRAPHS`](@ref) themselves: `paths` are
+relative to data_root(), as an entry's files, a tarball's listing and an installed tree's files are."
 private_photographs(paths) =
-    [String(p) for p in paths if any(c -> any(x -> occursin(x, uppercase(c)), PRIVATE_PHOTOGRAPHS), splitpath(String(p)))]
+    [String(p) for p in paths if !(normpath(String(p)) in SAME_NAME_PHOTOGRAPHS) &&
+                                 any(c -> any(x -> occursin(x, uppercase(c)), PRIVATE_PHOTOGRAPHS), splitpath(String(p)))]
 
 """The catalog's `[[unpacked.<tier>]]` entries (files of the author's folders that no config reads and no tier holds; the catalog's
 header): `tier => [(; paths, configs, where, provenance)]`."""

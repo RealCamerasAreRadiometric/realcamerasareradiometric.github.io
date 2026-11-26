@@ -37,4 +37,5 @@ is the inputs' and nothing is fetched there (a view would outrank it). The autho
 
 **Privacy.** The photographs DSC06045, DSC06052, DSC06053, DSC06054 and DSC06055 of the 14 mm Siemens-star session show another
 person: they are in no tier and no record, under any name variant (`src/data.jl` `private_photographs`; the packer refuses them,
-the suite checks every entry).
+the suite checks every entry). The fisheye AprilGrid set of the board-warping session holds five other photographs with the same
+file names (the camera's counter came round): those five paths, and nothing else, are published (`SAME_NAME_PHOTOGRAPHS`).
