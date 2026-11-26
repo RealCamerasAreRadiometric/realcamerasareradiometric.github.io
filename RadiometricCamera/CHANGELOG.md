@@ -41,6 +41,23 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
 - **Dependencies:** VisualGeometryToolkitCore 0.14, VisualGeometryToolkitEstimation 0.13, VisualGeometryToolkitFeatures 0.10,
   VisualGeometryToolkitIO 0.12 (none registered yet: the package's `[sources]` take them by path, TEMPORARY until they are).
 
+### experiments
+
+- **Changed:** on the Core 0.14 solve stack (TEMPORARY `[sources]` at the BlobBoards 0.8, LocalOptimizationDoneRight 0.8,
+  PanoramaStitching 0.12, monorepo and Visual Radiometry Toolkit port worktrees; compat RadiometricCamera 0.4). Every estimator
+  call is `solve(problem, algorithm)`: the index stage's RANSAC (`Ransac` on its `GridPoseProblem`, whose sample is
+  `sample_models` through `MinimalProblem` + `P3P`), its pixel refit (`LevenbergMarquardt` on `AbsolutePoseProblem`), the MAD scale
+  (`MedianNormScale`), the pooled scale (`PooledScale`), the rotation-centre start's least squares (`_linear_least_squares`:
+  `ReweightedLeastSquares` on a `LinearModel`) and refine (`LevenbergMarquardt` on `CameraPosesProblem` of `RotationCenterViews`,
+  its stops the problem's with the evaluation's cap), the ray models' best centre (`NearestPoint`), the parametric starts (`Ransac` on
+  `AbsolutePoseProblem`, then `CameraPosesProblem`), the sensor characterisation (`MasterDark`, `PhotonTransfer`), the board's page
+  map (`ReweightedLeastSquares` on `EuclideanMap{3}`) and Kabsch (`Kabsch`); results read by field.
+- **Renamed** (check_naming R15: the kind words name no function): `fit_start` → `_fit_start`, `fit_rotation_center` →
+  `_fit_rotation_center` (its records keep `"method" = "fit_rotation_center"`), `refine_product` → `refinement_product`,
+  `refine_settings` → `refinement_settings`, `fit_operator` → `texture_operator`.
+- **Changed:** `tools/texture_benchmark.jl` takes `--key=value` flags (VisualGeometryToolkitEval's `cli_option`, the paper project's
+  one reader; was `key=value`). The reproduce test writes its number fragments through Eval's number macros.
+
 ## 0.3.0 (2026-11-25; breaking)
 
 - **Breaking:** the GPU is the default device. `CalibrationState`, `render_view`, `compute_mask` (whose `backend` was required

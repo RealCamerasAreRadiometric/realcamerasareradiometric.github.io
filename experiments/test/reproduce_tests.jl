@@ -172,7 +172,7 @@
         frags = [joinpath(results, "figures-$i", "numbers.tex") for i in eachindex(experiments)]
         # each fragment written as a driver writes it: Eval's number macros (`PaperNumbers`, `add_number!`, `write_numbers`), its value typeset text
         fragment(path, name, value) = (mkpath(dirname(path));
-            Reproduce.write_numbers(path, Reproduce.add_number!(Reproduce.PaperNumbers(; driver = "a driver", config = "test", run_key = "0", commit = "0"), name, value)))
+            Reproduce.write_numbers(path, Reproduce.add_number!(Reproduce.PaperNumbers(; driver = "test_driver", config = "test", run_key = "0", commit = "0"), name, value)))
         for (i, f) in enumerate(frags)
             fragment(f, "fakeNumber$(('A':'Z')[i])", "$(i).5")
         end
