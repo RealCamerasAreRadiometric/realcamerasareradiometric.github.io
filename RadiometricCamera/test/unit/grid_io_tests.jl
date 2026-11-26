@@ -2,9 +2,9 @@
 # model ↔ a camera record, a grid camera ↔ a camera record), an old grid file read
 # through IO's migration, and synthetic Schöps intrinsics0.yaml files (VisualGeometryToolkitIO's readers) resampled into our grid lenses.
 @testitem "grid I/O (Schöps import)" setup = [RCFixtures] begin
-    using RadiometricCamera: grid_dims, grid_model, initialization_region, load_camera, load_grid, load_lens, load_model,
+    using RadiometricCamera: grid_dims, _image_start, initialization_region, load_camera, load_grid, load_lens, load_model,
                              load_parametric_lens, load_start, save_grid, save_initialization_region, save_lens,
-                             save_run_parameters, schoeps_gridlens, schoeps_start, stored_initialization_region, 𝐩_of_pixel
+                             save_run_parameters, _schoeps_start, _schoeps_start, stored_initialization_region, 𝐩_of_pixel
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -29,7 +29,7 @@
         @test unp(SVector(448.0, 288.0)) ≈ normalize(RC.chief_ray(rl, SVector(448.0, 288.0))) && startswith(label, "lens:")
         # a grid camera ↔ vgio/cameras/v5 (its K the initializing camera's own: the gauge, ruling 1; its lens coverage kept)
         circle = VgtkCore.Ellipse(VgtkCore.Point2{Float64}(320.0, 240.0), 300.0, 230.0, 0.1)
-        g = grid_model(rl, 35, 25; coverage = circle); path = tempname() * ".json"
+        g = _image_start(rl, (35, 25); coverage = circle).camera; path = tempname() * ".json"
         @test g isa VgtkCore.BoundedCamera{<:VgtkCore.CameraModel{<:VgtkCore.AbstractIntrinsics, <:VgtkCore.SplineLens}}
         @test VgtkCore.calibration_matrix(VgtkCore.model(g)) == VgtkCore.calibration_matrix(VgtkCore.model(rl))
         save_grid(path, g; provenance = (; model = "test"))
@@ -65,7 +65,7 @@
         @test norm(unp(320.0, 240.0)) ≈ 1
         # the Schöps surface is a cubic B-spline of the nodes: a smooth field, continuous across the grid
         @test norm(unp(100.0, 100.0) - unp(100.5, 100.0)) < 1e-2
-        g = schoeps_gridlens(path, W, H)                                     # his 160 px cells, never subdivided (m = 1, RC 0.11.4)
+        g = _schoeps_start(path, W, H).lens                                     # his 160 px cells, never subdivided (m = 1, RC 0.11.4)
         @test g isa VgtkCore.BoundedCamera{<:VgtkCore.CameraModel{<:VgtkCore.AbstractIntrinsics, <:VgtkCore.SplineLens}} && grid_dims(g) == (10, 10)   # his 7 × 6, padded to the patch multiple (RC 0.11.2)
         # the source turned onto its optical axis (Estimation's CameraRegression, RC 0.11.0): K's principal point the axis's pixel (here the
         # radially symmetric source's centre), the rays the source's (below)
@@ -87,7 +87,7 @@
         # initialization region is the source's own imaged region, and the start bounded to it images only there
         path = tempname() * ".yaml"; schoeps_yaml(path; cmin = (100, 80), cmax = (539, 399), size = (W, H))
         src = VgtkIO.load(VgtkCore.BoundedCamera, path)
-        st = schoeps_start(path, W, H)
+        st = _schoeps_start(path, W, H)
         @test st.init_region isa VgtkCore.Rect2 && rect(st.init_region) ≈ rect(VgtkCore.imaged_region(src)) ≈ SVector(100.0, 80.0, 440.0, 320.0)
         @test rect(VgtkCore.Rect2(VgtkCore.imaged_region(st.lens))) ≈ SVector(0.0, 0.0, 640.0, 480.0)          # the lattice: the sensor
         # the initialization's detections: those inside the region (Core's region membership), with or without an image circle
@@ -101,7 +101,7 @@
         end
         # a full-sensor source: unchanged
         pf = tempname() * ".yaml"; schoeps_yaml(pf)
-        sf = schoeps_start(pf, W, H)
+        sf = _schoeps_start(pf, W, H)
         @test rect(sf.init_region) ≈ SVector(0.0, 0.0, 640.0, 480.0)
         @test rect(sf.init_region) ≈ rect(VgtkCore.Rect2(VgtkCore.imaged_region(sf.lens)))                # the same as the lattice's
         # stored beside the grid (rc/initialization_region/v1.0, IO's Rect2 body) and restored with a reloaded grid start
@@ -181,7 +181,7 @@
     @testset "a Schöps run's non-central model is refused: every camera is central" begin
         W, H = 640, 480
         path = tempname() * ".yaml"; schoeps_yaml(path; noncentral = true, origin = SVector(0.01, -0.02, 0.05))
-        @test_throws Exception schoeps_gridlens(path, W, H)            # no non-central start (the model is removed)
+        @test_throws Exception _schoeps_start(path, W, H).lens            # no non-central start (the model is removed)
         @test_throws Exception load_camera("noncentral:" * path)               # no such model spec
         @test !isdefined(RC, :noncentral_gridlens) && !isdefined(RC, :ApertureSpline) && !isdefined(RC, :NoncentralLens)
         # a non-central RECORD (IO reads the YAML when told its length unit, and writes Core's non-central camera as a camera record):

@@ -277,7 +277,7 @@ function _check_options(opts::PipelineOptions)
 end
 
 # The lattice's mode against the start (owner ruling 2026-11-15): "node_count" states its count and is a parametric start's — a Schöps
-# start is his own lattice ("derived"); a SplineLens / parametric source the mode does not fit is refused at its start (`start_grid`).
+# start is his own lattice ("derived"); a SplineLens / parametric source the mode does not fit is refused at its start (`GridStart`).
 function _check_lattice(opts::PipelineOptions)
     g = opts.grid
     g.node_count === nothing || check_node_count(g.node_count)
@@ -301,7 +301,7 @@ const INAPPLICABLE_KEYS = (
         "a parametric record start (`io.init = \"lens:…\"`) is refined per view in its own parameters: it has no lattice",
     ("grid", "node_count") => o -> (o.grid.lattice isa DerivedLattice && _frontend_tag(o) == "schoeps") ?
         "a Schöps start (`frontend.type = \"schoeps\"`, `grid.lattice = \"derived\"`) is his own lattice extended over the lens coverage, " *
-        "never subdivided (m = 1, `schoeps_start`): no node count acts on it" : nothing,
+        "never subdivided (m = 1, the Schöps start): no node count acts on it" : nothing,
     ("focus", "smoothness") => o -> "focus" in o.fixed ? "the focus surface is held (\"focus\" in `fixed`): no smoothness acts on it" : nothing,
 )
 """Why the option `table.key` cannot act in a run of `opts` (`INAPPLICABLE_KEYS`), or `nothing` where it applies."""

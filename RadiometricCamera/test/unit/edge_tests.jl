@@ -3,7 +3,7 @@
 
 # The distance-map board, the two-view scene and its targets both items use.
 @testsetup module EdgeScene
-    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, grid_model, Material, TexturedTarget, render_all,
+    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget, render_all,
                              RenderSettings, sphere_radius, with_sdf, with_state, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -41,7 +41,7 @@
     # 3. a two-view scene on the distance-map board and its render
     We = He = 32
     board_e = board_e
-    glens_e = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), We, He), 10, 10)
+    glens_e = _image_start(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), We, He), (10, 10)).camera
     focus_e = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, We, He))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_e = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_e = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, We, He); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end

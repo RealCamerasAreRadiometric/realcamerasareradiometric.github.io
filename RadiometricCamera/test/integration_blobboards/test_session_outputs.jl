@@ -5,7 +5,7 @@
 # LensSim fisheye render of blob board 291 with rendered board-UV truth). The records are test/fixtures/lenssim_fisheye3/session_io,
 # written once by CaliBlobs' scripts/migrate_rc_session.jl from the BlobBoards session export of this fixture (README there):
 #   1 camera.json → the division camera as Core's pixel camera (Division)                                                vs golden
-#   3 the grid init sampled from that camera (Core's quasi-interpolation, `grid_model`) vs the division camera
+#   3 the grid init sampled from that camera (Core's quasi-interpolation, `GridStart`) vs the division camera
 #   4 target_poses.json → Blender world (similarity on the board frame) vs the true poses                      vs golden
 #   5 load_session (the photo pipeline's loader of the records) for every lens option
 #   6 held-out evaluation of the division camera and the grid init on 3 test views: dense lattice of true board points, pose refit
@@ -19,7 +19,7 @@
 #   env RC_MIG_FIX=<fixture dir> RC_MIG_WORK=<run dir> [RC_MIG_REFINE=1 [RC_MIG_REFINE_ITERATIONS=30]] julia --project=test/integration_blobboards test/integration_blobboards/test_session_outputs.jl
 using Test, RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf
 using RadiometricCamera: chief_ray
-using RadiometricCamera: in_domain, grid_model, grid_dims       # public, not exported (D13)
+using RadiometricCamera: in_domain, _image_start, grid_dims       # public, not exported (D13)
 import TOML
 import FileIO                                                   # EXR truth maps via ImageIO / OpenEXR (the harness environment)
 const RC = RadiometricCamera
@@ -209,8 +209,8 @@ try
         check_golden("refined.residual_median_px", resid, 0.03)
     end
 
-    g35 = grid_model(bblens, 35, 35)
-    @testset "3 the grid init sampled from the camera (grid_model) vs the division camera" begin
+    g35 = _image_start(bblens, (35, 35)).camera
+    @testset "3 the grid init sampled from the camera (GridStart) vs the division camera" begin
         angs = Float64[]
         for x in 0.05:0.05:0.95, y in 0.05:0.05:0.95
             p = SVector(x * RW, y * RH); (in_domain(bblens, p) && hypot(x - 0.5, y - 0.5) <= 0.4) || continue

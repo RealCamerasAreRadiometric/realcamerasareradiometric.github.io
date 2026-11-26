@@ -13,7 +13,7 @@ The geometric calibration a radiometric calibration starts from: the geometric `
 `poses[k]` per photograph (camera → world, `EuclideanMap`), the `observations[k]` of the target in photograph `k` (`(𝐩, X)` pairs: the
 image point, COLMAP px, and the target point in the world, plain metres) and the printed `target` (a `TexturedTarget`). The
 front end's facts ride along: the photographs' `names`, the image size, the start camera's initialization region (where it is
-defined; `nothing`: its own domain), the record of its exact resample (`resample`, [`exact_start`](@ref)'s; `nothing` for a camera
+defined; `nothing`: its own domain), the record of its exact resample (`resample`, [`GridStart`](@ref)'s; `nothing` for a camera
 that was not resampled), `features_for(surface)` (the observations under a warped or misprinted surface), the world's
 name and the front end's frame choices (`page_flip`, `board_y_sign`) its records keep.
 """
@@ -46,7 +46,7 @@ end
     start_geometry(options; record = nothing) -> StartGeometry
 
 The start geometry of the run `options` from its front end (`frontend.type`: a calibration session's records, or a Schöps run's), every
-input read through VisualGeometryToolkitIO: the start camera (the front end's onto the run's lattice, `start_grid`; or the stored start
+input read through VisualGeometryToolkitIO: the start camera (the front end's onto the run's lattice, `GridStart`; or the stored start
 `io.init`), its poses, the observations of the target and the printed target. With a start `record` (a start record's,
 `load_calibration_start`) its camera, initialization region and poses are the record's, nothing fitted again.
 """

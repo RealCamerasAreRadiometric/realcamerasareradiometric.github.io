@@ -8,7 +8,7 @@
     const RCU = RadiometricCamera
 
     kb_u = cam(VgtkCore.KannalaBrandt(-0.05, 0.01, 0.0, 0.0), 57.6, (32.0, 32.0), 64, 64)
-    g0_u = RCU.grid_model(kb_u, 12, 12)
+    g0_u = RCU._image_start(kb_u, (12, 12)).camera
     D0_u = RCU.VgtkCore.directions(RCU.VgtkCore.model(g0_u))
     G_u = [D0_u[j, i] * (1 + 0.2 * sin(0.7i) * cos(0.9j)) for j in axes(D0_u, 1), i in axes(D0_u, 2)]   # node (x = i, y = j)
     g_u = RCU.VgtkCore.with_directions(g0_u, G_u)

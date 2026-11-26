@@ -24,7 +24,7 @@
 #
 # The scene is the README's: a W × H double-sphere fisheye over a 2 m checkerboard, `views` photographs rendered at a known
 # camera, material and lighting; the timed states start from a perturbed camera (a flat vignetting, another μ and lighting), as a
-# calibration does. The grid stages see the same scene through the fisheye's spline model (`grid_model`, `grid` controls).
+# calibration does. The grid stages see the same scene through the fisheye's spline model (`GridStart` of an `ImageLattice`, `grid` controls).
 #
 # Per stage: `first` (the first call: compilation and caches), `best` (the minimum of `reps` warm calls), `bytes` (the host
 # allocation of that call) and `value` (a checksum of the stage's result: two records of the same arithmetic agree in it, so a
@@ -177,7 +177,7 @@ function stages(c)
     add("lm3_view", () -> () -> (s = c.state(); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # per tile
     grid = Ref{Any}(nothing)
-    grid_state() = (grid[] === nothing && (grid[] = RC.grid_model(c.lens, GRID...)); c.state(grid[]))
+    grid_state() = (grid[] === nothing && (grid[] = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, c.lens), RC.GridStart(; lattice = RC.ImageLattice(GRID...))).u); c.state(grid[]))
     add("tile_normal_equations", () -> begin
         s = grid_state(); problem, idx = RC.build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]

@@ -139,9 +139,9 @@ end
 
 """`[grid]`: the grid model's control directions, the smoothness of its interior nodes and the start's perturbation (grid_smoothness.jl)."""
 Base.@kwdef struct GridOptions <: AbstractOptionsTable
-    lattice::LatticeRule = _option_default(GridOptions, :lattice)               # "derived" (the source's own lattice, m = 1: `exact_start`) | "node_count"
-                                                     #   (over the image region: `region_start`), `LATTICE_TAGS`
-    node_count::Union{Nothing, Int} = nothing        # lattice = "node_count" only: the nodes the image region supports (`region_start`); absent = none
+    lattice::LatticeRule = _option_default(GridOptions, :lattice)               # "derived" (the source's own lattice, m = 1: `GridStart`) | "node_count"
+                                                     #   (over the image region: `GridStart`), `LATTICE_TAGS`
+    node_count::Union{Nothing, Int} = nothing        # lattice = "node_count" only: the nodes the image region supports (`GridStart`); absent = none
     smoothness::AbstractSmoothness = _option_default(GridOptions, :smoothness)    # [grid.smoothness]: pspline (its Δ³) | bending | none, its weight β relative to
                                                      #   the data energy Σϕ² per node, or "gcv": chosen by GCV on the linearization at the start
                                                      #   (`select_grid_smoothness_weight`, 2026-11-04)

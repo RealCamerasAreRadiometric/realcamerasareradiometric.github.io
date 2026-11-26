@@ -2,7 +2,7 @@
 # in pixels) — fixed in the per-view LM when no parameter is freed: its sampling into the generic grid model (the route that makes it
 # refinable), Float32 cleanliness, duals through Core's lens inverses, and the per-view problem with the lens block fixed.
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, grid_model, in_domain,
+    using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, _image_start, in_domain,
                              Material, PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, sphere_radius,
                              chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
@@ -45,9 +45,9 @@
     @test chief_ray(l, SVector(ForwardDiff.Dual(720.0, 1.0), ForwardDiff.Dual(440.0, 0.0))) isa SVector{3, <:ForwardDiff.Dual}
     @test has_lens(l, VgtkCore.KannalaBrandt{4, Float64}) && VgtkCore.lens(l) == kb
     # the refinable route: sample into the SplineLens camera, whose K is the camera's own (the gauge)
-    g = grid_model(l, 35, 25)
+    g = _image_start(l, (35, 25)).camera
     @test grid_angular_error(g, l) < 2e-3                                               # 35 × 25 quasi-interpolation of a KB lens
-    @test grid_angular_error(grid_model(l, 105, 75), l) < 2e-4
+    @test grid_angular_error(_image_start(l, (105, 75)).camera, l) < 2e-4
     @test VgtkCore.calibration_matrix(VgtkCore.model(g)) == VgtkCore.calibration_matrix(VgtkCore.model(l))
     # a fixed lens block: held fixed by the LM (NLLSsolver's variables are never empty, so it keeps the default coordinates)
     names_f, fixed_f = RC.lens_free(l; fixed = VgtkCore.parameter_names(VgtkCore.model(l)))

@@ -6,7 +6,7 @@
 # The truth and the two-view scene of the blob fixture the items share: a 3 % stretch of x against y and a 2 % shear — 3 cm at the edge
 # of the 2 m board, ≈ 0.5 px at the 32-px camera (the height tests' scene, with the in-plane error in place of the saddle).
 @testsetup module InplaneScene
-    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, grid_model, Material, TexturedTarget, render_all,
+    using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget, render_all,
                              RenderSettings, sphere_radius, with_state, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -24,7 +24,7 @@
     board_i = board_i
     board_iθ(θ) = RadiometricCamera.with_state(board_i, TargetState(inplane = θ))                        # the print error is the scene's surface parameter
     lens_param_i = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wi, Hi)
-    glens_i = grid_model(lens_param_i, 10, 10)
+    glens_i = _image_start(lens_param_i, (10, 10)).camera
     focus_i = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wi, Hi))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_i = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_i = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wi, Hi); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end

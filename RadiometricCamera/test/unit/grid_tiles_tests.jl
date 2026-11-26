@@ -4,7 +4,7 @@
 
 # The scene, the CPU problem and the perturbed camera and poses both items use (the GPU item compares its device tiles with `tiles`).
 @testsetup module GridTilesScene
-    using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, Material, TexturedTarget,
+    using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget,
                              render_view, RenderSettings, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -20,7 +20,7 @@
     board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
-    glens_t = grid_model(src_t, 10, 10)               # 7 × 7 cells; patches 5 × 5 → 2 × 2 patch blocks
+    glens_t = _image_start(src_t, (10, 10)).camera               # 7 × 7 cells; patches 5 × 5 → 2 × 2 patch blocks
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
     focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     r_t = 0.0386
@@ -50,7 +50,7 @@
 end
 
 @testitem "grid lens / per-tile blocks" setup = [RCFixtures, GridTilesScene] begin
-    using RadiometricCamera: cost, grid_angular_error, grid_model, _lm_tiles!
+    using RadiometricCamera: cost, grid_angular_error, _image_start, _lm_tiles!
     import Rotations
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -60,7 +60,7 @@ end
     # quasi-interpolation converges with grid resolution (the wide-FOV test lens is strongly curved;
     # the fine 64 × 48 production grid on the phone's division camera reaches ~3e-7 rad)
     @test grid_angular_error(glens_t, src_t) < 2e-2
-    @test grid_angular_error(grid_model(src_t, 32, 32), src_t) < 5e-4
+    @test grid_angular_error(_image_start(src_t, (32, 32)).camera, src_t) < 5e-4
     @test idx.n_tiles >= 2 && size(idx.patches) == (2, 2)
     @test sum(r -> length(r.pix), tiles) == sum(length, s.px)          # every masked pixel in exactly one tile
     # residual at the truth vanishes, and the stacked tile residuals match the per-view residuals

@@ -17,7 +17,7 @@
 # The scene and the per-tile (grid) problem at a point away from the truth, with its Jacobian, both items use (the GPU
 # item compares the device Jacobian with `J_g`).
 @testsetup module RichardsonScene
-    using RadiometricCamera: TargetState, build_problem_grid, compute_mask, Focus, FocusSpline, grid_model, HEIGHT_NC, Material,
+    using RadiometricCamera: TargetState, build_problem_grid, compute_mask, Focus, FocusSpline, _image_start, HEIGHT_NC, Material,
                              TexturedTarget, render_all, RenderSettings, sphere_radius, with_state, with_μ, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -52,7 +52,7 @@
     mat_r = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)      # strictly inside every box
     st_r = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 42)
     kb_r = cam(VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), Wr, Hr)
-    glens_r = grid_model(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wr, Hr), 10, 10)
+    glens_r = _image_start(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), Wr, Hr), (10, 10)).camera
     blank_r = [zeros(Hr, Wr, 3) for _ in 1:2]
     # ---------------------------------------------------------------------------------------------------------------
     # 2. the per-tile route (the grid model: the node tangents through the bicubic chain rule, the nodal heights h as duals, Θ_e, Θ_f, r, Θ_m)

@@ -3,11 +3,11 @@
 # decision, and the problem spec dispatches on the route.
 
 @testitem "LM route: by the camera's type; the problem spec dispatches on it" setup = [RCFixtures] begin
-    using RadiometricCamera: focus, grid_model
+    using RadiometricCamera: focus, _image_start
     using Test
     W, H = 640, 480
     pc = cam(VgtkCore.Division(-0.15, 0.03), 540.0, (326.4, 230.4), W, H)
-    gc = grid_model(pc, 35, 25)
+    gc = _image_start(pc, (35, 25)).camera
     @test RC.lm_route(pc) === RC.PerViewRoute() && RC.lm_route(gc) === RC.PerTileRoute()
     @inferred RC.lm_route(pc); @inferred RC.lm_route(gc)
     o = RC.pipeline_options(Dict("fixed" => ["camera", "focus"]))

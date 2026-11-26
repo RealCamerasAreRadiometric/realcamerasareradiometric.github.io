@@ -10,9 +10,9 @@
 `build_notebook.py` and executed, so its outputs are embedded):
 
 1. **A geometric central model** — three ways in: a calibration session's records (`load_session`, division camera),
-   a Schöps `central-generic` calibration (`schoeps_gridlens`), any VisualGeometryToolkitCore lens as Core's pixel camera
+   a Schöps `central-generic` calibration (`GridStart` of a `DerivedLattice`), any VisualGeometryToolkitCore lens as Core's pixel camera
    (`BoundedCamera(CameraModel(K, VgtkCore.KannalaBrandt(…)), extent)`); each becomes the refinable generic grid model —
-   VisualGeometryToolkitCore's SplineLens camera — with `grid_model(camera, G_x, G_y)`.
+   VisualGeometryToolkitCore's SplineLens camera — with `GridStart(; lattice = ImageLattice(G_x, G_y))`.
 2. **The radiometric model around it** — `Focus` (inverse depth `t̂`, TPS), the vignetting (`V`), the camera that holds them with
    the geometric camera (`geometric`) and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at
    a pose), the light `EnvironmentLight` (a `SphericalHarmonicMap` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` —

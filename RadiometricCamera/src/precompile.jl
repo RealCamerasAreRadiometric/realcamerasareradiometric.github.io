@@ -65,7 +65,7 @@
         per_view(state(pixel_camera(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0))); fixed = (:f, :aspect, :cx, :cy, :k))
 
         # the grid lens (Core's central generic model): evaluate, project, back-project, and its per-tile blocks (with the warping)
-        g = grid_model(ds, 10, 10)
+        g = VgtkCore.solve(VgtkCore.EstimationProblem(SplineLens, ds), GridStart(; lattice = ImageLattice(10, 10))).u
         𝐩 = SVector(10.0, 13.0)
         d = chief_ray(g, 𝐩); project(g, d); backproject(g, 𝐩); in_domain(g, 𝐩)
         grid_angular_error(g, ds)

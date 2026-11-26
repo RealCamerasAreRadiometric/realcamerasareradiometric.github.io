@@ -18,8 +18,8 @@
 # records on rendered photographs) and the Schöps calibration of the FX3 fisheye (`geometric_accuracy/night_stars/data/fx3-fisheye/schoeps`).
 
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
-using RadiometricCamera: grid_angular_error, grid_dims, grid_model, load_session, render_all, RenderSettings, _lm_tiles!,
-                         save_grid, schoeps_gridlens, all_parts, RadiometryBlocks, RadiometryBlockDescent, sphere_radius
+using RadiometricCamera: grid_angular_error, grid_dims, GridStart, ImageLattice, DerivedLattice, load_camera, load_session, render_all, RenderSettings, _lm_tiles!,
+                         save_grid, all_parts, RadiometryBlocks, RadiometryBlockDescent, sphere_radius
 using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
 using VisualGeometryToolkitCore: cost                                        # a state's ½ Σ (Φ − ϕ)² and its relative RMS
 import CUDA, KernelAbstractions
@@ -46,25 +46,27 @@ W₀, H₀ = ds.extent; W, H = Tuple(VgtkCore.extent(ds.lens₀))               
 @printf("%d views, image %d × %d (used at %d × %d); division camera f = %.1f px (at %d × %d), k = %s\n", length(ds.poses), W₀, H₀, W, H,
         VgtkCore.model(ds.lens₀).intrinsics.K[1, 1], W, H, string(VgtkCore.parameter_vector(VgtkCore.lens(ds.lens₀))))
 
-# **(b) A Schöps `central-generic` calibration** (intrinsics0.yaml: a B-spline surface of directions over the image). `schoeps_gridlens`
+# **(b) A Schöps `central-generic` calibration** (intrinsics0.yaml: a B-spline surface of directions over the image). `GridStart` of a `DerivedLattice`
 # resamples it EXACTLY into the grid model on his own lattice (VisualGeometryToolkitCore's SplineLens camera, extended over the sensor, never subdivided),
 # its K the Schöps model's gauge (the pinhole at the pixel imaging the optical axis).
 
-g_schoeps = schoeps_gridlens(joinpath(EXP, "night_stars", "data", "fx3-fisheye", "schoeps", "intrinsics0.yaml"), W₀, H₀)
+g_schoeps = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, load_camera("schoeps:" * joinpath(EXP, "night_stars", "data", "fx3-fisheye", "schoeps", "intrinsics0.yaml"))),
+                           GridStart(; lattice = DerivedLattice())).u
 @printf("Schöps → grid model %d × %d; central ray %s\n", grid_dims(g_schoeps)..., string(round.(normalize(VgtkCore.backproject(g_schoeps, SVector(VgtkCore.centroid(VgtkCore.Rect(0, 0, W₀, H₀))...))); digits = 4)))
 
 # **(c) Any VisualGeometryToolkitCore lens** (Kannala–Brandt, Brown–Conrady, equidistant, pinhole…) as VisualGeometryToolkitCore's pixel camera: a
 # `BoundedCamera` of `CameraModel(LogicalIntrinsics(K), lens)` with K in pixels of the image, whose parameters are Core's parameter
-# protocol. Sampled into the grid model (`grid_model`) it is refined per tile — the route below.
+# protocol. Sampled into the grid model (`GridStart` of an `ImageLattice`) it is refined per tile — the route below.
 
 kb = VgtkCore.BoundedCamera(VgtkCore.CameraModel(VgtkCore.intrinsics(ds.lens₀), VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0)), VgtkCore.extent(ds.lens₀))
-g_kb = grid_model(kb, 35, 25)
+grid_start(camera, G...) = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, camera), GridStart(; lattice = ImageLattice(G...))).u
+g_kb = grid_start(kb, 35, 25)
 @printf("Kannala–Brandt as a pixel camera, sampled into a %d × %d grid: %.2e rad quasi-interpolation error\n", grid_dims(g_kb)..., grid_angular_error(g_kb, kb))
 
 # This walkthrough refines the blob board's own camera: the division model of (a) sampled into a 35 × 25 grid (the production runs use
-# 105 × 75). `grid_model(camera, G_x, G_y)` works for every camera above.
+# 105 × 75). `GridStart(; lattice = ImageLattice(G_x, G_y))` works for every parametric camera above.
 
-lens0 = grid_model(ds.lens₀, 35, 25);
+lens0 = grid_start(ds.lens₀, 35, 25);
 
 # ## 2. The radiometric model around it
 #

@@ -5,7 +5,7 @@
 #                                       vgio/cameras/v6.0 record of one camera; any VisualGeometryToolkitCore lens — the record carries the lens's own type
 #   save_grid / load_grid              a grid camera (a bounded SplineLens camera) ↔ a vgio/cameras/v6.0 record (VisualGeometryToolkitIO's one camera
 #                                       kind); old vgio/generic_camera files read through VisualGeometryToolkitIO's migration
-#   schoeps_gridlens                   Schöps et al.'s central intrinsics0.yaml (VisualGeometryToolkitIO's `load`) resampled into our G_x × G_y grid
+#   _schoeps_start                     Schöps et al.'s central intrinsics0.yaml (VisualGeometryToolkitIO's `load`) resampled exactly (GridStart)
 #   load_lens(spec)                    "grid:<record>" | "lens:<record>" → the lens object (the start of a refinement)
 #   load_model(spec, W, H)             "grid:" | "lens:" | "schoeps:" spec → (𝐩 ↦ unit direction, label)
 #
@@ -28,26 +28,20 @@ function _schoeps_model(yamlpath::AbstractString, W::Integer, H::Integer, who::A
 end
 
 """
-    schoeps_gridlens(yaml, W, H; coverage = nothing, device = default_backend()) -> BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}
+    _schoeps_start(yaml, W, H; coverage = nothing, device = default_backend()) -> (; lens, init_region, resample)
 
-A Schöps run's central spline model (VisualGeometryToolkitIO's reader: a SplineLens camera, K its lattice's gauge) over the `W × H`
-image (its own) resampled EXACTLY by [`exact_start`](@ref): his lattice extended over the sensor ∩ the lens coverage (`coverage`, the
-run's image circle; else his own) on his own spacing, never subdivided, turned onto his optical axis.
+A Schöps run's start: his central spline model (VisualGeometryToolkitIO's reader: a SplineLens camera, K its lattice's gauge) over
+the `W × H` image (its own) resampled EXACTLY ([`GridStart`](@ref)`(; lattice = DerivedLattice())`: his lattice extended over the
+sensor ∩ the lens coverage `coverage`, the run's image circle, else his own, on his own spacing, never subdivided, turned onto his
+optical axis) — the grid start `lens` and the resample's record `resample` — and his [`initialization_region`](@ref) `init_region`
+(Schöps's calibrated area: where his model is defined).
 """
-schoeps_gridlens(yamlpath::AbstractString, W::Integer, H::Integer; kwargs...) = schoeps_start(yamlpath, W, H; kwargs...).lens
-
-"""
-    schoeps_start(yaml, W, H; coverage = nothing, device = default_backend()) -> (; lens, init_region, resample)
-
-[`schoeps_gridlens`](@ref)'s grid start `lens`, the source's [`initialization_region`](@ref) `init_region` (Schöps's calibrated
-area: where his model is defined) and the resample's record `resample` ([`exact_start`](@ref)).
-"""
-function schoeps_start(yamlpath::AbstractString, W::Integer, H::Integer; coverage = nothing, device = default_backend())
-    src = _schoeps_model(yamlpath, W, H, "schoeps_gridlens")
+function _schoeps_start(yamlpath::AbstractString, W::Integer, H::Integer; coverage = nothing, device = default_backend())
+    src = _schoeps_model(yamlpath, W, H, "the Schöps start")
     src isa SplineCamera ||
-        throw(ArgumentError("schoeps_gridlens: $yamlpath holds a non-central model; this package's cameras are central (a Schöps run's central-generic model)"))
-    st = exact_start(src; coverage, device)
-    return (; lens = st.camera, init_region = initialization_region(src), st.resample)
+        throw(ArgumentError("the Schöps start: $yamlpath holds a non-central model; this package's cameras are central (a Schöps run's central-generic model)"))
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(SplineLens, src, (; coverage, device)), GridStart(; lattice = DerivedLattice()))
+    return (; lens = r.u, init_region = initialization_region(src), r.metadata.resample)
 end
 
 # ---- parametric models ↔ vgio/cameras/v6.0 ---------------------------------------------------------------------------------

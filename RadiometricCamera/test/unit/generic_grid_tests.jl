@@ -56,14 +56,14 @@ end
 # The start perturbation (`grid.start_perturbation`, perturb_start / perturb_directions in per_tile_smoothness.jl): every direction control
 # rotated on its sphere by Core's control chart, deterministic from the seed, σ / f radians RMS per tangent axis.
 @testitem "grid start perturbation: reproducible, norm-keeping, σ / f per tangent axis" setup = [RCFixtures] begin
-    using RadiometricCamera: grid_model
+    using RadiometricCamera: _image_start
     using StaticArrays, LinearAlgebra, Statistics, Random
     const StableRNG = RC.StableRNG
     W, H = 520, 348
     f = 416.0
     pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), f, (260.0, 174.0), W, H)
     circle = VgtkCore.Ellipse(VgtkCore.Point2{Float64}(260.0, 174.0), 150.0, 150.0, 0.0)
-    g = grid_model(pin, 35, 25; coverage = circle)
+    g = _image_start(pin, (35, 25); coverage = circle).camera
     dirs(l) = VgtkCore.directions(VgtkCore.model(l))
     D = dirs(g)
     p = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)

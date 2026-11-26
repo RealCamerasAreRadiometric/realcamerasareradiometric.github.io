@@ -19,9 +19,9 @@ export calibrate, RadiometricCalibration, CalibrationCache, read_calibration, St
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        CalibrationState, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
 
-public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, grid_model,
-       exact_start, start_grid, region_start, coverage_region, check_coverage, calibrated_folds, grid_angular_error,
-       schoeps_gridlens, schoeps_start, load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,
+public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
+       coverage_region, check_coverage, calibrated_folds, grid_angular_error,
+       load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,
        save_lens, load_parametric_lens, load_lens, lens_type_name, TargetRadiometry, material, edge_parameters,
        target_radiometry, board_surface, radiometric_target, set_radiometric_target!, HEIGHT_NFREE, height_manifold,
        height_basis, height_nparams, sphere_radius, RadianceSampler, SampleKey, draws, key_hash, L_c, RadianceParts,

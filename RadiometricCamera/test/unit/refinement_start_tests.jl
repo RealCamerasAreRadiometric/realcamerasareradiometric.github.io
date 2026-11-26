@@ -71,7 +71,7 @@
         @test typeof(st2.grid_gcv) == typeof(sel) && st2.grid_gcv == sel
         @test typeof(only(st2.vignetting_gcv)) == typeof(merge(only(meta.vignetting_gcv), (; m̄ = 2.5, rows = 14)))
         @test st.resample === nothing                                                            # a start that was not resampled
-        # the exact resample's record (`exact_start`, RC 0.11.0) round-trips through start.json: its lattice, marks, folds, fidelity
+        # the exact resample's record (`GridStart`'s exact resample, RC 0.11.0) round-trips through start.json: its lattice, marks, folds, fidelity
         res = (; grid_size = [9, 8], subdivision = [1, 1], lattice_spacing = [110.0, 106.66666666666667], extension_offset = [1, 1],
                  extrapolated = [[true, false, true], [false, false, true]], extrapolated_fraction = 0.5417,
                  folds = (; folded = [[12.0, 40.0], [20.0, 40.0]], samples = 4941, unimaged = 0), max_px = 2.76e-13, max_px_edge = 2.18e-13,

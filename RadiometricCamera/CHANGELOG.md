@@ -65,6 +65,13 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   `kernel_float`, `dual_chunk`, `OnBackend(…; host_workgroupsize)`, `device_resident_threads`, `device_names` and
   `on_device(T, S, device, x)`; the test scenes' board warping is Core's `Synthetic.saddle_height`. The repository's
   DUPLICATION.toml is gone (no exception left). Same values.
+- **Breaking: the grid starts are a solve.** `GridStart(; lattice, node_count)` (a fit) on `EstimationProblem(SplineLens, source[,
+  (; coverage, device)])`, a `FitResult` of the bounded SplineLens camera (the regression's retcode, stop rule, stats and rms;
+  `metadata.regression`, and `resample` — an exact start — or `spacing`, `origin`, `supported` — a region start): `DerivedLattice()`
+  a SplineLens source resampled exactly (was `exact_start`), `NodeCountLattice()` a parametric source over the image region (was
+  `region_start`), `ImageLattice(G_x, G_y)` a parametric source's full-image lattice (new; was `grid_model(src, G_x, G_y)`).
+  `grid_model`, `exact_start`, `region_start`, `start_grid`, `schoeps_gridlens` and `schoeps_start` are removed (a Schöps run's
+  model: `load_camera("schoeps:" * path)` and `GridStart(; lattice = DerivedLattice())`). Same cameras.
 - **Public:** `PIPELINE_OUTPUT_KEYS`, `START_RECORD_FILE`, `START_MASKS_DIR`, `load_refinement_start`, `masked_observations` and
   `Unweighted` (read by the paper project).
 - **Changed:** the start's per-view pose refit (`_refined_pose`) returns its `FitResult`; a start pose whose refine did not succeed

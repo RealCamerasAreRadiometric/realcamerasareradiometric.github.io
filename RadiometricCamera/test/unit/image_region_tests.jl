@@ -4,7 +4,7 @@
 # valid, not where light falls): the grid's lens coverage, the masks, the focus nodes' support and the vignetting's radius all read it.
 
 @testitem "imaged region: the measured image region, stored by the grid" setup = [RCFixtures] begin
-    using RadiometricCamera: grid_model, in_domain
+    using RadiometricCamera: _image_start, in_domain
     using StaticArrays, Random, Statistics, PNGFiles, ImageCore
     using VisualGeometryToolkitCore: thrown_message
     using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
@@ -18,8 +18,8 @@
     inside(r, (x, y)) = VgtkCore.Point2{Float64}(x, y) ∈ r
     # a grid built from the lens does not inherit its fold: its lens coverage is the one it is given (the source's, the sensor, by
     # default)
-    @test VgtkCore.lens_coverage(grid_model(fish, 35, 25)) == VgtkCore.Rect2{Float64}(0, 0, W, H)
-    g = VgtkCore.with_lens_coverage(grid_model(fish, 35, 25), circle)
+    @test VgtkCore.lens_coverage(_image_start(fish, (35, 25)).camera) == VgtkCore.Rect2{Float64}(0, 0, W, H)
+    g = VgtkCore.with_lens_coverage(_image_start(fish, (35, 25)).camera, circle)
     @test VgtkCore.lens_coverage(g) == circle
     @test all(inside(VgtkCore.imaged_region(g), p) == inside(region, p) for p in raster)
     # the record stores it: a grid read back keeps its lens coverage
@@ -78,7 +78,7 @@
     pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), 416.0, (260.0, 174.0), W, H; f_y = 417.6)
     rp = VgtkCore.imaged_region(pin)
     @test !(VgtkCore.lens_coverage(pin) isa VgtkCore.Ellipse) && all(inside(rp, p) for p in raster)
-    gp = grid_model(pin, 10, 10)
+    gp = _image_start(pin, (10, 10)).camera
     @test VgtkCore.lens_coverage(gp) == VgtkCore.Rect2{Float64}(0, 0, W, H) && all(RC.grid_present(gp))
     @test all(VgtkCore.pixel_mask(rp, W, H)) && radius(VgtkCore.lens_coverage(pin)) ≈ hypot(W, H) / 2
     @test all(RC._focus_support(pin, rp), VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H)))

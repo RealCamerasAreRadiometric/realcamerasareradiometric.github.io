@@ -49,11 +49,11 @@ end
 end
 
 @testitem "grid lattice: the start dispatches on the source and the mode" setup = [RCFixtures] begin
-    using RadiometricCamera: DerivedLattice, NodeCountLattice, start_grid
+    using RadiometricCamera: DerivedLattice, NodeCountLattice, _start_grid
     W, H = 640, 480
     kb = cam(VgtkCore.KannalaBrandt(-0.05, 0.01, 0.0, 0.0), 300.0, (320.0, 240.0), W, H)
     # a parametric source has no lattice of its own: "derived" refused at its start, naming the source and the fix
-    m = try start_grid(kb, RC.GridOptions()); "" catch e; e.msg end
+    m = try _start_grid(kb, RC.GridOptions()); "" catch e; e.msg end
     @test occursin("grid.lattice = \"derived\"", m) && occursin("node_count", m)
-    @test start_grid(kb, RC.GridOptions(; lattice = NodeCountLattice(), node_count = 150)).resample === nothing
+    @test _start_grid(kb, RC.GridOptions(; lattice = NodeCountLattice(), node_count = 150)).resample === nothing
 end

@@ -58,7 +58,7 @@ _model_number_type(g::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics,
     initialization_region(src) -> region
 
 Where the start camera `src` (the source a grid start is fitted to: a Schöps run's spline model, a session's camera) is DEFINED: its image ∩ its
-lens model's `valid_domain` (Schöps's calibrated area, a `Rect2`, for its SplineLens) — the region [`grid_model`](@ref) fits over and
+lens model's `valid_domain` (Schöps's calibrated area, a `Rect2`, for its SplineLens) — the region a [`GridStart`](@ref) fits over and
 the re-gridding's sensor-wide lattice no longer carries. A stage input of the initialization (the run's `rc/run_parameters/v1`
 record holds it), never a camera property: the initialization's steps take it explicitly ([`in_initialization`](@ref)).
 """
@@ -82,30 +82,27 @@ in_initialization(detections, region) = [d for d in detections if SVector{2, Flo
 
 
 """
-    grid_model(src, G_x, G_y; coverage = nothing) -> BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}
+    _image_start(src, G; coverage = nothing) -> (; camera, fit)
 
-The SplineLens camera of `G_x × G_y` controls over the image of the parametric camera `src` (a SplineLens source is resampled
-exactly instead, [`exact_start`](@ref); Estimation refuses a `grid_size` for one) by
-Estimation's `CameraRegression(; grid_size = (G_x, G_y), forward = false)` on `CameraRegressionProblem(SplineLens, src, imaged_region(src))`
-(`_spline_regression`): the source turned onto its optical axis first (`OpticalAxis`, Core's `axis_gauged`: K's principal point at the axis's pixel — the same camera, its
-rays rotated), then the backward fitted on Core's full-image lattice of that size to the turned source's rays over its imaged region
-by the penalized least squares of `PSpline` (one solve, no forward spline; a node the region misses held by the penalty). The
-camera is bounded by `src`'s image, its lens coverage `coverage` (the capture set's image region — where light falls, its keyed
-step's record, never the source lens's fold) or, without one, `src`'s own.
-
-No tolerance is asked of the resample and its fidelity is not reported (Estimation's held-out errors of a resample are not yet
-right). A start whose optical-axis fit did not converge (the regression's retcode) proceeds on the lattice
-the regression returned (the stalled axis's rotation 0): the start is not axis-gauged for that run, and one line
-says so.
+[`GridStart`](@ref)'s [`ImageLattice`](@ref): the SplineLens camera of `G = (G_x, G_y)` controls over the image of the parametric
+camera `src` by Estimation's `CameraRegression(; grid_size = G, forward = false)` on `CameraRegressionProblem(SplineLens, src,
+imaged_region(src))` (`_spline_regression`): the source turned onto its optical axis first (`OpticalAxis`, Core's `axis_gauged`: K's
+principal point at the axis's pixel — the same camera, its rays rotated), then the backward fitted on Core's full-image lattice of
+that size to the turned source's rays over its imaged region by the penalized least squares of `PSpline` (one solve, no forward
+spline; a node the region misses held by the penalty). The camera is bounded by `src`'s image, its lens coverage `coverage` (the
+capture set's image region — where light falls, its keyed step's record, never the source lens's fold) or, without one, `src`'s own.
+`fit` the regression's `FitResult`. No tolerance is asked of the resample and its fidelity is not reported (Estimation's held-out
+errors of a resample are not yet right). A start whose optical-axis fit did not converge (the regression's retcode) proceeds on the
+lattice the regression returned (the stalled axis's rotation 0): the start is not axis-gauged for that run, and one line says so.
 """
-function grid_model(src, G_x::Integer, G_y::Integer; coverage = nothing)
-    (G_x >= 5 && G_y >= 5) || throw(ArgumentError("grid must be at least 5 × 5"))
+function _image_start(src, G::Tuple{Integer, Integer}; coverage = nothing)
+    (G[1] >= 5 && G[2] >= 5) || throw(ArgumentError("grid must be at least 5 × 5"))
     s = coverage === nothing ? src : with_lens_coverage(src, coverage)
-    fit = _spline_regression(s, VgtkCore.imaged_region(s); grid_size = (Int(G_x), Int(G_y)))
-    _axis_line(fit, (G_x, G_y))
-    return VgtkCore.with_model(s, fit.u)
+    fit = _spline_regression(s, VgtkCore.imaged_region(s); grid_size = (Int(G[1]), Int(G[2])))
+    _axis_line(fit, G)
+    return (; camera = VgtkCore.with_model(s, fit.u), fit)
 end
-# A parametric start's fit (`grid_model`, `region_start`) whose optical-axis fit did not converge proceeds on the lattice it returned: one line.
+# A parametric start's fit (`_image_start`, `_region_start`) whose optical-axis fit did not converge proceeds on the lattice it returned: one line.
 _axis_line(fit, G) = VgtkCore.successful_retcode(fit) ||
     (@printf("start resample onto %d × %d: the optical-axis fit did not converge (%s, %s): the start is not axis-gauged for this run\n",
              G..., fit.retcode, fit.stop_rule); flush(stdout))
@@ -157,46 +154,115 @@ end
 
 # ---- the geometry lattice's mode: `[grid] lattice` ---
 """How a grid start's geometry lattice is made (`[grid] lattice`, parsed ONCE by `read_switch` through [`LATTICE_TAGS`](@ref)):
-[`DerivedLattice`](@ref) or [`NodeCountLattice`](@ref). Every decision on it is a dispatch ([`start_grid`](@ref))."""
+[`DerivedLattice`](@ref) or [`NodeCountLattice`](@ref). Every decision on it is a dispatch ([`GridStart`](@ref))."""
 abstract type LatticeRule end
 """`grid.lattice = "derived"`: the start source's OWN lattice (T. Schöps's camera) extended over the sensor ∩ the lens coverage on its
 own spacing, split exactly by the integer m whose present nodes come closest to `grid.node_count` without exceeding it (no count:
-m = 1; [`exact_start`](@ref), its internal `exact_subdivision`). A source without a lattice (a parametric camera) is refused."""
+m = 1; [`GridStart`](@ref)'s exact resample, its internal `exact_subdivision`). A source without a lattice (a parametric camera) is refused."""
 struct DerivedLattice <: LatticeRule end
 """`grid.lattice = "node_count"`: a lattice of square cells laid over the image region's bounding box, sized so the nodes the region
-supports come nearest `grid.node_count` ([`region_start`](@ref); a parametric source). A SplineLens source is refused."""
+supports come nearest `grid.node_count` ([`GridStart`](@ref); a parametric source). A SplineLens source is refused."""
 struct NodeCountLattice <: LatticeRule end
 """The spellings of `grid.lattice` and the rule each reads as (`read_switch`'s cases; the writer's `switch_spelling`)."""
 const LATTICE_TAGS = VgtkCore.TagRegistry(:lattice, "Lattice", "derived" => DerivedLattice, "node_count" => NodeCountLattice; paths = [r"grid\.lattice"])
 
 """
-    start_grid(source, grid::GridOptions; coverage = nothing, device = default_backend()) -> (; camera, resample)
+    ImageLattice(G_x, G_y)
 
-The grid start of a source camera, by its TYPE and the lattice's mode `grid.lattice`: a SplineLens source (a Schöps run's model)
-under `"derived"` is resampled EXACTLY on its own lattice, m = 1 ([`exact_start`](@ref)); a parametric source under `"node_count"`
-has its lattice laid over the image region and fitted at `grid.node_count` supported nodes ([`region_start`](@ref);
-`resample = nothing`). The other two combinations are refused, naming the key and the fix (a TOML value the input makes unusable
-is an error, never ignored). `coverage`: the run's lens coverage (its measured image region; `nothing`, the source's own).
+A lattice of `G_x × G_y` controls over the whole image of a PARAMETRIC source, Core's full-image lattice (each at least 5): a
+[`GridStart`](@ref)'s for a camera sampled into the generic grid model at a stated size (the session's `lens = :grid`, a test
+scene's). Not a `grid.lattice` of a run's TOML (a run states `"derived"` or `"node_count"`, [`LATTICE_TAGS`](@ref)).
 """
-function start_grid(src, grid; coverage = nothing, device = default_backend())
-    r = lattice_refusal(grid.lattice, lattice_source(src))
-    r === nothing || throw(ArgumentError(r * " (the start's source: $(_lattice_source_label(src)))"))
-    return _start_grid(src, grid.lattice, grid; coverage, device)
+struct ImageLattice <: LatticeRule
+    grid_size::Tuple{Int, Int}
 end
-_start_grid(src::SplineCamera, ::DerivedLattice, grid; coverage, device) = exact_start(src; grid.node_count, coverage, device)
-_start_grid(src, ::NodeCountLattice, grid; coverage, device) = (; region_start(src, grid.node_count; coverage).camera, resample = nothing)
+function ImageLattice(G_x::Integer, G_y::Integer)
+    (G_x >= 5 && G_y >= 5) || throw(ArgumentError("ImageLattice: a lattice of at least 5 × 5 controls; got $G_x × $G_y"))
+    return ImageLattice((Int(G_x), Int(G_y)))
+end
+
+"""
+    GridStart(; lattice::LatticeRule, node_count = nothing)
+
+The grid start of a source camera, a fit: the SplineLens camera (Core's generic grid model) of a camera `source`, solved on
+`EstimationProblem(SplineLens, source[, (; coverage, device)])` — `coverage` the capture set's lens coverage (its measured image
+region; `nothing`, the source's own), `device` the compute backend of an exact resample ([`default_backend`](@ref) by default) — by
+VisualGeometryToolkitEstimation's `CameraRegression` (no tolerance, no forward spline), its lattice by `lattice`:
+
+- [`DerivedLattice`](@ref)`()`: a SplineLens source (a Schöps run's model) resampled EXACTLY on its own lattice, extended over the
+  sensor ∩ the coverage, subdivided by the integer m whose present nodes come closest to `node_count` without exceeding it (`nothing`:
+  m = 1), padded to the grid route's patch multiple; `metadata.resample` the start record's entry (`_exact_start`);
+- [`NodeCountLattice`](@ref)`()`: a parametric source's lattice of square cells over the image region, fitted at `node_count` (≥ 16)
+  supported nodes, the others absent, padded; `metadata.spacing`, `origin`, `supported` (`_region_start`);
+- [`ImageLattice`](@ref)`(G_x, G_y)`: a parametric source's full-image lattice of that size (`_image_start`).
+
+The source's kind and the lattice must agree (`lattice_refusal`: an `ArgumentError` naming the key and the fix). The `FitResult`:
+`u` the bounded SplineLens camera; `retcode`, `stop_rule`, `stats`, `rms` and `n` the regression's; `metadata.regression` its
+metadata. A start whose optical-axis fit did not converge proceeds unturned, and one line says so.
+"""
+struct GridStart{L <: LatticeRule} <: VgtkCore.AbstractEstimationAlgorithm
+    lattice::L
+    node_count::Union{Nothing, Int}
+end
+function GridStart(; lattice::LatticeRule, node_count::Union{Nothing, Integer} = nothing)
+    lattice isa NodeCountLattice && node_count === nothing &&
+        throw(ArgumentError("GridStart: a NodeCountLattice lattice is fitted at a `node_count` of supported nodes; give one"))
+    lattice isa NodeCountLattice && check_node_count(node_count)
+    lattice isa ImageLattice && node_count !== nothing &&
+        throw(ArgumentError("GridStart: an ImageLattice has its own size ($(join(lattice.grid_size, " × "))); no `node_count`"))
+    return GridStart(lattice, node_count === nothing ? nothing : Int(node_count))
+end
+VgtkCore.estimator_kind(::GridStart) = VgtkCore.FitKind()
+
+# the problem's context: the lens coverage and the device (the default backend only when none is stated)
+_grid_start_coverage(p) = p isa NamedTuple ? get(p, :coverage, nothing) : nothing
+_grid_start_device(p) = p isa NamedTuple && haskey(p, :device) ? p.device : default_backend()
+
+function VgtkCore.__solve(prob::VgtkCore.EstimationProblem{VgtkCore.SplineLens}, alg::GridStart)
+    st = _grid_start(prob.f, alg.lattice, alg.node_count; coverage = _grid_start_coverage(prob.p),
+                     device = alg.lattice isa DerivedLattice ? _grid_start_device(prob.p) : nothing)
+    f = st.fit
+    extras = alg.lattice isa DerivedLattice ? (; st.resample) :
+             alg.lattice isa NodeCountLattice ? (; st.spacing, st.origin, st.supported) : (;)
+    return VgtkCore.FitResult(st.camera, f.retcode, f.stop_rule, f.stats, f.rms, f.n, (; regression = f.metadata, extras...))
+end
+
+# THE grid start of a source by its lattice (the solve's, and the front ends' `_start_grid`): the source's kind and the lattice agree
+# (`lattice_refusal`), then the start of that lattice
+function _grid_start(src, lattice::LatticeRule, node_count; coverage, device)
+    r = lattice_refusal(lattice, lattice_source(src))
+    r === nothing || throw(ArgumentError(r * " (the start's source: $(_lattice_source_label(src)))"))
+    return _lattice_start(src, lattice, node_count; coverage, device)
+end
+_lattice_start(src::SplineCamera, ::DerivedLattice, node_count; coverage, device) = _exact_start(src; node_count, coverage, device)
+_lattice_start(src, ::NodeCountLattice, node_count; coverage, device) = _region_start(src, node_count; coverage)
+_lattice_start(src, l::ImageLattice, _node_count; coverage, device) = _image_start(src, l.grid_size; coverage)
+
+"""
+    _start_grid(source, grid::GridOptions; coverage = nothing, device = default_backend()) -> (; camera, resample)
+
+A run's grid start of a source camera ([`GridStart`](@ref)'s, by `grid.lattice` and `grid.node_count`): a SplineLens source under
+`"derived"` resampled EXACTLY on its own lattice; a parametric source under `"node_count"` fitted over the image region
+(`resample = nothing`). The other two combinations are refused, naming the key and the fix.
+"""
+function _start_grid(src, grid; coverage = nothing, device = default_backend())
+    st = _grid_start(src, grid.lattice, grid.node_count; coverage, device)
+    return (; st.camera, resample = get(st, :resample, nothing))
+end
 
 """The kind of a start's source for its lattice: `:spline` (a SplineLens camera, T. Schöps's: its own lattice) or `:parametric`."""
 lattice_source(::SplineCamera) = Val(:spline)
 lattice_source(_) = Val(:parametric)
 _lattice_source_label(::SplineCamera) = "a SplineLens camera"
 _lattice_source_label(src) = VgtkCore.lens_label(VgtkCore.lens(src))
+lattice_refusal(::ImageLattice, ::Val{:spline}) =
+    "an ImageLattice: a SplineLens source is resampled on its own lattice — `DerivedLattice()` (Estimation takes no `grid_size` for one)"
 """
     lattice_refusal(rule::LatticeRule, source::Val) -> Union{String, Nothing}
 
 THE rule of a lattice mode against its start's source kind (`lattice_source`; the config reader's `frontend.type = "schoeps"` is a
 `:spline` source): a SplineLens / Schöps source is its own lattice ("node_count" refused), a parametric one has none ("derived"
-refused) — the refusal's text, or `nothing`. Read by the config reader (`_check_lattice`) and by the start (`start_grid`).
+refused) — the refusal's text, or `nothing`. Read by the config reader (`_check_lattice`) and by the start ([`GridStart`](@ref)).
 """
 lattice_refusal(::NodeCountLattice, ::Val{:spline}) =
     "`grid.lattice = \"node_count\"`: a Schöps / SplineLens start is its own lattice — state `grid.lattice = \"derived\"` (m = 1) and no `grid.node_count`"
@@ -212,7 +278,7 @@ lattice_refusal(::LatticeRule, ::Val) = nothing
 # principal point moved by the box's origin: `_origin_shifted`; the region moved with it: `_in_frame`), the fitted camera moved back.
 # A pixel-frame change is a translation, so the lens and every ray are unchanged (the rule of Core's convert_frame, which has no
 # LogicalIntrinsics method). FOLLOW-UP Estimation: a lattice-area setting of CameraRegressionProblem(SplineLens, …) (Core's spline_lattice already
-# takes `calib_area`); then `_origin_shifted`, `_in_frame` and the crop in `region_start` and `_layout_lattice` are DELETED, not kept.
+# takes `calib_area`); then `_origin_shifted`, `_in_frame` and the crop in `_region_start` and `_layout_lattice` are DELETED, not kept.
 
 # The camera model `m` (Core's LogicalIntrinsics over its lens) in the pixels of the frame whose origin is the pixel `o` of `m`'s.
 function _origin_shifted(m::CameraModel{<:VgtkCore.LogicalIntrinsics}, o)
@@ -283,19 +349,19 @@ function region_spacing(m, region, node_count::Integer)
 end
 
 """
-    region_start(src, node_count; coverage = nothing) -> (; camera, spacing, origin, supported)
+    _region_start(src, node_count; coverage = nothing) -> (; camera, spacing, origin, supported, fit)
 
 A PARAMETRIC start's lattice: the SplineLens camera of the parametric camera `src` on a lattice of
 square cells laid over the bounding box of the image region — the sensor ∩ the lens coverage `coverage` (the capture set's image
 region; `nothing`, `src`'s own: [`coverage_region`](@ref)) — whose cell (`region_spacing`, an integer px) makes the nodes the
 region supports (Core's present-node rule, `node_mask`) come nearest `node_count`. Its controls are Estimation's public
 `CameraRegression(; grid_size, forward = false)` on `CameraRegressionProblem(SplineLens, src, imaged_region(src))` (`_spline_regression`; the source turned onto its optical axis, the
-penalized least squares of `PSpline`, as [`grid_model`](@ref)) on the source in the pixels of the lattice's box, moved back;
+penalized least squares of `PSpline`, as `_image_start`) on the source in the pixels of the lattice's box, moved back;
 the nodes the region does not support are ABSENT (never read on it, never a parameter); then the lattice is padded at its right and
 bottom edges to the grid route's patch multiple (`pad_lattice`). `spacing` (px), `origin` (the pixel where the lattice's area begins: its first node + one cell) and
-`supported` (the nodes the region supports, before the padding) describe the lattice.
+`supported` (the nodes the region supports, before the padding) describe the lattice; `fit` the regression's `FitResult`.
 """
-function region_start(src, node_count::Integer; coverage = nothing)
+function _region_start(src, node_count::Integer; coverage = nothing)
     s = coverage === nothing ? src : with_lens_coverage(src, coverage)
     m = VgtkCore.model(s)
     region = coverage_region(s)
@@ -303,7 +369,7 @@ function region_start(src, node_count::Integer; coverage = nothing)
     layout = region_layout(region, h)
     o = layout.origin; G = layout.grid_size
     # the fit in the box's pixels: the source's camera there, bounded by the box, its lens coverage moved with it, over its imaged
-    # region (the sensor ∩ the coverage ∩ its valid domain, as grid_model's) moved with it
+    # region (the sensor ∩ the coverage ∩ its valid domain, as `_image_start`'s) moved with it
     box = VgtkCore.with_lens_coverage(BoundedCamera(_origin_shifted(m, o), VgtkCore.Size2(((G .- 3) .* h)...)), _in_frame(VgtkCore.lens_coverage(s), o))
     # the support the fit checks the region against: the source's valid domain moved by the same translation, the very object the
     # region holds (Estimation re-deriving it from the moved K could differ by rounding and refuse a region on its edge)
@@ -312,13 +378,13 @@ function region_start(src, node_count::Integer; coverage = nothing)
     fitted = _origin_shifted(fit.u, .-o)
     supported = BitMatrix(VgtkCore.node_mask(fitted, region))
     count(supported) <= node_count ||                              # the guard: never more present nodes than the case's literal
-        error("region_start: $(count(supported)) supported nodes exceed grid.node_count = $node_count at the $h px cell (region_spacing's bound)")
+        error("_region_start: $(count(supported)) supported nodes exceed grid.node_count = $node_count at the $h px cell (region_spacing's bound)")
     pad = pad_lattice(VgtkCore.with_model(s, VgtkCore.with_present(fitted, supported)), region)
     @printf("start: a parametric source's lattice over the image region's box from pixel (%d, %d): %d × %d nodes of %d px (square), %d supported by the region (target %d)%s\n",
             o..., G..., h, count(supported), node_count,
             pad.folds === nothing ? "" : @sprintf("; padded at its right and bottom edges by %d × %d nodes to %d × %d (the grid route's patch multiple, %s)", pad.nodes..., grid_dims(pad.camera)..., join(GRID_PATCH, " × ")))
     flush(stdout)
-    return (; pad.camera, spacing = h, origin = collect(Int, o), supported = count(supported))
+    return (; pad.camera, spacing = h, origin = collect(Int, o), supported = count(supported), fit)
 end
 
 """
@@ -384,7 +450,7 @@ function exact_subdivision(m, region, node_count)
 end
 
 """
-    exact_start(source::SplineCamera; node_count = nothing, coverage = nothing, device = default_backend()) -> (; camera, resample)
+    _exact_start(source::SplineCamera; node_count = nothing, coverage = nothing, device = default_backend()) -> (; camera, resample, fit)
 
 The start of a SplineLens `source` (Schöps's lattice, `grid.lattice = "derived"`), resampled exactly by Estimation's
 `CameraRegression(; forward = false)` on `CameraRegressionProblem(SplineLens, source, region)` (`_spline_regression`) over `region` = the sensor ∩ the lens coverage
@@ -407,7 +473,7 @@ assertion ([`check_coverage`](@ref)).
 `folds` (`folded` pixels, `samples`, `unimaged`), the fidelity to his rays where he images one (`max_px`, `max_px_edge`, `rms`) and
 the axis turn (`axis_rotation`, the rows of R: every control of his is R·c in the start).
 """
-function exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = nothing, coverage = nothing, device = default_backend())
+function _exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = nothing, coverage = nothing, device = default_backend())
     s = coverage === nothing ? src : with_lens_coverage(src, coverage)
     region = coverage_region(s)
     sub = exact_subdivision(VgtkCore.model(s), region, node_count)
@@ -438,7 +504,7 @@ function exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = no
         @printf("start: the lattice padded at its right and bottom edges by %d × %d nodes to %d × %d (the grid route's patch multiple, %s; %d present, outside the region); padding folds: %d of %d samples (%d unimaged)\n",
                 pad.nodes..., grid_dims(camera)..., join(GRID_PATCH, " × "), count(VgtkCore.present_nodes(VgtkCore.model(camera))) - count(VgtkCore.present_nodes(VgtkCore.model(resampled))), length(pad.folds.folded), pad.folds.samples, pad.folds.unimaged)
     flush(stdout)
-    return (; camera, resample)
+    return (; camera, resample, fit)
 end
 
 """

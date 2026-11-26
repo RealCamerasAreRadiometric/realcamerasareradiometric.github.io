@@ -57,8 +57,8 @@ sensor_model = "auto"          # whether the run uses the sensor model: "auto" (
 lattice = "derived"            # the geometry lattice of a grid start (owner rulings 2026-11-15): "derived" = the start source's OWN
                                #   lattice (T. Schöps's camera) extended over the sensor ∩ lens coverage, split exactly by the
                                #   integer m whose present nodes come closest to `node_count` without exceeding it (no node_count:
-                               #   m = 1, his cell; `exact_start`) | "node_count" = square cells over the image region's bounding
-                               #   box, the present nodes nearest `node_count` from below (a PARAMETRIC start: `region_start`).
+                               #   m = 1, his cell; GridStart's exact resample) | "node_count" = square cells over the image region's bounding
+                               #   box, the present nodes nearest `node_count` from below (a PARAMETRIC start, GridStart's).
                                #   Derivation of the default: every grid start of record but the blob front end's parametric session
                                #   cameras is a Schöps start, and his own lattice (m = 1) runs the 14 mm refinement at 88 s/it on the
                                #   GPU against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits (dgx01 A/B, 2026-11-15).

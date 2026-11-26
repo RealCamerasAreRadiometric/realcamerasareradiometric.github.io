@@ -1,5 +1,5 @@
 @testitem "division lens (BlobBoards division model)" setup = [RCFixtures] begin
-    using RadiometricCamera: build_problem, compute_mask, Focus, FocusSpline, grid_model, in_domain, Material, PerViewResidual,
+    using RadiometricCamera: build_problem, compute_mask, Focus, FocusSpline, _image_start, in_domain, Material, PerViewResidual,
                              TexturedTarget, render_view, RenderSettings, sphere_radius, View, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -143,7 +143,7 @@
         P = [SVector(x, y) for x in range(0.0, 640.0, length = 41), y in range(0.0, 640.0, length = 41)]
         ang(a, b) = atan(norm(cross(a, b)), dot(a, b))
         for (G, tol) in ((8, 0.04), (14, 5e-3))
-            gl = grid_model(src, G, G; coverage = VgtkCore.valid_domain(src))
+            gl = _image_start(src, (G, G); coverage = VgtkCore.valid_domain(src)).camera
             @test all(all(isfinite, n) for n in VgtkCore.directions(VgtkCore.model(gl)))
             @test all(in_domain(src, p) for p in P if in_domain(gl, p)) && count(p -> in_domain(gl, p), P) > 0.5 * count(p -> in_domain(src, p), P)
             @test maximum(ang(normalize(chief_ray(gl, p)), chief_ray(src, p)) for p in P if in_domain(gl, p)) < tol

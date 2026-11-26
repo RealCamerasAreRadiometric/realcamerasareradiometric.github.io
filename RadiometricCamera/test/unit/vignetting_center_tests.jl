@@ -19,10 +19,10 @@
     # 2. of a SplineLens start: its K's principal point, which is the optical axis — the start is fitted by Estimation's CameraRegression,
     # which turns its source onto the axis (RC 0.11.0): the lattice of a radially symmetric lens about (331.5, 228.25), and a resample
     # of that lattice onto another (a SplineLens source: turned by OpticalAxis first)
-    g = RC.grid_model(kb, 13, 10)
+    g = RC._image_start(kb, (13, 10)).camera
     @test RC.vignetting_center(g) == SVector{2, Float64}(VgtkCore.principal_point(VgtkCore.model(g).intrinsics)...)
     @test RC.vignetting_center(g) ≈ SVector(331.5, 228.25) atol = 0.05
-    r = RC.exact_start(g).camera                                                       # a SplineLens source: resampled exactly on its own lattice (m = 1)
+    r = RC._exact_start(g).camera                                                       # a SplineLens source: resampled exactly on its own lattice (m = 1)
     axfit = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkEstimation.CameraRegressionProblem(r)), VgtkEstimation.OpticalAxis())
     @test VgtkCore.successful_retcode(axfit)                                           # the axis converged here: the K tests below hold
     ax = axfit.u                                                                       # the resample's K principal point == its optical axis

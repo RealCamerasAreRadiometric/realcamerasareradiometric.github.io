@@ -46,7 +46,7 @@ Board, camera parts and initial poses of a calibration session stored as VisualG
 * the camera: `load(BoundedCamera, camera.json)` — K in COLMAP pixels, the image extent, e.g. BlobBoards' division camera — bounded
   by its `Sensor` (`sensor_width` over the record's extent) and moved to the photographs' pixels when they are box-averaged by
   `downsample` (K re-expressed under the box downsample: Core's `Cameras.reframed_calibration` by the similarity x ↦ x / f): `lens = :camera` that pixel camera, `:grid` the generic grid model of
-  `grid_size` sampled from it (`grid_model`);
+  `grid_size` sampled from it ([`GridStart`](@ref) of an [`ImageLattice`](@ref));
 * the board: the target of component `component`, `load(Rig, targets_<component>.json)` — Core's planar target with its Canvas and
   the CanvasTexture of the printed image, whose file (`textures/<id>.png`, beside the records) is read by Features' `load_linear_image`
   and box-averaged by `texture_downsample` — as the board, a `TexturedTarget` whose world frame is the target's (metres);
@@ -110,7 +110,8 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     m0 = VgtkCore.model(bc)
     Kd = VgtkCore.Cameras.reframed_calibration(VgtkCore.SimilarityMap(LinearMap(UniformScaling(1 / downsample))), m0.intrinsics.K)
     lc = VgtkCore.BoundedCamera(CameraModel(LogicalIntrinsics(Kd), m0.lens), VgtkCore.Sensor(VgtkCore.Size2(Int(W), Int(H)), VgtkCore.px * sensor.pitch.width * downsample))
-    lens₀ = lens === :camera ? lc : grid_model(lc, grid_size[1], grid_size[2])
+    lens₀ = lens === :camera ? lc :
+            VgtkCore.solve(VgtkCore.EstimationProblem(SplineLens, lc), GridStart(; lattice = ImageLattice(grid_size...))).u
     f_m = VgtkCore.calibration_matrix(VgtkCore.model(lc))[1, 1] * _pixel_pitch(VgtkCore.sensor(lc))
     nodes = grid_nodes(focus_grid, VgtkCore.Rect(0, 0, W, H))
     cosα_i = chief_cos_at_nodes(lens₀, nodes)                 # NaN at a node the lens does not image

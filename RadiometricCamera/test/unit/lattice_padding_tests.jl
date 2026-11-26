@@ -6,7 +6,7 @@
 # and a start whose counts are not multiples runs through build_problem_grid and the LM.
 
 @testitem "lattice padding: the exact start's node counts reach the patch multiple, the region unchanged" setup = [RCFixtures, SchoepsSource] begin
-    using RadiometricCamera: GRID_PATCH, coverage_region, exact_start, grid_dims, grid_present, pad_lattice, start_grid
+    using RadiometricCamera: GRID_PATCH, coverage_region, _exact_start, grid_dims, grid_present, pad_lattice, _start_grid
     using StaticArrays, LinearAlgebra
     using KernelAbstractions: CPU
 
@@ -18,7 +18,7 @@
     circle = VgtkCore.Ellipse(VgtkCore.Point2(320.0, 240.0), 300.0, 260.0, 0.0)
 
     for (m, coverage) in ((1, nothing), (2, nothing), (4, nothing), (4, circle))
-        st = exact_start(subdivided(src, m); coverage)
+        st = _exact_start(subdivided(src, m); coverage)
         r = st.resample
         G = grid_dims(st.camera)
         # the node counts: multiples of the patch, the resample's own counts before, padded at the right and bottom by fewer than a patch
@@ -46,7 +46,7 @@
     # lattice (a parametric start's, over the whole sensor) and of Schöps's own 7 × 6 (over his domain). Both regions' edges are the
     # lattice's (a knot): the first padded ring touches the region (Core's closed footprint) and is present, its basis zero there
     kb = cam(VgtkCore.KannalaBrandt(-0.05, 0.01, 0.0, 0.0), 300.0, (320.0, 240.0), W, H)
-    for (c0, region) in ((RC.grid_model(kb, 27, 23), sensor), (src, sensor ∩ VgtkCore.valid_domain(VgtkCore.model(src))))
+    for (c0, region) in ((RC._image_start(kb, (27, 23)).camera, sensor), (src, sensor ∩ VgtkCore.valid_domain(VgtkCore.model(src))))
         p = pad_lattice(c0, region)
         G0 = grid_dims(c0); G = grid_dims(p.camera)
         @test all(G .% GRID_PATCH .== 0) && collect(G .- G0) == p.nodes && any(>(0), p.nodes)
@@ -75,16 +75,16 @@
         f0 = VgtkCore.folded_pixels(c0, region); f1 = VgtkCore.folded_pixels(p.camera, region)
         @test f1.folded == f0.folded && f1.samples == f0.samples && f1.unimaged == f0.unimaged
     end
-    @test pad_lattice(RC.grid_model(kb, 15, 10), sensor).nodes == [0, 0]                                     # multiples already: nothing added
+    @test pad_lattice(RC._image_start(kb, (15, 10)).camera, sensor).nodes == [0, 0]                                     # multiples already: nothing added
 
     # the resample at his own cell (9 × 8 nodes) is padded to 10 × 10
-    @test grid_dims(exact_start(src).camera) == (10, 10)
+    @test grid_dims(_exact_start(src).camera) == (10, 10)
     # a parametric start's lattice (sized by grid.node_count over the image region, RC 0.11.4): padded to the patch multiple too
-    @test all(grid_dims(start_grid(kb, RC.GridOptions(; lattice = RC.NodeCountLattice(), node_count = 150)).camera) .% GRID_PATCH .== 0)
+    @test all(grid_dims(_start_grid(kb, RC.GridOptions(; lattice = RC.NodeCountLattice(), node_count = 150)).camera) .% GRID_PATCH .== 0)
 end
 
 @testitem "lattice padding: a start whose node counts are not patch multiples runs through build_problem_grid and the LM" setup = [RCFixtures, SchoepsSource] begin
-    using RadiometricCamera: build_problem_grid, compute_mask, exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, grid_model,
+    using RadiometricCamera: build_problem_grid, compute_mask, _exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, _image_start,
                              grid_present, Material, TexturedTarget, render_view, RenderSettings, _lm_tiles!, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
@@ -94,8 +94,8 @@ end
     board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
-    spline = subdivided(grid_model(src_t, 10, 10), 2)                      # a SplineLens source of 7 × 7 cells split 2 × 2: 17 nodes per axis
-    st = exact_start(spline)                                               # his lattice, m = 1: 17 nodes per axis, padded to 20
+    spline = subdivided(_image_start(src_t, (10, 10)).camera, 2)                      # a SplineLens source of 7 × 7 cells split 2 × 2: 17 nodes per axis
+    st = _exact_start(spline)                                               # his lattice, m = 1: 17 nodes per axis, padded to 20
     @test st.resample.padding.from == [17, 17] && grid_dims(st.camera) == (20, 20)
     glens = VgtkCore.with_present(st.camera, grid_present(st.camera; nodes = :interior))   # the run's free nodes (grid.nodes = "interior")
     focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])

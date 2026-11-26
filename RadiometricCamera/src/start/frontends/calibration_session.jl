@@ -14,7 +14,7 @@ function _frontend(::Type{BlobFrontend}, opts::PipelineOptions, start::NamedTupl
     poses0 = copy(ds.poses)
     stored = start.stored                                         # a start record (`load_refinement_start`): its lens, region and poses, no fit
     st0 = stored !== nothing ? (; stored.lens, stored.init_region, resample = nothing) :
-          isempty(opts.io.init) ? _session_start(opts, ds.lens₀) :   # the session's camera onto the run's lattice (`start_grid`, by its type)
+          isempty(opts.io.init) ? _session_start(opts, ds.lens₀) :   # the session's camera onto the run's lattice (`_start_grid`, by its type)
                                   (; load_start(opts.io.init)..., resample = nothing)
     lens0 = st0.lens; init_region = st0.init_region              # the initialization region: where the start is defined (a stage input)
     @printf("blob front-end: %d views of %s, image %d × %d, init grid %s from %s\n", length(names), opts.frontend.session, W₀, H₀, _lattice_line(lens0),
@@ -89,9 +89,9 @@ function _session_observations(file::AbstractString, target)
     return out
 end
 
-"""The blob front end's start from the session's camera `src`: `start_grid` over the run's lens coverage (`run_lens_coverage`) — a
-SplineLens camera resampled exactly, a parametric one fitted over the image region at `grid.node_count` (`region_start`) — and `src`'s initialization region."""
+"""The blob front end's start from the session's camera `src`: `_start_grid` over the run's lens coverage (`run_lens_coverage`) — a
+SplineLens camera resampled exactly, a parametric one fitted over the image region at `grid.node_count` ([`GridStart`](@ref)) — and `src`'s initialization region."""
 function _session_start(opts::PipelineOptions, src)
-    st = start_grid(src, opts.grid; coverage = run_lens_coverage(opts, Tuple(VgtkCore.extent(src))...))
+    st = _start_grid(src, opts.grid; coverage = run_lens_coverage(opts, Tuple(VgtkCore.extent(src))...))
     return (; lens = st.camera, init_region = initialization_region(src), st.resample)
 end

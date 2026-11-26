@@ -110,8 +110,8 @@ function gold_outputs()
     out = Dict{String, Any}()
     W = H = GOLD_W
     kb = cam(RCg.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
-    # the recorded scene's grid lens: Core's quasi-interpolation of the double sphere at the 10 × 10 nodes, as grid_model built it
-    # when the goldens were recorded (grid_model fits by Estimation's P-spline fit (PSpline) since 2026-11-04 — a different start, not what
+    # the recorded scene's grid lens: Core's quasi-interpolation of the double sphere at the 10 × 10 nodes, as the grid start built it
+    # when the goldens were recorded (the grid start fits by Estimation's P-spline fit (PSpline) since 2026-11-04 — a different start, not what
     # these goldens of the flux and Jacobian pin)
     ds = cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H)
     # (Core 0.9: the SplineLens camera of that function, re-gauged to the double sphere's K — a pixel's lattice coordinate, so its

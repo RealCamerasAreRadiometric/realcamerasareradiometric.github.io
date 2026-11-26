@@ -17,7 +17,7 @@ Any VisualGeometryToolkitCore lens plugs into the `RadiometricCameraModel` as Co
 back-projection is Core's `backproject` and whose parameters are Core's parameter protocol; the calibration refines it per view in its own
 parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and the image-size coordinate scale
 [`lm_scale`](@ref)). Any camera is sampled into the grid model, VisualGeometryToolkitCore's SplineLens camera (`CameraModel(K, SplineLens)`), by
-[`grid_model`](@ref)`(camera, G_x, G_y)` and refined per tile — the route of the paper's generic model (`lm_route`: the camera's type
+[`GridStart`](@ref) (`solve(EstimationProblem(SplineLens, camera), GridStart(; lattice = ImageLattice(G_x, G_y))).u`) and refined per tile — the route of the paper's generic model (`lm_route`: the camera's type
 picks it).
 
 ## Calibrate a session

@@ -4,7 +4,7 @@
 # grid.size is refused by name; a Schöps start (a SplineLens source) keeps his lattice, bit for bit.
 
 @testitem "region lattice: a parametric start over an ellipse ≈ N supported nodes, square cells, patch multiples" setup = [RCFixtures] begin
-    using RadiometricCamera: GRID_PATCH, coverage_region, grid_dims, region_layout, region_spacing, region_start, start_grid
+    using RadiometricCamera: GRID_PATCH, coverage_region, grid_dims, region_layout, region_spacing, _region_start, _start_grid
     using StaticArrays, LinearAlgebra
     using KernelAbstractions: CPU
 
@@ -13,7 +13,7 @@
     circle = VgtkCore.Ellipse(VgtkCore.Point2(320.0, 240.0), 200.0, 180.0, 0.0)
     rays(c, px) = Array(VgtkCore.backproject(VgtkCore.model(c), px; device = CPU()))
     for N in (150, 400, 1200)
-        st = region_start(kb, N; coverage = circle)
+        st = _region_start(kb, N; coverage = circle)
         m = VgtkCore.model(st.camera)
         region = coverage_region(st.camera)
         @test region == VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H)) ∩ circle
@@ -42,20 +42,20 @@
     # the cell falls as N grows
     @test region_spacing(VgtkCore.model(kb), coverage_region(VgtkCore.with_lens_coverage(kb, circle)), 1200) <
           region_spacing(VgtkCore.model(kb), coverage_region(VgtkCore.with_lens_coverage(kb, circle)), 150)
-    # start_grid of a parametric source: region_start at grid.node_count over the run's coverage, no resample record
-    gs = start_grid(kb, RC.GridOptions(; lattice = RC.NodeCountLattice(), node_count = 400); coverage = circle)
-    @test gs.resample === nothing && grid_dims(gs.camera) == grid_dims(region_start(kb, 400; coverage = circle).camera)
+    # _start_grid of a parametric source: _region_start at grid.node_count over the run's coverage, no resample record
+    gs = _start_grid(kb, RC.GridOptions(; lattice = RC.NodeCountLattice(), node_count = 400); coverage = circle)
+    @test gs.resample === nothing && grid_dims(gs.camera) == grid_dims(_region_start(kb, 400; coverage = circle).camera)
 end
 
 @testitem "region lattice: a sensor region gives a lattice covering the sensor" setup = [RCFixtures] begin
-    using RadiometricCamera: GRID_PATCH, coverage_region, grid_dims, region_start
+    using RadiometricCamera: GRID_PATCH, coverage_region, grid_dims, _region_start
     using KernelAbstractions: CPU
 
     W, H = 640, 480
     ds = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 300.0, (322.0, 238.0), W, H)
     sensor = VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H))
     for N in (200, 875)
-        st = region_start(ds, N)
+        st = _region_start(ds, N)
         m = VgtkCore.model(st.camera)
         G = grid_dims(st.camera)
         @test coverage_region(st.camera) == sensor ∩ sensor
@@ -72,7 +72,7 @@ end
     # N = 7875 on the FX3 sensor (configs/default.toml's derivation of the example count): the 41 px cell, 107 × 73 = 7811 nodes, padded to 110 × 75
     fx3 = cam(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), 3000.0, (2128.0, 1424.0), 4256, 2848)
     @test RC.PipelineOptions().grid.node_count === nothing                       # no default: a parametric start states it (lattice = "node_count")
-    s = region_start(fx3, 7875)
+    s = _region_start(fx3, 7875)
     @test s.spacing == 41 && s.supported == 107 * 73 && grid_dims(s.camera) == (110, 75)
 end
 
@@ -89,14 +89,14 @@ end
 end
 
 @testitem "region lattice: a Schöps start is his own lattice (bit for bit), whatever the coverage" setup = [RCFixtures, SchoepsSource] begin
-    using RadiometricCamera: exact_start, start_grid
+    using RadiometricCamera: _exact_start, _start_grid
     W, H = 640, 480
     path = tempname() * ".yaml"; schoeps_yaml(path)
     src = VgtkIO.load(VgtkCore.BoundedCamera, path)
     circle = VgtkCore.Ellipse(VgtkCore.Point2(320.0, 240.0), 300.0, 260.0, 0.0)
     for coverage in (nothing, circle)
-        a = exact_start(src; coverage)
-        b = start_grid(src, RC.GridOptions(); coverage)                          # grid.lattice = "derived": the exact start, m = 1
+        a = _exact_start(src; coverage)
+        b = _start_grid(src, RC.GridOptions(); coverage)                          # grid.lattice = "derived": the exact start, m = 1
         mb = VgtkCore.model(b.camera); ma = VgtkCore.model(a.camera)
         @test isequal(VgtkCore.directions(mb), VgtkCore.directions(ma)) && VgtkCore.present_nodes(mb) == VgtkCore.present_nodes(ma)
         @test VgtkCore.calibration_matrix(mb) == VgtkCore.calibration_matrix(ma) && VgtkCore.lattice_spacing(mb) == VgtkCore.lattice_spacing(ma)
@@ -123,7 +123,7 @@ end
 end
 
 @testitem "region lattice: grid.node_count is refused on a Schöps start (derived: his own lattice, never subdivided)" setup = [RCFixtures] begin
-    # owner ruling 2026-11-16 (the inapplicable-keys rule): the Schöps route (`schoeps_start` → `exact_start`) reads no node count, so a
+    # owner ruling 2026-11-16 (the inapplicable-keys rule): the Schöps route (the Schöps start → `GridStart`'s exact resample) reads no node count, so a
     # stated `grid.node_count` under `grid.lattice = "derived"` is an error naming the key and why, never silently ignored
     d = Dict("frontend" => Dict("type" => "schoeps"), "grid" => Dict("lattice" => "derived", "node_count" => 5000))
     m = try RC.pipeline_options(d); "" catch e; sprint(showerror, e) end

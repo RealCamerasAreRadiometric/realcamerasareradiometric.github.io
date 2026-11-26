@@ -8,7 +8,7 @@
 #
 #   start.json            rc/refinement_start/v1.0: the views, the image size, fpx, R0, d_c, f_m, the self-check bearings, the
 #                         front end's frame choice, the vignetting centre, the costs of the closed-form start, μ, the GCV selections,
-#                         the non-central centre, the exact resample of a SplineLens start (`resample`, `exact_start`: its lattice,
+#                         the non-central centre, the exact resample of a SplineLens start (`resample`, `GridStart`'s exact resample: its lattice,
 #                         the extrapolated nodes, the folds of its extension and its fidelity to the source)
 #   pipeline_config.toml  the start options (start_options; write_pipeline_config)
 #   grid.json | lens.json the start's lens as the refinement starts from it (perturbed, its present nodes; save_grid / save_lens),
@@ -107,7 +107,7 @@ function save_start(dir::AbstractString, s::CalibrationState, meta, opts::Pipeli
            vignetting_gcv = meta.vignetting_gcv, grid_gcv = meta.grid_gcv,
            samples = get(meta, :samples, nothing),             # the masks' record: samples_per_view, the samples drawn per view, the shortfall per view
            sensor_model = get(meta, :sensor_model, nothing),   # the run's use of the sensor model (`sensor_model_record`): mode, used, the record present
-           resample = meta.resample))   # the exact resample's record (`exact_start`): its lattice, marks, folds and fidelity; null when none
+           resample = meta.resample))   # the exact resample's record (`GridStart`'s): its lattice, marks, folds and fidelity; null when none
     return dir
 end
 
@@ -146,7 +146,7 @@ function load_refinement_start(dir::AbstractString; masks = nothing)
               costs = (; init = (Float64(r.cost_init[1]), Float64(r.cost_init[2])), linear = (Float64(r.cost_linear[1]), Float64(r.cost_linear[2]))),
               μ_lin = Float64(r.mu_linear), vignetting_gcv = NamedTuple[_plain_object(g) for g in gcv], grid_gcv = _plain_object(r.grid_gcv),
               options = pipeline_options(joinpath(dir, PIPELINE_CONFIG_FILE)),
-              resample = _plain_object(get(r, :resample, nothing)),   # the exact resample's record (`exact_start`), as written; a start without one null
+              resample = _plain_object(get(r, :resample, nothing)),   # the exact resample's record (`GridStart`'s), as written; a start without one null
               lens = st.lens, init_region = st.init_region, state = load_state(joinpath(dir, "state.json")), masks, dir = String(dir))
 end
 """

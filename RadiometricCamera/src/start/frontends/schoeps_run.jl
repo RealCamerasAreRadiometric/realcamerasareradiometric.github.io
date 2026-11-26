@@ -54,14 +54,14 @@ end
 
 """`_schoeps_frontend_start(opts, stored, W, H)`: the Schöps front end's start — the stored start `stored` (`io.init`, `load_start`)
 when there is one, and then no Schöps run's model is read (`resample = nothing`); else the Schöps run's spline model resampled
-exactly on his own lattice (`grid.lattice = "derived"`, m = 1) over the sensor ∩ the run's lens coverage (`schoeps_start`; the coverage
+exactly on his own lattice (`grid.lattice = "derived"`, m = 1) over the sensor ∩ the run's lens coverage (`_schoeps_start`; the coverage
 `run_lens_coverage`'s: the sensor, or the capture set's image-region record)."""
 function _schoeps_frontend_start(opts::PipelineOptions, stored, W, H)
     stored === nothing || return (; stored.lens, stored.init_region, resample = nothing)
     f = schoeps_run_file(opts.frontend.schoeps, :camera)
     isfile(f) || error("no Schöps start camera: no stored start (io.init) and no $f (frontend.schoeps: the run's import camera.json or its intrinsics0.yaml)")
-    src = _schoeps_model(f, W, H, "schoeps_gridlens")
-    return schoeps_start(f, W, H; coverage = run_lens_coverage(opts, W, H))
+    src = _schoeps_model(f, W, H, "the Schöps start")
+    return _schoeps_start(f, W, H; coverage = run_lens_coverage(opts, W, H))
 end
 
 """The Schöps front-end: a central-generic run on a printed page (the board = the page textured with the design;

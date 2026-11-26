@@ -12,7 +12,7 @@ import VisualGeometryToolkitCore as VgtkCore
 using VisualGeometryToolkitCore: exp_so3
 using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
 # the public names of RadiometricCamera (not exported, D13) and the generic radiometric layer's (VisualRadiometryToolkitCore's) the stage uses
-using RadiometricCamera: compute_mask, render_view, RenderSettings, sphere_radius, grid_model
+using RadiometricCamera: compute_mask, render_view, RenderSettings, sphere_radius, _image_start
 using VisualRadiometryToolkitCore: TexturedTarget, Focus, FocusSpline, Material, intersect_board, world_point, 𝐩_of_pixel, pixel_of_𝐩, 𝔟
 using VisualGeometryToolkitCore: chart, cost
 const RC = RadiometricCamera
@@ -83,7 +83,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))), fill(1 / 1.5, 9))
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
         rl = cam(VgtkCore.Division(0.144, -0.293), 32.4, (12.24, 11.52), 24, 24; f_y = 18.24)
-        gl = grid_model(rl, 25, 25)
+        gl = _image_start(rl, (25, 25)).camera
         @test RC.grid_angular_error(gl, rl) < 5e-3                          # 25×25 quasi-interpolation of the rational lens: 1.1 mrad
         vk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
         for lens in (cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), 24, 24), rl, gl, vk)

@@ -71,7 +71,7 @@ src/camera/                         the geometric camera's chief-ray models and 
   models/                             pixel_camera.jl: any VisualGeometryToolkitCore lens as Core's pixel camera (a BoundedCamera of a
                                       CameraModel: Lens(DoubleSphere), KannalaBrandt, Division — BlobBoards' model —, the 14-coefficient
                                       chain, …) and its LM box and scale; grid_camera.jl: Core's spline cameras (a SplineLens camera
-                                      and its per-tile windows) as chief-ray models, grid_model (any camera → the grid)
+                                      and its per-tile windows) as chief-ray models, GridStart (any camera → the grid)
   view.jl                             the kernels' View of the camera at a pose (Θ_e): one-line forwards to VisualRadiometryToolkitCore's
                                       maps; flat_vignetting, the calibration's start of V
   vignetting.jl, pose.jl              the vignetting's rules and gauge; the pose
