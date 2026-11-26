@@ -1,7 +1,7 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit from the repository
-# root (`bash experiments/scripts/reproduce/reproduce_results_dgx.sh --only=board_warping_lenses`, or
+# root (`bash experiments/scripts/reproduce/reproduce_results_vcai.sh --only=board_warping_lenses`, or
 # `BOARD_WARPING_CONFIG=<config> sbatch --cpus-per-task=8 --mem-per-cpu=8480M experiments/scripts/slurm/board_warping.sbatch`); logs go
 # to ./logs/, which must exist before submission.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh).

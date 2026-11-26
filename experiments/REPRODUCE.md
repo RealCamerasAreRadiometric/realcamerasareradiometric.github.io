@@ -122,7 +122,7 @@ julia --project=experiments experiments/scripts/board_warping.jl --plan         
 julia --project=experiments experiments/scripts/board_warping.jl                                          # the heights, their table, the figure (CPU; the refinements must exist)
 julia --project=experiments experiments/scripts/board_warping.jl --config=experiments/configs/supplement/board_warping_lenses.toml --plan   # the paper's board-warping figure (the three-lens session): its stage
 julia --project=experiments experiments/scripts/radiometric_refinement.jl --config=experiments/configs/experiments/radiometric_refinement_board_warping.toml --plan   # its six refinements (GPU; the Siemens sets' starts: scripts/frontends.jl)
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh --only=board_warping_lenses --dry-run            # the whole chain as jobs: the front ends, the six refinements, the figure
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh --only=board_warping_lenses --dry-run            # the whole chain as jobs: the front ends, the six refinements, the figure
 julia --project=experiments experiments/scripts/panorama_vignetting.jl --config=experiments/configs/experiments/panorama_vignetting_fx3_<lens>.toml   # per lens (14mm, fisheye, tamron) its sweep's chain (one GPU)
 julia --project=experiments experiments/scripts/panorama_stitching.jl --config=experiments/configs/experiments/panorama_stitching_fx3_<lens>.toml     # per lens the learned V's export and the panoramas (a GPU job; the f/4 refinement must exist)
 julia --project=experiments experiments/scripts/panorama_figure.jl                                        # the three lenses' panoramas as the figure (CPU; the panoramas must exist)

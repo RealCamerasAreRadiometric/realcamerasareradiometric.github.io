@@ -1,7 +1,7 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit through the runner
-# (`bash experiments/scripts/reproduce/reproduce_results_dgx.sh --only=panorama_stitching`: the stage panorama_stitching, its
+# (`bash experiments/scripts/reproduce/reproduce_results_vcai.sh --only=panorama_stitching`: the stage panorama_stitching, its
 # phases, the array over the lenses and the resources of configs/reproduce.toml); logs go to ./logs/.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh).
 #SBATCH --partition=gpu
