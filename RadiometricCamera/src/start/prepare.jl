@@ -48,7 +48,7 @@ the start takes it (and refuses a front end whose start disagrees); its start re
 """
 start_is_grid(opts::PipelineOptions) = !startswith(opts.io.init, "lens:")
 
-function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, opts::PipelineOptions, start; backend, damping,
+function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, opts::PipelineOptions, start; backend, damping, radiometry,
                       observations = nothing)
     isempty(opts.io.out) && error("io.out required")
     mkpath(opts.io.out)
@@ -253,12 +253,12 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     # the same pixels cannot fail): the closed-form Θ_l solve sets the lighting's scale (no scalar light gain), then ONE closed-form
     # sweep of Θ_l, Θ_v, μ. Every solve is exact on these pixels, so the cost cannot rise.
     parts = all_parts(s)
-    update_radiometry!(s; parts, light = true, vignetting = false, mu = false)
+    _update_radiometry!(s, RadiometryBlockDescent(), (; light = true, vignetting = false, mu = false); parts)
     c0, rms0 = cost(s)
     @printf("lighting solve; init cost %.4e rel-RMS %.4f\n", c0, rms0); flush(stdout)
     t1 = time()
-    update_radiometry!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint, damping,
-                         vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
+    _update_radiometry!(s, _with_schedule(radiometry; sweeps = 1, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), verbose = false),
+                        (; light = true, vignetting = true, mu = !("material" in opts.fixed)); parts, gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
     c1, rms1 = cost(s); μ_lin = s.mat.diffuse_weight
     @printf("linear sweep (%.0f s): cost %.4e rel-RMS %.4f; μ %.3f; V centre %.3f\n", time() - t1, c1, rms1, μ_lin, s.camera.vignetting(VgtkCore.center(s.camera.vignetting))); flush(stdout)

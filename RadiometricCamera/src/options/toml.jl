@@ -264,8 +264,6 @@ function _check_options(opts::PipelineOptions)
     _grid_gcv(opts) && "camera" in opts.fixed &&
         throw(ArgumentError("`grid.smoothness.weight = \"gcv\"` with \"camera\" in `fixed`: the grid is held, so GCV has no grid column to " *
                             "weigh; state a number for `grid.smoothness.weight` (or free the grid)"))
-    opts.sweep.joint && smoothing(opts.vignetting.smoothness) &&
-        throw(ArgumentError("`vignetting.smoothness` = $(smoothness_line(opts.vignetting.smoothness)) with `sweep.joint`: the joint solve has no smoothness penalty"))
     0 < opts.focus.lens_coverage_scale <= 1 || throw(ArgumentError("`focus.lens_coverage_scale` = $(opts.focus.lens_coverage_scale) is not in (0, 1]: the scale of the lens coverage the focus nodes keep inside"))
     opts.masks.samples_per_view >= 1 || throw(ArgumentError("`masks.samples_per_view` = $(opts.masks.samples_per_view): at least one sample per view"))
     let m = opts.masks; check_draw(m.samples_per_view, m.gradient_bias, m.edge_fraction, m.addon_samples, m.addon_gradient_bias); end   # the draw's settings together (masks.jl)
@@ -377,8 +375,9 @@ function _read_config_file(read, path::AbstractString, set)
 end
 function pipeline_options(d::AbstractDict; set = ())
     d = _current_config(d, set)
-    _read_table(OptimizerTable, get(d, "optimizer", Dict{String, Any}()), "optimizer")   # the algorithm's table, checked here, read by read_calibration
-    delete!(d, "optimizer")
+    for T in _ALGORITHM_TABLES                         # the algorithm's tables, checked here, read by read_calibration
+        _read_table(T, get(d, _table_name(T), Dict{String, Any}()), _table_name(T)); delete!(d, _table_name(T))
+    end
     unknown = setdiff(collect(String, keys(d)), allowed_keys(PipelineOptions))
     isempty(unknown) || throw(ArgumentError("unknown table(s) $(sort(unknown)); allowed tables: $(sort(allowed_keys(PipelineOptions)))"))
     kw = [f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_TOML_DEFAULTS, "", "fixed"))) :
@@ -399,6 +398,10 @@ function _current_config(d::AbstractDict, set)
     delete!(d, VgtkCore.CONFIG_VERSION_KEY)
     return d
 end
+
+"""The tables of a run's TOML that configure its algorithm (a [`RadiometricCalibration`](@ref)'s optimizer and sweeps), read by
+[`read_calibration`](@ref) and checked, not read, by [`pipeline_options`](@ref)."""
+const _ALGORITHM_TABLES = (OptimizerTable, SweepTable)
 
 """
     config_key(table, key) -> String

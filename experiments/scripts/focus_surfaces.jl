@@ -26,6 +26,7 @@ using .Figures: focus_surface_figure
 import VisualGeometryToolkitEval.Reproduce as Reproduce
 using StaticArrays: SVector
 import VisualGeometryToolkitCore as VgtkCore
+import VisualRadiometryToolkitCore as VrtkCore
 
 const DRIVER = "scripts/focus_surfaces.jl"
 const CFG_PATH = abspath(cli_option(ARGS, "config", projectdir("configs", "experiments", "focus_surfaces.toml")))   # default: the config of record
@@ -80,8 +81,8 @@ function focus_surface_points(camera, W::Integer, H::Integer; spacing::Integer)
         p = SVector(Float64(x), Float64(y))
         RadiometricCamera.in_domain(camera.geometric, p) || continue
         all(isfinite, VgtkCore.backproject(camera.geometric, p)) || continue
-        t̂ = RadiometricCamera.t̂(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
-        X[i, j], Y[i, j], Z[i, j] = RadiometricCamera.𝔣(camera, p); D[i, j] = 1 / t̂  # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩), camera frame
+        t̂ = VrtkCore.t̂(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
+        X[i, j], Y[i, j], Z[i, j] = VrtkCore.𝔣(camera, p); D[i, j] = 1 / t̂  # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩), camera frame
     end
     return X, Y, Z, D
 end

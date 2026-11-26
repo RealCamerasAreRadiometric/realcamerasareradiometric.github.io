@@ -200,7 +200,7 @@ end
                     @test o.warping.inplane == "none"
                 else
                     @test w["inplane"] == "aspect_skew" && w["inplane_start"] == [0.0, 0.0]
-                    @test o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed) && RadiometricCamera._surface_free(o, :inplane)
+                    @test o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed)   # free: modelled and not held
                 end
             end
         end

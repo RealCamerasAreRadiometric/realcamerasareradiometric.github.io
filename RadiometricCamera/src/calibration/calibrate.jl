@@ -45,13 +45,17 @@ struct CalibrationMetadata{S}
 end
 
 """
-    RadiometricCalibration(options::PipelineOptions; optimizer = LevenbergMarquardt(; damping = LevenbergDamping()), log = "")
+    RadiometricCalibration(options::PipelineOptions; optimizer = LevenbergMarquardt(; damping = LevenbergDamping()),
+                           radiometry = RadiometryBlockDescent(; sweeps), lm_chunk, log = "")
 
 The radiometric calibration of the paper, a fit (`FitKind`: it seeds itself, from the geometric calibration): `options` the run's
 ([`pipeline_options`](@ref)), `optimizer` the refinement's (VisualGeometryToolkitCore's `LevenbergMarquardt`; its damping
 Levenberg's λ·I by default, which converged on the origins of a non-central lens where λ·DᵀD stalled at 1.2e-8 of its start cost,
-and reaches a slightly lower cost 1.6–1.8× faster on the Tamron and grid cases), `log` a file the LM appends a line per iteration to
-(empty: none). The stop settings are the solve's: `solve(problem, algorithm; stops = LmStops(…))` (and `init`'s), Core's
+and reaches a slightly lower cost 1.6–1.8× faster on the Tamron and grid cases), `radiometry` the closed-form blocks' solve
+([`RadiometryBlockDescent`](@ref), or [`JointRadiometry`](@ref) at the optimizer's damping: `[sweep] joint`; its `sweeps` those of
+a solve between LM chunks, `[sweep] iterations`; the start's closed-form solve one sweep of it), `lm_chunk` the LM iterations
+between two such solves (`[sweep] lm_chunk`; 0: the LM in one run), the defaults configs/default.toml's `[sweep]`; `log` a file the
+LM appends a line per iteration to (empty: none). The stop settings are the solve's: `solve(problem, algorithm; stops = LmStops(…))` (and `init`'s), Core's
 `LmStops` (`max_iter`, `max_time`, `ftol`, `xtol_rel`, `xtol`; the defaults configs/default.toml's `[optimizer]`); a run's TOML gives
 both, [`read_calibration`](@ref). Solved on `EstimationProblem(CalibrationEstimate, data[, (; device)])` (`device` the compute backend,
 [`default_backend`](@ref) by default), `data` either
@@ -85,13 +89,20 @@ with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camer
 (`VisualGeometryToolkitIO.load(BoundedCamera, …)`, `load(TargetObservations, …)`) and builds the [`StartGeometry`](@ref) — RC reads
 no foreign format.
 """
-struct RadiometricCalibration{O <: VgtkCore.LevenbergMarquardt} <: VgtkCore.AbstractEstimationAlgorithm
+struct RadiometricCalibration{O <: VgtkCore.LevenbergMarquardt, R <: RadiometrySolve} <: VgtkCore.AbstractEstimationAlgorithm
     options::PipelineOptions
     optimizer::O
+    radiometry::R
+    lm_chunk::Int
     log::String
 end
-RadiometricCalibration(options::PipelineOptions; optimizer::VgtkCore.LevenbergMarquardt = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()),
-                       log::AbstractString = "") = RadiometricCalibration(options, optimizer, String(log))
+function RadiometricCalibration(options::PipelineOptions; optimizer::VgtkCore.LevenbergMarquardt = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()),
+                                radiometry::RadiometrySolve = RadiometryBlockDescent(; sweeps = SweepTable().iterations),
+                                lm_chunk::Integer = SweepTable().lm_chunk, log::AbstractString = "")
+    lm_chunk >= 0 || throw(ArgumentError("RadiometricCalibration: lm_chunk ≥ 0 (0: no closed-form solve between LM chunks); got $lm_chunk"))
+    _with_schedule(radiometry; vignetting_smoothness = smoothness_weight(options.vignetting.smoothness))   # (a joint solve takes no smoothness)
+    return RadiometricCalibration(options, optimizer, radiometry, Int(lm_chunk), String(log))
+end
 VgtkCore.estimator_kind(::RadiometricCalibration) = VgtkCore.FitKind()
 
 """
@@ -126,7 +137,7 @@ function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <
                          alg::RadiometricCalibration; stops::VgtkCore.LmStops = _calibration_stops())
     geometry, photographs = prob.f
     state = _start_state(geometry, photographs, _start_run_options(alg.options), nothing; backend = _calibration_device(prob.p),
-                         damping = alg.optimizer.damping)
+                         damping = alg.optimizer.damping, alg.radiometry)
     return CalibrationCache(state, alg, stops)
 end
 VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:CalibrationState, VgtkCore.NullParameters}, alg::RadiometricCalibration;
@@ -164,23 +175,29 @@ end
     read_calibration(table::AbstractDict; set = ()) -> (algorithm, stops)
 
 The radiometric calibration a run's TOML states: `algorithm` the [`RadiometricCalibration`](@ref) of its options
-([`pipeline_options`](@ref)) and of its `[optimizer]` table (`type`, a tag of [`OPTIMIZER_TAGS`](@ref): Core's
-`LevenbergMarquardt` at Levenberg's damping λ·I; `log`, its per-iteration log), and `stops` its solve's stop settings (Core's
+([`pipeline_options`](@ref)), of its `[optimizer]` table (`type`, a tag of [`OPTIMIZER_TAGS`](@ref): Core's
+`LevenbergMarquardt` at Levenberg's damping λ·I; `log`, its per-iteration log) and of its `[sweep]` table (`joint`: the closed-form
+blocks by [`JointRadiometry`](@ref), else [`RadiometryBlockDescent`](@ref), of `iterations` sweeps; `lm_chunk`), and `stops` its solve's stop settings (Core's
 `LmStops`: `max_iter`, `max_time`, `ftol`, `xtol_rel` of the table, Core's absolute step tolerance of record) —
 `solve(problem, algorithm; stops)`. A version-1 config's `[lm]` is the `[optimizer]` table ([`RC_CONFIG_VERSIONS`](@ref)).
 """
 read_calibration(path::AbstractString; set = ()) = _read_config_file(read_calibration, path, set)
 function read_calibration(d::AbstractDict; set = ())
     options = pipeline_options(d; set)
-    t = _read_table(OptimizerTable, get(_current_config(d, set), "optimizer", Dict{String, Any}()), "optimizer")
-    algorithm = RadiometricCalibration(options; log = t.log)   # the optimizer `t.type` names (one tag, OPTIMIZER_TAGS), at its default damping
+    d = _current_config(d, set)
+    t = _read_table(OptimizerTable, get(d, "optimizer", Dict{String, Any}()), "optimizer")
+    sw = _read_table(SweepTable, get(d, "sweep", Dict{String, Any}()), "sweep")
+    optimizer = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping())   # the optimizer `t.type` names (one tag, OPTIMIZER_TAGS)
+    radiometry = sw.joint ? JointRadiometry(; optimizer.damping, sweeps = sw.iterations) : RadiometryBlockDescent(; sweeps = sw.iterations)
+    algorithm = RadiometricCalibration(options; optimizer, radiometry, sw.lm_chunk, log = t.log)
     return algorithm, VgtkCore.LmStops(; max_iter = t.max_iter, max_time = t.max_time, ftol = t.ftol, xtol_rel = t.xtol_rel, xtol = CORE_LM_XTOL)
 end
 
 function config_dict(algorithm::RadiometricCalibration, stops::VgtkCore.LmStops)
     d = config_dict(algorithm.options)
-    d["optimizer"] = Dict{String, Any}("type" => tag_of(OPTIMIZER_TAGS, VgtkCore.LevenbergMarquardt), "max_iter" => stops.max_iter,
-                                       "max_time" => stops.max_time, "ftol" => stops.ftol, "xtol_rel" => stops.xtol_rel, "log" => algorithm.log)
+    d["optimizer"] = toml_table(OptimizerTable(; type = VgtkCore.LevenbergMarquardt, stops.max_iter, stops.max_time, stops.ftol, stops.xtol_rel,
+                                               algorithm.log))
+    d["sweep"] = toml_table(SweepTable(; algorithm.lm_chunk, iterations = algorithm.radiometry.sweeps, joint = algorithm.radiometry isa JointRadiometry))
     return d
 end
 write_pipeline_config(dir::AbstractString, algorithm::RadiometricCalibration, stops::VgtkCore.LmStops; header::AbstractString = "") =
@@ -250,9 +267,10 @@ function _run_refinement!(s::CalibrationState, meta, alg::RadiometricCalibration
                 vig_ok ? "" : "; the state's vignetting ($(nameof(typeof(sv))), $(join(size(control_points(sv)), " × "))$(sv isa RadialVignetting ? ", r_max $(round(VrtkCore.field_radius(sv); digits = 1)) px" : "")) is not the run's ($(meta.vig_desc)) → V flat"); flush(stdout)
         if !vig_ok || opts.resume.sweep                      # the closed-form start of the linear blocks on the resumed geometry (and material)
             tsw = time()
-            update_radiometry!(s; light = !("lighting" in opts.fixed), vignetting = !("vignetting" in opts.fixed), mu = !pinned_material,
-                                 sweeps = max(opts.sweep.iterations, 1), verbose = true, joint = opts.sweep.joint, damping,
-                                 vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
+            _update_radiometry!(s, _with_schedule(alg.radiometry; sweeps = max(alg.radiometry.sweeps, 1), verbose = true,
+                                                  vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness)),
+                                (; light = !("lighting" in opts.fixed), vignetting = !("vignetting" in opts.fixed), mu = !pinned_material);
+                                gcv_record = meta.vignetting_gcv)
             c1, rms1 = cost(s)
             @printf("closed-form sweep on the resumed geometry (%.0f s): rel-RMS %.4f; μ %.4f; V(31/48/58°) %s\n", time() - tsw, rms1, s.mat.diffuse_weight, _Vprof(s.camera.vignetting)); flush(stdout)
         end
@@ -307,18 +325,18 @@ function _run_refinement!(s::CalibrationState, meta, alg::RadiometricCalibration
         _lm_route!(s, route; stops = _chunk_stops(stops, n, max(stops.max_time - (time() - t2), 1.0)), trace,
                  trace_meta = (; ϕ²), iter_callback = monitor_chunk, lm_log = alg.log, problem_kw...)
     end
-    res = if opts.sweep.lm_chunk <= 0
+    res = if alg.lm_chunk <= 0
         run_chunk(stops.max_iter)
     else                                                     # LM chunks with the closed-form (lighting, vignetting, μ) sweep between them
         r_last = nothing
         while it_done[] < stops.max_iter && time() - t2 < stops.max_time
             n_before = length(trace)
-            r_last = run_chunk(min(opts.sweep.lm_chunk, stops.max_iter - it_done[]))
+            r_last = run_chunk(min(alg.lm_chunk, stops.max_iter - it_done[]))
             it_done[] += length(trace) - n_before
             length(trace) == n_before && break               # the LM did not iterate (converged / out of time)
             ts = time(); cb, rmsb = cost(s); camera_b, light_b, mat_b = s.camera, s.light, s.mat
-            update_radiometry!(s; light = blocks.lighting, vignetting = blocks.vignetting, mu = blocks.material, sweeps = opts.sweep.iterations, verbose = true,
-                                 joint = opts.sweep.joint, damping, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
+            _update_radiometry!(s, _with_schedule(alg.radiometry; verbose = true, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness)),
+                                (; light = blocks.lighting, vignetting = blocks.vignetting, mu = blocks.material); gcv_record = meta.vignetting_gcv)
             ca, rmsa = cost(s)
             if ca < cb
                 @printf("      sweep after it %d (%.0f s): cost %.4e → %.4e, rel-RMS %.4f → %.4f; μ %.4f; V(31/48/58°) %s → %s\n", it_done[] + opts.resume.iteration_offset, time() - ts, cb, ca, rmsb, rmsa, s.mat.diffuse_weight, _Vprof(camera_b.vignetting), _Vprof(s.camera.vignetting))
@@ -333,7 +351,7 @@ function _run_refinement!(s::CalibrationState, meta, alg::RadiometricCalibration
     end
     c2, rms2 = cost(s)
     @printf("%s LM: %.0f s, %d its%s; rel-RMS %.4f → %.4f; stopped: %s\n", _route_label(route), time() - t2, count(t -> t.phase == :lm, trace),
-            opts.sweep.lm_chunk > 0 ? @sprintf(" + %d sweeps", count(t -> t.phase == :sweep, trace)) : "", rms1, rms2, res === nothing ? "no LM iteration" : string(res.code, " (", res.rule, ")")); flush(stdout)
+            alg.lm_chunk > 0 ? @sprintf(" + %d sweeps", count(t -> t.phase == :sweep, trace)) : "", rms1, rms2, res === nothing ? "no LM iteration" : string(res.code, " (", res.rule, ")")); flush(stdout)
     length(trace) >= 3 && @printf("steady-state ≈ %.1f s/it\n", median(diff([t.time for t in trace])[2:end]))
     termination = lm_termination(res)
     return res, trace, (; linear = (c1, rms1), final = (c2, rms2), seconds = time() - t2, termination)

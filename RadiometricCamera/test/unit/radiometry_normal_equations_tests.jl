@@ -58,7 +58,7 @@
 end
 
 @testitem "closed-form blocks: device normal equations" setup = [NEScene] begin
-    using RadiometricCamera: all_parts, chart, update_diffuse_weight!
+    using RadiometricCamera: all_parts, chart, _update_diffuse_weight!
     using StaticArrays, LinearAlgebra
     for channel in (0, 2)                                   # the colour state and a single-channel one (its J coefficients)
         s = ne_state(; channel); parts = all_parts(s)
@@ -75,9 +75,9 @@ end
         @test norm(fd - g) / norm(g) < 1e-6
         @test issymmetric(Matrix(H)) && isposdef(Symmetric(Matrix(H)))
     end
-    # μ alone (the additive chart): update_diffuse_weight!'s one Gauss–Newton step is exact (Φ is affine in μ): the step's gradient vanishes
+    # μ alone (the additive chart): _update_diffuse_weight!'s one Gauss–Newton step is exact (Φ is affine in μ): the step's gradient vanishes
     s = ne_state(); parts = all_parts(s)
-    update_diffuse_weight!(s, parts)
+    _update_diffuse_weight!(s, parts)
     _, g, H = RC.radiometry_normal_equations(s, parts; light = false, vignetting = false, chart = false)
     @test abs(g[1]) < 1e-10 * sqrt(H[1, 1]) * sqrt(2 * RC.parts_cost(s, parts))
 end
@@ -104,7 +104,7 @@ end
 end
 
 @testitem "closed-form blocks: device normal equations (GPU)" tags = [:gpu] setup = [RCGPU, NEScene] begin
-    using RadiometricCamera: all_parts, update_radiometry!, _lm_radiometry!
+    using RadiometricCamera: all_parts, RadiometryBlocks, RadiometryBlockDescent, _lm_radiometry!
     using StaticArrays, LinearAlgebra
     using CUDA: CUDABackend
     require_gpu()
@@ -116,7 +116,7 @@ end
         nc_ = RC.radiometry_normal_equations(sc, pc); ng = RC.radiometry_normal_equations(sg, pg)
         @test relerr(ng[1], nc_[1]) < 1e-10 && relerr(Vector(ng[2]), Vector(nc_[2])) < 1e-10 && relerr(Matrix(ng[3]), Matrix(nc_[3])) < 1e-10
         # the block sweep and the joint solve on the device land where the CPU's do
-        for (s_, p_) in ((sc, pc), (sg, pg)); update_radiometry!(s_; parts = p_, sweeps = 2); end
+        for (s_, p_) in ((sc, pc), (sg, pg)); RC.VgtkCore.solve(RC.VgtkCore.EstimationProblem(RadiometryBlocks, (s_, p_)), RadiometryBlockDescent(; sweeps = 2)); end
         @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.diffuse_weight - sc.mat.diffuse_weight) < 1e-10
         rc = _lm_radiometry!(sc, pc; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg, pg; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80))
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success

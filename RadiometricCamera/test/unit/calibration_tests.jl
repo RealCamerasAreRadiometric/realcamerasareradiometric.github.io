@@ -1,7 +1,7 @@
 @testitem "calibration" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, aperture_radius, build_problem, compute_mask, cost, focus, Focus, FocusSpline, Material,
                              PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, _lm_radiometry!,
-                             update_lighting!, update_vignetting!, update_diffuse_weight!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
+                             _update_lighting!, _update_vignetting!, _update_diffuse_weight!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
@@ -30,9 +30,9 @@
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     # single linear-block steps at the truth of everything else are exact
     s = CalibrationState(board, st, camera_t, poses, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
-    update_lighting!(s); @test maximum(abs, Matrix(coefficients(s.light)) - a_t) < 1e-8
+    _update_lighting!(s); @test maximum(abs, Matrix(coefficients(s.light)) - a_t) < 1e-8
     s = CalibrationState(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, mat_t, light_t, targets; masks)
-    update_vignetting!(s); @test maximum(abs, Matrix(s.camera.vignetting.P) - Matrix(vig_t.P)) < 1e-6
+    _update_vignetting!(s); @test maximum(abs, Matrix(s.camera.vignetting.P) - Matrix(vig_t.P)) < 1e-6
     # under an imaged region (a circle of radius 7 px about the sensor centre) the tensor surface's nodes outside it are
     # dependent (Core's BoundaryRule through the surface's support trait): the solve's unknowns are the interior nodes, one column each
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
@@ -40,10 +40,10 @@
     rule = s.vig_rule
     @test rule.interior == VgtkCore.node_mask(s.camera.vignetting, reg) && !rule.interior[1, 1] && rule.interior[3, 3] && !isempty(rule.dependent)
     @test size(RC.vignetting_basis(s)) == (36, count(rule.interior) - 1) && Int(RC.NLLSsolver.nvars(VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), RC.vignetting_basis(s)))) == count(rule.interior) - 1   # the pin V(𝐜) = 1 takes one direction, always
-    P0 = Matrix(s.camera.vignetting.P); update_vignetting!(s); P1 = Matrix(s.camera.vignetting.P)
+    P0 = Matrix(s.camera.vignetting.P); _update_vignetting!(s); P1 = Matrix(s.camera.vignetting.P)
     @test P1 ≈ VgtkCore.extend_controls(rule, P1, P0) && P1[rule.interior] != P0[rule.interior]
     s = CalibrationState(board, st, camera_t, poses, with_μ(mat_t, 0.8), light_t, targets; masks)
-    update_diffuse_weight!(s); @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-8
+    _update_diffuse_weight!(s); @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-8
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
     s = CalibrationState(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
@@ -163,7 +163,7 @@
     @test vig_r.P[1] ≈ vig_r.P[2] atol = 1e-10
     targets_r = [render_view(k, with_vignetting(camera_t, vig_r), poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     s = CalibrationState(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
-    update_vignetting!(s); @test maximum(abs, Matrix(VrtkCore.control_points(s.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
+    _update_vignetting!(s); @test maximum(abs, Matrix(VrtkCore.control_points(s.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
     s = CalibrationState(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
     parts_r = all_parts(s); _lm_radiometry!(s, parts_r; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj_r = RC.parts_cost(s, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.ϕ)

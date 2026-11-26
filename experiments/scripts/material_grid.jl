@@ -3,7 +3,7 @@
 # parameters and the lighting"): from an init state (a start record's state.json, bin/refine.jl --stage=start: the start geometry, focus and board warping; V flat)
 # every candidate (α_ink, α_¬ink, η_ink, η_¬ink; η grey over the channels) of the α × α × η × η grid is scored on the config's masked
 # pixels — the parts rendered once on the CPU (threaded), μ scanned over 0:0.1:1 with the closed-form lighting Θ_l at each value, then from
-# the best μ update_lighting! / update_diffuse_weight! alternating until the cost changes < 1e-7 relative: the exact cost of the candidate (parts_cost).
+# the best μ the lighting and μ by RadiometricCamera's block descent (`RadiometryBlockDescent`) until the cost changes < 1e-7 relative: the exact cost of the candidate.
 # Writes <out>/grid.tsv (one row per candidate), <out>/state.json (the init state with the best material, μ and lighting; V flat) — the
 # start of the joint LM (bin/refine.jl's `resume.state`) — and the options as pipeline_config.toml.
 #   julia --project=experiments experiments/scripts/material_grid.jl --config=<run.toml> --init=<state.json> --out=<dir> [--set table.key=value …]
@@ -13,7 +13,8 @@
 #     --alphas, --etas  the candidate values, comma lists (the defaults are the values of record)
 #     --limit           evaluate only the first n candidates (a timing probe)
 using RadiometricCamera, Printf, StaticArrays
-using RadiometricCamera: all_parts, cost, Material, material, set_vignetting!, update_lighting!, update_diffuse_weight!, with_μ
+using RadiometricCamera: all_parts, cost, set_vignetting!, RadiometryBlocks, RadiometryBlockDescent
+using VisualRadiometryToolkitCore: Material, with_μ
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
 const RC = RadiometricCamera
@@ -52,9 +53,9 @@ init = RC.load_state(initpath)
 sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
-    so = RC._start_run_options(opts); g = RC.start_geometry(so)
-    RC.save_calibration_start(joinpath(out, "start"), VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = RC.KernelAbstractions.CPU())),
-                                                                alg; stops).cache.state; options = so)
+    g = RC.start_geometry(opts)                                          # (the start reads its own options: `init`'s, the record's)
+    RC.save_calibration_start(joinpath(out, "start"), VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(opts, g.names)), (; device = RC.KernelAbstractions.CPU())),
+                                                                alg; stops).cache.state; options = opts)
 end
 s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.start
 RC.load_state_into!(s, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
@@ -68,19 +69,18 @@ relrms(c) = sqrt(2c / ϕ²)
 @printf("material grid: %d candidates (α %s; η %s) on %d pixels of %d views, V flat\n", length(cands), join(αs, "/"), join(ηs, "/"),
         sum(length.(s.px)), length(s.px)); flush(stdout)
 
-"""μ scanned over 0:0.1:1 with the closed-form lighting at each value, then the alternation from the best μ; returns the cost."""
+"""μ scanned over 0:0.1:1 with the closed-form lighting at each value (RadiometricCamera's closed-form blocks, the lighting alone),
+then the lighting and μ by block descent from the best μ (up to 100 sweeps, to a relative cost change of 1e-7); returns the cost."""
 function fit_light_mu!(s, parts)
+    lighting(s) = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts), (; vignetting = false, mu = false)), RadiometryBlockDescent())
     best = (Inf, 0.5)
     for μ in 0.0:0.1:1.0
-        s.mat = with_μ(s.mat, μ); update_lighting!(s, parts); c = RC.parts_cost(s, parts)
+        s.mat = with_μ(s.mat, μ); c = lighting(s).metadata.cost
         c < best[1] && (best = (c, μ))
     end
-    s.mat = with_μ(s.mat, best[2]); update_lighting!(s, parts); c = RC.parts_cost(s, parts)
-    for _ in 1:100
-        update_diffuse_weight!(s, parts); update_lighting!(s, parts); c1 = RC.parts_cost(s, parts)
-        done = c - c1 < 1e-7 * c; c = min(c, c1); done && break
-    end
-    return c
+    s.mat = with_μ(s.mat, best[2]); c = lighting(s).metadata.cost
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts), (; vignetting = false)), RadiometryBlockDescent(; sweeps = 100, reltol = 1e-7))
+    return min(c, r.metadata.cost)
 end
 
 best = (; c = Inf, mat = s.mat, light = s.light)

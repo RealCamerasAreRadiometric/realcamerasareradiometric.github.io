@@ -41,7 +41,7 @@ function texture_benchmark_scene(dir)
     sc = BENCH_SCALE; W, H = 240sc, 180sc
     cam0 = VgtkCore.BoundedCamera(VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(600.0sc, 0, 0, 0, 600.0sc, 0, W / 2, H / 2, 1))),
                                                        VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.3))), VgtkCore.Size2(W, H))
-    focus0 = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
+    focus0 = VrtkCore.Focus(VrtkCore.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
     camera = RC.RadiometricCameraModel(cam0, focus0, 0.004, VrtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2))
     sett = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8)
     TW, TH = 60sc, 84sc
@@ -50,8 +50,8 @@ function texture_benchmark_scene(dir)
     PNGFiles.save(joinpath(sheetdir, "texture.png"), [RGB{N0f16}(design[i, j], design[i, j], design[i, j]) for j in 1:TH, i in 1:TW])
     save_sheet_target(sheetdir; page_mm = (60.0, 84.0), blobs_mm = Dict(1 => SVector(5.0, 5.0)))
     sheet = read_sheet(sheetdir)
-    rad = RC.TargetRadiometry(RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), RC.TargetState(; edge = [0.021, 0.034]))
-    target = RC.RadiometricTarget(nothing, zero(SVector{RC.HEIGHT_NC, Float64}), 1.0, rad)
+    rad = RC.TargetRadiometry(VrtkCore.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), VrtkCore.TargetState(; edge = [0.021, 0.034]))
+    target = RC.RadiometricTarget(nothing, zero(SVector{VrtkCore.HEIGHT_NC, Float64}), 1.0, rad)
     Rx(a) = SMatrix{3, 3}(1.0, 0, 0, 0, cos(a), sin(a), 0, -sin(a), cos(a)); Ry(a) = SMatrix{3, 3}(cos(a), 0, -sin(a), 0, 1.0, 0, sin(a), 0, cos(a))
     poses = map(1:BENCH_VIEWS) do k
         C = SVector(0.03 + 0.004 * cos(1.7k), 0.042 + 0.003 * sin(2.3k), -(0.30 + 0.12 * mod(0.37k, 1.0)))

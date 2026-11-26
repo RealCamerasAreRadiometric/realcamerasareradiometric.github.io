@@ -75,23 +75,23 @@ end
         views = observe(truth, 0.1, StableRNG(5))
         @test length(views) == 12 && all(v -> length(v[2]) > 400, views)
         r = _fit_start(model, views, W, H, 14.6776, 35.6; scoring = Dict{String, Any}("type" => "msac", "threshold" => 8.0), max_iter = 100, rng = StableRNG(1))
-        @test VgtkCore.successful_retcode(r.retcode) && r.n_dropped == 0 && length(r.names) == 12 && r.names == ["V$k" for k in 1:12]
-        @test 0.12 < r.rms < 0.16                                       # √2 · σ: the rms of the 2-vector residuals at σ = 0.1 px, not more
-        θ, θtrue = VgtkCore.parameter_vector(r.camera), VgtkCore.parameter_vector(truth)
-        @test VgtkCore.parameter_names(r.camera) == VgtkCore.parameter_names(truth)
+        @test VgtkCore.successful_retcode(r.fit) && r.n_dropped == 0 && length(r.names) == 12 && r.names == ["V$k" for k in 1:12]
+        @test 0.12 < r.fit.rms < 0.16                                       # √2 · σ: the rms of the 2-vector residuals at σ = 0.1 px, not more
+        θ, θtrue = VgtkCore.parameter_vector(r.fit.u.camera), VgtkCore.parameter_vector(truth)
+        @test VgtkCore.parameter_names(r.fit.u.camera) == VgtkCore.parameter_names(truth)
         @test abs(θ[1] - θtrue[1]) < 1.0 && abs(θ[4] - θtrue[4]) < 0.5 && abs(θ[5] - θtrue[5]) < 0.5   # f, cx, cy [px]
         @test all(abs.(θ[6:end] .- θtrue[6:end]) .< 0.005)               # the lens coefficients
         @test all(0.05 .< r.view_rms .< 0.2) && length(r.view_rms) == 12
         @test r.n_correspondences == sum(length(v[2]) for v in views)
         # the record a refinement starts from: RadiometricCamera reads back the same camera over the image
-        p = write_start(joinpath(mktempdir(), "start.json"), r.camera, W, H; lens_coverage = VgtkCore.Rect2{Float64}(0, 0, W, H), provenance = (; model = "test"))
+        p = write_start(joinpath(mktempdir(), "start.json"), r.fit.u.camera, W, H; lens_coverage = VgtkCore.Rect2{Float64}(0, 0, W, H), provenance = (; model = "test"))
         l = RC.load_parametric_lens(p)
         @test VgtkCore.parameter_vector(VgtkCore.model(l)) == θ && VgtkCore.extent(l) == VgtkCore.Size2(W, H)
         # the set's measured image region bounds it (src/image_region.jl), stated by the caller: no default
         e = VgtkCore.Ellipse(VgtkCore.Point2(W / 2, H / 2), 0.45W, 0.4W, 0.0)
-        @test VgtkCore.lens_coverage(RC.load_parametric_lens(write_start(joinpath(mktempdir(), "s.json"), r.camera, W, H; lens_coverage = e, provenance = (; model = "test")))) == e
-        @test_throws UndefKeywordError write_start(joinpath(mktempdir(), "s.json"), r.camera, W, H; provenance = (; model = "test"))
-        @test start_parameters(r.camera)["f"] == θ[1]
+        @test VgtkCore.lens_coverage(RC.load_parametric_lens(write_start(joinpath(mktempdir(), "s.json"), r.fit.u.camera, W, H; lens_coverage = e, provenance = (; model = "test")))) == e
+        @test_throws UndefKeywordError write_start(joinpath(mktempdir(), "s.json"), r.fit.u.camera, W, H; provenance = (; model = "test"))
+        @test start_parameters(r.fit.u.camera)["f"] == θ[1]
     end
     # the pose starts alone: every view converges through the nominal camera; a view without a pose is left out
     cam0 = nominal_camera("kannala_brandt", W, H, 14.6776, 35.6)

@@ -161,8 +161,9 @@ function stages(c)
     # closed form
     add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s))))
     add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s); () -> RC.radiometry_normal_equations(s, parts)))
-    add("linear_blocks", () -> () -> (s = c.state(); RC.update_radiometry!(s); cost(s)[1]))
-    add("linear_joint", () -> () -> (s = c.state(); RC.update_radiometry!(s; damping = VgtkCore.LevenbergDamping(), joint = true); cost(s)[1]))
+    radiometry(s, alg) = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s, RC.all_parts(s))), alg)
+    add("linear_blocks", () -> () -> (s = c.state(); radiometry(s, RC.RadiometryBlockDescent()); cost(s)[1]))
+    add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); cost(s)[1]))
     # per view
     function view_setup()
         s = c.state(); problem, _ = RC.build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
@@ -198,7 +199,7 @@ function stages(c)
     end)
     add("lm1_grid", () -> () -> (s = grid_state(); RC._lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); RC.update_radiometry!(s; damping = VgtkCore.LevenbergDamping(), joint = true); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("calibration", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     return list
 end
 

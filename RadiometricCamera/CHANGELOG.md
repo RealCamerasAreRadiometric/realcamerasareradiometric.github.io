@@ -51,6 +51,17 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   - `run_lm!`, `run_lm_grid!` and `radiometry_lmsolve!` are internal (`_lm_views!`, `_lm_tiles!`, `_lm_radiometry!`, each
     taking `stops` and `damping`): the calibration is reached through `solve` / `init` / `solve!`. `build_problem`,
     `build_problem_grid` and `update_radiometry!(…; joint = true)` take the LM's `damping`.
+- **Breaking: the closed-form blocks are a solve.** `update_radiometry!`, `update_lighting!`, `update_vignetting!` and
+  `update_diffuse_weight!` are internal; the closed-form blocks are `solve(EstimationProblem(RadiometryBlocks, (state, parts),
+  (; light, vignetting, mu)), algorithm)` with `RadiometryBlockDescent(; sweeps, reltol, vignetting_smoothness, verbose)` (the block
+  sweeps) or `JointRadiometry(; damping, sweeps, reltol, verbose)` (their joint LM), a `FitResult{RadiometryBlocks}` (the blocks
+  written into the state; `metadata.cost`, `metadata.gcv`). `RadiometricCalibration` takes `radiometry` (one of the two; `[sweep]
+  joint`, `iterations`) and `lm_chunk` (`[sweep] lm_chunk`): `[sweep]` is the algorithm's table (`SweepOptions` and
+  `PipelineOptions.sweep` removed), read by `read_calibration`, its keys unchanged. Same arithmetic, same numbers.
+- **Public:** `PIPELINE_OUTPUT_KEYS`, `START_RECORD_FILE`, `START_MASKS_DIR`, `load_refinement_start`, `masked_observations` and
+  `Unweighted` (read by the paper project).
+- **Changed:** the start's per-view pose refit (`_refined_pose`) returns its `FitResult`; a start pose whose refine did not succeed
+  is not taken (`successful_retcode`), and a session pose refit that did not succeed keeps the session's pose.
 - **Breaking: the closed-form block updates are named `update_<block>!`** (check_naming R19: no identifier begins `solve_`):
   `solve_Θ_l!` → `update_lighting!`, `solve_Θ_v!` → `update_vignetting!`, `solve_μ!` → `update_diffuse_weight!`,
   `solve_linear_blocks!` → `update_radiometry!` (the composite block: its parts' updates per sweep, or the joint LM); the joint LM

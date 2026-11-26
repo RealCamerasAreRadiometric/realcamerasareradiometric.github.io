@@ -960,9 +960,10 @@ The pose refined from `pose` on the correspondences `pairs` (point => node) in P
 """
 function pixel_refit(p::GridPoseProblem, pose, pairs::AbstractDict, strategy; name::AbstractString = "the photograph")
     obs = [_node_point(p, nd) => p.xy[i] for (i, nd) in sort(collect(pairs); by = first)]
-    est = solve(RefineProblem(AbsolutePoseProblem(p.camera, obs), pose), LevenbergMarquardt(; optimization_strategy = strategy)).u
-    est === nothing && throw(ArgumentError("$name: the pose does not refine in pixels on its $(length(obs)) matches"))
-    return convert(typeof(pose), est)
+    r = solve(RefineProblem(AbsolutePoseProblem(p.camera, obs), pose), LevenbergMarquardt(; optimization_strategy = strategy))
+    r.retcode == VgtkCore.ReturnCode.InitialFailure &&                   # too few matches to refine: no pose comes back
+        throw(ArgumentError("$name: the pose does not refine in pixels on its $(length(obs)) matches"))
+    return convert(typeof(pose), r.u)
 end
 
 """

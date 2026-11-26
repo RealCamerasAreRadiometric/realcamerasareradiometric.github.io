@@ -382,9 +382,9 @@ function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::Abstrac
     names = [String(p[1]) for p in poses]
     photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterization)   # THE entry point, the camera's own model
     cam_poses = [EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false) for (_, R, t) in poses]   # camera → world
-    bd = RC.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
-    surf = RC.TargetState(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
-    board = RC.with_state(bd, surf); rays = RC.BoardRays(board)
+    bd = VrtkCore.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
+    surf = VrtkCore.TargetState(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
+    board = VrtkCore.with_state(bd, surf); rays = VrtkCore.BoardRays(board)
     img = VgtkFeatures.load_linear_image(design_png); TH, TW = size(img, 1), size(img, 2)
     design = Matrix{Float64}(permutedims(Float64.(img[:, :, 2])))                           # [x, y]
     page_mm = (1e3 * sheet.page_w, 1e3 * sheet.page_h); tex_mm = page_mm[1] / TW
@@ -442,9 +442,9 @@ function sample_pixels(ctx, k::Integer, external; fraction::Real, seed::Integer,
     rng = StableRNG(seed + k); px = NTuple{4, Float64}[]
     for (u, v) in RC.masked_pixels(mask)
         rand(rng) < fraction || continue
-        o, d = RC.world_ray(ctx.camera, ctx.poses[k], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
+        o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[k], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
         (isfinite(sr) && sr > 0) || continue
-        𝐛 = RC.chart(ctx.bd, 𝐱); push!(px, (u, v, 𝐛[1] * ctx.page_mm[1], 𝐛[2] * ctx.page_mm[2]))
+        𝐛 = VgtkCore.chart(ctx.bd, 𝐱); push!(px, (u, v, 𝐛[1] * ctx.page_mm[1], 𝐛[2] * ctx.page_mm[2]))
     end
     # a photosite's one value (and, uncertain, its 1/σ); a decoded photograph's linear green — RC's masked_observations, channel G
     values, weights, _ = RC.masked_observations(plane, [(Int(p[1]), Int(p[2])) for p in px]; channel = 2)
@@ -548,19 +548,19 @@ struct _FootprintAt{V, S, T, G, C, W}
 end
 Adapt.@adapt_structure _FootprintAt
 "The slots of a pixel's blur row: 4 bilinear texels per sensor sample × aperture-disc sample of the render settings `st` (its most distinct texels)."
-_footprint_slots(st) = 4 * length(st.sensor) * RC.n_disc(st.aperture)
+_footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
 @inline function (f::_FootprintAt)(q::Int32, u::Int32, v::Int32)
     st, view = f.st, f.view
-    bd = f.board; rays = RC.BoardRays(f.board)
+    bd = f.board; rays = VrtkCore.BoardRays(f.board)
     TW, TH = Int(f.TW), Int(f.TH)
     base = (Int(q) - 1) * _footprint_slots(st); n = 0; tot = 0.0
     @inbounds for ks in 1:length(st.sensor)
         𝐩 = RC.𝐩_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
-        for la in 1:RC.n_disc(st.aperture)
+        for la in 1:VrtkCore.n_disc(st.aperture)
             𝐚 = RC.𝐚_sample(st.aperture, la, rs)
-            o, d = RC.world_ray(view, 𝐩, 𝐚); sr, 𝐱 = RC.intersect_board(rays, o, d)
+            o, d = VrtkCore.world_ray(view, 𝐩, 𝐚); sr, 𝐱 = VrtkCore.intersect_board(rays, o, d)
             (isfinite(sr) && sr > 0) || return Int32(0)
-            tw = texel_weights(RC.chart(bd, 𝐱), TW, TH); tw === nothing && return Int32(0)
+            tw = texel_weights(VgtkCore.chart(bd, 𝐱), TW, TH); tw === nothing && return Int32(0)
             w = sw * RC.𝐚_weight(st.aperture, la, rs)
             for (t, b) in tw                                           # the texel's slot (a linear search of the ≤ n so far), or a new one
                 c = Int32(t); i = base + 1

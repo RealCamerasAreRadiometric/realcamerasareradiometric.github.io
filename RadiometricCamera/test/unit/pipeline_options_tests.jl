@@ -11,7 +11,8 @@
     function haskey_path(T, path)        # `table.key` names a field of a table of T (or of the optimizer's, `[optimizer]`); `fixed`, the top-level list
         path == "fixed" && return hasfield(T, :fixed)
         t, k = split(path, '.')
-        t == "optimizer" && return hasfield(RadiometricCamera.OptimizerTable, Symbol(k))
+        t == "optimizer" && return hasfield(RadiometricCamera.OptimizerTable, Symbol(k))   # the algorithm's tables
+        t == "sweep" && return hasfield(RadiometricCamera.SweepTable, Symbol(k))
         return hasfield(T, Symbol(t)) && hasfield(fieldtype(T, Symbol(t)), Symbol(k))
     end
     using Test                          # (loads Core's TestExt: thrown_message, the message of the ArgumentError `f()` throws)
@@ -31,9 +32,9 @@ end
     @test count("_option_default(", src) >= 75                                     # every table field's default reads the file
     # every key of the struct is in the file (the file documents them all)
     doc = TOML.parsefile(path)
-    @test Set(keys(doc)) == union(Set(String.(fieldnames(RC.PipelineOptions))), ["optimizer", "config_version"])   # and the algorithm's optimizer, the version
+    @test Set(keys(doc)) == union(Set(String.(fieldnames(RC.PipelineOptions))), ["optimizer", "sweep", "config_version"])   # the algorithm's tables, the version
     @test doc["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
-    @test Set(keys(doc["optimizer"])) == Set(String.(fieldnames(RC.OptimizerTable)))
+    @test Set(keys(doc["optimizer"])) == Set(String.(fieldnames(RC.OptimizerTable))) && Set(keys(doc["sweep"])) == Set(String.(fieldnames(RC.SweepTable)))
     # but for the optional tables, absent by default, which the file documents in a comment
     optional = Dict("grid" => ["start_perturbation", "node_count"], "io" => ["lens_identity"])   # absent unless stated (no default)
     @test doc["fixed"] == [] && RC.PipelineOptions().fixed == String[]                      # the top-level list of held blocks: none
@@ -115,7 +116,7 @@ end
     # and every other key is one of them: no knob without a former variable, none forgotten
     keyset = union(Set(p for (_, ps) in FORMER_KNOBS for p in ps), NEW_KEYS)
     @test keyset == union(Set("$t.$k" for t in fieldnames(RC.PipelineOptions) if t !== :fixed for k in fieldnames(fieldtype(RC.PipelineOptions, t))), ["fixed"],
-                          Set("optimizer.$k" for k in fieldnames(RC.OptimizerTable)))
+                          Set("optimizer.$k" for k in fieldnames(RC.OptimizerTable)), Set("sweep.$k" for k in fieldnames(RC.SweepTable)))
 end
 
 @testitem "pipeline options (TOML): unknown tables, keys and values are refused" setup = [RCFixtures, PipelineOptionsHelpers] begin
@@ -490,11 +491,17 @@ end
     switches = [(String(t), String(k)) for t in fieldnames(RC.PipelineOptions) if t !== :fixed
                 for (k, K) in zip(fieldnames(fieldtype(RC.PipelineOptions, t)), fieldtypes(fieldtype(RC.PipelineOptions, t))) if K === Bool]
     @test Set("$t.$k" for (t, k) in switches) ==
-          Set(["io.linearize", "io.checkpoint_each", "io.render_init", "rendering.hammersley", "sweep.joint", "resume.sweep", "selfcheck.only"])
-    # the joint solve has no vignetting smoothness: its "on" is read beside a smoothness of none
-    extra(t) = t == "sweep" ? Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none"))) : Dict{String, Any}()
+          Set(["io.linearize", "io.checkpoint_each", "io.render_init", "rendering.hammersley", "resume.sweep", "selfcheck.only"])
+    # and the algorithm's one, `sweep.joint` (read by read_calibration: the closed-form blocks jointly); the joint solve has no
+    # vignetting smoothness, so its "on" is read beside a smoothness of none
+    none = Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none")))
+    jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
+    joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
+    @test jon.radiometry isa RC.JointRadiometry && jon.radiometry.damping == jon.optimizer.damping && joff.radiometry isa RC.RadiometryBlockDescent
+    @test RC.config_dict(jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(joff, joff_stops)["sweep"]["joint"] == "off"
+    @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
     for (t, k) in switches
-        cfg(v) = merge(extra(t), Dict{String, Any}(t => Dict{String, Any}(k => v)))
+        cfg(v) = Dict{String, Any}(t => Dict{String, Any}(k => v))
         on, off = RC.pipeline_options(cfg("on")), RC.pipeline_options(cfg("off"))
         @test getfield(getfield(on, Symbol(t)), Symbol(k)) === true && getfield(getfield(off, Symbol(t)), Symbol(k)) === false
         @test RC.config_dict(on)[t][k] == "on" && RC.config_dict(off)[t][k] == "off"          # the writer spells it

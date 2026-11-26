@@ -43,11 +43,7 @@
     end
 
     @testset "the input keys are every path option" begin
-        strings = String[]
-        for (t, T) in zip(fieldnames(PipelineOptions), fieldtypes(PipelineOptions)), (f, F) in zip(fieldnames(T), fieldtypes(T))
-            F === String && push!(strings, "$t.$f")
-        end
-        @test sort(strings) == sort([PIPELINE_INPUT_KEYS..., PIPELINE_OUTPUT_KEYS..., RadiometricCamera._NOT_PATH_KEYS...])
+        # (that every string option is an input, an output or no path is RadiometricCamera's own test, pipeline_options_tests.jl)
         @test PIPELINE_PATH_KEYS === PIPELINE_INPUT_KEYS                   # the drivers' and the calibration's: the package's one list
         cfg, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
         @test pipeline_inputs(cfg) == ["io.images" => "geometric_accuracy/detector_bias/data/fisheye_full/gt/images_linear",
@@ -129,7 +125,7 @@ end
     const RC = RadiometricCamera
     root = normpath(pkgdir(RadiometricCamera), "..")   # the repository: the package and the experiments side by side
     o = RC.pipeline_options(TOML.parsefile(joinpath(root, "experiments", "configs", "calibration", "siemens_coarse_full.toml"))["pipeline"])
-    @test o isa RC.PipelineOptions && o.warping.inplane == "aspect_skew" && RC._surface_free(o, :inplane) && o.fixed == ["aperture"]
+    @test o isa RC.PipelineOptions && o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed) && o.fixed == ["aperture"]
     @test RC.load_run_parameters(joinpath(root, "experiments", "test", "pipeline", "golden", "siemens_coarse_full", "parameters.json"))["frontend"] == "schoeps"
     # the paper's parametric cases build their problem without a printed-edge block (the edge is never a parameter)
     rr = TOML.parsefile(joinpath(root, "experiments", "configs", "experiments", "radiometric_refinement.toml"))

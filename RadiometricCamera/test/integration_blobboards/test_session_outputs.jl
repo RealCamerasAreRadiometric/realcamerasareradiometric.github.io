@@ -169,7 +169,7 @@ end
 Estimation's BearingPoseProblem) on the package's bearing correspondences."""
 function refine_pose(Xs, vs, R0, t0)
     guess = VgtkCore.EuclideanMap(SMatrix{3, 3, Float64}(R0), SVector{3, Float64}(t0); check = false)
-    p = RC._refined_pose(guess, RC._ray_correspondences(Xs, vs))
+    p = RC._refined_pose(guess, RC._ray_correspondences(Xs, vs)).u     # (the refine's FitResult: its pose)
     return SMatrix{3, 3, Float64}(p.R), SVector{3, Float64}(p.t)
 end
 

@@ -305,16 +305,16 @@ function run_frontend_fit(cfg::AbstractDict, name::AbstractString; driver::Abstr
         views = schoeps_views(sch, board_points(board); min_features = Int(t["min_features"]))
         t0 = time()
         r = _fit_start(t["model"], views, W, H, t["f_mm"], t["sensor_mm"]; scoring = t["scoring"], max_iter = Int(t["max_iter"]), rng)
-        params = start_parameters(r.camera)
+        fit = r.fit; params = start_parameters(fit.u.camera)
         @printf("fit %s: %s on %d views (%d correspondences, %d not projected), %s (%s) after %d iterations, rms %.4f px [%.1f s]\n", name, t["model"],
-                length(r.names), r.n_correspondences, r.n_dropped, r.retcode, r.stop_rule, r.iterations, r.rms, time() - t0)
-        write_start(joinpath(dir, "camera.json"), r.camera, W, H; lens_coverage = VgtkCore.lens_coverage(sc),   # the set's, as its import holds it
+                length(r.names), r.n_correspondences, r.n_dropped, fit.retcode, fit.stop_rule, fit.stats.nsteps, fit.rms, time() - t0)
+        write_start(joinpath(dir, "camera.json"), fit.u.camera, W, H; lens_coverage = VgtkCore.lens_coverage(sc),   # the set's, as its import holds it
                     provenance = (; model = name, source = "scripts/frontends.jl (configs/experiments/frontends.toml [fits.$name])",
                                   method = "VisualGeometryToolkitEstimation Ransac on AbsolutePoseProblem per view, then LevenbergMarquardt on CameraPosesProblem",
-                                  detections = sch, views = length(r.names), correspondences = r.n_correspondences, rms_px = r.rms,
-                                  retcode = string(r.retcode), stop_rule = string(r.stop_rule)))
-        report = Dict{String, Any}("fit" => name, "model" => t["model"], "retcode" => string(r.retcode), "stop_rule" => string(r.stop_rule),
-                                   "iterations" => r.iterations, "rms_px" => r.rms, "views" => length(r.names), "correspondences" => r.n_correspondences,
+                                  detections = sch, views = length(r.names), correspondences = r.n_correspondences, rms_px = fit.rms,
+                                  retcode = string(fit.retcode), stop_rule = string(fit.stop_rule)))
+        report = Dict{String, Any}("fit" => name, "model" => t["model"], "retcode" => string(fit.retcode), "stop_rule" => string(fit.stop_rule),
+                                   "iterations" => fit.stats.nsteps, "rms_px" => fit.rms,   # (the report's key of record: the fit's `stats.nsteps`) "views" => length(r.names), "correspondences" => r.n_correspondences,
                                    "not_projected" => r.n_dropped, "start_xi_alpha" => collect(r.start), "parameters" => params,
                                    "seconds" => time() - t0, "view_rms_px" => Dict(n => v for (n, v) in zip(r.names, r.view_rms)))
         open(io -> TOML.print(io, report), joinpath(dir, "fit.toml"), "w")

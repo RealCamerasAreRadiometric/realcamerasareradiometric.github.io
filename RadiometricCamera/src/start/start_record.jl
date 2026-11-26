@@ -67,8 +67,9 @@ The `[pipeline]` table `table` as its start reads it: without the refinement-onl
 """
 start_pipeline_table(table::AbstractDict) = first(split_refine_only(table; keys = (REFINE_ONLY_KEYS..., PIPELINE_OUTPUT_KEYS...)))
 
-"The start record's files ([`save_start`](@ref))."
+"The start record's files ([`save_calibration_start`](@ref))."
 const START_RECORD_FILE = "start.json"
+"The start record's directory of its masks, one PNG per view ([`save_calibration_start`](@ref))."
 const START_MASKS_DIR = "masks"
 
 """The start record's camera file, by the route the record names (its `parametric` entry): `lens.json` per view, `grid.json` per tile."""
@@ -123,7 +124,7 @@ _plain_object(o) = o === nothing ? nothing : _plain_fields([(Symbol(k), x) for (
 """
     load_refinement_start(dir) -> NamedTuple
 
-The start record `dir` ([`save_start`](@ref)): `(; names, W₀, H₀, parametric, fpx, R0, d_c, f_m, be0, page_flip, board_y_sign,
+The start record `dir` ([`save_calibration_start`](@ref)): `(; names, W₀, H₀, parametric, fpx, R0, d_c, f_m, be0, page_flip, board_y_sign,
 vig_c, costs, μ_lin, vignetting_gcv, grid_gcv, resample, options, lens, init_region, state, masks, dir)` — the front end's lens
 (`frontend/`, read as the start was), its initialization region, the state
 ([`load_state`](@ref)) and the masks (`BitMatrix`, one per view; `masks`, when given, the very masks the record was written from:

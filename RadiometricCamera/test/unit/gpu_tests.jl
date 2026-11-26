@@ -77,7 +77,7 @@ end
 
 @testitem "GPU backend" tags = [:gpu] setup = [RCFixtures, RCGPU, GPUDomainScene] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, Material, PerViewResidual, TexturedTarget,
-                             render_all, render_view, RenderSettings, _lm_views!, update_vignetting!, sphere_radius, View, with_nonlinear,
+                             render_all, render_view, RenderSettings, _lm_views!, _update_vignetting!, sphere_radius, View, with_nonlinear,
                              chief_ray, 𝐩_of_pixel, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -196,7 +196,7 @@ end
         @test maximum(abs, imr_gpu .- imr_cpu) / maximum(imr_cpu) < 2e-3
         sr_fit = CalibrationState(board, st, RC.with_vignetting(camera_t, RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W)), poses, mat_t, light_t, targets_r;
                                   masks, backend = CUDABackend())
-        update_vignetting!(sr_fit)
+        _update_vignetting!(sr_fit)
         pts_r = [𝐩_of_pixel(u, v) for (u, v) in sr_fit.px[1]]
         @test maximum(abs(sr_fit.camera.vignetting(𝐩) - vig_r(𝐩)) for 𝐩 in pts_r) < 5e-3
         # the LM problem with the radial block on the device: residual parity with the CPU and finite columns

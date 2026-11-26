@@ -24,7 +24,7 @@ identifiers.
 - **Image formation**: the radiant flux of a pixel [`Φ_pixel`](@ref) and the render [`render_view`](@ref), by fixed quadrature
   rules on the pixel and the aperture and a Monte Carlo radiance with common random numbers.
 - **Calibration**: the [`CalibrationState`](@ref), the closed-form solves of the blocks the flux is linear in
-  ([`update_radiometry!`](@ref)), and the joint Levenberg–Marquardt with pathwise Jacobians (per view, or per tile for the
+  ([`RadiometryBlocks`](@ref): [`RadiometryBlockDescent`](@ref), [`JointRadiometry`](@ref)), and the joint Levenberg–Marquardt with pathwise Jacobians (per view, or per tile for the
   grid model; the optimizer a [`RadiometricCalibration`](@ref)'s) on a CUDA GPU (the default device) or the CPU, its residuals whitened when a RAW photograph's sensor model
   has a noise variance law ([`photo_set`](@ref RadiometricCamera.photo_set): VisualGeometryToolkitCore's `SensorModel` resolved by the
   photograph's EXIF).

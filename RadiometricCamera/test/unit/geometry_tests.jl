@@ -26,8 +26,8 @@
     let R = exp_so3(SVector(0.1, -0.2, 0.05)), t = SVector(0.1, 0.0, 2.0)
         Xs = [SVector(x, y, 0.3 * sin(x + y)) for x in -0.5:0.25:0.5 for y in -0.5:0.25:0.5]
         guess = VgtkCore.EuclideanMap(exp_so3(SVector(0.02, 0.0, -0.01)) * R, t + SVector(0.01, -0.02, 0.05); check = false)
-        p1 = RC._refined_pose(guess, RC._ray_correspondences(Xs, [R * X + t for X in Xs]))
-        @test maximum(abs, p1.R - R) < 1e-9 && maximum(abs, p1.t - t) < 1e-9
+        r1 = RC._refined_pose(guess, RC._ray_correspondences(Xs, [R * X + t for X in Xs])); p1 = r1.u
+        @test VgtkCore.successful_retcode(r1) && maximum(abs, p1.R - R) < 1e-9 && maximum(abs, p1.t - t) < 1e-9
     end
     # board
     tex = rand(64, 96, 3)

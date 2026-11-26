@@ -43,8 +43,9 @@ function _frontend(::Type{BlobFrontend}, opts::PipelineOptions, start::NamedTupl
         for k in eachindex(names)
             fk = _imaged(lens0, in_initialization(features[k], init_region)); length(fk) < 6 && continue
             Xs = [X for (_, X) in fk]; vs = [normalize(backproject(lens0, 𝐩)) for (𝐩, _) in fk]
-            est = _refined_pose(inv(poses0[k]), _ray_correspondences(Xs, vs))   # world → camera
-            e0 = median(bearing_px(lens0, poses0[k], fk, fpx0)); poses0[k] = _pose_eltype(Float64, inv(est))
+            r = _refined_pose(inv(poses0[k]), _ray_correspondences(Xs, vs))     # world → camera
+            VgtkCore.successful_retcode(r) || (@printf("  %s: the pose refit did not succeed (%s, %s): the session's pose kept\n", names[k], r.retcode, r.stop_rule); continue)
+            e0 = median(bearing_px(lens0, poses0[k], fk, fpx0)); poses0[k] = _pose_eltype(Float64, inv(r.u))
             @printf("  %s: pose refit through the lens under test, bearing median %.3f → %.3f px\n", names[k], e0, median(bearing_px(lens0, poses0[k], fk, fpx0)))
         end
         flush(stdout)

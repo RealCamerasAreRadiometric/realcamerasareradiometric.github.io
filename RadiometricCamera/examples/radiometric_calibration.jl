@@ -19,7 +19,7 @@
 
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
 using RadiometricCamera: grid_angular_error, grid_dims, grid_model, load_session, render_all, RenderSettings, _lm_tiles!,
-                         save_grid, schoeps_gridlens, update_radiometry!, sphere_radius
+                         save_grid, schoeps_gridlens, all_parts, RadiometryBlocks, RadiometryBlockDescent, sphere_radius
 using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
 using VisualGeometryToolkitCore: cost                                        # a state's ½ Σ (Φ − ϕ)² and its relative RMS
 import CUDA, KernelAbstractions
@@ -102,7 +102,7 @@ st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 
 K = 4; sel = round.(Int, range(1, length(ds.poses); length = K))
 s = CalibrationState(ds.board, st, camera0, ds.poses[sel], mat0, light0, ds.targets[sel]; δ = 0.01, backend)
-update_radiometry!(s; light = true, vignetting = false, mu = false); c0, rms0 = cost(s)
+VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, all_parts(s)), (; light = true, vignetting = false, mu = false)), RadiometryBlockDescent()); c0, rms0 = cost(s)
 @printf("%d views, %d masked pixels; start (flat V, closed-form lighting): rel-RMS %.4f\n", K, sum(length, s.px), rms0)
 Φ0 = render_all(s);                                                          # H × W × 3 per view, zero outside the mask
 
@@ -114,12 +114,12 @@ end
 
 # ## 4. Calibration
 #
-# The blocks that enter Φ linearly — `Θ_v`, `Θ_l` and μ — have closed-form least-squares solutions (`update_radiometry!`: one linear
+# The blocks that enter Φ linearly — `Θ_v`, `Θ_l` and μ — have closed-form least-squares solutions (`RadiometryBlockDescent`: one linear
 # sweep from the per-pixel light / vignetting responses). Then the joint Levenberg–Marquardt over every block: poses `Θ_e`, the grid
 # directions (per-tile cost blocks, `_lm_tiles!`), focus `Θ_f`, aperture r, material `Θ_m`, vignetting `Θ_v`, lighting `Θ_l`; the
 # vignetting gauge V(𝐜) = 1 is exact (the centre's free direction eliminated, `gauge_basis`), no geometric prior.
 
-update_radiometry!(s; light = true, vignetting = true, mu = true); c1, rms1 = cost(s)
+VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, all_parts(s))), RadiometryBlockDescent()); c1, rms1 = cost(s)
 @printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, s.mat.diffuse_weight, s.camera.vignetting(VgtkCore.center(s.camera.vignetting) + SVector(0.4W, 0.0)))
 trace = NamedTuple[]
 monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", it, cst,

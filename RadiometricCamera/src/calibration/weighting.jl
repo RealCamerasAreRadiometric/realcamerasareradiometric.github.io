@@ -15,7 +15,7 @@
 """
     Unweighted()
 
-The weights of rows taken as measured (a plain image): every row's weight is one, and [`_whiten`](@ref) is the identity, so the
+The weights of rows taken as measured (a plain image): every row's weight is one, and `_whiten` is the identity, so the
 residuals, Jacobians and costs are today's bit for bit. The other weights are a vector of 1/σ per row (a whitened view).
 """
 struct Unweighted end

@@ -210,7 +210,7 @@ Base.@kwdef struct VignettingOptions <: AbstractOptionsTable
     support_min::Float64 = _option_default(VignettingOptions, :support_min)                        # a node with less than this share of the mean data weight Σ N_i(ρ)² is dependent
                                                      #   (continues the supported ones with `boundary_order`; 0 = any masked pixel supports; 2026-10-30, the order 2026-11-07)
     smoothness::AbstractSmoothness = _option_default(VignettingOptions, :smoothness)     # [vignetting.smoothness]: pspline, the closed-form solve's Δ³ penalty over the free
-                                                     #   nodes (`update_vignetting!`; its weight normalized as the grid's; 0 = none; "gcv" = chosen
+                                                     #   nodes (`RadiometryBlockDescent`; its weight normalized as the grid's; 0 = none; "gcv" = chosen
                                                      #   by GCV per solve, 2026-11-04) | none
     boundary_order::Int = _option_default(VignettingOptions, :boundary_order)                           # the dependent nodes' extrapolation past the supported nodes, 2 Δ²c = 0 | 3 Δ³c = 0 (`BOUNDARY_ORDERS`)
     chart::Symbol = _option_default(VignettingOptions, :chart)                           # the chart of the normalized radius (Core's `RADIAL_CHARTS`, 2026-11-10): linear ρ = d / r_max, uniform
@@ -249,12 +249,16 @@ Base.@kwdef struct OptimizerTable <: AbstractOptionsTable
 end
 _table_name(::Type{OptimizerTable}) = "optimizer"
 
-"""`[sweep]`: the closed-form (lighting, vignetting, μ) sweep between LM chunks."""
-Base.@kwdef struct SweepOptions <: AbstractOptionsTable
-    lm_chunk::Int = _option_default(SweepOptions, :lm_chunk)                                 # LM iterations between sweeps (0 = no sweeps)
-    iterations::Int = _option_default(SweepOptions, :iterations)                               # block-solve iterations of one sweep
-    joint::Bool = _option_default(SweepOptions, :joint)                               # the closed-form blocks jointly (_lm_radiometry!)
+"""`[sweep]`: the refinement's closed-form (lighting, vignetting, μ) solves — `iterations` the sweeps of one solve, `joint` the
+blocks jointly ([`JointRadiometry`](@ref); else [`RadiometryBlockDescent`](@ref)) — and `lm_chunk`, the LM iterations between two
+of them (0: none between): the table [`read_calibration`](@ref) reads into a [`RadiometricCalibration`](@ref)'s `radiometry` and
+`lm_chunk`. Not a table of [`PipelineOptions`](@ref)."""
+Base.@kwdef struct SweepTable <: AbstractOptionsTable
+    lm_chunk::Int = _option_default(SweepTable, :lm_chunk)                                   # LM iterations between sweeps (0 = no sweeps)
+    iterations::Int = _option_default(SweepTable, :iterations)                               # block-solve iterations of one sweep
+    joint::Bool = _option_default(SweepTable, :joint)                                        # the closed-form blocks jointly (JointRadiometry)
 end
+_table_name(::Type{SweepTable}) = "sweep"
 
 """`[resume]`: continuing a finished run."""
 Base.@kwdef struct ResumeOptions <: AbstractOptionsTable
@@ -276,11 +280,11 @@ Base.@kwdef struct ComputeOptions <: AbstractOptionsTable
 end
 
 """
-    PipelineOptions(; io, frontend, camera, grid, masks, rendering, lighting, material, vignetting, warping, edge, sweep, resume,
+    PipelineOptions(; io, frontend, camera, grid, masks, rendering, lighting, material, vignetting, warping, edge, resume,
                     selfcheck, compute)
 
 The options of a refinement, one table each (see the table structs for every key and its default; `configs/default.toml` lists
-them; the optimizer's `[optimizer]` table is the algorithm's, [`read_calibration`](@ref)). Read from TOML with [`pipeline_options`](@ref),
+them; the optimizer's `[optimizer]` and the sweeps' `[sweep]` tables are the algorithm's, [`read_calibration`](@ref)). Read from TOML with [`pipeline_options`](@ref),
 written for the run record with [`config_dict`](@ref). Required: `io.images`,
 `io.out` and the front-end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`).
 A `selfcheck.only` run reads no photograph: it needs no `io.images`.
@@ -299,7 +303,6 @@ Base.@kwdef struct PipelineOptions
     vignetting::VignettingOptions = VignettingOptions()
     warping::WarpingOptions = WarpingOptions()
     edge::EdgeOptions = EdgeOptions()
-    sweep::SweepOptions = SweepOptions()
     resume::ResumeOptions = ResumeOptions()
     selfcheck::SelfcheckOptions = SelfcheckOptions()
     compute::ComputeOptions = ComputeOptions()

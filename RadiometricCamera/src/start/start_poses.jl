@@ -5,11 +5,11 @@ function _ray_correspondences(Xs, vs)
     return VgtkCore.Correspondences(src, dst)
 end
 
-"""The pose world → camera refined from `pose` on the bearing correspondences `cs` (`_ray_correspondences`): Core's
-`LevenbergMarquardt` on Estimation's `BearingPoseProblem(cs)` — the tangent-plane angle residual on Core's `LeftRigidManifold6`,
-least squares over every ray (`optimization_strategy = nothing`)."""
+"""The refine of the pose world → camera from `pose` on the bearing correspondences `cs` (`_ray_correspondences`), its `FitResult`
+(`u` the pose; a caller reads `successful_retcode` first): Core's `LevenbergMarquardt` on Estimation's `BearingPoseProblem(cs)` —
+the tangent-plane angle residual on Core's `LeftRigidManifold6`, least squares over every ray (`optimization_strategy = nothing`)."""
 _refined_pose(pose, cs) =
-    VgtkCore.solve(VgtkCore.RefineProblem(VgtkEstimation.BearingPoseProblem(cs), pose), VgtkCore.LevenbergMarquardt(; optimization_strategy = nothing)).u
+    VgtkCore.solve(VgtkCore.RefineProblem(VgtkEstimation.BearingPoseProblem(cs), pose), VgtkCore.LevenbergMarquardt(; optimization_strategy = nothing))
 
 """
     _fit_page_pose(Xs, vs, 𝐨, 𝐧, bc, distances) -> (e, R, t)
@@ -17,7 +17,8 @@ _refined_pose(pose, cs) =
 The world → camera pose `(R, t)` of a view of a planar page through `𝐨` whose printed side's normal is `𝐧`, from the page points
 `Xs` and their camera-frame rays `vs` (`_refined_pose` on `_ray_correspondences`): a multi-start over `distances` (along the page's normal, towards
 the printed side, from the page centre `bc`) and 5 tilts, the camera always on the printed side. A refined pose whose camera centre
-`−Rᵀt` is not on that side (Core's `signed_distance` to the page plane `≤ 0`: cheirality) is refused. `e` is the median bearing
+`−Rᵀt` is not on that side (Core's `signed_distance` to the page plane `≤ 0`: cheirality), or whose refine did not succeed
+(`successful_retcode`), is refused. `e` is the median bearing
 angle of the best pose (rad); `e = Inf` when no start gives a pose on the printed side.
 """
 function _fit_page_pose(Xs, vs, 𝐨, 𝐧, bc, distances)
@@ -27,8 +28,9 @@ function _fit_page_pose(Xs, vs, 𝐨, 𝐧, bc, distances)
     best = (Inf, SMatrix{3, 3, Float64}(I), SVector(0.0, 0.0, 1.0))
     for d in distances, (rx, ry) in ((0.0, 0.0), (0.5, 0.0), (-0.5, 0.0), (0.0, 0.5), (0.0, -0.5))
         R0 = exp_so3(SVector(rx, ry, 0.0)) * Rface; t0 = SVector(0.0, 0.0, d) - R0 * bc
-        est = _refined_pose(EuclideanMap(R0, t0; check = false), _ray_correspondences(Xs, vs))
-        R, t = SMatrix{3, 3, Float64}(est.R), SVector{3, Float64}(est.t)
+        r = _refined_pose(EuclideanMap(R0, t0; check = false), _ray_correspondences(Xs, vs))
+        VgtkCore.successful_retcode(r) || continue                                     # a refine that did not succeed is no start
+        R, t = SMatrix{3, 3, Float64}(r.u.R), SVector{3, Float64}(r.u.t)
         VgtkCore.signed_distance(page, VgtkCore.Point3((-R' * t)...)) > 0 || continue   # cheirality: the camera sees the printed side
         e = median(angle_between(normalize(R * X + t), v) for (X, v) in zip(Xs, vs))
         isfinite(e) && e < best[1] && (best = (e, R, t))

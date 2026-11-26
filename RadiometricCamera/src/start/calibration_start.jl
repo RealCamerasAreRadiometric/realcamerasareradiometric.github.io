@@ -84,7 +84,7 @@ function load_calibration_start(dir::AbstractString; options::PipelineOptions, d
     check_start_options(record, options)
     g = start_geometry(options; record, load_state)
     files = photographs === nothing ? start_photographs(options, g.names) : photographs
-    return _start_state(g, files, options, record; backend = device, observations, damping = nothing)   # a record's start: no closed-form solve, no LM
+    return _start_state(g, files, options, record; backend = device, observations, damping = nothing, radiometry = nothing)   # a record's start: no closed-form solve, no LM
 end
 
 """The photographs of the views `names` of the run `options` (`io.images`; a RAW file by its stem, `photo_file`)."""
