@@ -17,7 +17,7 @@
 
 export calibrate, RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_calibration, StartGeometry, start_geometry, load_calibration_start,
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
-       calibration_problem, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
+       calibration_problem, RadiometricCameraModel, RadiometricTarget, RunOptions, CalibrationSettings, pipeline_options, CalibratedCamera
 
 public CalibrationData, CalibrationParameters, flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
        coverage_region, check_coverage, calibrated_folds, grid_angular_error,

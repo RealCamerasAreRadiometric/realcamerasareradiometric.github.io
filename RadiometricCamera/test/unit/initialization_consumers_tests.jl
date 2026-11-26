@@ -23,12 +23,12 @@
     # the start: the self-check on the initialization region …
     @test occursin("be0 = _start_bearings(g, fpx)", pre) && occursin("detection_bearings(g.camera, g.poses, [in_initialization(g.observations[k], g.init_region) for k in eachindex(g.names)], fpx)", body("_start_bearings(g::StartGeometry, fpx) ="))
     # … the focus start's nodes, support and box on the imaged region (`focus_start_nodes`), never the initialization region
-    @test occursin("= focus_start_nodes(lens0, opts.focus)", pre) && !occursin("region_i", pre)
+    @test occursin("= focus_start_nodes(lens0, settings.focus)", pre) && !occursin("region_i", pre)
     # the vignetting centre is the start's principal point, no region of its own (RC 0.11.0: the start is on its optical axis)
     @test occursin("vignetting_center(lens0)", pre)
     # … and the refinement's own region for its masks and the grid
-    @test occursin("region = VgtkCore.imaged_region(lens0)", pre) && occursin("VgtkCore.pixel_mask(_sampling_region(lens0, opts.masks.lens_coverage_scale),", pre)
+    @test occursin("region = VgtkCore.imaged_region(lens0)", pre) && occursin("VgtkCore.pixel_mask(_sampling_region(lens0, settings.masks.lens_coverage_scale),", pre)
     # the initialization region has ONE record, beside the grids (`_save_run_grid`, review round 2 finding 4): parameters.json holds none
-    @test occursin("_save_run_grid(joinpath(opts.io.out, \"grid.json\"), gfin, meta.init_region;", src)
+    @test occursin("_save_run_grid(joinpath(run.io.out, \"grid.json\"), gfin, meta.init_region;", src)
     @test !occursin("initialization_region = meta.init_region", src) && !occursin("initialization_region_unrecorded", src)
 end

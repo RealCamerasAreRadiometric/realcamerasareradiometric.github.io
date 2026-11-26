@@ -151,7 +151,7 @@ end
                "sampling_strategy_fe10_count.toml", "sampling_strategy_fe10_kb16384.toml", "sampling_strategy_kb_count.toml", "sampling_strategy_smoke.toml",
                "warping_ablation.toml"]
         @test sort(readdir(projectdir("configs", "supplement"))) == ["timing.toml", "timing_smoke.toml"]
-        # every case's [pipeline] table reads as PipelineOptions, and its paths stay inside data_root()
+        # every case's [pipeline] table reads as RunOptions and CalibrationSettings, and its paths stay inside data_root()
         for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
             cfg = TOML.parsefile(projectdir("configs", "experiments", f))
             for (c, t) in get(cfg, "cases", Dict()), (tb, kv) in get(t, "pipeline", Dict()), (k, v) in kv
@@ -164,8 +164,8 @@ end
         end
         # spot checks: the real-data budget of the runs of record (the 03.11 settings)
         rc = load_radiometric_refinement_config(experiment_config("radiometric_refinement"))
-        alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = alg.refinement.options
-        @test o.io.channel == "G" && o.masks.samples_per_view == 8192 && stops.max_iter == 25 && o.rendering.N == 16 && o.rendering.hammersley
+        run, alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = (run, alg.refinement.settings)
+        @test first(o).io.channel == "G" && last(o).masks.samples_per_view == 8192 && stops.max_iter == 25 && last(o).rendering.N == 16 && last(o).rendering.hammersley
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)
         isfisheye(n) = occursin(r"^(ag10fe_|si27fe_|si30fe_)|fisheye", n)   # si30fe: the fisheye 30 cm set (2026-11-16)
@@ -182,7 +182,7 @@ end
         @test !any(r -> occursin("non-central", r["model"]) || endswith(r["chrome"], "_nc"), vcat((t["rows"] for t in values(gf["tables"]))...))
         rv = load_radiometric_refinement_config(projectdir("configs", "experiments", "radiometric_refinement_vignetting.toml"))
         @test sort(collect(keys(rv["cases"]))) == ["f4_$(l)_spline_warped" for l in lenses]
-        @test RadiometricCamera.pipeline_options(rv["cases"]["f4_tamron_spline_warped"]["pipeline"]).camera.fnumber == 2.8
+        @test first(RadiometricCamera.pipeline_options(rv["cases"]["f4_tamron_spline_warped"]["pipeline"])).camera.fnumber == 2.8
         # the board model is named in every case (owner ruling 2026-11-11), and every case's target is a print whose in-plane aspect and
         # skew are estimated (owner ruling 2026-11-13): [warping] inplane "aspect_skew" from the design as printed, not held, the
         # heights as each case states them. The former <base>_warped_print_error cases (radiometric_refinement_warping.toml) were
@@ -197,10 +197,10 @@ end
                 o = RadiometricCamera.pipeline_options(t["pipeline"])
                 if f == "radiometric_refinement.toml" && t["kind"] == "lens"
                     @test w["inplane"] == "none" && !haskey(w, "inplane_start") && w["degree"] == 1
-                    @test o.warping.inplane == "none"
+                    @test last(o).warping.inplane == "none"
                 else
                     @test w["inplane"] == "aspect_skew" && w["inplane_start"] == [0.0, 0.0]
-                    @test o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed)   # free: modelled and not held
+                    @test last(o).warping.inplane == "aspect_skew" && !("inplane" in last(o).fixed)   # free: modelled and not held
                 end
             end
         end
@@ -341,7 +341,7 @@ end
         let t = merge(deepcopy(db["cases"][c]), Dict("pipeline" => merge(deepcopy(db["cases"][c]["pipeline"]),
                                                      Dict("io" => merge(get(db["cases"][c]["pipeline"], "io", Dict()), Dict("out" => "/x")), "lm" => Dict("log" => "lm.tsv", "max_iter" => 3)))))
             @test !haskey(start_settings(t)["pipeline"]["io"], "out") && !haskey(get(start_settings(t)["pipeline"], "lm", Dict()), "log")
-            @test RadiometricCamera.pipeline_options(start_settings(t)["pipeline"]) == RadiometricCamera.start_options(RadiometricCamera.pipeline_options(t["pipeline"]))
+            @test RadiometricCamera.pipeline_options(start_settings(t)["pipeline"]) == RadiometricCamera.start_options(RadiometricCamera.pipeline_options(t["pipeline"])...)
         end
         @test resolve_pipeline(db, start_settings(db["cases"][c]); produce = false)["io"] isa AbstractDict      # the start table resolves without an init's grid
         @test all(id -> db["inputs"][id]["stage"] != "evaluate", table_inputs(db, resolve_pipeline(db, start_settings(db["cases"][c]); produce = false)))

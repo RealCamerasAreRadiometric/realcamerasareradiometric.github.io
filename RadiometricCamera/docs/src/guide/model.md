@@ -89,7 +89,7 @@ src/start/                          the start: frontends/ (calibration_session.j
                                     focus_start.jl, masks.jl, radiometric_start.jl, calibration_start.jl (StartGeometry, start_geometry, load_calibration_start), prepare.jl,
                                     start_record.jl (the start record)
 src/diagnostics/                    monitor.jl, selfcheck.jl, render.jl
-src/options/                        tables.jl, toml.jl (PipelineOptions from TOML: pipeline_options, config_dict), device.jl, retired.jl
+src/options/                        tables.jl, toml.jl (RunOptions and CalibrationSettings from TOML: pipeline_options, config_dict), device.jl, retired.jl
 src/io/                             photographs.jl (photos, BlobBoards sessions), camera_models.jl (lens / grid records, Schöps import),
                                     run_outputs.jl (save_radiometric_calibration), records.jl (RC's record kinds)
 bin/refine.jl                       the refinement driver (--config=<toml>; configs/default.toml lists every key)

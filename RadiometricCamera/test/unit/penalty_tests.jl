@@ -111,12 +111,12 @@ end
     using VisualGeometryToolkitEstimation: GeneralizedCrossValidation
     ps(w) = Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => w))
     o = RC.pipeline_options(Dict("grid" => ps("gcv"), "vignetting" => merge(ps("gcv"), Dict("boundary_order" => 3))))
-    @test o.grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && o.vignetting.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && o.vignetting.boundary_order == 3
-    @test RC.pipeline_options(TOML.parse(sprint(TOML.print, RC.config_dict(o)))) == o      # the writer's "gcv" reads back
-    @test RC.pipeline_options(Dict("vignetting" => ps(2))).vignetting.smoothness == RC.PSplineSmoothness(3, 2.0)
-    @test RC.pipeline_options(Dict{String, Any}(); set = ["grid.smoothness={type = \"pspline\", order = 3, weight = \"gcv\"}"]).grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation())
+    @test last(o).grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && last(o).vignetting.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && last(o).vignetting.boundary_order == 3
+    @test RC.pipeline_options(TOML.parse(sprint(TOML.print, RC.config_dict(o...)))) == o      # the writer's "gcv" reads back
+    @test last(RC.pipeline_options(Dict("vignetting" => ps(2)))).vignetting.smoothness == RC.PSplineSmoothness(3, 2.0)
+    @test last(RC.pipeline_options(Dict{String, Any}(); set = ["grid.smoothness={type = \"pspline\", order = 3, weight = \"gcv\"}"])).grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation())
     # today's values are the defaults: no penalty on V, order 2, the grid smoothness's weight a number
-    d = RC.PipelineOptions()
+    d = RC.CalibrationSettings()
     @test d.vignetting.smoothness == RC.PSplineSmoothness(3, 0.0) && d.vignetting.boundary_order == 2 && d.grid.smoothness == RC.PSplineSmoothness(3, 0.1)
     for bad in (Dict("grid" => ps("aic")), Dict("grid" => ps(-1.0)),
                 Dict("vignetting" => ps("x")), Dict("grid" => Dict("boundary_order" => 2)),   # retired: no dependent nodes

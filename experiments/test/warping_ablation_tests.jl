@@ -60,7 +60,7 @@
         wa = plan.rc["cases"][a.variant]["pipeline"]["warping"]; wb = plan.rc["cases"][b.variant]["pipeline"]["warping"]
         @test wa["degree"] == 0 && wa["inplane"] == "none" && !haskey(wa, "inplane_start")
         @test wb["degree"] == rc["cases"]["si17ta_kb_warped"]["pipeline"]["warping"]["degree"] && wb["inplane"] == "none" && !haskey(wb, "inplane_start")
-        o = pipeline_options(plan.rc["cases"][a.variant]["pipeline"])
+        _, o = pipeline_options(plan.rc["cases"][a.variant]["pipeline"])
         @test o.warping.degree == 0 && o.warping.inplane == "none"
         @test length(unique(refinement_product(plan.rc, x.variant).key for x in plan.rows)) == length(plan.rows)
         @test a.label == "si17ta_kb_rigid" && r("si30_spline_warped", "heights").label == "si30_spline_heights"

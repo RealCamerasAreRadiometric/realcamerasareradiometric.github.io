@@ -9,8 +9,8 @@
               "calibration_min_x : 0\ncalibration_min_y : 0\ncalibration_max_x : 639\ncalibration_max_y : 479\ngrid_width : 4\ngrid_height : 4\ngrid : [$grid]\n")
         write(joinpath(images, "V01.png"), "not a PNG")          # a photograph that must not be opened by a self-check
         opts(; schoeps = "", images = "", out = "", only = false) =
-            RC.PipelineOptions(; io = RC.IOOptions(; images, out), frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, schoeps),
-                               selfcheck = RC.SelfcheckOptions(; only))
+            RC.RunOptions(; io = RC.IOOptions(; images, out), frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, schoeps),
+                          selfcheck = RC.SelfcheckOptions(; only))
         # the start camera's size, the photograph never opened (review finding 10: a refinement decoded the first photograph, a whole
         # RAW, only to compare its size): a self-check and a refinement alike
         sc = opts(; schoeps, images, only = true)
@@ -21,8 +21,8 @@
         # a stored start (macro_defocus' held-out self-check, no Schöps run's model; `load_start`, read once by the front end): its size
         none = mkpath(joinpath(dir, "no_model"))
         lens = RC.save_lens(joinpath(dir, "start.json"), RC.load_camera("schoeps:" * joinpath(schoeps, "intrinsics0.yaml")))
-        po = RC.PipelineOptions(; io = RC.IOOptions(; images, out = "", init = "lens:" * joinpath(dir, "start.json")),
-                                frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, schoeps = none))
+        po = RC.RunOptions(; io = RC.IOOptions(; images, out = "", init = "lens:" * joinpath(dir, "start.json")),
+                           frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, schoeps = none))
         @test RC._schoeps_extent(po, RC.load_start(po.io.init)) == (640, 480)
         # the start: the stored one when io.init names it, and then no Schöps run's model is read (review round 2, finding 2: the Schöps
         # start was built eagerly, failing a stored start's self-check whose Schöps folder holds no model)
@@ -41,7 +41,7 @@
         # io.images is required by the start's photographs only: a self-check reads none and gets past to the front-end's own checks
         out = mkpath(joinpath(dir, "out"))
         e = try
-            RC.selfcheck(RC.start_geometry(opts(; out, only = true)); options = opts(; out, only = true)); nothing
+            RC.selfcheck(RC.start_geometry(opts(; out, only = true), RC.CalibrationSettings()); run = opts(; out, only = true)); nothing
         catch err
             err
         end

@@ -5,7 +5,7 @@
 #
 # A config of record has three tables, each key checked, and an optional fourth:
 #   [experiment]  case (the file's name) and dataset (its input tier under data_root())
-#   [pipeline]    the full RadiometricCamera.PipelineOptions table of the run;
+#   [pipeline]    the full table of the run's RadiometricCamera options (its RunOptions and CalibrationSettings);
 #                 its input paths are relative to data_root() or `run:<id>` (a
 #                 [runs.<id>]: a derived file, produced on demand), and io.out is the
 #                 driver's (the run's keyed directory), never the config's
@@ -13,7 +13,7 @@
 #   [runs.<id>]   the derived files [pipeline] names as `run:<id>` (src/drivers.jl
 #                 check_runs_table: e.g. the board's distance map, scripts/distance_maps.jl)
 # =============================================================================
-using RadiometricCamera: RadiometricCamera, PipelineOptions, pipeline_options
+using RadiometricCamera: RadiometricCamera, pipeline_options
 import VisualGeometryToolkitCore as VgtkCore
 
 "The keys of the tables of a calibration config other than `[pipeline]` (which `pipeline_options` checks)."
@@ -39,9 +39,9 @@ function _pipeline_value(table::AbstractDict, key::AbstractString)
 end
 
 """
-    load_calibration_config(path) -> (cfg, opts)
+    load_calibration_config(path) -> (cfg, run, settings)
 
-Read a calibration config of record: the parsed TOML `cfg` and the run's `PipelineOptions` `opts`. Every table and key is checked
+Read a calibration config of record: the parsed TOML `cfg`, the run's `RunOptions` `run` and its `CalibrationSettings` `settings`. Every table and key is checked
 (an unknown one is an `ArgumentError` naming it and the allowed ones), `[experiment] case` must be the file's name, and a
 `[pipeline]` output key (`PIPELINE_OUTPUT_KEYS`) is refused: the run's output directory is the driver's.
 """
@@ -71,12 +71,12 @@ function load_calibration_config(path::AbstractString)
         isempty(_pipeline_value(cfg["pipeline"], k)) ||
             throw(ArgumentError("$path: [pipeline] $k is an output; the driver writes the run into its keyed directory"))
     end
-    opts = try
+    run, settings = try
         pipeline_options(cfg["pipeline"])
     catch err
         err isa ArgumentError ? throw(ArgumentError("$path [pipeline]: $(err.msg)")) : rethrow()
     end
-    return cfg, opts
+    return cfg, run, settings
 end
 
 """

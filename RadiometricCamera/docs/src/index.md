@@ -30,7 +30,7 @@ identifiers.
   photograph's EXIF).
 - **The pipeline**: real sessions in, through the calibration ([`RadiometricCalibration`](@ref), solved by VisualGeometryToolkitCore's
   `init` — the start, its record [`save_calibration_start`](@ref) / [`load_calibration_start`](@ref) — and `solve!`, the refinement) and its records out
-  ([`save_radiometric_calibration`](@ref)) — or [`calibrate`](@ref) in one call — configured by one TOML file ([`read_calibration`](@ref): the [`PipelineOptions`](@ref), the optimizer and the
+  ([`save_radiometric_calibration`](@ref)) — or [`calibrate`](@ref) in one call — configured by one TOML file ([`read_calibration`](@ref): the run's [`RunOptions`](@ref), the [`CalibrationSettings`](@ref), the optimizer and the
   solve's stops; defaults `configs/default.toml`); the driver is `bin/refine.jl`; the API surface: [API surface](api/surface.md).
 
 Its design is explained in [The radiometric camera model](guide/model.md): the model in the paper's symbols, the identifier ↔

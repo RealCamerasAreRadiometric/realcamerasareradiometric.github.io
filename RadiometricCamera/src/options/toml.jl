@@ -1,5 +1,6 @@
 # ---------------------------------------------------------------------------
-# The options of the calibration pipeline: ONE value, `PipelineOptions`, read from TOML.
+# The options of the calibration pipeline, read from TOML: TWO values, the run's `RunOptions` (its data and input/output) and the
+# calibration's `CalibrationSettings` (the algorithm's typed settings), each table in one of them.
 #
 # A run is configured by a TOML file of tables (`[io]`, `[frontend]`, `[camera]`, `[grid]`, `[focus]`, `[masks]`, `[rendering]`,
 # `[lighting]`, `[material]`, `[vignetting]`, `[warping]`, `[edge]`, `[optimizer]` (version 1: `[lm]`), `[sweep]`, `[resume]`, `[selfcheck]`, `[compute]`), one struct per
@@ -7,8 +8,8 @@
 # key is refused (`ArgumentError` naming it and the allowed keys), never ignored. An enumerated choice is a tag of a `TagRegistry`
 # (VisualGeometryToolkitCore's one tag → type map): `FRONTEND_TAGS`, `VIGNETTING_TAGS`, `BACKEND_TAGS`.
 #
-#   pipeline_options(path_or_dict; set = ["optimizer.max_iter=2", …]) -> PipelineOptions     the reader (`set`: dotted-key overrides)
-#   config_dict(opts) -> Dict{String, Any}                                              the writer (the run record; reads back equal)
+#   pipeline_options(path_or_dict; set = ["optimizer.max_iter=2", …]) -> (run, settings)  the reader (`set`: dotted-key overrides)
+#   config_dict(run, settings) -> Dict{String, Any}                                     the writer (the run record; reads back equal)
 #   PIPELINE_PATH_KEYS, PIPELINE_OUTPUT_KEYS                                            the keys that name an input / an output path
 #
 # configs/default.toml states every key with its default and one comment each: every table field's keyword default reads it (tables.jl).
@@ -21,7 +22,7 @@
 """
 The keys (`table.key`) whose values name an INPUT file or directory of a run: what a driver resolves against its data root and
 records as the run's inputs. `io.init` is a model spec, `lens:<path>` or `grid:<path>`. Every `String` option of
-[`PipelineOptions`](@ref) is here, in `PIPELINE_OUTPUT_KEYS` or in `_NOT_PATH_KEYS` (the suite checks the three cover
+[`RunOptions`](@ref) and [`CalibrationSettings`](@ref) is here, in `PIPELINE_OUTPUT_KEYS` or in `_NOT_PATH_KEYS` (the suite checks the three cover
 the options): a new string option has to be declared one or the other.
 """
 const PIPELINE_PATH_KEYS = ("io.images", "io.init", "io.render_state", "io.raw", "frontend.session", "frontend.schoeps",
@@ -42,15 +43,15 @@ const _NOT_PATH_KEYS = ("io.channel", "warping.inplane", "camera.sensor_model")
 
 # ---- derived values the pipeline reads -------------------------------------------------------------------------------------------
 """The sensor width as a length quantity (`camera.sensor_mm` mm)."""
-_sensor_width(opts::PipelineOptions) = opts.camera.sensor_mm * VgtkCore.mm
+_sensor_width(run::RunOptions) = run.camera.sensor_mm * VgtkCore.mm
 """The nominal focal length as a length quantity (`camera.f_mm` mm)."""
-_focal_length(opts::PipelineOptions) = opts.camera.f_mm * VgtkCore.mm
+_focal_length(run::RunOptions) = run.camera.f_mm * VgtkCore.mm
 """The printed page `(width, height)` as length quantities (`frontend.page_mm` mm)."""
-_page_size(opts::PipelineOptions) = (opts.frontend.page_mm[1] * VgtkCore.mm, opts.frontend.page_mm[2] * VgtkCore.mm)
+_page_size(run::RunOptions) = (run.frontend.page_mm[1] * VgtkCore.mm, run.frontend.page_mm[2] * VgtkCore.mm)
 """The printed edge `(δ, σ_print)` of the options (the print's: `TargetState.edge`)."""
-_edge_start(opts::PipelineOptions) = (e = opts.edge; (e.ink_spread_mm, e.print_sigma_mm))
+_edge_start(settings::CalibrationSettings) = (e = settings.edge; (e.ink_spread_mm, e.print_sigma_mm))
 """The front-end's tag (the labels of the output files)."""
-_frontend_tag(opts::PipelineOptions) = tag_of(FRONTEND_TAGS, opts.frontend.type)
+_frontend_tag(run::RunOptions) = tag_of(FRONTEND_TAGS, run.frontend.type)
 
 # ---- the reader ------------------------------------------------------------------------------------------------------------------
 # A TOML value → the field type, with the key in every message: Core's keyed `convert_field` (a table refused, a tuple's length
@@ -222,7 +223,7 @@ end
 _field(::Val{F}) where {F} = F
 
 # Whether the run chooses its grid smoothness's weight by GCV: a grid route (`start_is_grid`) with a smoothness of weight "gcv".
-_grid_gcv(opts::PipelineOptions) = smoothness_weight(opts.grid.smoothness) isa VgtkEstimation.GeneralizedCrossValidation && start_is_grid(opts)
+_grid_gcv(run::RunOptions, settings::CalibrationSettings) = smoothness_weight(settings.grid.smoothness) isa VgtkEstimation.GeneralizedCrossValidation && start_is_grid(run)
 # A component's smoothness: of a type it takes, a pspline of the difference order it implements, its weight ≥ 0 (or "gcv" where taken).
 function _check_smoothness(sm::AbstractSmoothness, key; types = (PSplineSmoothness, BendingSmoothness, NoSmoothness), order = nothing, gcv = true)
     any(T -> sm isa T, types) || throw(ArgumentError("`$key.type` = $(repr(String(smoothness_type(sm)))): the component takes $(join([repr(String(smoothness_type(T))) for T in types], ", "))"))
@@ -234,57 +235,57 @@ function _check_smoothness(sm::AbstractSmoothness, key; types = (PSplineSmoothne
     return nothing
 end
 # The checks a single field's type cannot state.
-function _check_options(opts::PipelineOptions)
-    isempty(opts.camera.lens_coverage) && throw(ArgumentError("`camera.lens_coverage` = \"\": state it — \"sensor\" (the lens lights the whole sensor) " *
+function _check_options(run::RunOptions, settings::CalibrationSettings)
+    isempty(run.camera.lens_coverage) && throw(ArgumentError("`camera.lens_coverage` = \"\": state it — \"sensor\" (the lens lights the whole sensor) " *
                                                               "or the path of the capture set's measured image region (rc/image_region/v1.0)"))
-    opts.camera.sensor_characterization == NO_SENSOR_CHARACTERIZATION &&
+    run.camera.sensor_characterization == NO_SENSOR_CHARACTERIZATION &&
         throw(ArgumentError("`camera.sensor_characterization = \"none\"` is retired: a run that does not use a sensor record present " *
                             "states `camera.sensor_model = \"off\"`; a run that names none leaves `camera.sensor_characterization` empty"))
-    sensor_model_mode(opts.camera.sensor_model)                 # one of SENSOR_MODEL_TAGS
-    "grid" in opts.fixed && throw(ArgumentError("\"grid\" in `fixed` is renamed \"camera\" (the geometric camera's own parameters, a grid's or a parametric camera's)"))
-    "edge" in opts.fixed && throw(ArgumentError("\"edge\" in `fixed` is refused: the printed edge is never a parameter (its δ and σ_print are held at " *
+    sensor_model_mode(run.camera.sensor_model)                 # one of SENSOR_MODEL_TAGS
+    "grid" in settings.fixed && throw(ArgumentError("\"grid\" in `fixed` is renamed \"camera\" (the geometric camera's own parameters, a grid's or a parametric camera's)"))
+    "edge" in settings.fixed && throw(ArgumentError("\"edge\" in `fixed` is refused: the printed edge is never a parameter (its δ and σ_print are held at " *
                                                 "`edge.ink_spread_mm` and `edge.print_sigma_mm`) — delete it"))
-    bad = setdiff(opts.fixed, FIXABLE_BLOCKS)
+    bad = setdiff(settings.fixed, FIXABLE_BLOCKS)
     isempty(bad) || throw(ArgumentError("`fixed` has unknown block(s) $(bad); allowed: $(collect(FIXABLE_BLOCKS))"))
-    _check_lattice(opts)
-    opts.grid.nodes in GRID_NODE_RULES || throw(ArgumentError("`grid.nodes` = :$(opts.grid.nodes) is not one of $(collect(GRID_NODE_RULES))"))
-    opts.vignetting.boundary_order in BOUNDARY_ORDERS ||
-        throw(ArgumentError("`vignetting.boundary_order` = $(opts.vignetting.boundary_order) is not one of $(collect(BOUNDARY_ORDERS))"))
-    opts.warping.inplane in INPLANE_KINDS || throw(ArgumentError("`warping.inplane` = $(repr(opts.warping.inplane)) is not one of $(collect(INPLANE_KINDS))"))
-    length(opts.warping.inplane_start) in (0, INPLANE_NC) && all(isfinite, opts.warping.inplane_start) ||
-        throw(ArgumentError("`warping.inplane_start` needs $INPLANE_NC finite values [a, u] (the log-stretch and the shear) or none, got $(opts.warping.inplane_start)"))
-    opts.vignetting.chart in VrtkCore.RADIAL_CHARTS || throw(ArgumentError("`vignetting.chart` = :$(opts.vignetting.chart) is not one of $(collect(VrtkCore.RADIAL_CHARTS))"))
+    _check_lattice(run, settings)
+    settings.grid.nodes in GRID_NODE_RULES || throw(ArgumentError("`grid.nodes` = :$(settings.grid.nodes) is not one of $(collect(GRID_NODE_RULES))"))
+    settings.vignetting.boundary_order in BOUNDARY_ORDERS ||
+        throw(ArgumentError("`vignetting.boundary_order` = $(settings.vignetting.boundary_order) is not one of $(collect(BOUNDARY_ORDERS))"))
+    settings.warping.inplane in INPLANE_KINDS || throw(ArgumentError("`warping.inplane` = $(repr(settings.warping.inplane)) is not one of $(collect(INPLANE_KINDS))"))
+    length(settings.warping.inplane_start) in (0, INPLANE_NC) && all(isfinite, settings.warping.inplane_start) ||
+        throw(ArgumentError("`warping.inplane_start` needs $INPLANE_NC finite values [a, u] (the log-stretch and the shear) or none, got $(settings.warping.inplane_start)"))
+    settings.vignetting.chart in VrtkCore.RADIAL_CHARTS || throw(ArgumentError("`vignetting.chart` = :$(settings.vignetting.chart) is not one of $(collect(VrtkCore.RADIAL_CHARTS))"))
     # the components' smoothness: the grid any type; the vignetting profile a pspline of its Δ³ (the closed-form solve's operator,
     # `vignetting_smoothness`) or none; the focus surface a bending of a number (no GCV) or none
-    _check_smoothness(opts.grid.smoothness, "grid.smoothness")
-    _check_smoothness(opts.vignetting.smoothness, "vignetting.smoothness"; types = (PSplineSmoothness, NoSmoothness), order = 3)
-    _check_smoothness(opts.focus.smoothness, "focus.smoothness"; types = (BendingSmoothness, NoSmoothness), gcv = false)
+    _check_smoothness(settings.grid.smoothness, "grid.smoothness")
+    _check_smoothness(settings.vignetting.smoothness, "vignetting.smoothness"; types = (PSplineSmoothness, NoSmoothness), order = 3)
+    _check_smoothness(settings.focus.smoothness, "focus.smoothness"; types = (BendingSmoothness, NoSmoothness), gcv = false)
     # the grid smoothness's weight by GCV linearizes the grid's patches: with the camera held ("camera" in fixed) it has no column to
     # choose for (a grid route only: the parametric route runs no GCV, `start_is_grid`)
-    _grid_gcv(opts) && "camera" in opts.fixed &&
+    _grid_gcv(run, settings) && "camera" in settings.fixed &&
         throw(ArgumentError("`grid.smoothness.weight = \"gcv\"` with \"camera\" in `fixed`: the grid is held, so GCV has no grid column to " *
                             "weigh; state a number for `grid.smoothness.weight` (or free the grid)"))
-    0 < opts.focus.lens_coverage_scale <= 1 || throw(ArgumentError("`focus.lens_coverage_scale` = $(opts.focus.lens_coverage_scale) is not in (0, 1]: the scale of the lens coverage the focus nodes keep inside"))
-    opts.masks.samples_per_view >= 1 || throw(ArgumentError("`masks.samples_per_view` = $(opts.masks.samples_per_view): at least one sample per view"))
-    let m = opts.masks; check_draw(m.samples_per_view, m.gradient_bias, m.edge_fraction, m.addon_samples, m.addon_gradient_bias); end   # the draw's settings together (masks.jl)
-    0 <= opts.focus.support_min < 1 || throw(ArgumentError("`focus.support_min` = $(opts.focus.support_min) is not a share of the mean data weight in [0, 1)"))
-    opts.io.channel == "RGB" || opts.io.channel in CHANNEL_NAMES ||
-        throw(ArgumentError("`io.channel` = $(repr(opts.io.channel)) is not one of RGB, $(join(CHANNEL_NAMES, ", "))"))
-    sp = opts.grid.start_perturbation
+    0 < settings.focus.lens_coverage_scale <= 1 || throw(ArgumentError("`focus.lens_coverage_scale` = $(settings.focus.lens_coverage_scale) is not in (0, 1]: the scale of the lens coverage the focus nodes keep inside"))
+    settings.masks.samples_per_view >= 1 || throw(ArgumentError("`masks.samples_per_view` = $(settings.masks.samples_per_view): at least one sample per view"))
+    let m = settings.masks; check_draw(m.samples_per_view, m.gradient_bias, m.edge_fraction, m.addon_samples, m.addon_gradient_bias); end   # the draw's settings together (masks.jl)
+    0 <= settings.focus.support_min < 1 || throw(ArgumentError("`focus.support_min` = $(settings.focus.support_min) is not a share of the mean data weight in [0, 1)"))
+    run.io.channel == "RGB" || run.io.channel in CHANNEL_NAMES ||
+        throw(ArgumentError("`io.channel` = $(repr(run.io.channel)) is not one of RGB, $(join(CHANNEL_NAMES, ", "))"))
+    sp = settings.grid.start_perturbation
     sp === nothing || (isfinite(sp.sigma_px) && sp.sigma_px >= 0) ||
         throw(ArgumentError("`grid.start_perturbation.sigma_px` = $(sp.sigma_px) is not a finite σ ≥ 0"))
-    return opts
+    return run, settings
 end
 
 # The lattice's mode against the start (owner ruling 2026-11-15): "node_count" states its count and is a parametric start's — a Schöps
 # start is his own lattice ("derived"); a SplineLens / parametric source the mode does not fit is refused at its start (`GridStart`).
-function _check_lattice(opts::PipelineOptions)
-    g = opts.grid
+function _check_lattice(run::RunOptions, settings::CalibrationSettings)
+    g = settings.grid
     g.node_count === nothing || check_node_count(g.node_count)
-    (start_is_grid(opts) && g.lattice isa NodeCountLattice) || return nothing
+    (start_is_grid(run) && g.lattice isa NodeCountLattice) || return nothing
     g.node_count === nothing && throw(ArgumentError("`grid.lattice = \"node_count\"` needs `grid.node_count`: the nodes the image region supports " *
                                                     "(e.g. 7875 = 105 · 75, the lattice of record's nodes)"))
-    _frontend_tag(opts) == "schoeps" && (r = lattice_refusal(g.lattice, Val(:spline)); r === nothing || throw(ArgumentError(r * " (frontend.type = \"schoeps\")")))
+    _frontend_tag(run) == "schoeps" && (r = lattice_refusal(g.lattice, Val(:spline)); r === nothing || throw(ArgumentError(r * " (frontend.type = \"schoeps\")")))
     return nothing
 end
 
@@ -292,37 +293,37 @@ end
 """
     INAPPLICABLE_KEYS
 
-The keys a run's other options make unusable: `(table, key) => why`, `key === nothing` for every key of the table, `why(opts)` the
+The keys a run's other options make unusable: `(table, key) => why`, `key === nothing` for every key of the table, `why(run, settings)` the
 reason the key cannot act (a string) or `nothing` where it applies. The reader refuses a key a config STATES where its reason holds
 (`pipeline_options`: the key and the reason named), and the writer (`config_dict`) leaves such a key out, so a run's record reads back.
 """
 const INAPPLICABLE_KEYS = (
-    ("grid", nothing) => o -> start_is_grid(o) ? nothing :
+    ("grid", nothing) => (run, _) -> start_is_grid(run) ? nothing :
         "a parametric record start (`io.init = \"lens:…\"`) is refined per view in its own parameters: it has no lattice",
-    ("grid", "node_count") => o -> (o.grid.lattice isa DerivedLattice && _frontend_tag(o) == "schoeps") ?
+    ("grid", "node_count") => (run, settings) -> (settings.grid.lattice isa DerivedLattice && _frontend_tag(run) == "schoeps") ?
         "a Schöps start (`frontend.type = \"schoeps\"`, `grid.lattice = \"derived\"`) is his own lattice extended over the lens coverage, " *
         "never subdivided (m = 1, the Schöps start): no node count acts on it" : nothing,
-    ("focus", "smoothness") => o -> "focus" in o.fixed ? "the focus surface is held (\"focus\" in `fixed`): no smoothness acts on it" : nothing,
+    ("focus", "smoothness") => (_, settings) -> "focus" in settings.fixed ? "the focus surface is held (\"focus\" in `fixed`): no smoothness acts on it" : nothing,
 )
-"""Why the option `table.key` cannot act in a run of `opts` (`INAPPLICABLE_KEYS`), or `nothing` where it applies."""
-function inapplicable_reason(opts::PipelineOptions, table::AbstractString, key::AbstractString)
+"""Why the option `table.key` cannot act in a run of `run` and `settings` (`INAPPLICABLE_KEYS`), or `nothing` where it applies."""
+function inapplicable_reason(run::RunOptions, settings::CalibrationSettings, table::AbstractString, key::AbstractString)
     for ((t, k), why) in INAPPLICABLE_KEYS
         t == table && (k === nothing || k == key) || continue
-        r = why(opts)
+        r = why(run, settings)
         r === nothing || return r
     end
     return nothing
 end
 # a key the document `d` states that the run's options make unusable: refused, naming the key and the reason
-function _refuse_inapplicable(d::AbstractDict, opts::PipelineOptions)
+function _refuse_inapplicable(d::AbstractDict, run::RunOptions, settings::CalibrationSettings)
     for (t, tb) in d
         tb isa AbstractDict || continue
         for k in sort(collect(String, keys(tb)))
-            r = inapplicable_reason(opts, t, k)
+            r = inapplicable_reason(run, settings, t, k)
             r === nothing || throw(ArgumentError("`$t.$k` cannot be used: $r — delete it (a value the run cannot use is an error, never ignored)"))
         end
     end
-    return opts
+    return run, settings
 end
 
 # `key.path=value` overrides into a copy of the parsed document: the value is read as a TOML value (`2`, `1e-10`, `true`, `"x"`,
@@ -354,10 +355,11 @@ function _with_overrides(d::AbstractDict, set)
 end
 
 """
-    pipeline_options(path::AbstractString; set = ()) -> PipelineOptions
-    pipeline_options(table::AbstractDict; set = ()) -> PipelineOptions
+    pipeline_options(path::AbstractString; set = ()) -> (run, settings)
+    pipeline_options(table::AbstractDict; set = ()) -> (run, settings)
 
-The options of a refinement from a TOML file (or its parsed table). Every table and key is optional and takes its struct default when
+The options of a run from a TOML file (or its parsed table): `run` its [`RunOptions`](@ref) (the data and the input/output) and
+`settings` its [`CalibrationSettings`](@ref) (the calibration's), each table of the file in one of them. Every table and key is optional and takes its struct default when
 absent; an unknown table or key, a value of the wrong type or length, an unknown or retired tag and an unknown `fixed` block are
 refused with an `ArgumentError` that names them. `set` holds `key.path=value` overrides applied before reading (the `--set` of
 bin/refine.jl): `pipeline_options("run.toml"; set = ["optimizer.max_iter=2", "io.out=/tmp/x"])` (of a version-2 config). The
@@ -378,12 +380,13 @@ function pipeline_options(d::AbstractDict; set = ())
     for T in _ALGORITHM_TABLES                         # the algorithm's tables, checked here, read by read_calibration
         _read_table(T, get(d, _table_name(T), Dict{String, Any}()), _table_name(T)); delete!(d, _table_name(T))
     end
-    unknown = setdiff(collect(String, keys(d)), allowed_keys(PipelineOptions))
-    isempty(unknown) || throw(ArgumentError("unknown table(s) $(sort(unknown)); allowed tables: $(sort(allowed_keys(PipelineOptions)))"))
-    kw = [f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_TOML_DEFAULTS, "", "fixed"))) :
-                haskey(d, String(f)) ? _read_table(fieldtype(PipelineOptions, f), d[String(f)], String(f)) : fieldtype(PipelineOptions, f)())
-          for f in fieldnames(PipelineOptions)]
-    return _refuse_inapplicable(d, _check_options(PipelineOptions(; kw...)))
+    allowed = reduce(vcat, allowed_keys(H) for H in _OPTION_HALVES)
+    unknown = setdiff(collect(String, keys(d)), allowed)
+    isempty(unknown) || throw(ArgumentError("unknown table(s) $(sort(unknown)); allowed tables: $(sort(allowed))"))
+    run, settings = (H(; (f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_TOML_DEFAULTS, "", "fixed"))) :
+                                haskey(d, String(f)) ? _read_table(fieldtype(H, f), d[String(f)], String(f)) : fieldtype(H, f)())
+                           for f in fieldnames(H))...) for H in _OPTION_HALVES)
+    return _refuse_inapplicable(d, _check_options(run, settings)...)
 end
 
 # A config at the current version: the `set` overrides applied, the retired keys refused (by their own version's names), then
@@ -428,18 +431,18 @@ function config_key(table::AbstractDict, key::AbstractString)
 end
 
 """
-    config_dict(opts::PipelineOptions) -> Dict{String, Any}
-    config_dict(algorithm::RadiometricCalibration, stops) -> Dict{String, Any}   (calibration/calibrate.jl)
+    config_dict(run::RunOptions, settings::CalibrationSettings) -> Dict{String, Any}
+    config_dict(run::RunOptions, algorithm::RadiometricCalibration, stops) -> Dict{String, Any}   (calibration/calibrate.jl)
 
 The options as a TOML document, one table per field (tags as their tag strings): what a run writes as its record. An absent
 optional table (`grid.start_perturbation = nothing`) is not written, nor a key the run cannot use (`INAPPLICABLE_KEYS`).
-`pipeline_options(config_dict(opts)) == opts` for options a config can state.
+`pipeline_options(config_dict(run, settings)) == (run, settings)` for options a config can state.
 """
-config_dict(opts::PipelineOptions) =
+config_dict(run::RunOptions, settings::CalibrationSettings) =
     Dict{String, Any}(VgtkCore.CONFIG_VERSION_KEY => VgtkCore.current_config_version(RC_CONFIG_VERSIONS),
-                      (String(f) => (f === :fixed ? copy(opts.fixed) :
-                                     filter(kv -> kv[2] !== nothing && inapplicable_reason(opts, String(f), kv[1]) === nothing, toml_table(getfield(opts, f))))
-                       for f in fieldnames(PipelineOptions))...)
+                      (String(f) => (f === :fixed ? copy(x.fixed) :
+                                     filter(kv -> kv[2] !== nothing && inapplicable_reason(run, settings, String(f), kv[1]) === nothing, toml_table(getfield(x, f))))
+                       for x in (run, settings) for f in fieldnames(typeof(x)))...)
 
 """The top-level `fixed` of a config: a list of block names (strings)."""
 _read_fixed(v) = v isa AbstractVector && all(x -> x isa AbstractString, v) ? String.(v) :
@@ -449,18 +452,18 @@ _read_fixed(v) = v isa AbstractVector && all(x -> x isa AbstractString, v) ? Str
 const PIPELINE_CONFIG_FILE = "pipeline_config.toml"
 
 """
-    write_pipeline_config(dir, opts; header = "") -> path
-    write_pipeline_config(dir, algorithm, stops; header = "") -> path
+    write_pipeline_config(dir, run, settings; header = "") -> path
+    write_pipeline_config(dir, run, algorithm, stops; header = "") -> path
 
-The options `opts` of a run (or its whole calibration, the `[optimizer]` table with them) as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
+The options `run` and `settings` of a run (or its whole calibration, the `[optimizer]` table with them) as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
 ABSOLUTE path (resolved against the writer's working directory, the one the run resolved it against): what bin/refine.jl and
 experiments/scripts/material_grid.jl write, so a record's regeneration hint can tell its own writer's options from another run's in a shared
 directory.
 """
-write_pipeline_config(dir::AbstractString, opts::PipelineOptions; header::AbstractString = "") =
-    _write_pipeline_config(dir, config_dict(opts), opts; header)
-function _write_pipeline_config(dir, d, opts::PipelineOptions; header)
-    isempty(opts.io.out) || (d["io"]["out"] = abspath(opts.io.out))
+write_pipeline_config(dir::AbstractString, run::RunOptions, settings::CalibrationSettings; header::AbstractString = "") =
+    _write_pipeline_config(dir, config_dict(run, settings), run; header)
+function _write_pipeline_config(dir, d, run::RunOptions; header)
+    isempty(run.io.out) || (d["io"]["out"] = abspath(run.io.out))
     path = joinpath(dir, PIPELINE_CONFIG_FILE)
     VgtkCore.write_toml(path, d; header)
     return path

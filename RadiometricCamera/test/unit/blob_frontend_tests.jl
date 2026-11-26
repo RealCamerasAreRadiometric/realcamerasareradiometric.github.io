@@ -7,7 +7,7 @@
     const RC = RadiometricCamera
     d = mktempdir(); write(joinpath(d, "sightings.json"), "{}")
     o = RC.pipeline_options(Dict("frontend" => Dict("type" => "blob", "session" => d), "io" => Dict("images" => d, "out" => mktempdir())))
-    e = try RC._frontend(RC.BlobFrontend, o, (; R0 = 1e-3, height0 = Float64[], page_flip = 1.0, inplane0 = nothing, stored = nothing)); nothing catch err; err end
+    e = try RC._frontend(RC.BlobFrontend, o..., (; R0 = 1e-3, height0 = Float64[], page_flip = 1.0, inplane0 = nothing, stored = nothing)); nothing catch err; err end
     @test e isa ArgumentError && occursin("observations.json", e.msg) && occursin("vgio/observations", e.msg) && occursin("sightings.json is not read", e.msg)
     src = join((read(f, String) for (r, _, fs) in walkdir(joinpath(pkgdir(RadiometricCamera), "src")) for n in fs if endswith(n, ".jl") for f in (joinpath(r, n),)), "\n")
     @test !occursin("sightings", replace(src, "a BlobBoards `sightings.json` is not read" => "", "a BlobBoards sightings.json is not read" => ""))

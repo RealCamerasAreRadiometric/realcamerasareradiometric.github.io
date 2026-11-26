@@ -171,10 +171,10 @@ end
         sha_a = write_characterization(a); sha_b = write_characterization(b; black = (512.5, 512.4, 512.5, 512.4))
         A = RC.SensorRecord(sha_a); raw = ["DSC1.ARW", "DSC2.ARW"]
         auto, on, off = RC.AutoSensorModel(), RC.OnSensorModel(), RC.OffSensorModel()
-        @test RC.sensor_model_mode.(("auto", "on", "off")) == (auto, on, off) && RC.PipelineOptions().camera.sensor_model == "auto"
+        @test RC.sensor_model_mode.(("auto", "on", "off")) == (auto, on, off) && RC.RunOptions().camera.sensor_model == "auto"
         @test_throws "is not one of \"auto\", \"on\", \"off\"" RC.sensor_model_mode("none")
         @test_throws "is not one of" RC.pipeline_options(Dict("camera" => Dict("sensor_model" => "yes")))
-        @test RC.pipeline_options(Dict("camera" => Dict("sensor_model" => "off"))).camera.sensor_model == "off"
+        @test first(RC.pipeline_options(Dict("camera" => Dict("sensor_model" => "off")))).camera.sensor_model == "off"
         # ESTIMATION: the run's observation model by mode × record present
         est(m, spec; stated = RC.NoSensorRecord()) = RC.observation_model(raw, spec; sensor_model = m, stated).sensor
         @test (@test_logs est(auto, a)) == A                                                           # auto + record: used

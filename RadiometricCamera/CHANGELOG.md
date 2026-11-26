@@ -22,6 +22,24 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **Breaking: the run's data are the problem's `p`; `PipelineOptions` is split (#16).** `PipelineOptions` is removed, with no alias and
+  no property forwarding, into two values, each TOML table in one (the TOML does not change: no key moves, no converter step):
+  - `RunOptions` (the run's data and input/output: `io`, `frontend`, `camera` — the capture's facts —, `resume`, `selfcheck`,
+    `compute`) and `CalibrationSettings` (the calibration's typed settings: `fixed`, `grid`, `focus`, `masks`, `rendering`,
+    `lighting`, `material`, `vignetting`, `warping`, `edge`); every option is read at its real path (`opts.io.out` → `run.io.out`,
+    `opts.grid` → `settings.grid`);
+  - `pipeline_options(d) -> (run, settings)`; `read_calibration(d) -> (run, algorithm, stops)`; `config_dict(run, settings)`,
+    `config_dict(run, algorithm, stops)`, `write_pipeline_config(dir, run, settings)` / `(dir, run, algorithm, stops)`;
+    `start_options(run, settings) -> (run, settings)`;
+  - `RadiometricRefinement(settings; optimizer, radiometry, lm_chunk, log)` holds the `CalibrationSettings` alone
+    (`alg.options` → `alg.refinement.settings`); the run is the problem's context: `EstimationProblem(CalibrationEstimate,
+    (geometry, photographs), (; run[, device]))` and `RefineProblem(f, u0, run)` (`CalibrationCache.prob`,
+    `load_calibration_start`'s result);
+  - `calibrate(geometry, photographs, run, algorithm; stops, device)`; `start_geometry(run, settings; record)`;
+    `start_photographs(run, names)`; `selfcheck(g; run)`; `save_calibration_start(dir, f, u0; run, settings)`;
+    `load_calibration_start(dir; run, settings, device, …)`; `save_radiometric_calibration(f, u0, result; run, settings)`;
+    a start record's `options` is its `(run, settings)`.
+  No number moves: the same options reach the same code.
 - **No upstream internal name (R22): the reductions' work items are Core's public `reduction_work_items(n)`; the row-job launcher is
   public, `launch_rows!`.** The closed-form radiometry's partial-sum count read Estimation's internal `_REDUCTION_ITEMS` through RC's
   own `_reduction_items` (removed): it is Core's `reduction_work_items` (VisualGeometryToolkitCore 0.14, the same `max(1, min(n, 2048))`).

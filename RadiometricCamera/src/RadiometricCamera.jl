@@ -141,7 +141,7 @@ include("io/photographs.jl")
 include("start/edge_detector.jl")            # the photosite sample's edge strength (Gaussian derivative) and its ECDF rank
 include("options/device.jl")       # the device tags and rc_backend
 include("options/tables.jl")
-include("options/toml.jl")         # PipelineOptions, read from TOML (pipeline_options / config_dict)
+include("options/toml.jl")         # RunOptions and CalibrationSettings, read from TOML (pipeline_options / config_dict)
 include("options/retired.jl")
 include("start/calibration_start.jl")      # StartGeometry (the diagnostics and the start read it), start_geometry, the start record, load_calibration_start
 include("start/masks.jl")

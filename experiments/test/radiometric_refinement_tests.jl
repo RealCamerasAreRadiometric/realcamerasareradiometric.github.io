@@ -35,16 +35,16 @@
     @testset "the case si30_bc5_warped: the 03.11 run's values" begin
         t = rc["cases"]["si30_bc5_warped"]
         @test t["kind"] == "lens"
-        alg, stops = RadiometricCamera.read_calibration(t["pipeline"]); o = alg.refinement.options
-        @test o.frontend.type === RadiometricCamera.SchoepsFrontend && o.frontend.page_mm == (1000.0, 1000.0)
-        @test o.frontend.texture_features_size == (4000, 4000)
-        @test o.camera.sensor_mm == 35.6 && o.camera.f_mm == 14.6776 && o.camera.fnumber == 22.0 && !("aperture" in o.fixed)
-        @test o.masks.samples_per_view == 8192 && o.masks.gradient_bias == 0.0 && o.masks.edge_fraction == 0.0 && o.masks.addon_samples == 0
-        @test o.rendering.N == 16 && o.rendering.n_p == 2 && o.rendering.hammersley
-        @test (o.material.alpha_ink, o.material.alpha_noink, o.material.eta_ink, o.material.eta_noink, o.material.mu) == (0.6, 0.6, 2.0, 1.3, 0.244)
-        @test o.vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && o.vignetting.node_count == 19 && o.vignetting.chart === :projective
-        @test o.warping.degree == 1 && o.edge.print_sigma_mm == 0.0277 && stops.max_iter == 25 && isempty(o.fixed)
-        @test o.io.checkpoint_each && o.io.channel == "G" && o.compute.jacobian_chunk == 4 && runs_on_gpu(t)
+        run, alg, stops = RadiometricCamera.read_calibration(t["pipeline"]); o = (run, alg.refinement.settings)
+        @test first(o).frontend.type === RadiometricCamera.SchoepsFrontend && first(o).frontend.page_mm == (1000.0, 1000.0)
+        @test first(o).frontend.texture_features_size == (4000, 4000)
+        @test first(o).camera.sensor_mm == 35.6 && first(o).camera.f_mm == 14.6776 && first(o).camera.fnumber == 22.0 && !("aperture" in last(o).fixed)
+        @test last(o).masks.samples_per_view == 8192 && last(o).masks.gradient_bias == 0.0 && last(o).masks.edge_fraction == 0.0 && last(o).masks.addon_samples == 0
+        @test last(o).rendering.N == 16 && last(o).rendering.n_p == 2 && last(o).rendering.hammersley
+        @test (last(o).material.alpha_ink, last(o).material.alpha_noink, last(o).material.eta_ink, last(o).material.eta_noink, last(o).material.mu) == (0.6, 0.6, 2.0, 1.3, 0.244)
+        @test last(o).vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && last(o).vignetting.node_count == 19 && last(o).vignetting.chart === :projective
+        @test last(o).warping.degree == 1 && last(o).edge.print_sigma_mm == 0.0277 && stops.max_iter == 25 && isempty(last(o).fixed)
+        @test first(o).io.checkpoint_each && first(o).io.channel == "G" && first(o).compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)
         p = resolve_pipeline(rc, t; produce = false)                     # the paths alone: nothing produced (the run inputs are produced only by a run)
         @test table_inputs(rc, p) == ["central30cm_14mm_central30cm_green_si_bc5_fit_json", "fx3_sensor_characterization", "siemens_1m_board"]   # the FX3 record: keyed by its sha256
@@ -53,7 +53,7 @@
         # the photographs are the RAW input (a photosites set: its prepare run links the RAW files): RC reads them as RAW by their files
         # and observes their green photosites by their type — no flag (owner ruling 2026-11-13); one measurement per photosite: "G"
         @test !haskey(p["io"], "photosites") && startswith(p["io"]["images"], results_root()) && endswith(p["io"]["images"], "raw_14mm_siemens_central30cm_frames")
-        @test RadiometricCamera.pipeline_options(p).io.channel == "G"         # RC's single-channel form, stated by the driver for a RAW set
+        @test first(RadiometricCamera.pipeline_options(p)).io.channel == "G"         # RC's single-channel form, stated by the driver for a RAW set
         t2 = deepcopy(t); t2["pipeline"]["io"]["channel"] = "RGB"
         @test resolve_pipeline(rc, t2; produce = false)["io"]["channel"] == "RGB"              # a stated channel is the case's (RC refuses it at the RAW photograph)
         @test all(t -> t["mode"] == "photosites" && !haskey(t, "gain") && !haskey(t, "srgb"), values(rc["prepare"]))

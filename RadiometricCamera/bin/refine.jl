@@ -4,7 +4,7 @@
 # lattice fitted over the image region at `grid.node_count` supported nodes, `grid.lattice = "node_count"`) or, with `io.init = "lens:<record>"`, a
 # parametric model (a Core pixel camera: DoubleSphere, KannalaBrandt, the 14-coefficient chain, …; a VisualGeometryToolkitIO camera
 # record) refined in its own parameters. The options are ONE TOML file
-# (`PipelineOptions`, src/options/; configs/default.toml lists every key and its default); two front-ends
+# (`RunOptions` and `CalibrationSettings`, src/options/; configs/default.toml lists every key and its default); two front-ends
 # give the start geometry:
 #   frontend.type = "blob"     a calibration session's VisualGeometryToolkitIO records (`frontend.session`: camera.json, targets_1.json,
 #                              trajectory_1.json, target_poses.json, textures/ — `load_session`) and its observations record observations.json
@@ -61,50 +61,49 @@ function _cli(args)
     return config, set, plan, repeat, start_only, start, start_out
 end
 config, set, plan, repeat, start_only, start_dir, start_out = _cli(ARGS)
-alg, stops = read_calibration(config; set)              # the calibration (its options and optimizer) and its solve's stops
-opts = alg.refinement.options
+run_options, alg, stops = read_calibration(config; set)       # the run's options, the calibration (its settings and optimizer) and its solve's stops
 if plan
-    TOML.print(stdout, RC.config_dict(alg, stops); sorted = true)
+    TOML.print(stdout, RC.config_dict(run_options, alg, stops); sorted = true)
     exit(0)
 end
 # the device (RC's one resolver, inlined): flux and Jacobian share this one backend, so the residual stays bitwise the one
 # computeresidual returns
-backend = RC.rc_backend(opts.compute.backend)
-isempty(opts.io.out) && throw(ArgumentError("$config: io.out is required"))   # before the run record
-isempty(start_dir) || abspath(start_dir) != abspath(opts.io.out) ||
+backend = RC.rc_backend(run_options.compute.backend)
+isempty(run_options.io.out) && throw(ArgumentError("$config: io.out is required"))   # before the run record
+isempty(start_dir) || abspath(start_dir) != abspath(run_options.io.out) ||
     throw(ArgumentError("--start=$start_dir is the run's io.out: a refinement writes its outputs beside its start, never into its start record"))
-isempty(start_out) || abspath(start_out) != abspath(opts.io.out) ||
+isempty(start_out) || abspath(start_out) != abspath(run_options.io.out) ||
     throw(ArgumentError("--start-out=$start_out is the run's io.out: the start record is written beside the refinement, never into its outputs"))
-isempty(opts.io.images) && !opts.selfcheck.only &&
+isempty(run_options.io.images) && !run_options.selfcheck.only &&
     throw(ArgumentError("$config: io.images is required (only a self-check, selfcheck.only, runs without photographs)"))
-RC.write_pipeline_config(opts.io.out, alg, stops;
+RC.write_pipeline_config(run_options.io.out, run_options, alg, stops;
                          header = "# the options of this run (bin/refine.jl --config=$config$(isempty(set) ? "" : " --set " * join(set, " --set ")))")
 # the start: written (--stage=start: into io.out, and done; else into io.out/start/), or read (--start=<dir>)
 # a default run (neither flag): the start computed, written into `--start-out=<dir>` (a driver's start product) or io.out/start/, and the
 # refinement's state built from it in this process, no photograph read twice (the start's streamed observations handed over: the record
 # path's state). The start reads the start options alone (`start_options`: no refinement option), its files in the run's io.out.
-so = RC._start_run_options(opts)
-if so.selfcheck.only                                                       # diagnostic: the start geometry's self-check, no photograph read
-    RC.selfcheck(RC.start_geometry(so); options = so)
+srun, ssettings = RC._start_run_options(run_options, alg.refinement.settings)
+if srun.selfcheck.only                                                     # diagnostic: the start geometry's self-check, no photograph read
+    RC.selfcheck(RC.start_geometry(srun, ssettings); run = srun)
     exit(0)
 end
 computed = nothing
 if isempty(start_dir)
-    start_dir = start_only ? opts.io.out : isempty(start_out) ? joinpath(opts.io.out, "start") : start_out
+    start_dir = start_only ? run_options.io.out : isempty(start_out) ? joinpath(run_options.io.out, "start") : start_out
     ts = @timed begin
-        g = RC.start_geometry(so)
-        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), alg; stops).cache.prob
+        g = RC.start_geometry(srun, ssettings)
+        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(srun, g.names)), (; run = run_options, device = backend)), alg; stops).cache.prob
     end
     s0 = ts.value
-    if !isempty(so.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
-        RC.load_state_into!(s0.f, s0.u0, RC.load_state(so.io.render_state), s0.f.start.names)
-        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, so.io.out, so.io.render_state)
+    if !isempty(srun.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
+        RC.load_state_into!(s0.f, s0.u0, RC.load_state(srun.io.render_state), s0.f.start.names)
+        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, srun.io.out, srun.io.render_state)
         exit(0)
-    elseif so.io.render_init                                               # diagnostic: the start state rendered
-        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, so.io.out, "init (linear sweep)")
+    elseif srun.io.render_init                                               # diagnostic: the start state rendered
+        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, srun.io.out, "init (linear sweep)")
         exit(0)
     end
-    save_calibration_start(start_dir, s0.f, s0.u0; options = so)
+    save_calibration_start(start_dir, s0.f, s0.u0; run = srun, settings = ssettings)
     println("START written to ", start_dir, " in ", round(ts.time; digits = 1), " s"); flush(stdout)
     start_only && exit(0)
     computed = s0.f.start.observations; s0 = nothing; ts = nothing; GC.gc()  # the start released before the refinement's is built
@@ -119,13 +118,13 @@ the common rotation with the poses (`rotation_gauge_coordinates`); its patch blo
 also carry the absent nodes of a partly present patch) beside them. A parametric (per-view) start prints its route alone.
 """
 function _print_free_parameters(s, alg)
-    opts = alg.refinement.options
+    settings = alg.refinement.settings
     meta = s.f.start
     route = RC.lm_route(meta.lens0)
     if !(route isa RC.PerTileRoute)
         println("PARAMETERS route=$(nameof(typeof(route)))"); flush(stdout); return nothing
     end
-    lp = RC._refinement_lm(opts, route; smoothness = meta.grid_smoothness)
+    lp = RC._refinement_lm(settings, route; smoothness = meta.grid_smoothness)
     problem, idx = RC.build_problem_grid(s.f, s.u0; damping = alg.refinement.optimizer.damping, lp.kw...)
     vars = problem.problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)
@@ -144,11 +143,11 @@ for r in 1:repeat
         global s = nothing; global result = nothing; GC.gc(true)           # repeat's spans: no finaliser of it lands in a timed span
     end
     obs = computed; global computed = nothing                               # the start's streamed observations: handed to repeat 1 only, then released
-    tp = @timed load_calibration_start(start_dir; options = opts, device = backend, observations = obs); obs = nothing
+    tp = @timed load_calibration_start(start_dir; run = run_options, settings = alg.refinement.settings, device = backend, observations = obs); obs = nothing
     global s = tp.value
     tr = @timed VgtkCore.solve(s, alg.refinement; stops)
     global result = tr.value
-    tw = @timed save_radiometric_calibration(s.f, s.u0, result; options = opts)
+    tw = @timed save_radiometric_calibration(s.f, s.u0, result; run = run_options, settings = alg.refinement.settings)
     println("TIMING $r/$repeat refine_s=$(tr.time) save_s=$(tw.time) refine_gc_s=$(tr.gctime) refine_compile_s=$(tr.compile_time) ",
             "save_compile_s=$(tw.compile_time) iterations=$(result.stats.nsteps) lm_seconds=$(result.metadata.seconds)")
     println(join(("REPEAT $r/$repeat", "load_calibration_start $(round(tp.time; digits = 1)) s ($(round(tp.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tp.gctime; digits = 1)) s, compile $(round(tp.compile_time; digits = 1)) s)",

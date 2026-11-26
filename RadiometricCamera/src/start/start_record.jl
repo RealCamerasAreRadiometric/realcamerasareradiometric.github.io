@@ -2,8 +2,8 @@
 # The refinement's start as its own step (the owner's rule of 2026-11-14: every step of a pipeline caches its intermediate, keyed by
 # ONLY what it reads). The start — the front end (the start lens on the grid, its initialization region, the PnP / page poses), the
 # image circle, the masks, the vignetting centre, the focus start, the closed-form radiometric start and the GCV weights — is computed
-# by the start (a `RadiometricCalibration`'s `init`, `_start_state`) from `start_options(opts)` (the refinement-only options at their defaults: a start never reads them) and written
-# as a START RECORD, a directory; every refinement starts from one (`load_refinement_start` → `load_calibration_start(dir; options)`), so
+# by the start (a `RadiometricCalibration`'s `init`, `_start_state`) from `start_options(run, settings)` (the refinement-only options at their defaults: a start never reads them) and written
+# as a START RECORD, a directory; every refinement starts from one (`load_refinement_start` → `load_calibration_start(dir; run, settings)`), so
 # a start loaded and a start computed are one code path. bin/refine.jl: `--stage=start` writes it, `--start=<dir>` refines from it.
 #
 #   start.json            rc/refinement_start/v1.0: the views, the image size, fpx, R0, d_c, f_m, the self-check bearings, the
@@ -22,7 +22,7 @@
 """
     REFINE_ONLY_KEYS
 
-The [`PipelineOptions`](@ref) keys (`table.key`) that only the refinement reads (the `RadiometricCalibration` solve, after the start): the LM's iteration and
+The keys (`table.key`) of a run's options that only the refinement reads (the `RadiometricCalibration` solve, after the start): the LM's iteration and
 time caps and its stop tolerances, the per-iteration checkpoints, the closed-form sweeps between LM chunks, a resumed run's iteration offset and its sweep.
 A start is computed from [`start_options`](@ref), which holds them at their defaults, so a change of one never changes (or
 recomputes) a start. `resume.state` is not among them: the front end reads its page frame.
@@ -52,12 +52,12 @@ function split_refine_only(table::AbstractDict; keys = REFINE_ONLY_KEYS)
 end
 
 """
-    start_options(opts) -> PipelineOptions
+    start_options(run, settings) -> (run, settings)
 
-The options a start is computed from and keyed by: `opts` with [`REFINE_ONLY_KEYS`](@ref) and the output keys
+The options a start is computed from and keyed by: the run's `run` and `settings` with [`REFINE_ONLY_KEYS`](@ref) and the output keys
 (`PIPELINE_OUTPUT_KEYS`: `io.out`, `optimizer.log`) at their defaults (`split_refine_only`).
 """
-start_options(opts::PipelineOptions) = pipeline_options(start_pipeline_table(config_dict(opts)))
+start_options(run::RunOptions, settings::CalibrationSettings) = pipeline_options(start_pipeline_table(config_dict(run, settings)))
 
 """
     start_pipeline_table(table) -> Dict
@@ -77,17 +77,17 @@ _start_lens_file(parametric::Bool) = parametric ? "lens.json" : "grid.json"
 _mask_file(dir, k) = joinpath(dir, START_MASKS_DIR, "$(k).png")
 
 """
-    save_start(dir, f, θ, meta, opts) -> dir
+    save_start(dir, f, θ, meta, run, settings) -> dir
 
-The start of a refinement (the start's state `s` and `meta`, of the options `opts`, its `start_options`) as the start record
-`dir` (the file header lists its files): every value a refinement takes from its start, so `load_calibration_start(dir; options)` rebuilds
+The start of a refinement (the start's data `f`, parameters `θ` and `meta`, of the options `run` and `settings`, its `start_options`) as the start record
+`dir` (the file header lists its files): every value a refinement takes from its start, so `load_calibration_start(dir; run, settings)` rebuilds
 the start's state from the photographs and this record without recomputing it.
 """
-function save_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters, meta, opts::PipelineOptions)
+function save_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters, meta, run::RunOptions, settings::CalibrationSettings)
     mkpath(joinpath(dir, START_MASKS_DIR))
     names = meta.names
     save_state(joinpath(dir, "state.json"), f, θ, names; page_flip = meta.page_flip, provenance = (; stage = "start (closed-form sweep)"))
-    tag = _frontend_tag(opts)
+    tag = _frontend_tag(run)
     route = lm_route(geometric(θ))                         # the state's camera's route (a SplineLens camera per tile)
     for (file, g, what) in ((joinpath(dir, "$(_camera_file(route)).json"), geometric(θ), "start"),
                             (joinpath(dir, "frontend", "$(_camera_file(route)).json"), meta.lens_start, "frontend"))
@@ -97,7 +97,7 @@ function save_start(dir::AbstractString, f::CalibrationData, θ::CalibrationPara
     for (k, m) in enumerate(f.masks)
         PNGFiles.save(_mask_file(dir, k), Gray{N0f8}.(Array(m)))
     end
-    write_pipeline_config(dir, opts; header = "# the start options of this start record (start_options: the refinement-only keys at their defaults)")
+    write_pipeline_config(dir, run, settings; header = "# the start options of this start record (start_options: the refinement-only keys at their defaults)")
     VgtkIO.write_record(joinpath(dir, START_RECORD_FILE),
         (; schema = RECORD_SCHEMAS.refinement_start, names = String.(names), image_size = [meta.W₀, meta.H₀], parametric = route isa PerViewRoute,
            fpx = meta.fpx, R0 = meta.R0, d_c = meta.d_c, f_m = meta.f_m,
@@ -150,16 +150,16 @@ function load_refinement_start(dir::AbstractString; masks = nothing)
               lens = st.lens, init_region = st.init_region, state = load_state(joinpath(dir, "state.json")), masks, dir = String(dir))
 end
 """
-    check_start_options(start, opts)
+    check_start_options(start, run, settings)
 
-Refuses (`ArgumentError`, naming the differing keys) a start record whose start options are not `start_options(opts)`: a start of
+Refuses (`ArgumentError`, naming the differing keys) a start record whose start options are not `start_options(run, settings)`: a start of
 other settings is never taken for this run's.
 """
-function check_start_options(start, opts::PipelineOptions)
-    want = start_options(opts)
+function check_start_options(start, run::RunOptions, settings::CalibrationSettings)
+    want = start_options(run, settings)
     have = start.options
     have == want && return nothing
-    a, b = config_dict(have), config_dict(want)
+    a, b = config_dict(have...), config_dict(want...)
     delete!(a, VgtkCore.CONFIG_VERSION_KEY); delete!(b, VgtkCore.CONFIG_VERSION_KEY)   # both the current one: tables and keys compared
     diff = sort!(["$t.$k" for t in union(keys(a), keys(b)) for k in union(keys(get(a, t, Dict())), keys(get(b, t, Dict())))
                   if get(get(a, t, Dict()), k, nothing) != get(get(b, t, Dict()), k, nothing)])

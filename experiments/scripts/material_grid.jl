@@ -41,24 +41,24 @@ function _cli(args)
     return config, init, out, set, parse.(Float64, split(alphas, ",")), parse.(Float64, split(etas, ",")), limit
 end
 config, initpath, out, set, αs, ηs, limit = _cli(ARGS)
-alg, stops = RC.read_calibration(config; set)                           # the calibration (its options and optimizer), its solve's stops
-opts = alg.refinement.options
+run_options, alg, stops = RC.read_calibration(config; set)              # the run's options, the calibration (its settings and optimizer), its solve's stops
+settings = alg.refinement.settings
 mkpath(out)
-RC.write_pipeline_config(out, alg, stops;
+RC.write_pipeline_config(out, run_options, alg, stops;
                          header = "# the options of this material grid (experiments/scripts/material_grid.jl --config=$config$(isempty(set) ? "" : " --set " * join(set, " --set ")))")
 init = RC.load_state(initpath)
 # the state's masks and photographs: the init's start record when it is one (its state.json), else a start of these options written
 # into <out>/start (bin/refine.jl --stage=start's); a diagnostic mode of the options writes no start
-(opts.selfcheck.only || opts.io.render_init || !isempty(opts.io.render_state)) && error("$config: a diagnostic mode (selfcheck.only, io.render_*) writes no start")
+(run_options.selfcheck.only || run_options.io.render_init || !isempty(run_options.io.render_state)) && error("$config: a diagnostic mode (selfcheck.only, io.render_*) writes no start")
 sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
-    g = RC.start_geometry(opts)                                          # (the start reads its own options: `init`'s, the record's)
-    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(opts, g.names)), (; device = RC.KernelAbstractions.CPU())),
+    g = RC.start_geometry(run_options, settings)                                          # (the start reads its own options: `init`'s, the record's)
+    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(run_options, g.names)), (; run = run_options, device = RC.KernelAbstractions.CPU())),
                           alg; stops).cache.prob
-    RC.save_calibration_start(joinpath(out, "start"), start.f, start.u0; options = opts)
+    RC.save_calibration_start(joinpath(out, "start"), start.f, start.u0; run = run_options, settings)
 end
-s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.f.start
+s = RC.load_calibration_start(sdir; run = run_options, settings, device = RC.KernelAbstractions.CPU()); meta = s.f.start
 RC.load_state_into!(s.f, s.u0, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
 let v = s.u0.camera.vignetting                                              # V flat: the grid scores the material and the lighting alone
     set_vignetting!(s.u0, VrtkCore.with_control_points(v, ones(size(VrtkCore.control_points(v)))))

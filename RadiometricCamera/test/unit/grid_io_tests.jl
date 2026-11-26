@@ -144,8 +144,8 @@
         rel = mktempdir()
         cd(rel) do
             mkpath("out")
-            f = RC.write_pipeline_config("out", RC.pipeline_options(Dict("io" => Dict("out" => "out"))))
-            @test RC.pipeline_options(f).io.out == abspath("out") && RC._writer_config(joinpath(rel, "out", "grid.json")) == abspath(f)
+            f = RC.write_pipeline_config("out", RC.pipeline_options(Dict("io" => Dict("out" => "out")))...)
+            @test first(RC.pipeline_options(f)).io.out == abspath("out") && RC._writer_config(joinpath(rel, "out", "grid.json")) == abspath(f)
         end
         # every grid the pipeline writes is a valid start (review finding 1: a saved initialization and a crashed run's checkpoint
         # held grid.json / grid_ckpt.json without their region): the pipeline's one grid writer, `_save_run_grid`, writes the region
@@ -170,7 +170,7 @@
         @test_throws "no initialization_region.json" load_start("grid:" * joinpath(d5, "grid.json"))
         # … and it is the pipeline's only grid writer: the checkpoints (calibration/calibrate.jl), the result and its start (io/run_outputs.jl), the start record (start/start_record.jl)
         psrc = join((read(joinpath(pkgdir(RadiometricCamera), "src", f), String) for f in ("io/run_outputs.jl", "calibration/calibrate.jl", "calibration/problem_spec.jl")), "\n")
-        @test count("save_grid(", psrc) == 1 && count("_save_run_camera(", psrc) == 4 && !occursin("save_lens(joinpath(opts.io.out, \"grid", psrc)   # the helper's own call; the run's writes through the route
+        @test count("save_grid(", psrc) == 1 && count("_save_run_camera(", psrc) == 4 && !occursin("save_lens(joinpath(run.io.out, \"grid", psrc)   # the helper's own call; the run's writes through the route
         ssrc = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "start_record.jl"), String)
         @test !occursin("save_grid(", ssrc) && !occursin("save_lens(", ssrc) && count("_save_run_camera(", ssrc) == 1   # the start record's two cameras, one call
         # a parametric start is defined wherever its own valid domain says: no stored region

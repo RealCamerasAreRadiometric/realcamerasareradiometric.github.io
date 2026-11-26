@@ -30,13 +30,13 @@
             PNGFiles.save(photos[k], [RGB{N0f16}(clamp.(imgs[k][i, j, :], 0, 1)...) for i in 1:H, j in 1:W])
         end
         out = joinpath(dir, "out")
-        alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
+        run, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
                                         "lm" => lm, "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
         start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
-                                                                      (; device = RC.KernelAbstractions.CPU())), alg; stops).cache.prob
-        fit = RC.calibrate(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos, alg; stops, device = RC.KernelAbstractions.CPU())
+                                                                      (; run, device = RC.KernelAbstractions.CPU())), alg; stops).cache.prob
+        fit = RC.calibrate(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos, run, alg; stops, device = RC.KernelAbstractions.CPU())
         return (; fit, out, photos)
     end
     export run_board

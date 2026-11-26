@@ -35,8 +35,8 @@
 
     # 3. the options: no centre keys; the retired ones are unknown keys (Core check_keys lists the allowed)
     o = RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial", "chart" => "projective")))
-    @test o.vignetting.chart == :projective && RC.pipeline_options(RC.config_dict(o)) == o
-    @test !any(k -> haskey(RC.config_dict(o)["vignetting"], k), ("center", "center_px", "center_bound_px"))
+    @test last(o).vignetting.chart == :projective && RC.pipeline_options(RC.config_dict(o...)) == o
+    @test !any(k -> haskey(RC.config_dict(o...)["vignetting"], k), ("center", "center_px", "center_bound_px"))
     bad(t) = thrown_message(() -> RC.pipeline_options(Dict("vignetting" => t)))
     for k in ("center", "center_px", "center_bound_px")
         m = bad(Dict("model" => "radial", k => (k == "center" ? "fixed" : k == "center_px" ? [1.0, 2.0] : 100.0)))
@@ -60,16 +60,16 @@
     ol = RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial", "node_count" => 16, "chart" => "linear")))
     # the projective chart at 19 nodes (Core 0.10.11's knots, T. Harder): 16 functions act on the fitted pixels, the linear 16's spacing
     op = RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial", "node_count" => 19, "chart" => "projective")))
-    vl = RC._vignetting_spec(ol, Ws, Hs, nothing, c)[1]()
-    mkp, dp = RC._vignetting_spec(op, Ws, Hs, nothing, c); vp = mkp()
+    vl = RC._vignetting_spec(last(ol), Ws, Hs, nothing, c)[1]()
+    mkp, dp = RC._vignetting_spec(last(op), Ws, Hs, nothing, c); vp = mkp()
     @test vl isa RadialVignetting && radial_chart(vl) == :linear && center(vl) == c
     @test field_radius(vl) ≈ maximum(hypot(x - c[1], y - c[2]) for x in (0, Ws), y in (0, Hs))     # no box: r_max is the region's alone
     @test vp == RadialVignetting(19, c, field_radius(vl); chart = :projective) && radial_chart(vp) == :projective
     @test collect(knot_vectors(vp)[1]) == collect(projective_knots(19, 3)) && occursin("principal point", dp) && occursin("projective", dp)
     # the defaults of 0.11.4 (configs/default.toml): the projective chart, 19 nodes
-    @test RC.PipelineOptions().vignetting.chart === :projective && RC.PipelineOptions().vignetting.node_count == 19
+    @test RC.CalibrationSettings().vignetting.chart === :projective && RC.CalibrationSettings().vignetting.node_count == 19
     @test !occursin("FREE", dp)
-    @test RC.PipelineOptions().vignetting.model === RadialVignetting && !hasfield(RC.VignettingOptions, :size)   # the one field the pipeline builds
+    @test RC.CalibrationSettings().vignetting.model === RadialVignetting && !hasfield(RC.VignettingOptions, :size)   # the one field the pipeline builds
 
     # 5. the pin V(𝐜) = 1 is always held: no `pin_center` keyword, the state's start normalised, the free directions without the
     # centre's, the block without centre parameters

@@ -19,9 +19,9 @@ end
 
 @testitem "sensor model: the characterisation key, its fallback and its refusals" setup = [RCFixtures, SensorFixtures] begin
     o = RC.pipeline_options(Dict("camera" => Dict("sensor_characterization" => "sensor/fx3.sensor_characterisation.json")))
-    @test o.camera.sensor_characterization == "sensor/fx3.sensor_characterisation.json"
-    @test RC.pipeline_options(RC.config_dict(o)) == o
-    @test RC.PipelineOptions().camera.sensor_characterization == ""                       # not stated
+    @test first(o).camera.sensor_characterization == "sensor/fx3.sensor_characterisation.json"
+    @test RC.pipeline_options(RC.config_dict(o...)) == o
+    @test RC.RunOptions().camera.sensor_characterization == ""                       # not stated
     @test "camera.sensor_characterization" in RC.PIPELINE_PATH_KEYS
     @test RC.names_input_path("camera.sensor_characterization", "sensor/fx3.json")
     @test !RC.names_input_path("camera.sensor_characterization", "")

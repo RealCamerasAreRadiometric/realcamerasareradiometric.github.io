@@ -1,4 +1,4 @@
-# The defaults of a radiometric calibration (RadiometricCamera.PipelineOptions): every key with its default, one comment each — THE
+# The defaults of a radiometric calibration (RadiometricCamera.RunOptions and CalibrationSettings): every key with its default, one comment each — THE
 # one statement of them: every option's keyword default reads this file, baked at precompile (src/options/tables.jl: Core's
 # config_toml mechanism; an edit recompiles the package). A config (`pipeline_options(path)`, bin/refine.jl --config=<file>
 # [--set table.key=value ...]) states only what differs; an unknown table or key is refused.

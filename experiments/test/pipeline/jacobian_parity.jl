@@ -30,18 +30,18 @@ function jacobian_parity(root, images, nviews = 2)
     end
     p["io"]["views"] = cfg["views"][t["views"]][1:nviews]; p["io"]["images"] = images
     p["io"]["out"] = mktempdir(); p["io"]["checkpoint_each"] = "off"
-    alg, stops = RC.read_calibration(p)                                  # the calibration (its options and optimizer), its solve's stops
-    opts = alg.refinement.options
+    run, alg, stops = RC.read_calibration(p)                             # the run's options, the calibration (its settings and optimizer), its solve's stops
+    settings = alg.refinement.settings
     s = redirect_stdout(devnull) do
-        g = RC.start_geometry(opts); dir = joinpath(opts.io.out, "start")   # (the start reads its own options: `init`'s, the record's)
-        start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(opts, g.names)), (; device = CUDA.CUDABackend())),
+        g = RC.start_geometry(run, settings); dir = joinpath(run.io.out, "start")   # (the start reads its own options: `init`'s, the record's)
+        start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(run, g.names)), (; run, device = CUDA.CUDABackend())),
                               alg; stops).cache.prob
-        RC.save_calibration_start(dir, start.f, start.u0; options = opts)
-        RC.load_calibration_start(dir; options = opts, device = CUDA.CUDABackend())
+        RC.save_calibration_start(dir, start.f, start.u0; run, settings)
+        RC.load_calibration_start(dir; run, settings, device = CUDA.CUDABackend())
     end
     meta = s.f.start
     # the problem as the RadiometricCalibration solve builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
-    lp = RC._refinement_lm(opts, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
+    lp = RC._refinement_lm(settings, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
     problem(st) = RC.build_problem_grid(st.f, st.u0; damping = alg.refinement.optimizer.damping, kw...)
     host(st) = (h = typeof(st.f)(ntuple(i -> getfield(st.f, i), fieldcount(typeof(st.f)))...); h.backend = RC.KernelAbstractions.CPU(); h.device_cache = nothing;
                 VgtkCore.RefineProblem(h, st.u0))   # the data on the host, the same parameters

@@ -1,8 +1,8 @@
 # ---- the state as a file -------------------------------------------------------------------------------------------------------
 """The page's ±y choice (`page_flip`) of the state a run renders (`io.render_state`) or resumes (`resume.state`), to hold in the front end;
 `nothing` without such a state, or for a state that records none (one written before 2026-11-02; a warning: the tie is broken again)."""
-function _state_page_flip(opts::PipelineOptions, load_state)
-    path = !isempty(opts.io.render_state) ? opts.io.render_state : opts.resume.state
+function _state_page_flip(run::RunOptions, load_state)
+    path = !isempty(run.io.render_state) ? run.io.render_state : run.resume.state
     isempty(path) && return nothing
     sst = load_state(path)
     sst.page_flip === nothing && (@warn "$path carries no page_flip (a state written before 2026-11-02): the page's ±y tie is broken again on this run's views"; return nothing)

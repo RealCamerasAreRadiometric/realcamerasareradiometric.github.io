@@ -7,16 +7,17 @@ reach is `public`: write it qualified (`RadiometricCamera.RenderSettings`) or im
 
 <!-- the suite checks this list equals `names(RadiometricCamera)` (test/unit/api_surface_tests.jl) -->
 - [`calibrate`](@ref) — a radiometric calibration in one call
-- [`RadiometricCalibration`](@ref) — the calibration, an algorithm of VisualGeometryToolkitCore's `solve` / `init` / `solve!` on `EstimationProblem(CalibrationEstimate, (geometry, photographs))`: `init` lifts the geometric calibration into the refinement's problem (the start; its cache the refinement stage's `init`, holding a [`CalibrationCache`](@ref)), `solve!` refines it (a `FitResult`)
-- [`RadiometricRefinement`](@ref) — the refinement, a refine of VisualGeometryToolkitCore's `solve` on `RefineProblem(f, u0)` ([`calibration_problem`](@ref), [`load_calibration_start`](@ref)): the parameters `u0` refined in place on the data `f`
+- [`RadiometricCalibration`](@ref) — the calibration, an algorithm of VisualGeometryToolkitCore's `solve` / `init` / `solve!` on `EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run))`: `init` lifts the geometric calibration into the refinement's problem (the start; its cache the refinement stage's `init`, holding a [`CalibrationCache`](@ref)), `solve!` refines it (a `FitResult`)
+- [`RadiometricRefinement`](@ref) — the refinement, a refine of VisualGeometryToolkitCore's `solve` on `RefineProblem(f, u0, run)` ([`calibration_problem`](@ref), [`load_calibration_start`](@ref)): the parameters `u0` refined in place on the data `f` in the run `run`; it holds the [`CalibrationSettings`](@ref)
 - [`StartGeometry`](@ref), [`start_geometry`](@ref), [`start_photographs`](@ref) — the start's inputs: the geometric calibration and the photographs
 - [`save_calibration_start`](@ref), [`load_calibration_start`](@ref) — the start record
 - [`CalibrationEstimate`](@ref), [`CalibrationMetadata`](@ref) — its estimate and diagnostics (a Core `FitResult` read by field: `r.u`, `r.retcode`, `r.stop_rule`, `r.stats.nsteps`, `r.rms`, `r.metadata`; `successful_retcode(r)`)
 - [`save_radiometric_calibration`](@ref) — the run's records
 - [`CalibrationCache`](@ref), [`calibration_problem`](@ref) (its `RefineProblem` of the public `CalibrationData` and `CalibrationParameters`), `RadiometricCameraModel` (re-exported: VisualRadiometryToolkitCore's radiometric camera), [`RadiometricTarget`](@ref) — the refinement's problem and the models
 - [`CalibratedCamera`](@ref) — the complete calibration: the camera model with its observation model (the sensor record its photographs were read under) and render settings; every photograph it predicts is read through `photo_set` / `observe`
-- [`PipelineOptions`](@ref), [`pipeline_options`](@ref) — the options and their TOML reader (defaults: `configs/default.toml`);
-  [`read_calibration`](@ref) — a run's TOML as the calibration and its solve's stops
+- [`RunOptions`](@ref), [`CalibrationSettings`](@ref), [`pipeline_options`](@ref) — a run's options (its data and input/output, the
+  problem's `p`) and the calibration's typed settings, and their TOML reader (defaults: `configs/default.toml`);
+  [`read_calibration`](@ref) — a run's TOML as the run, the calibration and its solve's stops
 
 ## Public
 

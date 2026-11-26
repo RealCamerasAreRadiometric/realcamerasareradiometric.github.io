@@ -48,8 +48,8 @@ end
         haskey(doc, "pipeline") && push!(runs, ("pipeline", doc["pipeline"], ""))
         for (header, p, kind) in runs
             ncases += 1
-            alg, stops = RC.read_calibration(p); o = alg.refinement.options                    # resolves (a refusal is a failure of the lock)
-            resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(alg, stops)))   # keyed as the file's version names them
+            run, alg, stops = RC.read_calibration(p); o = (run, alg.refinement.settings)                   # resolves (a refusal is a failure of the lock)
+            resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(run, alg, stops)))   # keyed as the file's version names them
             for (k, v) in lock
                 haskey(resolved, k) || continue                                     # a key the run cannot use (INAPPLICABLE_KEYS): not written
                 # the in-plane start acts only with inplane = "aspect_skew": a heights-only case (inplane = "none", its commented override;
@@ -60,9 +60,9 @@ end
                 commented(lines, header, k) === true || push!(uncommented, "$(relpath(f, root)) [$header] $k = $(repr(resolved[k])) (lock $(repr(v)))")
             end
             # a Schöps-started grid case: his own lattice, m = 1 (the exact start never subdivides: test/unit/exact_start_tests.jl)
-            if get(get(p, "frontend", Dict()), "type", "") == "schoeps" && RC.start_is_grid(o)
+            if get(get(p, "frontend", Dict()), "type", "") == "schoeps" && RC.start_is_grid(run)
                 nschoeps += 1
-                @test o.grid.lattice === RC.DerivedLattice()
+                @test last(o).grid.lattice === RC.DerivedLattice()
                 @test commented(lines, header, "grid.lattice") === true             # stated, with its derivation
             end
             @test !haskey(get(p, "grid", Dict()), "lattice_spacing") && !haskey(get(p, "grid", Dict()), "size")
@@ -88,8 +88,8 @@ end
             end
             # every other grid start (a parametric or any non-Schöps source) lays its lattice over the image region at a stated,
             # commented node count — the case's bound on its present nodes (owner 2026-11-15, 23:18)
-            if get(get(p, "frontend", Dict()), "type", "") != "schoeps" && RC.start_is_grid(o)
-                @test o.grid.lattice === RC.NodeCountLattice() && o.grid.node_count !== nothing
+            if get(get(p, "frontend", Dict()), "type", "") != "schoeps" && RC.start_is_grid(run)
+                @test last(o).grid.lattice === RC.NodeCountLattice() && last(o).grid.node_count !== nothing
                 @test commented(lines, header, "grid.node_count") === true
             end
         end

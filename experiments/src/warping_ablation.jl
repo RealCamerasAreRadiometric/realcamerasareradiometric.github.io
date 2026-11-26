@@ -111,12 +111,12 @@ print error (`warping.inplane = "aspect_skew"`); and a Schöps-started grid case
 m = 1 — the slow lattice is refused). An `ArgumentError` names the case otherwise.
 """
 function check_case_of_record(t::AbstractDict, case::AbstractString)
-    o = pipeline_options(t["pipeline"])
-    o.warping.degree > 0 && o.warping.inplane == "aspect_skew" ||
-        throw(ArgumentError("case $case: warping.degree = $(o.warping.degree), inplane = $(repr(o.warping.inplane)) — the modes are overrides of a case " *
+    _, settings = pipeline_options(t["pipeline"])
+    settings.warping.degree > 0 && settings.warping.inplane == "aspect_skew" ||
+        throw(ArgumentError("case $case: warping.degree = $(settings.warping.degree), inplane = $(repr(settings.warping.inplane)) — the modes are overrides of a case " *
                             "of record with the heights and the in-plane print error"))
-    t["kind"] == "grid" && o.grid.node_count !== nothing &&
-        throw(ArgumentError("case $case: grid.node_count = $(o.grid.node_count) subdivides Schöps's lattice (m > 1, the slow lattice): refused"))
+    t["kind"] == "grid" && settings.grid.node_count !== nothing &&
+        throw(ArgumentError("case $case: grid.node_count = $(settings.grid.node_count) subdivides Schöps's lattice (m > 1, the slow lattice): refused"))
     return nothing
 end
 

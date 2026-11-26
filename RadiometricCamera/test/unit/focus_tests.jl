@@ -38,7 +38,7 @@ end
     using StaticArrays
     W, H = 400, 300
     pin = cam(VgtkCore.Lens(VgtkCore.Perspective()), 300.0, (200.0, 150.0), W, H)       # a W × H pixel camera: the run's region is Core's imaged_region of it
-    fo = RC.PipelineOptions().focus
+    fo = RC.CalibrationSettings().focus
     # no image circle: the sensor's 5 × 5 grid, every node kept (the sensor's edges are exact)
     @test RC.focus_grid_nodes(VgtkCore.imaged_region(pin)) == VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))
     @test RC.focus_start_nodes(pin, fo).nodes == VgtkCore.grid_nodes(5, VgtkCore.Rect(0, 0, W, H))

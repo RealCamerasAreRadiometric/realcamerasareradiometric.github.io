@@ -29,11 +29,11 @@
 
     @testset "the configs of record load through pipeline_options" begin
         for c in CASES
-            cfg, opts = load_calibration_config(calibration_config(c))
-            @test opts isa PipelineOptions
-            @test opts == pipeline_options(cfg["pipeline"])
+            cfg, run, settings = load_calibration_config(calibration_config(c))
+            @test run isa RadiometricCamera.RunOptions && settings isa RadiometricCamera.CalibrationSettings
+            @test (run, settings) == pipeline_options(cfg["pipeline"])
             @test cfg["experiment"]["case"] == c
-            @test isempty(opts.io.out)
+            @test isempty(run.io.out)
         end
         @test sort(readdir(projectdir("configs", "calibration"))) == sort(["$c.toml" for c in CASES])
     end
@@ -45,14 +45,14 @@
     @testset "the input keys are every path option" begin
         # (that every string option is an input, an output or no path is RadiometricCamera's own test, pipeline_options_tests.jl)
         @test PIPELINE_PATH_KEYS === PIPELINE_INPUT_KEYS                   # the drivers' and the calibration's: the package's one list
-        cfg, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
+        cfg, _, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
         @test pipeline_inputs(cfg) == ["io.images" => "geometric_accuracy/detector_bias/data/fisheye_full/gt/images_linear",
                                        "frontend.schoeps" => "geometric_accuracy/detector_bias/data/fisheye_full/schoeps",
                                        "frontend.texture" => "geometric_accuracy/data/target/siemens_1m/board/texture.png",
                                        "frontend.texture_features" => "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"]   # edge.sdf: run:siemens_1m_distance_map, a [runs] file (no input under data_root())
         @test table_runs(cfg["pipeline"]) == ["siemens_1m_distance_map"] && cfg["pipeline"]["edge"]["sdf"] == "run:siemens_1m_distance_map"
         # an empty `camera.sensor_characterization` names none: no input path (RadiometricCamera's `names_input_path`)
-        cfg, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
+        cfg, _, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
         c2 = deepcopy(cfg); get!(c2["pipeline"], "camera", Dict{String, Any}())["sensor_characterization"] = ""
         @test pipeline_inputs(c2) == pipeline_inputs(cfg)
         c2["pipeline"]["camera"]["sensor_characterization"] = "sensor/fx3.json"
@@ -96,7 +96,7 @@
 
     @testset "the driver writes only under results_root()" begin
         data, results = mktempdir(), mktempdir()
-        cfg, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
+        cfg, _, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
         key = calibration_products(cfg; threads = TEST_THREADS).refine.key          # the driver's products (src/calibration.jl) at the test's threads
         run_dir = joinpath(results, "calibrate", "refine", key)                 # driver_product: <results>/<experiment>/<stage>/<key>
         mkpath(run_dir)
@@ -124,13 +124,13 @@ end
     using Test, TOML, RadiometricCamera
     const RC = RadiometricCamera
     root = normpath(pkgdir(RadiometricCamera), "..")   # the repository: the package and the experiments side by side
-    o = RC.pipeline_options(TOML.parsefile(joinpath(root, "experiments", "configs", "calibration", "siemens_coarse_full.toml"))["pipeline"])
-    @test o isa RC.PipelineOptions && o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed) && o.fixed == ["aperture"]
+    _, o = RC.pipeline_options(TOML.parsefile(joinpath(root, "experiments", "configs", "calibration", "siemens_coarse_full.toml"))["pipeline"])
+    @test o isa RC.CalibrationSettings && o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed) && o.fixed == ["aperture"]
     @test RC.load_run_parameters(joinpath(root, "experiments", "test", "pipeline", "golden", "siemens_coarse_full", "parameters.json"))["frontend"] == "schoeps"
     # the paper's parametric cases build their problem without a printed-edge block (the edge is never a parameter)
     rr = TOML.parsefile(joinpath(root, "experiments", "configs", "experiments", "radiometric_refinement.toml"))
     for c in ("si30_ocv14_warped", "si30_kb_warped", "ag30_ocv14_warped", "ag30_kb_warped")
-        oc = RC.pipeline_options(rr["cases"][c]["pipeline"])
+        _, oc = RC.pipeline_options(rr["cases"][c]["pipeline"])
         @test !isempty(oc.edge.sdf) && !(:edge in RC._refinement_lm(oc, RC.PerViewRoute()).kw.fixed)
     end
     @test isempty(RC.VgtkCore.config_tag_violations((RC.FRONTEND_TAGS, RC.VIGNETTING_CONFIG_TAGS, RC.BACKEND_TAGS),
@@ -163,7 +163,7 @@ end
         endswith(f, ".toml") || continue
         for (p, t) in pipes(TOML.parsefile(joinpath(r, f)), f, Pair{String, Any}[])
             n += 1
-            @test RC.pipeline_options(t) isa RC.PipelineOptions
+            @test RC.pipeline_options(t) isa Tuple{RC.RunOptions, RC.CalibrationSettings}
         end
     end
     @test n > 30                                                                  # 38 at 2026-11-15

@@ -60,7 +60,7 @@ function load_convergence_config(path::AbstractString)
         rt = get(rc["cases"], n, nothing)
         rt === nothing && throw(ArgumentError("$where: no case $n in $(c["upstream"]["radiometric_refinement"])"))
         rt["kind"] == "grid" || throw(ArgumentError("$where: the case writes a $(rt["kind"]) model; the iterations are scored as grid cameras"))
-        RadiometricCamera.pipeline_options(rt["pipeline"]).io.checkpoint_each ||
+        first(RadiometricCamera.pipeline_options(rt["pipeline"])).io.checkpoint_each ||
             throw(ArgumentError("$where: the refinement does not checkpoint every iteration (its [pipeline.io] checkpoint_each): no iteration to read"))
         cc = convergence_chrome(c, n)
         any(m -> get(m, "case", "") == n, cc["evaluate"]["models"]) ||
@@ -156,7 +156,7 @@ data_root(), where the options' relative inputs are; `geometry` given: that one)
 """
 function bearing_series(start_dir::AbstractString, refine_dir::AbstractString, iterations::AbstractVector{<:Integer}; geometry = nothing)
     start = RadiometricCamera.load_refinement_start(start_dir)
-    g = geometry === nothing ? cd(() -> RadiometricCamera.start_geometry(start.options; record = start), data_root()) : geometry
+    g = geometry === nothing ? cd(() -> RadiometricCamera.start_geometry(start.options...; record = start), data_root()) : geometry
     return map(iterations) do i
         f = i == 0 ? joinpath(start_dir, "state.json") : joinpath(refine_dir, "state_it$i.json")
         (; iteration = Int(i), bearing_divergence(g, RadiometricCamera.load_state(f))..., rel_rms = i == 0 ? start.costs.linear[2] : state_rel_rms(f))
@@ -338,7 +338,7 @@ port of T. Harder's convergence/tools/per_detection_values.jl and rms_figure.py'
 function detection_reprojection_series(start_dir::AbstractString, refine_dir::AbstractString, iterations::AbstractVector{<:Integer})
     RC_ = RadiometricCamera
     start = RC_.load_refinement_start(start_dir)
-    g = cd(() -> RC_.start_geometry(start.options; record = start), data_root())
+    g = cd(() -> RC_.start_geometry(start.options...; record = start), data_root())
     nd = sum(length, g.observations)
     D = fill(NaN, nd, length(iterations))
     for (m, it) in enumerate(iterations)

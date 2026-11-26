@@ -40,7 +40,7 @@ include(srcdir("drivers.jl"))
 include(srcdir("calibration.jl"))
 
 const CFG_PATH = abspath(cli_option(ARGS, "config"))
-const CFG, OPTS = load_calibration_config(CFG_PATH)
+const CFG, _, _ = load_calibration_config(CFG_PATH)
 # the products, each keyed by only what it reads, under the driver's name (the config names a case): src/calibration.jl
 const PRODUCTS = calibration_products(CFG)
 const SELFCHECK, OUTPUT = PRODUCTS.selfcheck, PRODUCTS.output

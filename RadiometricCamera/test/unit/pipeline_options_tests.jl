@@ -8,16 +8,20 @@
     import RadiometricCamera
     const RC_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 
-    function haskey_path(T, path)        # `table.key` names a field of a table of T (or of the optimizer's, `[optimizer]`); `fixed`, the top-level list
-        path == "fixed" && return hasfield(T, :fixed)
+    # the tables of a run's TOML: the run's (RunOptions) and the calibration's (CalibrationSettings), each table in one, by name
+    const OPTION_TABLES = Dict(f => fieldtype(H, f) for H in (RadiometricCamera.RunOptions, RadiometricCamera.CalibrationSettings) for f in fieldnames(H))
+    function haskey_path(path)           # `table.key` names a field of an options table (or of the optimizer's, `[optimizer]`); `fixed`, the top-level list
+        path == "fixed" && return haskey(OPTION_TABLES, :fixed)
         t, k = split(path, '.')
         t == "optimizer" && return hasfield(RadiometricCamera.OptimizerTable, Symbol(k))   # the algorithm's tables
         t == "sweep" && return hasfield(RadiometricCamera.SweepTable, Symbol(k))
-        return hasfield(T, Symbol(t)) && hasfield(fieldtype(T, Symbol(t)), Symbol(k))
+        return haskey(OPTION_TABLES, Symbol(t)) && hasfield(OPTION_TABLES[Symbol(t)], Symbol(k))
     end
     using Test                          # (loads Core's TestExt: thrown_message, the message of the ArgumentError `f()` throws)
     using VisualGeometryToolkitCore: thrown_message
-    export RC_ROOT, haskey_path, thrown_message
+    # the table `t` of a reader's `(run, settings)`: in the one of them that holds it
+    option_table(o::Tuple, t::Symbol) = getfield(only(x for x in o if hasfield(typeof(x), t)), t)
+    export RC_ROOT, OPTION_TABLES, haskey_path, option_table, thrown_message
 end
 
 @testitem "pipeline options (TOML): configs/default.toml is THE defaults (every key, nothing else)" setup = [RCFixtures, PipelineOptionsHelpers] begin
@@ -26,21 +30,21 @@ end
     # set of literals to agree with it; a key missing from the file is an error naming it, by design
     path = pkgdir(RC, "configs", "default.toml")                                     # the file, where users find it
     @test RC._TOML_DEFAULTS == TOML.parsefile(path)
-    @test RC.pipeline_options(Dict{String, Any}()) == RC.PipelineOptions()
+    @test RC.pipeline_options(Dict{String, Any}()) == (RC.RunOptions(), RC.CalibrationSettings())
     @test_throws KeyError RC.toml_default(RC._TOML_DEFAULTS, "grid", "no_such_key")
     src = read(joinpath(RC_ROOT, "src", "options", "tables.jl"), String)
     @test count("_option_default(", src) >= 75                                     # every table field's default reads the file
     # every key of the struct is in the file (the file documents them all)
     doc = TOML.parsefile(path)
-    @test Set(keys(doc)) == union(Set(String.(fieldnames(RC.PipelineOptions))), ["optimizer", "sweep", "config_version"])   # the algorithm's tables, the version
+    @test Set(keys(doc)) == union(Set(String.(keys(OPTION_TABLES))), ["optimizer", "sweep", "config_version"])   # the algorithm's tables, the version
     @test doc["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
     @test Set(keys(doc["optimizer"])) == Set(String.(fieldnames(RC.OptimizerTable))) && Set(keys(doc["sweep"])) == Set(String.(fieldnames(RC.SweepTable)))
     # but for the optional tables, absent by default, which the file documents in a comment
     optional = Dict("grid" => ["start_perturbation", "node_count"], "io" => ["lens_identity"])   # absent unless stated (no default)
-    @test doc["fixed"] == [] && RC.PipelineOptions().fixed == String[]                      # the top-level list of held blocks: none
-    for f in fieldnames(RC.PipelineOptions)
+    @test doc["fixed"] == [] && RC.CalibrationSettings().fixed == String[]                      # the top-level list of held blocks: none
+    for (f, T) in OPTION_TABLES
         f === :fixed && continue
-        @test union(Set(keys(doc[String(f)])), get(optional, String(f), String[])) == Set(String.(fieldnames(fieldtype(RC.PipelineOptions, f))))
+        @test union(Set(keys(doc[String(f)])), get(optional, String(f), String[])) == Set(String.(fieldnames(T)))
     end
     @test occursin("# start_perturbation = {sigma_px", read(path, String))
 end
@@ -95,7 +99,7 @@ end
     @test length(FORMER_KNOBS) == 62                                     # RC_SAVE_INIT (io.save_init) retired with the start record, RC_LINEAR_FRAC (masks.linear_fraction) with RC 0.11.0
     @test allunique(vcat(first.(FORMER_KNOBS), RETIRED_KNOBS))
     for (var, paths) in FORMER_KNOBS, p in paths
-        @test haskey_path(RC.PipelineOptions, p)
+        @test haskey_path(p)
     end
     # keys born after the environment variables were retired (config keys from the start)
     NEW_KEYS = ["grid.nodes", "vignetting.support_min",
@@ -115,7 +119,7 @@ end
                 "masks.edge_fraction", "masks.addon_samples", "masks.addon_gradient_bias"]   # 2026-11-15: the draw's other modes (the sampling-strategy experiment, RC 0.11.5)
     # and every other key is one of them: no knob without a former variable, none forgotten
     keyset = union(Set(p for (_, ps) in FORMER_KNOBS for p in ps), NEW_KEYS)
-    @test keyset == union(Set("$t.$k" for t in fieldnames(RC.PipelineOptions) if t !== :fixed for k in fieldnames(fieldtype(RC.PipelineOptions, t))), ["fixed"],
+    @test keyset == union(Set("$t.$k" for (t, T) in OPTION_TABLES if t !== :fixed for k in fieldnames(T)), ["fixed"],
                           Set("optimizer.$k" for k in fieldnames(RC.OptimizerTable)), Set("sweep.$k" for k in fieldnames(RC.SweepTable)))
 end
 
@@ -135,10 +139,10 @@ end
     for (t, k) in (("camera", "r_min"), ("camera", "r_max"), ("rendering", "psf_sigma"), ("edge", "camera_sigma_px"), ("warping", "points"))
         @test occursin("`$t.$k` is retired", thrown_message(() -> RC.pipeline_options(Dict(t => Dict(k => 0.0)))))
     end
-    @test RC.pipeline_options(Dict("fixed" => ["aperture"])).fixed == ["aperture"] && !RC._lm_blocks(RC.pipeline_options(Dict("fixed" => ["aperture"]))).aperture
-    @test RC._lm_blocks(RC.PipelineOptions()).aperture                                    # free by default (no bound: the log chart)
-    @test RC.config_dict(RC.pipeline_options(Dict("fixed" => ["focus", "aperture"])))["fixed"] == ["focus", "aperture"]
-    @test RC.pipeline_options(RC.config_dict(RC.pipeline_options(Dict("fixed" => ["camera"])))).fixed == ["camera"]
+    @test last(RC.pipeline_options(Dict("fixed" => ["aperture"]))).fixed == ["aperture"] && !RC._lm_blocks(last(RC.pipeline_options(Dict("fixed" => ["aperture"])))).aperture
+    @test RC._lm_blocks(RC.CalibrationSettings()).aperture                                    # free by default (no bound: the log chart)
+    @test RC.config_dict(RC.pipeline_options(Dict("fixed" => ["focus", "aperture"]))...)["fixed"] == ["focus", "aperture"]
+    @test last(RC.pipeline_options(RC.config_dict(RC.pipeline_options(Dict("fixed" => ["camera"]))...))).fixed == ["camera"]
     # the retired parameter-holding keys are refused by name (`RETIRED_KEYS`), naming `fixed` (the stack's one parameter-holding keyword)
     m = thrown_message(() -> RC.pipeline_options(Dict("lm" => Dict("fix" => ["focus"])))); @test occursin("`lm.fix` is retired", m) && occursin("`fixed`", m)
     m = thrown_message(() -> RC.pipeline_options(Dict("edge" => Dict("free" => false)))); @test occursin("`edge.free` is retired", m) && occursin("never a parameter", m)
@@ -147,54 +151,54 @@ end
     @test occursin("`masks.linear_fraction` is retired", m) && occursin("not read since 2026-10-31", m) && occursin("delete the key", m)
     @test !hasfield(RC.MaskOptions, :linear_fraction)
     # the printed edge is never a parameter (no hold of the LM; "edge" in fixed refused)
-    @test_throws ArgumentError RC._surface_free(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"))), :edge)
+    @test_throws ArgumentError RC._surface_free(last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board")))), :edge)
     # one encoding (review round 2, finding 9): the model's structure (`_lm_structure`) and the holds (`_lm_surface_holds`), the
     # booleans `_edge_free` / `_inplane_free` gone; the LM's keywords are built from them by `_refinement_lm` alone
-    eh = RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "warping" => Dict("inplane" => "aspect_skew")))
+    _, eh = RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "warping" => Dict("inplane" => "aspect_skew")))
     @test isempty(eh.fixed) && RC._lm_structure(eh) == (; height_degree = 0, inplane = true) && RC._lm_surface_holds(eh) == ()
     @test RC._refinement_lm(eh, RC.PerTileRoute()).kw.fixed == () && RC._refinement_lm(eh, RC.PerViewRoute()).kw.fixed == () && RC._surface_free(eh, :inplane)
     @test !haskey(RC._refinement_lm(eh, RC.PerTileRoute()).kw, :edge_block) && RC._refinement_lm(eh, RC.PerTileRoute(); smoothness = :p).kw.smoothness === :p
     # one derivation of the held blocks (review round 3, findings 6 and 7): `_refinement_lm` reads `_lm_blocks` itself; "material" is
     # the problem's `fixed` either way — the builders hold Θ_m alone while a surface parameter rides the block (`_hold_material`), the
     # problem's own type (`MaterialVar{…, true}`), never a module global
-    hm = RC.pipeline_options(Dict("fixed" => ["focus", "material"], "warping" => Dict("degree" => 1)))
+    _, hm = RC.pipeline_options(Dict("fixed" => ["focus", "material"], "warping" => Dict("degree" => 1)))
     lh = RC._refinement_lm(hm, RC.PerTileRoute())
     @test lh.kw.fixed == (:focus, :material) && lh.blocks.material && keys(lh) == (:kw, :blocks)       # Θ_m held inside a riding block
-    lh2 = RC._refinement_lm(RC.pipeline_options(Dict("fixed" => ["material"])), RC.PerViewRoute())
+    lh2 = RC._refinement_lm(last(RC.pipeline_options(Dict("fixed" => ["material"]))), RC.PerViewRoute())
     @test lh2.kw.fixed == (:material,) && !lh2.blocks.material                                         # nothing rides: the block held
     @test RC._refinement_lm(hm, RC.PerViewRoute()).kw.fixed == (:focus, :material)
     @test RC._hold_material((:focus, :material), true) == ((:material,), (:focus,)) && RC._hold_material((:focus, :material), false) == ((), (:focus, :material))
     @test !isdefined(RC, :_edge_free) && !isdefined(RC, :_inplane_free)
     psrc = join((read(joinpath(pkgdir(RadiometricCamera), "src", f), String) for f in ("calibration/problem_spec.jl", "start/prepare.jl", "start/image_region.jl", "calibration/calibrate.jl")), "\n")
-    @test count("_refinement_lm(opts, ", psrc) == 3                                                    # docstring; the GCV, refine!
+    @test count("_refinement_lm(settings, ", psrc) == 3                                                    # docstring; the GCV, refine!
     # the grid smoothness's GCV builds the refinement's problem from the same keywords (RC 0.9.0 review, finding 4: prepare_refinement
     # left a module-global hold set; there is none now)
-    @test count("select_grid_smoothness_weight(f, θ, opts.grid.smoothness, grid_int; damping, lp.kw...)", psrc) == 1
+    @test count("select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; damping, lp.kw...)", psrc) == 1
     # the grid smoothness's weight by GCV with the grid held: refused at load (finding 5: GCV linearized the held patches)
     m = thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => "gcv")), "fixed" => ["camera"])))
     @test occursin("`grid.smoothness.weight = \"gcv\"` with \"camera\" in `fixed`", m)
-    @test RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => 0.1)), "fixed" => ["camera"])).grid.smoothness == RC.PSplineSmoothness(3, 0.1)
-    @test RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "none")), "fixed" => ["camera"])).grid.smoothness == RC.NoSmoothness()
+    @test last(RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => 0.1)), "fixed" => ["camera"]))).grid.smoothness == RC.PSplineSmoothness(3, 0.1)
+    @test last(RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "none")), "fixed" => ["camera"]))).grid.smoothness == RC.NoSmoothness()
     # … on a grid route only: the parametric route (a `lens:` start) has no lattice, so a grid key it states is refused as unusable
     # (RC 0.11.4, owner ruling: never ignored), not as the grid route's GCV conflict
     m = thrown_message(() -> RC.pipeline_options(Dict("io" => Dict("init" => "lens:a/lens.json"), "grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => "gcv")),
                                                       "fixed" => ["camera"])))
     @test occursin("`grid.smoothness` cannot be used", m) && !occursin("gcv", m)
     # the start's kind, decided once (finding 6): what prepare_refinement refines and what its io.save_init writes
-    @test !RC.start_is_grid(RC.pipeline_options(Dict("io" => Dict("init" => "lens:a/lens.json"))))
-    @test all(i -> RC.start_is_grid(RC.pipeline_options(Dict("io" => Dict("init" => i)))), ("", "grid:a/grid.json"))
+    @test !RC.start_is_grid(first(RC.pipeline_options(Dict("io" => Dict("init" => "lens:a/lens.json")))))
+    @test all(i -> RC.start_is_grid(first(RC.pipeline_options(Dict("io" => Dict("init" => i))))), ("", "grid:a/grid.json"))
     @test count("route = lm_route(lens0)", psrc) == 2 && !occursin("parametric = ", psrc)               # the route: the start camera's type, never a Bool
     # GPU first: a refinement's device, and its image region's measurement, is default_backend() (Core's default_device(), warning on the CPU) unless the caller names one (review
     # finding 10: prepare_refinement defaulted to the CPU)
     ssrc = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "calibration_start.jl"), String)
     csrc = read(joinpath(pkgdir(RadiometricCamera), "src", "calibration", "calibrate.jl"), String)
-    @test occursin("_calibration_device(::VgtkCore.NullParameters) = default_backend()", csrc)
-    @test occursin("function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = default_backend(),", ssrc)
+    @test occursin("_calibration_device(::NamedTuple{(:run,)}) = default_backend()", csrc)
+    @test occursin("function load_calibration_start(dir::AbstractString; run::RunOptions, settings::CalibrationSettings, device = default_backend(),", ssrc)
     @test occursin("function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,\n                              device = default_backend(),", psrc)
     @test !occursin("_lm_problem_kw", psrc) && count("if !getfield(blocks, k)", psrc) == 1                       # the held blocks: derived once
     # the printed edge is never a parameter, so no route can leave it free and unsolved (review finding 2: a parametric run recorded
     # it free and never solved it): whatever the holds the problem's keywords hold no edge, on either route
-    edge_free = RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"))); edge_held = RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "fixed" => ["aperture"]))
+    edge_free = last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board")))); edge_held = last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "fixed" => ["aperture"])))
     @test all(!(:edge in RC._refinement_lm(o, p).kw.fixed) && !haskey(RC._refinement_lm(o, p).kw, :edge_block) for o in (edge_free, edge_held), p in (RC.PerViewRoute(), RC.PerTileRoute()))
     @test !isdefined(RC, :_check_parametric_edge)
     m = thrown_message(() -> RC.pipeline_options(Dict("material" => Dict("freeze" => true)))); @test occursin("[material]", m) && occursin("\"freeze\"", m)
@@ -203,7 +207,7 @@ end
     for (k, v) in (("image_circle_frames", "frames"), ("image_circle_outlier_halfwidth_px", 512.1), ("image_circle_min_hole_area_px", 8.0))
         m = thrown_message(() -> RC.pipeline_options(Dict("camera" => Dict(k => v)))); @test occursin("`camera.$k` is retired", m)
     end
-    @test RC.PipelineOptions().camera.lens_coverage == RC.SENSOR_LENS_COVERAGE == "sensor"                     # default.toml: the sensor
+    @test RC.RunOptions().camera.lens_coverage == RC.SENSOR_LENS_COVERAGE == "sensor"                     # default.toml: the sensor
     @test occursin("camera.lens_coverage", thrown_message(() -> RC.pipeline_options(Dict("camera" => Dict("lens_coverage" => "")))))   # stated, never empty
     @test !RC.names_input_path("camera.lens_coverage", "sensor") && RC.names_input_path("camera.lens_coverage", "regions/image_region.json")
     @test occursin("is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["camera.image_circle_min_hole_area_px=8"])))
@@ -222,7 +226,7 @@ end
         @test occursin("`edge.free` is retired", m) && occursin("never a parameter", m)
     end
     @test occursin("`lm.fix` is retired: renamed `fixed`", thrown_message(() -> RC.pipeline_options(Dict("lm" => Dict("fix" => ["edge"])))))
-    let c = RC.pipeline_options(Dict("camera" => Dict("lens_coverage" => "regions/image_region.json"))).camera
+    let c = first(RC.pipeline_options(Dict("camera" => Dict("lens_coverage" => "regions/image_region.json")))).camera
         @test c.lens_coverage == "regions/image_region.json" && !hasfield(RC.CameraOptions, :image_circle_frames) && !hasfield(RC.CameraOptions, :image_circle_outlier_halfwidth_px)
     end
     @test occursin("image_circle", thrown_message(() -> RC.pipeline_options(Dict("camera" => Dict("image_circle" => [1.0, 2.0, 3.0])))))   # retired: measured
@@ -238,12 +242,12 @@ end
     @test occursin("warping.inplane", thrown_message(() -> RC.pipeline_options(Dict("warping" => Dict("inplane" => "affine")))))
     @test occursin("warping.inplane_start", thrown_message(() -> RC.pipeline_options(Dict("warping" => Dict("inplane_start" => [0.01])))))
     @test occursin("warping.inplane_start", thrown_message(() -> RC.pipeline_options(Dict("warping" => Dict("inplane_start" => [0.01, NaN])))))
-    let o = RC.pipeline_options(Dict("warping" => Dict("inplane" => "aspect_skew", "inplane_start" => [0.01, -0.002]), "fixed" => ["inplane"]))
+    let o = last(RC.pipeline_options(Dict("warping" => Dict("inplane" => "aspect_skew", "inplane_start" => [0.01, -0.002]), "fixed" => ["inplane"])))
         @test o.warping.inplane == "aspect_skew" && o.warping.inplane_start == [0.01, -0.002] && "inplane" in o.fixed
         @test RC._inplane_start(o) == [0.01, -0.002] && !RC._surface_free(o, :inplane)
     end
-    @test RC._surface_free(RC.pipeline_options(Dict("warping" => Dict("inplane" => "aspect_skew"))), :inplane) && iszero(RC._inplane_start(RC.PipelineOptions()))
-    @test !RC._surface_free(RC.PipelineOptions(), :inplane) && RC.PipelineOptions().warping.inplane == "none"
+    @test RC._surface_free(last(RC.pipeline_options(Dict("warping" => Dict("inplane" => "aspect_skew")))), :inplane) && iszero(RC._inplane_start(RC.CalibrationSettings()))
+    @test !RC._surface_free(RC.CalibrationSettings(), :inplane) && RC.CalibrationSettings().warping.inplane == "none"
     # grid.start_perturbation: a table, both keys required (no default), no other key, σ ≥ 0
     sp(t) = thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("start_perturbation" => t))))
     m = sp(Dict("sigma_px" => 0.5))
@@ -256,10 +260,10 @@ end
     @test occursin("grid.start_perturbation.seed", sp(Dict("sigma_px" => 0.5, "seed" => "x")))
     @test occursin("sigma_px", sp(Dict("sigma_px" => -1.0, "seed" => 7)))
     @test occursin("grid.start_perturbation", sp(Dict{String, Any}()))
-    o = RC.pipeline_options(Dict("grid" => Dict("start_perturbation" => Dict("sigma_px" => 0.5, "seed" => 7))))
+    _, o = RC.pipeline_options(Dict("grid" => Dict("start_perturbation" => Dict("sigma_px" => 0.5, "seed" => 7))))
     @test o.grid.start_perturbation == RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)
-    @test RC.pipeline_options(Dict{String, Any}()).grid.start_perturbation === nothing
-    @test RC.pipeline_options(Dict{String, Any}(); set = ["grid.start_perturbation.sigma_px=0.25", "grid.start_perturbation.seed=3"]).grid.start_perturbation ==
+    @test last(RC.pipeline_options(Dict{String, Any}())).grid.start_perturbation === nothing
+    @test last(RC.pipeline_options(Dict{String, Any}(); set = ["grid.start_perturbation.sigma_px=0.25", "grid.start_perturbation.seed=3"])).grid.start_perturbation ==
           RC.StartPerturbationOptions(; sigma_px = 0.25, seed = 3)
     @test occursin("frontend", thrown_message(() -> RC.pipeline_options(Dict("frontend" => Dict("board" => "x")))))           # retired: the session's records
     @test occursin("must be a table", thrown_message(() -> RC.pipeline_options(Dict("lm" => 3))))
@@ -286,15 +290,15 @@ end
     for reg in (RC.FRONTEND_TAGS, RC.VIGNETTING_CONFIG_TAGS, RC.BACKEND_TAGS, RC.LATTICE_TAGS, RC.SENSOR_MODEL_TAGS)   # every enumeration a registry (0.11.5)
         @test isempty(VgtkCore.tag_rule_violations(reg))
     end
-    @test RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps"))).frontend.type === RC.SchoepsFrontend
-    @test RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial"))).vignetting.model === VrtkCore.RadialVignetting
+    @test first(RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps")))).frontend.type === RC.SchoepsFrontend
+    @test last(RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial")))).vignetting.model === VrtkCore.RadialVignetting
     # the vignetting field is a tag of Core's VIGNETTING_TAGS, and a refinement fits the radial profile alone: "tensor_product" and
     # "log" are refused by name, the retired "tensor" names its successor
     @test occursin("a refinement fits \"radial\" alone", thrown_message(() -> RC.pipeline_options(Dict("vignetting" => Dict("model" => "tensor_product")))))
     @test occursin("renamed \"tensor_product\"", thrown_message(() -> RC.pipeline_options(Dict("vignetting" => Dict("model" => "tensor")))))
     @test occursin("\"log\"", thrown_message(() -> RC.pipeline_options(Dict("vignetting" => Dict("model" => "log")))))
-    @test RC.pipeline_options(Dict("compute" => Dict("backend" => "cpu"))).compute.backend === RC.CPUCompute
-    @test RC.pipeline_options(Dict("compute" => Dict("backend" => "gpu"))).compute.backend === RC.GPUCompute === RC.ComputeOptions().backend
+    @test first(RC.pipeline_options(Dict("compute" => Dict("backend" => "cpu")))).compute.backend === RC.CPUCompute
+    @test first(RC.pipeline_options(Dict("compute" => Dict("backend" => "gpu")))).compute.backend === RC.GPUCompute === RC.ComputeOptions().backend
     # the backend's retired tag "cuda" (2026-11-13: any KernelAbstractions GPU backend) names its successor
     @test occursin("renamed \"gpu\"", thrown_message(() -> RC.pipeline_options(Dict("compute" => Dict("backend" => "cuda")))))
     m = thrown_message(() -> RC.pipeline_options(Dict("frontend" => Dict("type" => "blobs"))))
@@ -310,14 +314,14 @@ end
 @testitem "pipeline options (TOML): --set overrides" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: focus
     using TOML
-    alg, stops = RC.read_calibration(Dict{String, Any}("config_version" => 2);
-                                     set = ["optimizer.max_time=1e-10", "optimizer.max_iter=2", "io.out=/tmp/rc out", "frontend.type=schoeps",
-                                            "io.views=[\"V01.png\", \"V02.png\"]", "camera.lens_coverage=/data/image_region.json",
-                                            "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.support_min=0.25"])
-    o = alg.refinement.options
-    @test stops.max_time == 1e-10 && stops.max_iter == 2 && o.io.out == "/tmp/rc out" && o.frontend.type === RC.SchoepsFrontend
-    @test o.io.views == ["V01.png", "V02.png"] && o.camera.lens_coverage == "/data/image_region.json"
-    @test o.grid.smoothness == RC.BendingSmoothness(0.1) && o.focus.support_min == 0.25
+    run, alg, stops = RC.read_calibration(Dict{String, Any}("config_version" => 2);
+                                          set = ["optimizer.max_time=1e-10", "optimizer.max_iter=2", "io.out=/tmp/rc out", "frontend.type=schoeps",
+                                                 "io.views=[\"V01.png\", \"V02.png\"]", "camera.lens_coverage=/data/image_region.json",
+                                                 "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.support_min=0.25"])
+    settings = alg.refinement.settings
+    @test stops.max_time == 1e-10 && stops.max_iter == 2 && run.io.out == "/tmp/rc out" && run.frontend.type === RC.SchoepsFrontend
+    @test run.io.views == ["V01.png", "V02.png"] && run.camera.lens_coverage == "/data/image_region.json"
+    @test settings.grid.smoothness == RC.BendingSmoothness(0.1) && settings.focus.support_min == 0.25
     # an override replaces a file's value and is refused like a file's unknown key
     @test last(RC.read_calibration(Dict("lm" => Dict("max_iter" => 7)); set = ["lm.max_iter=3"])).max_iter == 3     # a version-1 table, its names
     @test last(RC.read_calibration(Dict("config_version" => 2, "optimizer" => Dict("max_iter" => 7)); set = ["optimizer.max_iter=3"])).max_iter == 3
@@ -325,47 +329,47 @@ end
     @test occursin("key.path=value", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["lm.max_iter"])))
     # one TOML value per override; a quoted string stays a string
     @test occursin("not one TOML value", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["lm.max_iter=1\nmax_time = 2"])))
-    @test RC.pipeline_options(Dict{String, Any}(); set = ["io.out=\"2024\""]).io.out == "2024"
+    @test first(RC.pipeline_options(Dict{String, Any}(); set = ["io.out=\"2024\""])).io.out == "2024"
 end
 
 @testitem "pipeline options (TOML): config_dict round-trips through TOML" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: focus, material
     using TOML
-    o = RC.PipelineOptions(; io = RC.IOOptions(; images = "imgs", out = "out", views = ["a.png"], linearize = true),
-                           frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, page_mm = (1000.0, 1000.0)),
-                           camera = RC.CameraOptions(; lens_coverage = "regions/image_region.json"),
-                           grid = RC.GridOptions(; smoothness = RC.BendingSmoothness(1e-2),
-                                                 start_perturbation = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)), focus = RC.FocusOptions(; support_min = 0.1, smoothness = RC.BendingSmoothness(0.5)),
-                           vignetting = RC.VignettingOptions(; model = VrtkCore.RadialVignetting, node_count = 16),
-                           fixed = ["material", "lighting", "aperture"],
-                           edge = RC.EdgeOptions(; ink_spread_mm = 0.02, print_sigma_mm = 0.03), compute = RC.ComputeOptions(; backend = RC.CPUCompute))
-    back = RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o)))))
+    run = RC.RunOptions(; io = RC.IOOptions(; images = "imgs", out = "out", views = ["a.png"], linearize = true),
+                        frontend = RC.FrontendOptions(; type = RC.SchoepsFrontend, page_mm = (1000.0, 1000.0)),
+                        camera = RC.CameraOptions(; lens_coverage = "regions/image_region.json"), compute = RC.ComputeOptions(; backend = RC.CPUCompute))
+    settings = RC.CalibrationSettings(; grid = RC.GridOptions(; smoothness = RC.BendingSmoothness(1e-2),
+                                                       start_perturbation = RC.StartPerturbationOptions(; sigma_px = 0.5, seed = 7)), focus = RC.FocusOptions(; support_min = 0.1, smoothness = RC.BendingSmoothness(0.5)),
+                                     vignetting = RC.VignettingOptions(; model = VrtkCore.RadialVignetting, node_count = 16),
+                                     fixed = ["material", "lighting", "aperture"],
+                                     edge = RC.EdgeOptions(; ink_spread_mm = 0.02, print_sigma_mm = 0.03))
+    o = (run, settings)
+    back = RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o...)))))
     @test back == o
-    # the calibration (its options, its optimizer) and its solve's stops round-trip too, the record a current version (`config_version`)
-    alg = RC.RadiometricCalibration(RC.RadiometricRefinement(o; log = "lm.tsv")); stops = RC._calibration_stops(; max_iter = 2)
-    d = TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(alg, stops))))
+    # the calibration (its settings, its optimizer), the run and its solve's stops round-trip too, the record a current version (`config_version`)
+    alg = RC.RadiometricCalibration(RC.RadiometricRefinement(settings; log = "lm.tsv")); stops = RC._calibration_stops(; max_iter = 2)
+    d = TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(run, alg, stops))))
     @test d["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS) && d["optimizer"]["max_iter"] == 2 &&
           d["optimizer"]["type"] == "levenberg_marquardt"
-    alg2, stops2 = RC.read_calibration(d)
-    @test alg2.refinement.options == o && alg2.refinement.log == "lm.tsv" && alg2.refinement.optimizer == alg.refinement.optimizer && stops2 == stops
-    @test RC.pipeline_options(RC.config_dict(RC.PipelineOptions())) == RC.PipelineOptions()
+    run2, alg2, stops2 = RC.read_calibration(d)
+    @test run2 == run && alg2.refinement.settings == settings && alg2.refinement.log == "lm.tsv" && alg2.refinement.optimizer == alg.refinement.optimizer && stops2 == stops
+    @test RC.pipeline_options(RC.config_dict(RC.RunOptions(), RC.CalibrationSettings())) == (RC.RunOptions(), RC.CalibrationSettings())
     # the camera's in-focus blur is removed: its two keys are retired (RC 0.11.0), refused by name whatever their value
     @test_throws "`rendering.psf_sigma` is retired" RC.pipeline_options(Dict{String, Any}("rendering" => Dict{String, Any}("psf_sigma" => 0.0)))
     @test_throws "`edge.camera_sigma_px` is retired" RC.pipeline_options(Dict{String, Any}("edge" => Dict{String, Any}("camera_sigma_px" => [0, 0, 0])))
-    @test RC.config_dict(o)["frontend"]["type"] == "schoeps" && RC.config_dict(o)["compute"]["backend"] == "cpu"
-    @test RC.config_dict(o)["grid"]["smoothness"] == Dict("type" => "bending", "weight" => 1e-2) && !haskey(RC.config_dict(o), "optimizer")
-    @test RC.config_dict(o)["grid"]["start_perturbation"] == Dict("sigma_px" => 0.5, "seed" => 7)
-    @test !haskey(RC.config_dict(RC.PipelineOptions())["grid"], "start_perturbation")     # absent: not written
+    @test RC.config_dict(o...)["frontend"]["type"] == "schoeps" && RC.config_dict(o...)["compute"]["backend"] == "cpu"
+    @test RC.config_dict(o...)["grid"]["smoothness"] == Dict("type" => "bending", "weight" => 1e-2) && !haskey(RC.config_dict(o...), "optimizer")
+    @test RC.config_dict(o...)["grid"]["start_perturbation"] == Dict("sigma_px" => 0.5, "seed" => 7)
+    @test !haskey(RC.config_dict(RC.RunOptions(), RC.CalibrationSettings())["grid"], "start_perturbation")     # absent: not written
 end
 
 @testitem "pipeline options (TOML): every string option is declared an input path, an output path or no path" setup = [RCFixtures, PipelineOptionsHelpers] begin
-    strings = ["$t.$k" for t in fieldnames(RC.PipelineOptions) for (k, K) in zip(fieldnames(fieldtype(RC.PipelineOptions, t)), fieldtypes(fieldtype(RC.PipelineOptions, t)))
-               if K === String]
+    strings = ["$t.$k" for (t, T) in OPTION_TABLES for (k, K) in zip(fieldnames(T), fieldtypes(T)) if K === String]
     append!(strings, "optimizer.$k" for (k, K) in zip(fieldnames(RC.OptimizerTable), fieldtypes(RC.OptimizerTable)) if K === String)
     declared = vcat(collect(RC.PIPELINE_PATH_KEYS), collect(RC.PIPELINE_OUTPUT_KEYS), collect(RC._NOT_PATH_KEYS))
     @test allunique(declared)
     @test sort(strings) == sort(declared)
-    @test all(k -> haskey_path(RC.PipelineOptions, k), declared)
+    @test all(haskey_path, declared)
 end
 
 @testitem "pipeline options (TOML): the pipeline's random draws are version-stable (masks.seed)" setup = [RCFixtures, PipelineOptionsHelpers] begin
@@ -460,14 +464,14 @@ end
     using TOML
     using VisualGeometryToolkitEstimation: GeneralizedCrossValidation   # a weight chosen by GCV: the algorithm value (the TOML's "gcv")
     # the defaults: the grid's P-spline of its Δ³ at 0.1, the vignetting's Δ³ at 0, the focus's bending at 0 (RC 0.11.0's tables)
-    d = RC.PipelineOptions()
+    d = RC.CalibrationSettings()
     @test d.grid.smoothness == RC.PSplineSmoothness(3, 0.1) && d.vignetting.smoothness == RC.PSplineSmoothness(3, 0.0) && d.focus.smoothness == RC.BendingSmoothness(0.0)
     # each table round-trips through TOML, dispatched by its type (no flag)
     for (comp, sm) in (("grid", RC.PSplineSmoothness(3, GeneralizedCrossValidation())), ("grid", RC.BendingSmoothness(0.5)), ("grid", RC.NoSmoothness()),
                        ("vignetting", RC.PSplineSmoothness(3, GeneralizedCrossValidation())), ("vignetting", RC.NoSmoothness()), ("focus", RC.BendingSmoothness(0.25)))
         o = RC.pipeline_options(Dict(comp => Dict("smoothness" => RC.smoothness_table(sm))))
-        @test getfield(o, Symbol(comp)).smoothness == sm
-        @test RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o))))) == o
+        @test option_table(o, Symbol(comp)).smoothness == sm
+        @test RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o...))))) == o
     end
     @test RC.smoothness_line(RC.PSplineSmoothness(3, 0.1)) == "pspline order 3, weight 0.1" && RC.smoothness_line(RC.NoSmoothness()) == "none"
     # the retired keys are refused by name, the replacement named
@@ -489,24 +493,23 @@ end
 @testitem "pipeline options (TOML): a switch is \"on\" | \"off\" (RC 0.11.4); a boolean is refused naming its new spelling" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using TOML
     # every Bool option is a switch, and these are all of them
-    switches = [(String(t), String(k)) for t in fieldnames(RC.PipelineOptions) if t !== :fixed
-                for (k, K) in zip(fieldnames(fieldtype(RC.PipelineOptions, t)), fieldtypes(fieldtype(RC.PipelineOptions, t))) if K === Bool]
+    switches = [(String(t), String(k)) for (t, T) in OPTION_TABLES if t !== :fixed for (k, K) in zip(fieldnames(T), fieldtypes(T)) if K === Bool]
     @test Set("$t.$k" for (t, k) in switches) ==
           Set(["io.linearize", "io.checkpoint_each", "io.render_init", "rendering.hammersley", "resume.sweep", "selfcheck.only"])
     # and the algorithm's one, `sweep.joint` (read by read_calibration: the closed-form blocks jointly); the joint solve has no
     # vignetting smoothness, so its "on" is read beside a smoothness of none
     none = Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none")))
-    jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
-    joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
+    jrun, jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
+    _, joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
     @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.damping == jon.refinement.optimizer.damping && joff.refinement.radiometry isa RC.RadiometryBlockDescent
-    @test RC.config_dict(jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(joff, joff_stops)["sweep"]["joint"] == "off"
+    @test RC.config_dict(jrun, jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(jrun, joff, joff_stops)["sweep"]["joint"] == "off"
     @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
     for (t, k) in switches
         cfg(v) = Dict{String, Any}(t => Dict{String, Any}(k => v))
         on, off = RC.pipeline_options(cfg("on")), RC.pipeline_options(cfg("off"))
-        @test getfield(getfield(on, Symbol(t)), Symbol(k)) === true && getfield(getfield(off, Symbol(t)), Symbol(k)) === false
-        @test RC.config_dict(on)[t][k] == "on" && RC.config_dict(off)[t][k] == "off"          # the writer spells it
-        @test RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(on))))) == on
+        @test getfield(option_table(on, Symbol(t)), Symbol(k)) === true && getfield(option_table(off, Symbol(t)), Symbol(k)) === false
+        @test RC.config_dict(on...)[t][k] == "on" && RC.config_dict(off...)[t][k] == "off"          # the writer spells it
+        @test RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(on...))))) == on
         @test TOML.parsefile(joinpath(RC_ROOT, "configs", "default.toml"))[t][k] == "off"      # every default: "off"
         for (b, w) in ((true, "on"), (false, "off"))                                           # the old boolean, refused (no alias)
             m = thrown_message(() -> RC.pipeline_options(cfg(b)))
@@ -516,7 +519,7 @@ end
         @test occursin("is not one of", thrown_message(() -> RC.pipeline_options(cfg(1))))
     end
     # --set: `table.key=on`; the old `=true` refused by the same message
-    @test RC.pipeline_options(Dict{String, Any}(); set = ["rendering.hammersley=on"]).rendering.hammersley
+    @test last(RC.pipeline_options(Dict{String, Any}(); set = ["rendering.hammersley=on"])).rendering.hammersley
     @test occursin("use `io.render_init = \"on\"`", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["io.render_init=true"])))
     # the one reader and its inverse
     @test RC.read_switch("on", "k") === true && RC.read_switch("off", "k") === false
@@ -539,7 +542,7 @@ end
         m = thrown_message(() -> RC.pipeline_options(Dict(t => Dict(k => 16))))
         @test occursin("`$t.$k` is retired", m) && occursin(names, m)
     end
-    @test RC.pipeline_options(Dict("vignetting" => Dict("node_count" => 12))).vignetting.node_count == 12
+    @test last(RC.pipeline_options(Dict("vignetting" => Dict("node_count" => 12)))).vignetting.node_count == 12
     # the package's configs carry no boolean switch (the paper project's: experiments/test, calibration_tests.jl)
     @test isempty(RC.boolean_switch_violations([joinpath(RC_ROOT, "configs")]))
 end
@@ -550,17 +553,17 @@ end
     @test cur == 2
     # a version-1 file (no config_version): [lm] is the optimizer's table, the old key spelling the current key, values as stored
     v1 = Dict{String, Any}("lm" => Dict{String, Any}("max_iter" => 7, "log" => "x.tsv"), "camera" => Dict{String, Any}(old => "s.json"))
-    alg, stops = RC.read_calibration(v1)
-    @test stops.max_iter == 7 && alg.refinement.log == "x.tsv" && alg.refinement.options.camera.sensor_characterization == "s.json"
-    @test RC.pipeline_options(v1) == alg.refinement.options
+    run, alg, stops = RC.read_calibration(v1)
+    @test stops.max_iter == 7 && alg.refinement.log == "x.tsv" && run.camera.sensor_characterization == "s.json"
+    @test RC.pipeline_options(v1) == (run, alg.refinement.settings)
     # a version-2 file names them as version 2 does: a version-1 name in it is refused, naming the current one
     @test occursin("optimizer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "lm" => Dict{String, Any}()))))
     @test occursin("sensor_characterization",
                    thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "camera" => Dict{String, Any}(old => "s.json")))))
     @test occursin("newer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 3))))
     # the writer states the current version, and its record reads back
-    d = RC.config_dict(alg, stops)
-    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && first(RC.read_calibration(d)).refinement.options == alg.refinement.options
+    d = RC.config_dict(run, alg, stops)
+    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && (r2 = RC.read_calibration(d); r2[1] == run && r2[2].refinement.settings == alg.refinement.settings)
     # a current key as a stored table names it: a table's rename undone, a key renamed inside its table kept
     @test RC.config_key(v1, "optimizer.max_iter") == "lm.max_iter" && RC.config_key(d, "optimizer.max_iter") == "optimizer.max_iter"
     @test RC.config_key(v1, "optimizer") == "lm" && RC.config_key(v1, "io.out") == "io.out"

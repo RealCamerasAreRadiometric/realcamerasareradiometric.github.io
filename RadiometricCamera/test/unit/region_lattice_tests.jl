@@ -71,7 +71,7 @@ end
     end
     # N = 7875 on the FX3 sensor (configs/default.toml's derivation of the example count): the 41 px cell, 107 × 73 = 7811 nodes, padded to 110 × 75
     fx3 = cam(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), 3000.0, (2128.0, 1424.0), 4256, 2848)
-    @test RC.PipelineOptions().grid.node_count === nothing                       # no default: a parametric start states it (lattice = "node_count")
+    @test RC.CalibrationSettings().grid.node_count === nothing                       # no default: a parametric start states it (lattice = "node_count")
     s = _region_start(fx3, 7875)
     @test s.spacing == 41 && s.supported == 107 * 73 && grid_dims(s.camera) == (110, 75)
 end
@@ -97,7 +97,7 @@ end
     for coverage in (nothing, circle)
         a = _exact_start(src; coverage)
         b = _start_grid(src, RC.GridOptions(); coverage)                          # grid.lattice = "derived": the exact start, m = 1
-        mb = VgtkCore.model(b.camera); ma = VgtkCore.model(a.camera)
+        mb = VgtkCore.model(b.camera); ma = VgtkCore.model(first(a).camera)
         @test isequal(VgtkCore.directions(mb), VgtkCore.directions(ma)) && VgtkCore.present_nodes(mb) == VgtkCore.present_nodes(ma)
         @test VgtkCore.calibration_matrix(mb) == VgtkCore.calibration_matrix(ma) && VgtkCore.lattice_spacing(mb) == VgtkCore.lattice_spacing(ma)
         @test isequal(b.resample, a.resample) && b.resample.subdivision == [1, 1]
@@ -113,7 +113,7 @@ end
     bc = cam(VgtkCore.Lens(VgtkCore.Perspective(), VgtkCore.Additive(VgtkCore.Radial((-0.3, 0.04)), VgtkCore.Tangential(1.0e-3, -5.0e-4))), 800.0, (700.0, 430.0), W, H)
     @test VgtkCore.valid_domain(VgtkCore.model(bc)) isa VgtkCore.PolygonRegion        # the polygon, about a decentred principal point
     opts = RC.pipeline_options(Dict("grid" => Dict("lattice" => "node_count", "node_count" => 300)))   # the sensor as the coverage (default)
-    st = RC._session_start(opts, bc)
+    st = RC._session_start(opts..., bc)
     @test st.resample === nothing && all(grid_dims(st.lens) .% GRID_PATCH .== 0)
     @test count(VgtkCore.present_nodes(VgtkCore.model(st.lens))) <= 300                 # the node count's bound
     mktempdir() do dir
@@ -128,7 +128,7 @@ end
     d = Dict("frontend" => Dict("type" => "schoeps"), "grid" => Dict("lattice" => "derived", "node_count" => 5000))
     m = try RC.pipeline_options(d); "" catch e; sprint(showerror, e) end
     @test occursin("grid.node_count", m) && occursin("Schöps", m)
-    @test RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps"), "grid" => Dict("lattice" => "derived"))).grid.node_count === nothing
-    @test RC.inapplicable_reason(RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps"))), "grid", "node_count") !== nothing
+    @test last(RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps"), "grid" => Dict("lattice" => "derived")))).grid.node_count === nothing
+    @test RC.inapplicable_reason(RC.pipeline_options(Dict("frontend" => Dict("type" => "schoeps")))..., "grid", "node_count") !== nothing
 end
 

@@ -23,20 +23,20 @@
 
     mktempdir() do dir
         log = joinpath(dir, "lm.tsv")
-        alg, stops = RC.read_calibration(Dict("fixed" => ["material"], "lm" => Dict("log" => log), "warping" => Dict("degree" => 1),
+        run, alg, stops = RC.read_calibration(Dict("fixed" => ["material"], "lm" => Dict("log" => log), "warping" => Dict("degree" => 1),
                                         "material" => Dict("mu_bounds" => [0.6, 1.0]), "compute" => Dict("jacobian_chunk" => 7),
                                         "resume" => Dict("state" => joinpath(dir, "state.json")),
                                         "io" => Dict("out" => mkpath(joinpath(dir, "out")), "images" => dir),
                                         "selfcheck" => Dict("only" => "on")))
-        opts = alg.refinement.options
+        settings = alg.refinement.settings
         # a run of these settings, stopped after it took them in: the preparation (its resume state is absent) and the
         # refinement (its resume reader)
-        @test_throws Exception RC.start_geometry(opts)
+        @test_throws Exception RC.start_geometry(run, settings)
         s = fresh()
         meta = (; names = ["a", "b"], W₀ = W, H₀ = H, fpx = 41.216, lens0 = s.u0.camera.geometric, views0 = nothing,
                 features = nothing, costs = (; linear = (0.0, 0.0)), grid_smoothness = nothing)
         s.f.start = meta
-        @test_throws "stop" RC._calibrate!(s.f, s.u0, alg.refinement, stops; load_state = _ -> error("stop"))
+        @test_throws "stop" RC._calibrate!(s.f, s.u0, run, alg.refinement, stops; load_state = _ -> error("stop"))
 
         # the next problem of the session: the material free, μ on (0, 1), no LM log
         s2 = fresh()
@@ -47,14 +47,14 @@
         _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = 1)
         @test !isfile(log)                                                                   # the run's log is the run's
         # … and the run's own problem has them: Θ_m held inside the riding block, μ on the run's bounds
-        lp = RC._refinement_lm(opts, RC.PerViewRoute())
+        lp = RC._refinement_lm(settings, RC.PerViewRoute())
         s3 = fresh()
         prob3, idx3 = build_problem(s3.f, s3.u0; damping = alg.refinement.optimizer.damping, lp.kw...)
         mv3 = material_var(prob3)
         @test idx3.free[idx3.material]                                                       # the block stays variable (the warping rides)
         m3 = NL.update(mv3, increment(mv3))
         @test RC.Θ_m_nonlinear(m3.mat) == RC.Θ_m_nonlinear(mv3.mat) && m3.mat.diffuse_weight == mv3.mat.diffuse_weight && m3.surface.h != mv3.surface.h
-        s4 = fresh(); s4.f.mu_bounds = opts.material.mu_bounds
+        s4 = fresh(); s4.f.mu_bounds = settings.material.mu_bounds
         mv4 = material_var(first(build_problem(s4.f, s4.u0; damping = VgtkCore.LevenbergDamping())))
         @test NL.update(mv4, increment(mv4)).mat.diffuse_weight >= 0.6                                         # the chart's lower end, the run's 0.6
         _lm_views!(s4.f, s4.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), lm_log = log)

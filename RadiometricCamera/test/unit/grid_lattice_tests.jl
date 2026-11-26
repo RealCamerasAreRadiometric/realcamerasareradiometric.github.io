@@ -6,13 +6,13 @@
 
 @testitem "grid lattice: parsed once into a type, the writer round-trips" setup = [RCFixtures] begin
     using RadiometricCamera: DerivedLattice, NodeCountLattice, LATTICE_TAGS, config_dict, pipeline_options
-    @test RC.PipelineOptions().grid.lattice === DerivedLattice() && RC.PipelineOptions().grid.node_count === nothing   # default.toml: "derived"
+    @test RC.CalibrationSettings().grid.lattice === DerivedLattice() && RC.CalibrationSettings().grid.node_count === nothing   # default.toml: "derived"
     o = pipeline_options(Dict("grid" => Dict("lattice" => "node_count", "node_count" => 875)))
-    @test o.grid.lattice === NodeCountLattice() && o.grid.node_count == 875
-    d = config_dict(o)
+    @test last(o).grid.lattice === NodeCountLattice() && last(o).grid.node_count == 875
+    d = config_dict(o...)
     @test d["grid"]["lattice"] == "node_count" && d["grid"]["node_count"] == 875 && pipeline_options(d) == o
     od = pipeline_options(Dict("grid" => Dict("lattice" => "derived")))     # no target: m = 1
-    @test od.grid.lattice === DerivedLattice() && !haskey(config_dict(od)["grid"], "node_count") && pipeline_options(config_dict(od)) == od
+    @test last(od).grid.lattice === DerivedLattice() && !haskey(config_dict(od...)["grid"], "node_count") && pipeline_options(config_dict(od...)) == od
     @test collect(keys(LATTICE_TAGS)) == ["derived", "node_count"]
 end
 
@@ -21,7 +21,7 @@ end
     # an unknown mode, and the TOML boolean of a switch
     @test occursin("`grid.lattice`", msg(Dict("grid" => Dict("lattice" => "fitted")))) && occursin("\"derived\"", msg(Dict("grid" => Dict("lattice" => "fitted"))))
     # "derived" reads a node count as its target of present nodes (owner 2026-11-15, 23:25)
-    @test RC.pipeline_options(Dict("grid" => Dict("lattice" => "derived", "node_count" => 875))).grid.node_count == 875
+    @test last(RC.pipeline_options(Dict("grid" => Dict("lattice" => "derived", "node_count" => 875)))).grid.node_count == 875
     # "node_count" needs its count
     m = msg(Dict("grid" => Dict("lattice" => "node_count")))
     @test occursin("grid.node_count", m) && occursin("node_count", m)
@@ -45,7 +45,7 @@ end
     m = msg(Dict("fixed" => ["focus"], "focus" => Dict("smoothness" => Dict("type" => "none"))))
     @test occursin("`focus.smoothness`", m) && occursin("fixed", m)
     # the applicable spellings read
-    @test RC.pipeline_options(Dict("io" => Dict("init" => "lens:x.json"))).grid == RC.GridOptions()
+    @test last(RC.pipeline_options(Dict("io" => Dict("init" => "lens:x.json")))).grid == RC.GridOptions()
 end
 
 @testitem "grid lattice: the start dispatches on the source and the mode" setup = [RCFixtures] begin

@@ -1,6 +1,6 @@
 @testitem "the page's ±y choice of a rendered or resumed state holds (page_flip)" begin
     const RC = RadiometricCamera
-    opts(; render_state = "", resume = "") = RC.PipelineOptions(; io = RC.IOOptions(; render_state), resume = RC.ResumeOptions(; state = resume))
+    opts(; render_state = "", resume = "") = RC.RunOptions(; io = RC.IOOptions(; render_state), resume = RC.ResumeOptions(; state = resume))
     never(path) = error("no state should be read for $path")
     # no state to render or resume: nothing is read, both directions are scored
     @test RC._state_page_flip(opts(), never) === nothing

@@ -41,7 +41,7 @@
         e = try RC.pipeline_options(Dict("masks" => Dict(k => 1))); nothing catch err; err end
         @test e isa ArgumentError && occursin("samples_per_view", sprint(showerror, e))
     end
-    @test RC.PipelineOptions().masks.samples_per_view == 27500
+    @test RC.CalibrationSettings().masks.samples_per_view == 27500
 end
 
 @testitem "samples: α = 0 is the uniform draw, bit for bit" setup = [RCFixtures] begin
@@ -145,19 +145,19 @@ end
 
 @testitem "samples: the options — the detector table, α = 0 (uniform) the default, the modes together, L0 and importance weights retired" setup = [RCFixtures] begin
     using RadiometricCamera: GaussianDerivativeEdges
-    o = RC.PipelineOptions().masks
+    o = RC.CalibrationSettings().masks
     @test o.gradient_bias == 0.0 && o.edge_detector == GaussianDerivativeEdges(1.5) && o.edge_fraction == 0.0 && o.addon_samples == 0 && o.addon_gradient_bias == 0.0
     @test !hasfield(typeof(o), :importance_weights)
-    p = RC.pipeline_options(Dict("masks" => Dict("gradient_bias" => 2.0, "edge_detector" => Dict("type" => "gaussian_derivative", "sigma" => 2.5)))).masks
+    p = last(RC.pipeline_options(Dict("masks" => Dict("gradient_bias" => 2.0, "edge_detector" => Dict("type" => "gaussian_derivative", "sigma" => 2.5))))).masks
     @test p.gradient_bias == 2.0 && p.edge_detector == GaussianDerivativeEdges(2.5)
-    @test RC.pipeline_options(RC.config_dict(RC.pipeline_options(Dict("masks" => Dict("edge_detector" => Dict("type" => "gaussian_derivative", "sigma" => 2.5)))))).masks.edge_detector ==
+    @test last(RC.pipeline_options(RC.config_dict(RC.pipeline_options(Dict("masks" => Dict("edge_detector" => Dict("type" => "gaussian_derivative", "sigma" => 2.5))))...))).masks.edge_detector ==
           GaussianDerivativeEdges(2.5)                                                       # the writer round-trips
-    @test RC.pipeline_options(Dict("masks" => Dict("gradient_bias" => 0.0, "edge_fraction" => 0.37))).masks.edge_fraction == 0.37
+    @test last(RC.pipeline_options(Dict("masks" => Dict("gradient_bias" => 0.0, "edge_fraction" => 0.37)))).masks.edge_fraction == 0.37
     a = RC.pipeline_options(Dict("masks" => Dict("gradient_bias" => 0.0, "addon_samples" => 100, "addon_gradient_bias" => 2.0)))
-    @test RC.pipeline_options(RC.config_dict(a)).masks == a.masks                 # the writer round-trips (every key, valid together)
+    @test last(RC.pipeline_options(RC.config_dict(a...))).masks == last(a).masks                 # the writer round-trips (every key, valid together)
     e = try RC.pipeline_options(Dict("masks" => Dict("edge_fraction" => 0.37, "gradient_bias" => 1.0))); nothing catch err; err end   # the old rule needs α = 0
     @test e isa ArgumentError && occursin("gradient_bias", sprint(showerror, e))
-    @test RC.pipeline_options(Dict("masks" => Dict("edge_fraction" => 0.37))).masks.edge_fraction == 0.37    # the default α = 0 admits it
+    @test last(RC.pipeline_options(Dict("masks" => Dict("edge_fraction" => 0.37)))).masks.edge_fraction == 0.37    # the default α = 0 admits it
     refused(m) = (try RC.pipeline_options(Dict("masks" => m)); nothing catch err; err end) isa ArgumentError
     @test refused(Dict("edge_fraction" => 1.0, "gradient_bias" => 0.0))
     @test refused(Dict("edge_fraction" => 0.37, "gradient_bias" => 0.0, "addon_samples" => 10))   # one mode at a time

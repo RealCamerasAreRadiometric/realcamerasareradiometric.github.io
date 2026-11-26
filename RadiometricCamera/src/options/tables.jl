@@ -58,11 +58,11 @@ const RC_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera",
 const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")); versions = RC_CONFIG_VERSIONS)
 """The default of the field `f` of the options table `T`: its configs/default.toml value, read as the TOML reader reads a config's."""
 _option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_TOML_DEFAULTS, t, k), "$t.$k"))
-"""The TOML table of the options table type `T` (its field of `PipelineOptions`)."""
-_table_name(::Type{T}) where {T} = String(only(n for n in fieldnames(PipelineOptions) if fieldtype(PipelineOptions, n) === T))
+"""The TOML table of the options table type `T` (its field of `RunOptions` or `CalibrationSettings`)."""
+_table_name(::Type{T}) where {T} = String(only(n for H in _OPTION_HALVES for n in fieldnames(H) if fieldtype(H, n) === T))
 
 # ---- the tables ------------------------------------------------------------------------------------------------------------------
-"""A table of [`PipelineOptions`](@ref): compared field by field."""
+"""A table of [`RunOptions`](@ref) or [`CalibrationSettings`](@ref): compared field by field."""
 abstract type AbstractOptionsTable end
 
 """`io.lens_identity`: the lens a capture was taken with, as the config states it (Core's `DeviceIdentity`; an empty field is
@@ -238,7 +238,7 @@ const OPTIMIZER_TAGS = TagRegistry(:optimizer, "", "levenberg_marquardt" => Vgtk
 
 """`[optimizer]` (version 1: `[lm]`): the refinement's optimizer (`type`, a tag of [`OPTIMIZER_TAGS`](@ref)), its stop settings (the
 solve's `stops`, VisualGeometryToolkitCore's `LmStops`) and its per-iteration log: the table [`read_calibration`](@ref) reads into a
-[`RadiometricCalibration`](@ref) and its stops. Not a table of [`PipelineOptions`](@ref)."""
+[`RadiometricCalibration`](@ref) and its stops. Not a table of [`CalibrationSettings`](@ref): the refinement's own fields."""
 Base.@kwdef struct OptimizerTable <: AbstractOptionsTable
     type::Type = _option_default(OptimizerTable, :type)                                  # levenberg_marquardt
     max_iter::Int = _option_default(OptimizerTable, :max_iter)                           # iterations at most (LmStops max_iter)
@@ -252,7 +252,7 @@ _table_name(::Type{OptimizerTable}) = "optimizer"
 """`[sweep]`: the refinement's closed-form (lighting, vignetting, μ) solves — `iterations` the sweeps of one solve, `joint` the
 blocks jointly ([`JointRadiometry`](@ref); else [`RadiometryBlockDescent`](@ref)) — and `lm_chunk`, the LM iterations between two
 of them (0: none between): the table [`read_calibration`](@ref) reads into a [`RadiometricCalibration`](@ref)'s `radiometry` and
-`lm_chunk`. Not a table of [`PipelineOptions`](@ref)."""
+`lm_chunk`. Not a table of [`CalibrationSettings`](@ref): the refinement's own fields."""
 Base.@kwdef struct SweepTable <: AbstractOptionsTable
     lm_chunk::Int = _option_default(SweepTable, :lm_chunk)                                   # LM iterations between sweeps (0 = no sweeps)
     iterations::Int = _option_default(SweepTable, :iterations)                               # block-solve iterations of one sweep
@@ -280,20 +280,37 @@ Base.@kwdef struct ComputeOptions <: AbstractOptionsTable
 end
 
 """
-    PipelineOptions(; io, frontend, camera, grid, masks, rendering, lighting, material, vignetting, warping, edge, resume,
-                    selfcheck, compute)
+    RunOptions(; io, frontend, camera, resume, selfcheck, compute)
 
-The options of a refinement, one table each (see the table structs for every key and its default; `configs/default.toml` lists
-them; the optimizer's `[optimizer]` and the sweeps' `[sweep]` tables are the algorithm's, [`read_calibration`](@ref)). Read from TOML with [`pipeline_options`](@ref),
-written for the run record with [`config_dict`](@ref). Required: `io.images`,
-`io.out` and the front-end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`).
-A `selfcheck.only` run reads no photograph: it needs no `io.images`.
+A run's data and its input/output, one table each (see the table structs for every key and its default; `configs/default.toml`
+lists them): where the photographs and the records are (`[io]`), the front end's geometric calibration (`[frontend]`), the capture's
+facts (`[camera]`: the sensor, the lens, the sensor characterization), resuming a finished run (`[resume]`), the bearing
+self-check (`[selfcheck]`) and the device (`[compute]`). The problem's `p` of a calibration: `EstimationProblem(CalibrationEstimate,
+(geometry, photographs), (; run, device))` and the refinement's `RefineProblem(f, u0, run)`. Read from TOML with the algorithm's
+settings by [`pipeline_options`](@ref), written for the run record with [`config_dict`](@ref). Required: `io.images`, `io.out` and
+the front end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`). A
+`selfcheck.only` run reads no photograph: it needs no `io.images`.
 """
-Base.@kwdef struct PipelineOptions
-    fixed::Vector{String} = String.(toml_default(_TOML_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
+Base.@kwdef struct RunOptions
     io::IOOptions = IOOptions()
     frontend::FrontendOptions = FrontendOptions()
     camera::CameraOptions = CameraOptions()
+    resume::ResumeOptions = ResumeOptions()
+    selfcheck::SelfcheckOptions = SelfcheckOptions()
+    compute::ComputeOptions = ComputeOptions()
+end
+
+"""
+    CalibrationSettings(; fixed, grid, focus, masks, rendering, lighting, material, vignetting, warping, edge)
+
+The typed settings of a radiometric calibration, one table each (see the table structs; `configs/default.toml` lists them): the
+blocks held (`fixed`), the grid, the focus surface, the masks and their sample draw, the rendering quadrature, the lighting, the
+material, the vignetting, the board warping and the printed edge — what [`RadiometricRefinement`](@ref) holds (its `settings`) and
+[`RadiometricCalibration`](@ref)'s start reads. The optimizer's `[optimizer]` and the sweeps' `[sweep]` tables are the refinement's own
+fields ([`read_calibration`](@ref)). Read from TOML with the run's options by [`pipeline_options`](@ref), written by [`config_dict`](@ref).
+"""
+Base.@kwdef struct CalibrationSettings
+    fixed::Vector{String} = String.(toml_default(_TOML_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
     grid::GridOptions = GridOptions()
     focus::FocusOptions = FocusOptions()
     masks::MaskOptions = MaskOptions()
@@ -303,12 +320,12 @@ Base.@kwdef struct PipelineOptions
     vignetting::VignettingOptions = VignettingOptions()
     warping::WarpingOptions = WarpingOptions()
     edge::EdgeOptions = EdgeOptions()
-    resume::ResumeOptions = ResumeOptions()
-    selfcheck::SelfcheckOptions = SelfcheckOptions()
-    compute::ComputeOptions = ComputeOptions()
 end
 
-const _OptionsValue = Union{AbstractOptionsTable, PipelineOptions}
+"""The two values a run's TOML states (its tables split between them, each table in one): [`RunOptions`](@ref) and [`CalibrationSettings`](@ref)."""
+const _OPTION_HALVES = (RunOptions, CalibrationSettings)
+
+const _OptionsValue = Union{AbstractOptionsTable, RunOptions, CalibrationSettings}
 Base.:(==)(a::T, b::T) where {T <: _OptionsValue} = all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))
 Base.isequal(a::T, b::T) where {T <: _OptionsValue} = all(isequal(getfield(a, f), getfield(b, f)) for f in fieldnames(T))
 Base.hash(a::T, h::UInt) where {T <: _OptionsValue} = foldl((h, f) -> hash(getfield(a, f), h), fieldnames(T); init = hash(T, h))

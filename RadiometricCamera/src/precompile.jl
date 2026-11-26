@@ -44,7 +44,7 @@
             targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
             return calibration_problem(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
-        damping = RadiometricRefinement(PipelineOptions()).optimizer.damping   # the algorithm's default
+        damping = RadiometricRefinement(CalibrationSettings()).optimizer.damping   # the algorithm's default
         per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; damping, kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
         per_tile(p; kw...) = ((prob, _) = build_problem_grid(p.f, p.u0; damping, patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
 
@@ -74,10 +74,10 @@
         per_tile(pg; height_degree = 2)
 
         # the pipeline's options: the defaults, an override, the record's round trip through TOML
-        alg, stops = read_calibration(Dict{String, Any}("config_version" => 2); set = ["optimizer.max_iter=2"])
-        TOML.print(IOBuffer(), config_dict(alg, stops))
-        read_calibration(config_dict(alg, stops))
-        pipeline_options(config_dict(alg.refinement.options))
+        run, alg, stops = read_calibration(Dict{String, Any}("config_version" => 2); set = ["optimizer.max_iter=2"])
+        TOML.print(IOBuffer(), config_dict(run, alg, stops))
+        read_calibration(config_dict(run, alg, stops))
+        pipeline_options(config_dict(run, alg.refinement.settings))
         _drain_device_pool!()          # the evaluations' pooled workers: a package image cannot hold a task
     end
 end

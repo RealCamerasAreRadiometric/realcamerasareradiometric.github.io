@@ -9,7 +9,7 @@
     # a synthetic fisheye: the blob board's Kannala–Brandt fit (its fold at 133°), f = 93.2 px, its image circle inside the sensor
     kb = VgtkCore.KannalaBrandt(-0.041634590670699925, 0.00040687025248368753, 0.00018535670662213487, -7.735440193838873e-5)
     fish = cam(kb, 93.2, (260.0, 174.0), W, H)
-    fo = RC.PipelineOptions().focus
+    fo = RC.CalibrationSettings().focus
     old_rule(lens, region) = filter(RC._focus_support(lens, region), RC.focus_grid_nodes(region))   # RC ≤ 0.11.2: membership alone
     # an AXIS-ALIGNED ellipse: the box's side midpoints lie exactly on its rim — membership keeps 13, the ρ margin 9 (the inner 3 × 3)
     ax = VgtkCore.with_lens_coverage(fish, VgtkCore.Ellipse(VgtkCore.Point2{Float64}(260.0, 174.0), 150.0, 140.0, 0.0))
@@ -27,7 +27,7 @@
     @test VgtkCore.Rect2(ri) != fr.box && length(old_rule(rot, ri)) == 21 && SVector(260.0, 60.0) in old_rule(rot, ri)
     @test fr.nodes_box == RC.focus_grid_nodes(VgtkCore.imaged_region(rot))
     src = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "prepare.jl"), String)
-    @test occursin("= focus_start_nodes(lens0, opts.focus)", src) && !occursin("region_i", src) && !occursin(r"_focus_support\(|focus_grid_nodes\(", src)
+    @test occursin("= focus_start_nodes(lens0, settings.focus)", src) && !occursin("region_i", src) && !occursin(r"_focus_support\(|focus_grid_nodes\(", src)
     # the margin is the options' literal, in (0, 1]: the lens coverage's scale, as [masks]'s (RC 0.11.4: was node_rho_max, refused by name)
     @test fo.lens_coverage_scale == 0.9
     @test_throws ArgumentError RC.pipeline_options(Dict("focus" => Dict("lens_coverage_scale" => 1.2)))

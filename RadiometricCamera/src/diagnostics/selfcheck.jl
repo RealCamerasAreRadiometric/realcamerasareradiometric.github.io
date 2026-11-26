@@ -74,16 +74,16 @@ function board_hits(lens, pose, feats, board)
 end
 """`selfcheck.only`: the bearing error of the detections through the start model (per view, under the refit poses or those of
 the `selfcheck.poses` state) → selfcheck.json, selfcheck_vectors.json."""
-function _write_selfcheck(g::StartGeometry, opts::PipelineOptions, fpx, be0, load_state)
+function _write_selfcheck(g::StartGeometry, run::RunOptions, fpx, be0, load_state)
     names = g.names; K = length(names); poses0 = copy(g.poses); lens0 = g.camera
     features = [in_initialization(f, g.init_region) for f in g.observations]   # the detections in the start's initialization region
-    if !isempty(opts.selfcheck.poses)
-        sst = load_state(opts.selfcheck.poses); sidx = [findfirst(==(n), sst.names) for n in names]
+    if !isempty(run.selfcheck.poses)
+        sst = load_state(run.selfcheck.poses); sidx = [findfirst(==(n), sst.names) for n in names]
         any(isnothing, sidx) && error("selfcheck.poses: views not in the state: $(names[isnothing.(sidx)])")
         for k in 1:K
             p = sst.poses[sidx[k]]; e0 = median(bearing_px(lens0, poses0[k], features[k], fpx))
             poses0[k] = _pose_eltype(Float64, p)
-            @printf("  %s: pose of the state %s instead of the refit, bearing median %.3f → %.3f px\n", names[k], basename(dirname(opts.selfcheck.poses)), e0, median(bearing_px(lens0, poses0[k], features[k], fpx)))
+            @printf("  %s: pose of the state %s instead of the refit, bearing median %.3f → %.3f px\n", names[k], basename(dirname(run.selfcheck.poses)), e0, median(bearing_px(lens0, poses0[k], features[k], fpx)))
         end
         flush(stdout)
     end
@@ -95,14 +95,14 @@ function _write_selfcheck(g::StartGeometry, opts::PipelineOptions, fpx, be0, loa
             median(filter(isfinite, lv)), median(be0), nbad, length(lv))
     bh = [board_hits(lens0, poses0[k], features[k], g.target) for k in 1:K]
     fin(v) = isfinite(v) ? v : nothing
-    VgtkIO.write_record(joinpath(opts.io.out, "selfcheck_vectors.json"),
-        (; schema = RECORD_SCHEMAS.selfcheck_vectors, init = opts.io.init, views = [(; name = names[k], x = [r[1] for r in rv[k]], y = [r[2] for r in rv[k]], dx = [fin(r[3]) for r in rv[k]],
+    VgtkIO.write_record(joinpath(run.io.out, "selfcheck_vectors.json"),
+        (; schema = RECORD_SCHEMAS.selfcheck_vectors, init = run.io.init, views = [(; name = names[k], x = [r[1] for r in rv[k]], y = [r[2] for r in rv[k]], dx = [fin(r[3]) for r in rv[k]],
                                            dy = [fin(r[4]) for r in rv[k]], e = pv[k],
                                            bu = [r[1] for r in bh[k]], bv = [r[2] for r in bh[k]],
                                            du = [fin(r[3]) for r in bh[k]], dv = [fin(r[4]) for r in bh[k]]) for k in 1:K]))
-    VgtkIO.write_record(joinpath(opts.io.out, "selfcheck.json"),
-        (; schema = RECORD_SCHEMAS.selfcheck, init = opts.io.init, schoeps = opts.frontend.schoeps, views = names, n = length.(pv), median = median.(pv), p90 = [quantile(v, 0.9) for v in pv], mean = mean.(pv),
+    VgtkIO.write_record(joinpath(run.io.out, "selfcheck.json"),
+        (; schema = RECORD_SCHEMAS.selfcheck, init = run.io.init, schoeps = run.frontend.schoeps, views = names, n = length.(pv), median = median.(pv), p90 = [quantile(v, 0.9) for v in pv], mean = mean.(pv),
            all = (; n = length(be0), median = median(be0), p90 = quantile(be0, 0.9), mean = mean(be0))))
-    println("self-check only: written to ", joinpath(opts.io.out, "selfcheck.json")); flush(stdout)
+    println("self-check only: written to ", joinpath(run.io.out, "selfcheck.json")); flush(stdout)
     return nothing
 end

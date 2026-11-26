@@ -131,18 +131,18 @@ end
             PNGFiles.save(photos[k], [RGB{N0f16}(clamp.(imgs[k][i, j, :], 0, 1)...) for i in 1:H, j in 1:W])
         end
         out = joinpath(dir, "out"); sdir = joinpath(dir, "start")
-        alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => "on", "channel" => "RGB"),
+        run, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => "on", "channel" => "RGB"),
                                         "lm" => Dict("max_iter" => 2), "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2)))
-        opts = alg.refinement.options
+        settings = alg.refinement.settings
         obs = [detections(k) for k in 1:2]
         @test all(o -> length(o) > 20, obs)
         # the start's initialization region: the whole 24 × 24 image (a stored grid start is defined on its region; every detection inside)
         g = RC.StartGeometry(glens, poses, obs, board; names = basename.(photos), init_region = VgtkCore.Rect2{Float64}(0, 0, W, H))
-        so = RC.start_options(opts)
-        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, photos), (; device = RC.KernelAbstractions.CPU())), alg; stops)
+        so = RC.start_options(run, settings)
+        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, photos), (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
         s = c.cache.prob                                                # the start (the start options, the run's io.out)
-        RC.save_start(sdir, s.f, s.u0, s.f.start, so)                              # the start record: iteration 0
+        RC.save_start(sdir, s.f, s.u0, s.f.start, so...)                              # the start record: iteration 0
         fit = VgtkCore.solve!(c)
         n = fit.stats.nsteps
         @test n == 2

@@ -296,14 +296,15 @@ try
             # the records' world is in board-291 metres (the 2 × 2 m Blender board rendered as the 130 mm board), so the camera is
             # scaled with it: sensor 36 → 2.34 mm, f 15 → 0.975 mm, f/2.8 as rendered; the focus plane starts through the mean board centre
             RCP = RadiometricCamera
-            opts = PipelineOptions(; io = RCP.IOOptions(; images = IMG, out = OUT, linearize = true, checkpoint_each = true),
-                                   frontend = RCP.FrontendOptions(; type = RCP.BlobFrontend, session = SES, texture_downsample = 4),
-                                   camera = RCP.CameraOptions(; sensor_mm = 2.34, f_mm = 0.975, fnumber = 2.8), grid = RCP.GridOptions(; lattice = RCP.NodeCountLattice(), node_count = 1225),   # 35 · 35 (grid.size retired, RC 0.11.4): the goldens below were recorded on the fitted 35 × 35 lattice — re-record them when this branch first runs
-                                   masks = RCP.MaskOptions(; samples_per_view = 3000, seed = 1),
-                                   rendering = RCP.RenderingOptions(; N = 4, n_rho = 2, n_phi = 6, n_p = 2))
+            run = RCP.RunOptions(; io = RCP.IOOptions(; images = IMG, out = OUT, linearize = true, checkpoint_each = true),
+                                 frontend = RCP.FrontendOptions(; type = RCP.BlobFrontend, session = SES, texture_downsample = 4),
+                                 camera = RCP.CameraOptions(; sensor_mm = 2.34, f_mm = 0.975, fnumber = 2.8))
+            settings = RCP.CalibrationSettings(; grid = RCP.GridOptions(; lattice = RCP.NodeCountLattice(), node_count = 1225),   # 35 · 35 (grid.size retired, RC 0.11.4): the goldens below were recorded on the fitted 35 × 35 lattice — re-record them when this branch first runs
+                                             masks = RCP.MaskOptions(; samples_per_view = 3000, seed = 1),
+                                             rendering = RCP.RenderingOptions(; N = 4, n_rho = 2, n_phi = 6, n_p = 2))
             stops = RCP._calibration_stops(; max_iter = REFINE_ITERATIONS, max_time = Float64(max(1200, 600 * REFINE_ITERATIONS)))
             config = joinpath(WORK, "refine_smoke.toml")
-            open(io -> TOML.print(io, RCP.config_dict(RCP.RadiometricCalibration(RCP.RadiometricRefinement(opts)), stops)), config, "w")
+            open(io -> TOML.print(io, RCP.config_dict(run, RCP.RadiometricCalibration(RCP.RadiometricRefinement(settings)), stops)), config, "w")
             cmd = Cmd(addenv(`$(Base.julia_cmd()) --project=$HARNESS_ENV $(joinpath(RC_ROOT, "bin", "refine.jl")) --config=$config`,
                              "CUDA_VISIBLE_DEVICES" => get(ENV, "CUDA_VISIBLE_DEVICES", "1")))
             @test run_logged(cmd, log)

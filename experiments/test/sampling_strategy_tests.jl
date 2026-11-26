@@ -43,7 +43,7 @@ end
             open(io -> m.TOML.print(io, r.cfg; sorted = true), f, "w")
             rc = Base.invokelatest(m.load_radiometric_refinement_config, f)
             @test all(n -> haskey(rc["cases"], n), values(r.names))
-            o = Base.invokelatest(m.pipeline_options, rc["cases"][r.names["ecdf_a2"]]["pipeline"]).masks
+            o = last(Base.invokelatest(m.pipeline_options, rc["cases"][r.names["ecdf_a2"]]["pipeline"])).masks
             @test o.gradient_bias == 2.0 && o.edge_fraction == 0.0 && o.addon_samples == 0 && o.edge_detector == m.RadiometricCamera.GaussianDerivativeEdges(1.5)
         end
     end

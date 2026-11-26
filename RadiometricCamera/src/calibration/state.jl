@@ -31,7 +31,7 @@ _LmRun() = _LmRun(false, Dict{Symbol, Int}(), Dict{Symbol, Int}(:flux => 0, :jac
 """
     CalibrationData
 
-The data of a radiometric calibration, the `f` of its `RefineProblem(f, u0)` ([`RadiometricRefinement`](@ref)): what the
+The data of a radiometric calibration, the `f` of its `RefineProblem(f, u0, run)` ([`RadiometricRefinement`](@ref)): what the
 refinement holds fixed — the board's design (`board`, a `TexturedTarget`: its page, texture, print outline and warping basis; its
 `state` the start's surface, the estimate's is [`CalibrationParameters`](@ref)' `surface`: the kernels' board is
 `_board(f, θ)`), the render settings, the masks and their pixel lists, the photographs and their masked observations ϕ, the rows'
@@ -65,7 +65,7 @@ end
 """
     CalibrationParameters
 
-The parameters Θ̄ of a radiometric calibration, the `u0` of its `RefineProblem(f, u0)` (refined in place by
+The parameters Θ̄ of a radiometric calibration, the `u0` of its `RefineProblem(f, u0, run)` (refined in place by
 [`RadiometricRefinement`](@ref)): the camera every view shares (`camera`, a `RadiometricCameraModel`: Θ_d, Θ_f, r and Θ_v), one pose
 per view (`poses`, camera → world: Θ_e), the material (Θ_m), the lighting (Θ_l) and the board's surface (`surface`, its
 `TargetState`: the warping h, the print's edge parameters and the in-plane print error).
@@ -210,8 +210,9 @@ end
 
 The refinement problem of a calibration of photographs `targets` of `board` seen by `camera` from `poses`, started at `mat` and
 `light`: VisualGeometryToolkitCore's `RefineProblem(f, u0)` of the data `f = `[`CalibrationData`](@ref)`(board, settings,
-camera, poses, targets; kwargs...)` and the parameters `u0 = `[`CalibrationParameters`](@ref)`(f, camera, poses, mat, light)`,
-which [`RadiometricRefinement`](@ref) refines in place.
+camera, poses, targets; kwargs...)` and the parameters `u0 = `[`CalibrationParameters`](@ref)`(f, camera, poses, mat, light)`: the
+blocks' and the closed forms' problem. [`RadiometricRefinement`](@ref) refines a started one in a run, `RefineProblem(f, u0, run)`
+(`run` its [`RunOptions`](@ref); [`RadiometricCalibration`](@ref)'s `init` and [`load_calibration_start`](@ref) build it).
 """
 function calibration_problem(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel, poses::AbstractVector{<:EuclideanMap},
                              mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}}; kwargs...)

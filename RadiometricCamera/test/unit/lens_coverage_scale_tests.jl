@@ -15,6 +15,6 @@
     @test all(VgtkCore.Point2{Float64}(u - 0.5, v - 0.5) ∈ e9 for v in 1:H, u in 1:W if m9[v, u])     # no pixel centre outside it
     @test VgtkCore.lens_coverage(c) == e                                                              # the camera's coverage untouched
     @test VgtkCore.pixel_mask(RC._sampling_region(c0, 0.9), W, H) == VgtkCore.pixel_mask(VgtkCore.imaged_region(c0), W, H)   # the sensor's: not scaled
-    @test RC.PipelineOptions().masks.lens_coverage_scale == 1.0                                       # the default (configs/default.toml)
+    @test RC.CalibrationSettings().masks.lens_coverage_scale == 1.0                                       # the default (configs/default.toml)
     @test_throws ArgumentError RC._sampling_region(c, 1.2)
 end

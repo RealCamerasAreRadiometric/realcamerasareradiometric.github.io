@@ -52,7 +52,7 @@
     nb = RC.focus_grid_nodes(region)
     @test length(nb) == 25 && nb[1] == SVector(110.0, 24.0) && nb[25] == SVector(410.0, 324.0)
     @test count(sup, nb) == 13 && all(p -> sup(p) == inside(region, (p[1], p[2])), nb)
-    fs = RC.focus_start_nodes(VgtkCore.with_lens_coverage(fish, circle), RC.PipelineOptions().focus)
+    fs = RC.focus_start_nodes(VgtkCore.with_lens_coverage(fish, circle), RC.CalibrationSettings().focus)
     @test fs.nodes == nb[[7, 8, 9, 12, 13, 14, 17, 18, 19]] && fs.nodes_box == nb && all(sup, fs.nodes)
     @test RC.focus_grid_nodes(VgtkCore.imaged_region(fish)) == VgtkCore.grid_nodes(5, VgtkCore.Rect2(VgtkCore.imaged_region(fish)))
     @test_throws ArgumentError RC._check_focus_nodes(nb[1:3], fish)
@@ -103,15 +103,15 @@
     rec = joinpath(mktempdir(), "image_region.json"); RC.save_image_region(rec, m; provenance = (; source = "the test's frames"))
     r = RC.load_image_region(rec)
     @test r.lens_coverage == e && r.extent == (W, H) && r.frames == m.frames
-    @test RC.run_lens_coverage(PipelineOptions(; camera = RC.CameraOptions(; lens_coverage = rec)), W, H) == e
+    @test RC.run_lens_coverage(RC.RunOptions(; camera = RC.CameraOptions(; lens_coverage = rec)), W, H) == e
     # no fallback: a record of other photographs, a missing record, a record of another kind — each refused by name
-    @test occursin("photographs, the run's are", thrown_message(() -> RC.run_lens_coverage(PipelineOptions(; camera = RC.CameraOptions(; lens_coverage = rec)), W + 2, H)))
-    @test occursin("no image-region record", thrown_message(() -> RC.run_lens_coverage(PipelineOptions(; camera = RC.CameraOptions(; lens_coverage = rec * ".missing")), W, H)))
+    @test occursin("photographs, the run's are", thrown_message(() -> RC.run_lens_coverage(RC.RunOptions(; camera = RC.CameraOptions(; lens_coverage = rec)), W + 2, H)))
+    @test occursin("no image-region record", thrown_message(() -> RC.run_lens_coverage(RC.RunOptions(; camera = RC.CameraOptions(; lens_coverage = rec * ".missing")), W, H)))
     RC.save_initialization_region(dirname(rec), circle)
     @test occursin("rc/image_region/v1.0", thrown_message(() -> RC.load_image_region(joinpath(dirname(rec), RC.INITIALIZATION_REGION_FILE))))
     # opt-in: a set stating the sensor is the sensor's rectangle, nothing measured — never a grid start's stored region (no fallback)
-    @test RC.run_lens_coverage(PipelineOptions(), W, H) === nothing && RC.PipelineOptions().camera.lens_coverage == "sensor"
-    @test VgtkCore.lens_coverage(VgtkCore.with_lens_coverage(g, RC.run_lens_coverage(PipelineOptions(), W, H))) == VgtkCore.Rect2{Float64}(0, 0, W, H)
+    @test RC.run_lens_coverage(RC.RunOptions(), W, H) === nothing && RC.RunOptions().camera.lens_coverage == "sensor"
+    @test VgtkCore.lens_coverage(VgtkCore.with_lens_coverage(g, RC.run_lens_coverage(RC.RunOptions(), W, H))) == VgtkCore.Rect2{Float64}(0, 0, W, H)
     # the detector is the step's alone: measured on the device (GPU first), never inside a run
     calls = Ref(0)
     stub(rng, fs; outlier_halfwidth, device) = (calls[] += 1; nothing)

@@ -21,11 +21,11 @@
 
     @testset "the options: io.raw a path key, io.lens_identity a table" begin
         o = RC.pipeline_options(Dict("io" => Dict("raw" => "raw/board", "lens_identity" => Dict("make" => "Sigma", "model" => "14mm F1.4 DG DN"))))
-        @test o.io.raw == "raw/board" && "io.raw" in RC.PIPELINE_PATH_KEYS
-        @test RC.lens_identity(o.io.lens_identity) == VgtkCore.DeviceIdentity("Sigma", "14mm F1.4 DG DN", nothing)
-        @test RC.pipeline_options(RC.config_dict(o)) == o                                   # the writer's table reads back
-        @test RC.PipelineOptions().io.lens_identity === nothing                              # absent: EXIF's lens
-        @test !haskey(RC.config_dict(RC.PipelineOptions())["io"], "lens_identity")
+        @test first(o).io.raw == "raw/board" && "io.raw" in RC.PIPELINE_PATH_KEYS
+        @test RC.lens_identity(first(o).io.lens_identity) == VgtkCore.DeviceIdentity("Sigma", "14mm F1.4 DG DN", nothing)
+        @test RC.pipeline_options(RC.config_dict(o...)) == o                                   # the writer's table reads back
+        @test RC.RunOptions().io.lens_identity === nothing                              # absent: EXIF's lens
+        @test !haskey(RC.config_dict(RC.RunOptions(), RC.CalibrationSettings())["io"], "lens_identity")
         @test_throws ArgumentError RC.pipeline_options(Dict("io" => Dict("lens_identity" => Dict{String, Any}())))
         @test_throws ArgumentError RC.pipeline_options(Dict("io" => Dict("lens_identity" => Dict("brand" => "Sigma"))))
         @test_throws ArgumentError RC.pipeline_options(Dict("io" => Dict("lens_identity" => "Sigma")))

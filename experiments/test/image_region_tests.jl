@@ -119,7 +119,7 @@
             @test require_lens_coverage(cfg, Dict("pipeline" => Dict("camera" => Dict("lens_coverage" => "image_region:disc"))), "c") === nothing
             pf = profile_frame(e, W, H)
             @test pf.centre == SVector(e.center...) && isapprox(pf.rmax, max(e.a, e.b); rtol = 1e-6)                           # the chrome radial frame: the rim
-            opts = RadiometricCamera.pipeline_options(Dict("camera" => Dict("lens_coverage" => lens_coverage_path(cfg, "image_region:disc"))))
+            opts, _ = RadiometricCamera.pipeline_options(Dict("camera" => Dict("lens_coverage" => lens_coverage_path(cfg, "image_region:disc"))))
             @test RadiometricCamera.run_lens_coverage(opts, W, H) == e                                                # the refinement's start (bin/refine.jl)
         end
     end

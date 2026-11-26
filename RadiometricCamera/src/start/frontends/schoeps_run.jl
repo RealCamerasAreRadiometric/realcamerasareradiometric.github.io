@@ -42,53 +42,53 @@ end
 `load_start`: its camera's extent), else the Schöps run's model
 (`frontend.schoeps`'s intrinsics0.yaml, VisualGeometryToolkitIO's reader). No photograph is opened: each photograph is checked
 against the start camera's size where it is read (`observe`, one decode per photograph)."""
-function _schoeps_extent(opts::PipelineOptions, start)
+function _schoeps_extent(run::RunOptions, start)
     model(prefix, y) = (
                           isfile(y) || error("no start camera to read the image size from: no $y");
                           (Tuple(VgtkCore.extent(load_camera(prefix * y))), y))
-    (W, H), src = start !== nothing ? (Tuple(VgtkCore.extent(start.lens)), opts.io.init) :
-                  model("schoeps:", schoeps_run_file(opts.frontend.schoeps, :camera))   # the run's import, or its intrinsics0.yaml
+    (W, H), src = start !== nothing ? (Tuple(VgtkCore.extent(start.lens)), run.io.init) :
+                  model("schoeps:", schoeps_run_file(run.frontend.schoeps, :camera))   # the run's import, or its intrinsics0.yaml
     @printf("  image size %d × %d from the start camera (%s)\n", W, H, src)
     return (W, H)
 end
 
-"""`_schoeps_frontend_start(opts, stored, W, H)`: the Schöps front end's start — the stored start `stored` (`io.init`, `load_start`)
+"""`_schoeps_frontend_start(run, stored, W, H)`: the Schöps front end's start — the stored start `stored` (`io.init`, `load_start`)
 when there is one, and then no Schöps run's model is read (`resample = nothing`); else the Schöps run's spline model resampled
 exactly on his own lattice (`grid.lattice = "derived"`, m = 1) over the sensor ∩ the run's lens coverage (`_schoeps_start`; the coverage
 `run_lens_coverage`'s: the sensor, or the capture set's image-region record)."""
-function _schoeps_frontend_start(opts::PipelineOptions, stored, W, H)
+function _schoeps_frontend_start(run::RunOptions, stored, W, H)
     stored === nothing || return (; stored.lens, stored.init_region, resample = nothing)
-    f = schoeps_run_file(opts.frontend.schoeps, :camera)
+    f = schoeps_run_file(run.frontend.schoeps, :camera)
     isfile(f) || error("no Schöps start camera: no stored start (io.init) and no $f (frontend.schoeps: the run's import camera.json or its intrinsics0.yaml)")
     src = _schoeps_model(f, W, H, "the Schöps start")
-    return _schoeps_start(f, W, H; coverage = run_lens_coverage(opts, W, H))
+    return _schoeps_start(f, W, H; coverage = run_lens_coverage(run, W, H))
 end
 
 """The Schöps front-end: a central-generic run on a printed page (the board = the page textured with the design;
 star ids → texture positions from the detector run on the texture; poses by a multi-start ray-domain fit through the start model).
 `start`: the run's start, `(; R0, height0, page_flip, inplane0)` (every front end takes the one NamedTuple and reads its own)."""
-function _frontend(::Type{SchoepsFrontend}, opts::PipelineOptions, start::NamedTuple)
+function _frontend(::Type{SchoepsFrontend}, run::RunOptions, ::CalibrationSettings, start::NamedTuple)
     (; R0, height0, page_flip, inplane0) = start
-    isempty(opts.frontend.schoeps) && error("frontend.schoeps required for the schoeps front-end")
-    (isempty(opts.frontend.texture) || isempty(opts.frontend.texture_features)) && error("frontend.texture and frontend.texture_features required for the schoeps front-end")
-    sets = dataset_features(schoeps_run_file(opts.frontend.schoeps, :detections))
-    texture = VgtkFeatures.load_linear_image(opts.frontend.texture); TH_t, TW_t = size(texture, 1), size(texture, 2)
-    sx_t, sy_t = TW_t / opts.frontend.texture_features_size[1], TH_t / opts.frontend.texture_features_size[2]
-    tsets = dataset_features(opts.frontend.texture_features); tex = Dict(id => (x * sx_t, y * sy_t) for (x, y, id) in tsets[1][2])
+    isempty(run.frontend.schoeps) && error("frontend.schoeps required for the schoeps front-end")
+    (isempty(run.frontend.texture) || isempty(run.frontend.texture_features)) && error("frontend.texture and frontend.texture_features required for the schoeps front-end")
+    sets = dataset_features(schoeps_run_file(run.frontend.schoeps, :detections))
+    texture = VgtkFeatures.load_linear_image(run.frontend.texture); TH_t, TW_t = size(texture, 1), size(texture, 2)
+    sx_t, sy_t = TW_t / run.frontend.texture_features_size[1], TH_t / run.frontend.texture_features_size[2]
+    tsets = dataset_features(run.frontend.texture_features); tex = Dict(id => (x * sx_t, y * sy_t) for (x, y, id) in tsets[1][2])
     # the views of the run: every view the case names must have front-end features (the one policy, `require_featured_views`)
-    require_featured_views([String(s[1]) => count(f -> haskey(tex, f[3]), s[2]) for s in sets], opts.io.views, opts.frontend.schoeps)
-    isempty(opts.io.views) || (sets = [s for s in sets if String(s[1]) in opts.io.views])
+    require_featured_views([String(s[1]) => count(f -> haskey(tex, f[3]), s[2]) for s in sets], run.io.views, run.frontend.schoeps)
+    isempty(run.io.views) || (sets = [s for s in sets if String(s[1]) in run.io.views])
     names = [String(s[1]) for s in sets]
     (sx_t != 1 || sy_t != 1) && @printf("  texture features rescaled by (%.4f, %.4f) to the %d × %d texture\n", sx_t, sy_t, TW_t, TH_t)
-    opts.frontend.texture_downsample > 1 && (texture = VgtkFeatures.box_downsample(texture, opts.frontend.texture_downsample))
-    page_w, page_h = VgtkCore.ustrip(VgtkCore.m, _page_size(opts)[1]) * opts.frontend.print_scale, VgtkCore.ustrip(VgtkCore.m, _page_size(opts)[2]) * opts.frontend.print_scale
+    run.frontend.texture_downsample > 1 && (texture = VgtkFeatures.box_downsample(texture, run.frontend.texture_downsample))
+    page_w, page_h = VgtkCore.ustrip(VgtkCore.m, _page_size(run)[1]) * run.frontend.print_scale, VgtkCore.ustrip(VgtkCore.m, _page_size(run)[2]) * run.frontend.print_scale
     rec = start.stored                                                     # a start record (`load_refinement_start`): its lens, region and poses, no fit
-    stored = rec !== nothing ? (; rec.lens, rec.init_region) : isempty(opts.io.init) ? nothing : load_start(opts.io.init)   # the stored start, read once
-    W₀, H₀ = _schoeps_extent(opts, stored)
-    st0 = _schoeps_frontend_start(opts, stored, W₀, H₀)
+    stored = rec !== nothing ? (; rec.lens, rec.init_region) : isempty(run.io.init) ? nothing : load_start(run.io.init)   # the stored start, read once
+    W₀, H₀ = _schoeps_extent(run, stored)
+    st0 = _schoeps_frontend_start(run, stored, W₀, H₀)
     lens0 = st0.lens; init_region = st0.init_region              # the initialization region: Schöps's calibrated area (a stage input)
     @printf("schoeps front-end: %d views of %s, image %d × %d, page %.1f × %.1f mm (print scale %.4f), texture %d × %d (ds %d), %d texture star ids, init grid %s\n",
-            length(names), opts.frontend.schoeps, W₀, H₀, _mm(page_w), _mm(page_h), opts.frontend.print_scale, TW_t, TH_t, opts.frontend.texture_downsample, length(tex), _lattice_line(lens0)); flush(stdout)
+            length(names), run.frontend.schoeps, W₀, H₀, _mm(page_w), _mm(page_h), run.frontend.print_scale, TW_t, TH_t, run.frontend.texture_downsample, length(tex), _lattice_line(lens0)); flush(stdout)
     fpx0 = fpx_of(lens0, W₀, H₀)
     # page frame: x = columns (right), rows along +y (down), the printed side's normal 𝐧f = −(𝐮 × 𝐯f) = −z: the world "printed page
     # (origin top-left, x right, y down)", one labelling, no search. Rows along −y with the camera on the other side is the SAME scene in
@@ -116,7 +116,7 @@ function _frontend(::Type{SchoepsFrontend}, opts::PipelineOptions, start::NamedT
         poses0 = _stored_poses(rec, names)
     else
         res_best = map(enumerate(_imaged(lens0, in_initialization(f, init_region)) for f in features)) do (k, fk)
-            r = _fit_page_pose([X for (_, X) in fk], [normalize(backproject(lens0, 𝐩)) for (𝐩, _) in fk], 𝐨, 𝐧f, bc, opts.frontend.pose_distances)
+            r = _fit_page_pose([X for (_, X) in fk], [normalize(backproject(lens0, 𝐩)) for (𝐩, _) in fk], 𝐨, 𝐧f, bc, run.frontend.pose_distances)
             isfinite(r[1]) || error("$(names[k]): no pose with the camera on the printed side of the page fits its $(length(fk)) stars " *
                                     "(a mirrored texture: the print seen from behind?)")
             r
@@ -131,7 +131,7 @@ function _frontend(::Type{SchoepsFrontend}, opts::PipelineOptions, start::NamedT
             @printf("  %s: %d stars, pose fit bearing median %.3f px, camera at (%.3f, %.3f, %.3f) m\n", names[k], length(features[k]), fpx0 * e, poses0[k].t...)
         end
     end
-    board = TexturedTarget(𝐨, 𝐮, 𝐯, texture; facing = poses0[1].t, design = Symbol(splitext(basename(opts.frontend.texture))[1]))
+    board = TexturedTarget(𝐨, 𝐮, 𝐯, texture; facing = poses0[1].t, design = Symbol(splitext(basename(run.frontend.texture))[1]))
     flip < 0 && @warn "the state's page frame has rows along −y (page_flip = −1, a state written before 2026-11-05): the same board as +y rotated 180° about x; a new run uses +y"
     return (; board, names, poses0, lens0, init_region, W₀, H₀, st0.resample, features, features_for = (surf::TargetState) -> feature_sets(𝐯, surf.h, surf.inplane), page_flip = flip,
             board_y_sign = 1.0, world = "printed page (origin top-left, x right, y down)")
