@@ -302,9 +302,6 @@ Base.@propagate_inbounds function _radiometry_normal_row!(out, w, parts, ϕ, ω,
     return nothing
 end
 
-# The work items of the reductions: Estimation's camera-regression refine's (enough to fill an accelerator, few enough that their columns sum
-# in one reduction).
-_reduction_items(npx::Integer) = max(1, min(Int(npx), VgtkEstimation._REDUCTION_ITEMS))
 
 """The chart LM's state of the closed-form blocks of `s` on its parts (`lay`: `_radiometry_layout`)."""
 function _radiometry_lm(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts, lay)
@@ -312,7 +309,7 @@ function _radiometry_lm(f::CalibrationData, θ::CalibrationParameters, parts::Ra
     Z = adapt(be, Matrix{Float64}(vignetting_basis(f, θ)))
     return _RadiometryLm(parts.parts, parts.ϕ, parts.w, VgtkCore.convert_eltype(Float64, θ.camera.vignetting),
                          SMatrix{3, sh_count(max_degree(θ.light)), Float64}(coefficients(θ.light)), Float64(θ.mat.diffuse_weight), Z, residual_channels(f), lay,
-                         VgtkCore.device_zeros(Float64, be, 1 + lay.N + lay.N^2, _reduction_items(length(parts))))
+                         VgtkCore.device_zeros(Float64, be, 1 + lay.N + lay.N^2, VgtkCore.reduction_work_items(length(parts))))
 end
 
 # The launch and the reduction are Core's (reduce_cost, reduce_normal_equations with the row functor: one kernel over the work
@@ -369,7 +366,7 @@ function _design_matrix(f::CalibrationData, θ::CalibrationParameters, parts::Ra
     a = SMatrix{3, sh_count(max_degree(θ.light)), Float64}(coefficients(θ.light))
     n = blk === Val(:light) ? size(a, 2) : n_control_points(vig)
     A = VgtkCore.device_zeros(Float64, f.backend, length(chs) * length(parts), n)
-    _launch_row_job!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(θ.mat.diffuse_weight), blk)
+    launch_rows!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(θ.mat.diffuse_weight), blk)
     return Array(A)
 end
 

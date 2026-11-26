@@ -50,6 +50,7 @@ public CalibrationData, CalibrationParameters, flat_vignetting, center_constrain
        PIPELINE_PATH_KEYS, PIPELINE_OUTPUT_KEYS, START_RECORD_FILE, START_MASKS_DIR, load_refinement_start, masked_observations, Unweighted, AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend,
        CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule,
        DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
+public launch_rows!   # the row kernels' one launch (Core's `pointwise!`): RC's and the paper project's
 
 # ---- retired names (an earlier release's), each refused by name with its replacement (no alias, no forwarding)
 """Retired in an earlier release: VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""

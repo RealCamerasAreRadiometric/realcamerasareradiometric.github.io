@@ -110,7 +110,7 @@ end
     _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, ::Val{N}, sensor, lensw,
                    bases, P0, pxy, light_scale, Z)
 
-THE row kernel of the LM's Jacobian, both routes (`_launch_row_job!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
+THE row kernel of the LM's Jacobian, both routes (`launch_rows!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
 `bufidx[i]` of the kernels' outputs, its id in `ids`) writes the residual `r` and the Jacobian rows (`J`, columns × rows) of its
 measured channels `chs`, in the layout's full columns (`klay`, `_kernel_layout`): the AD scatter from the slots `S` (`_slot_rows`), the
 focus chain through the nodal weights `G[:, ks, gidx[i]]` (`_focus_chain!`), a tile's patch fan-out on its window lens `lensw` with
@@ -457,7 +457,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::VgtkCore.LeftRigi
     chs = residual_channels(f)
     Jd, rd = _jacobian_buffers(f, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    _launch_row_job!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(θ)), S, flux, _view_phi(f, θ, r.k), _view_weights_device(f, θ, r.k), chs,
+    launch_rows!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(θ)), S, flux, _view_phi(f, θ, r.k), _view_weights_device(f, θ, r.k), chs,
                            _cached_layout(_view_layouts(f, θ), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(f, m.dense_basis) : nothing, Gw, Val(N), f.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(f, vg.basis) : nothing; exec = _pixel_rows_exec(be))

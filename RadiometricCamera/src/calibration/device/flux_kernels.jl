@@ -28,11 +28,11 @@ default group is 1024 items: a view of a run's 8,192 to 16,384 measured pixels t
 one. A pixel's flux is ≈ 50 µs of work (96 rays, four radiance samples each), so 16 pixels a group cost nothing in scheduling and
 every thread works: the flux kernel of a 1,728-pixel view 49 ms → 5.5 ms on 32 threads (2026-11-20), the same bits (a pixel's value
 does not depend on its group). The policy of `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`,
-`_launch_row_job!`).
+`launch_rows!`).
 """
 _pixel_rows_exec(be, requested = nothing) = VgtkCore.OnBackend(be; workgroupsize = requested, host_workgroupsize = 16)
 
-"""A row job (`_launch_row_job!`): `row!(out, i, args...)` writes row `i` of `out`. A per-index functor of Core's `pointwise!`: the
+"""A row job (`launch_rows!`): `row!(out, i, args...)` writes row `i` of `out`. A per-index functor of Core's `pointwise!`: the
 row function a singleton, `out` and the tuple `args` adapted to the backend as its fields (one kernel argument each); its value
 the `UInt8` 0 (`pointwise!`'s output, nothing read)."""
 struct _RowJob{R, O, A}
@@ -44,13 +44,14 @@ Adapt.adapt_structure(to, j::_RowJob) = _RowJob(j.row!, adapt(to, j.out), adapt(
 Base.@propagate_inbounds (j::_RowJob)(i) = (j.row!(j.out, i, j.args...); 0x00)
 
 """
-    _launch_row_job!(row!, out, n, args...; exec = OnBackend(get_backend(out))) -> out
+    launch_rows!(row!, out, n, args...; exec = OnBackend(get_backend(out))) -> out
 
 `row!(out, i, args...)` for `i in 1:n` as ONE launch of Core's public `pointwise!` (a `_RowJob` over the indices `1:n`, on the backend
 and workgroup of `exec`), then a synchronize: the row kernels of the Jacobian, the closed-form design rows and the closed-form cost and
-normal-equation rows. `n = 0` launches nothing. A row's bits do not depend on the launch.
+normal-equation rows, and the paper project's sparse-operator kernels (experiments/src/texture_recovery.jl). `row!` is a function
+singleton and its state travels in `args` (arrays, tuples of them), as a device kernel receives it. `n = 0` launches nothing. A row's bits do not depend on the launch.
 """
-function _launch_row_job!(row!::F, out, n::Integer, args::Vararg{Any, N}; exec::VgtkCore.OnBackend = VgtkCore.OnBackend(KA.get_backend(out))) where {F, N}
+function launch_rows!(row!::F, out, n::Integer, args::Vararg{Any, N}; exec::VgtkCore.OnBackend = VgtkCore.OnBackend(KA.get_backend(out))) where {F, N}
     n > 0 || return out
     VgtkCore.pointwise!(_RowJob(row!, out, args), KA.allocate(exec.backend, UInt8, Int(n)), Base.OneTo(Int(n)); exec)
     KA.synchronize(exec.backend)

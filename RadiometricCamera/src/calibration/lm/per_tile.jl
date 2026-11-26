@@ -785,7 +785,7 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::VgtkCore.LeftRigi
     Gw, gidx = need_f ? _focus_weights(f, θ, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
     chs = residual_channels(f)
     Jd, rd = _jacobian_buffers(f, lay.ncol, length(chs) * npx)
-    _launch_row_job!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(θ)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
+    launch_rows!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(θ)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
                            _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
                            need_h ? _device_copy(f, m.dense_basis) : nothing, Gw, Val(N),
                            f.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,

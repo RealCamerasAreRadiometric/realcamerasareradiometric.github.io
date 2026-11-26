@@ -601,7 +601,7 @@ end
 
 # The page's operators are built where the rows are computed (owner 2026-11-20: as the calibration's normal equations, nothing of
 # the system's construction on the host). The footprint kernel leaves each sampled pixel's texels in its slots, ascending; the rows
-# are compacted, selected, weighted and transposed by row-parallel kernels (Core's `_launch_rows!`: a work item per row, no atomics)
+# are compacted, selected, weighted and transposed by row-parallel kernels (RadiometricCamera's `launch_rows!`, one launch of Core's `pointwise!`: a work item per row, no atomics)
 # and one device sort of the entries' keys, into Core's `CSRMatrix`es — the arrays Core's `PenalizedOperator` holds. The entries and
 # their order are the host assembly's (`sparse(I, J, V)` of the same slots, then Core's upload), so the solves are the same numbers.
 
@@ -667,7 +667,7 @@ function csr_rows(C::VgtkCore.CSRMatrix, sel::AbstractVector{<:Integer}; device)
     cnt = C.rowptr[seld .+ 1] .- 1 .- src
     ptr = _row_pointers(cnt, device); nz = n == 0 ? 0 : Int(sum(cnt))
     colval = VgtkCore.KA.zeros(device, Int, nz); nzval = VgtkCore.KA.zeros(device, Float64, nz)
-    VgtkCore._launch_rows!(_gather_row!, nzval, n, colval, ptr .- 1, src, cnt, C.colval, C.nzval)
+    RadiometricCamera.launch_rows!(_gather_row!, nzval, n, colval, ptr .- 1, src, cnt, C.colval, C.nzval)
     return VgtkCore.CSRMatrix(n, C.n, ptr, colval, nzval)
 end
 
@@ -681,13 +681,13 @@ entries' keys on the device, the rest row-parallel kernels (no atomics, so the r
 function csr_transpose(C::VgtkCore.CSRMatrix; device)
     nz = length(C.nzval)
     keys = VgtkCore.KA.zeros(device, Int, nz); rows = VgtkCore.KA.zeros(device, Int, nz)
-    VgtkCore._launch_rows!(_transpose_keys!, keys, C.m, C.rowptr, C.colval, nz)
-    VgtkCore._launch_rows!(_entry_rows!, rows, C.m, C.rowptr)
+    RadiometricCamera.launch_rows!(_transpose_keys!, keys, C.m, C.rowptr, C.colval, nz)
+    RadiometricCamera.launch_rows!(_entry_rows!, rows, C.m, C.rowptr)
     sort!(keys)
     colval = VgtkCore.KA.zeros(device, Int, nz); nzval = VgtkCore.KA.zeros(device, Float64, nz)
-    VgtkCore._launch_rows!(_transposed_entry!, nzval, nz, colval, keys, nz, rows, C.nzval)
+    RadiometricCamera.launch_rows!(_transposed_entry!, nzval, nz, colval, keys, nz, rows, C.nzval)
     ptr = VgtkCore.KA.zeros(device, Int, C.n + 1)
-    VgtkCore._launch_rows!(_column_start!, ptr, C.n + 1, keys, nz)
+    RadiometricCamera.launch_rows!(_column_start!, ptr, C.n + 1, keys, nz)
     return VgtkCore.CSRMatrix(C.n, C.m, ptr, colval, nzval)
 end
 
@@ -717,7 +717,7 @@ function page_footprints(ctx, rows_px, camera::RC.RadiometricCameraModel, groups
         KA.synchronize(device)
         cnt = Int.(n); dst = cumsum(cnt) .- cnt; nz = Int(sum(cnt))
         colk = KA.zeros(device, Int, nz); valk = KA.zeros(device, Float64, nz)
-        VgtkCore._launch_rows!(_gather_row!, valk, m, colk, dst, Adapt.adapt(device, collect(0:N:(N * (m - 1)))), cnt, slot_cols, slot_vals)
+        RadiometricCamera.launch_rows!(_gather_row!, valk, m, colk, dst, Adapt.adapt(device, collect(0:N:(N * (m - 1)))), cnt, slot_cols, slot_vals)
         append!(order, qs); push!(cnts, cnt); push!(cols, colk); push!(vals, valk)
     end
     length(order) == length(rows_px) || throw(ArgumentError("page_footprints: the groups hold $(length(order)) of the $(length(rows_px)) sampled pixels"))
@@ -758,7 +758,7 @@ weighted and transposed on `device` (`csr_rows`, `csr_transpose`) — the arrays
 """
 function texture_operator(A::VgtkCore.CSRMatrix, rows::AbstractVector{<:Integer}, w, D::SparseMatrixCSC; device)
     Af = csr_rows(A, rows; device)
-    w isa RC.Unweighted || VgtkCore._launch_rows!(_weight_row!, Af.nzval, Af.m, Af.rowptr, Adapt.adapt(device, Vector{Float64}(w)))
+    w isa RC.Unweighted || RadiometricCamera.launch_rows!(_weight_row!, Af.nzval, Af.m, Af.rowptr, Adapt.adapt(device, Vector{Float64}(w)))
     pen = VgtkCore.PenalizedOperator(SparseMatrixCSC{Float64, Int}(undef, 0, size(D, 2)), D; device)       # the penalty's two operators, Core's upload
     return VgtkCore.PenalizedOperator(Af, csr_transpose(Af; device), pen.D, pen.Dt, pen.device)
 end
@@ -799,7 +799,7 @@ squares, one row kernel on `device`, so the diagonal of `CᵀC` (`page_solves`' 
 """
 function column_sumsq(Ct::VgtkCore.CSRMatrix; device)
     out = VgtkCore.KA.allocate(device, Float64, Ct.m)                  # every entry written
-    VgtkCore._launch_rows!(_row_sumsq!, out, Ct.m, Ct.rowptr, Ct.nzval)
+    RadiometricCamera.launch_rows!(_row_sumsq!, out, Ct.m, Ct.rowptr, Ct.nzval)
     return out
 end
 # Row `i`'s sum of squares.

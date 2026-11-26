@@ -22,6 +22,12 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **No upstream internal name (R22): the reductions' work items are Core's public `reduction_work_items(n)`; the row-job launcher is
+  public, `launch_rows!`.** The closed-form radiometry's partial-sum count read Estimation's internal `_REDUCTION_ITEMS` through RC's
+  own `_reduction_items` (removed): it is Core's `reduction_work_items` (VisualGeometryToolkitCore 0.14, the same `max(1, min(n, 2048))`).
+  RC's row-kernel launch through Core's `pointwise!` (`_launch_row_job!`) is the public `launch_rows!(row!, out, n, args...; exec)`, and
+  the experiments' sparse-operator kernels (experiments/src/texture_recovery.jl), which called Core's internal `_launch_rows!`, run
+  through it. Bit for bit: a row's values do not depend on its launch.
 - **The geometry image `"raw_green"` through Features' public `bilinear_green`** (VisualGeometryToolkitFeatures 0.10's export):
   `raw_green_image` called the internal `_bilinear_green` kernel (R22); it now reads the public function, the same kernel, bit for
   bit. The experiments' check that the decode is the chrome detect's image compares with `bilinear_green` and no longer reads
