@@ -111,10 +111,10 @@ function rotation_center_rows(dir)
     for row in read_summary(joinpath(dir, "summary.tsv"))                 # the evaluate run's table (VisualGeometryToolkitEval's)
         row["variant"] == "motion" || continue
         lab = String(row["model"])
-        rec = VgtkIO.read_record(joinpath(dir, "eval_$lab.json"))
+        rec = read_chrome_evaluation(joinpath(dir, "eval_$lab.json"))     # v2.0 (a v1.0 record through its version step)
         f = rec["fit"]["in_sample"]
         push!(out, Dict{String, Any}("model" => lab, (k => v for (k, v) in row if !(k in ("model", "variant")))...,
-                                     "its" => f["iterations"], "retcode" => string(f["retcode"]), "loss_width_px" => f["loss_width_px"],
+                                     "its" => f["stats"]["nsteps"], "retcode" => string(f["retcode"]), "loss_width_px" => f["loss_width_px"],
                                      "translation_residual_mm" => median(rec["motion"]["summary"]["start_translation_residual_mm"]),
                                      "photos_list" => [p["photo"] for p in rec["motion"]["per_photo"]]))
     end

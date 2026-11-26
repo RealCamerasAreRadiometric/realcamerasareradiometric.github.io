@@ -22,6 +22,12 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **Experiments: `experiments/chrome_evaluation/v2.0`, the FitResult's names in the eval record (decision 11).** Each fit of
+  `eval_<label>.json`'s `fit` (`in_sample`, `held_out.even` / `.odd`) records `successful_retcode` (was `converged`) and
+  `stats.nsteps` (was `iterations`), and the fit's iteration cap is `fit.max_iter` (was `fit.iterations`, the `LmStops`' `max_iter`
+  it sets). A v1.0 record — the run of record's, written under the project's earlier name — reads through the version step of the
+  one reader, `read_chrome_evaluation` (in memory; the files stay as published): scripts/chrome_index_grid.jl's rows read it. Tested
+  on a fixture of the run of record's values and on its 253 eval records where results_root() binds them: every value `===`.
 - **Breaking: the calibration is an algorithm.** `start_calibration` and `refine_calibration!` are removed (check_naming R15: a
   `refine_` name is a kind, never a function), replaced by `RadiometricCalibration(options)` (a fit, `FitKind`) on
   `EstimationProblem(CalibrationEstimate, (geometry, photographs)[, (; device)])`:

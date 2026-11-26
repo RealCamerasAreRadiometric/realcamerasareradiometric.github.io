@@ -1,0 +1,88 @@
+{
+ "schema": "experiments/chrome_evaluation/v1.0",
+ "generator": {
+  "name": "VisualGeometryToolkitIO",
+  "version": "0.10.6"
+ },
+ "units": {
+  "length": "mm",
+  "time": "s",
+  "angle": "rad",
+  "pixel": "colmap",
+  "density": "dpi",
+  "radiance": "relative",
+  "length_roles": {}
+ },
+ "conventions": {
+  "rotation_encoding": "quaternion_wxyz_hamilton",
+  "transform_convention": "x_to = R * x_from + t",
+  "matrix_layout": "rows",
+  "grid_layout": "row_major",
+  "index_base": 1
+ },
+ "label": "sizl_spline_start",
+ "model": "schoeps:732112ae6c6130a6",
+ "photos": 54,
+ "dots": 15606,
+ "fit": {
+  "held_camera": [
+   "controls"
+  ],
+  "held_out": {
+   "even": {
+    "retcode": "Success",
+    "stop_rule": "CostDecrease",
+    "converged": true,
+    "iterations": 21,
+    "scale_px": 0.029370188252185736,
+    "scale_source": "ScaleUpstream",
+    "loss_width_px": 0.04408758958535601,
+    "downweighted": 1417,
+    "dots": 7830,
+    "rms_px": 0.055840959084576265,
+    "ν": 15488,
+    "seconds": 0.1236579418182373,
+    "n_without_bearing": 0,
+    "without_bearing": []
+   },
+   "odd": {
+    "retcode": "Success",
+    "stop_rule": "CostDecrease",
+    "converged": true,
+    "iterations": 22,
+    "scale_px": 0.029370188252185736,
+    "scale_source": "ScaleUpstream",
+    "loss_width_px": 0.04408758958535601,
+    "downweighted": 1395,
+    "dots": 7776,
+    "rms_px": 0.055622921879447715,
+    "ν": 15382,
+    "seconds": 0.1426699161529541,
+    "n_without_bearing": 0,
+    "without_bearing": []
+   }
+  },
+  "holdout": true,
+  "in_sample": {
+   "retcode": "Success",
+   "stop_rule": "CostDecrease",
+   "converged": true,
+   "iterations": 21,
+   "scale_px": 0.029370188252185736,
+   "scale_source": "ScaleUpstream",
+   "loss_width_px": 0.04408758958535601,
+   "downweighted": 2817,
+   "dots": 15603,
+   "rms_px": 0.055741310477762075,
+   "ν": 31038,
+   "seconds": 6.978193044662476,
+   "n_without_bearing": 0,
+   "without_bearing": []
+  },
+  "iterations": 80,
+  "optimization_strategy": {
+   "loss": "huber",
+   "type": "triggs"
+  }
+ }
+}

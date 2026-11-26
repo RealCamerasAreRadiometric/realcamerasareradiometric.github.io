@@ -41,7 +41,7 @@
 #             fit_rotation_center (c, d from the dots' bearings at the index rotations); the refine is Estimation's
 #             LevenbergMarquardt on CameraPosesProblem of RotationCenterViews, the model's camera held, at [evaluate] optimization_strategy (required;
 #             an Estimation strategy table, type "triggs": the Triggs-corrected LM at efficiency_constant × the index stage's pooled
-#             noise scale), capped at [evaluate] iterations; eval_<label>.json's `fit` records its retcode, iterations, scale and width. The optional weights / holdout switches whiten the dots by the detect run's covariances and add
+#             noise scale), capped at [evaluate] iterations; eval_<label>.json's `fit` records its retcode, successful_retcode, stats.nsteps, scale and width. The optional weights / holdout switches whiten the dots by the detect run's covariances and add
 #             the held-out variant (EVALUATE_FIT_SWITCHES). The registrations are the
 #             index stage's ([evaluate] index = "stage") or an index run of record given as an input (a config without [detect] and
 #             [index]); a model is an input or a case of [upstream] radiometric_refinement

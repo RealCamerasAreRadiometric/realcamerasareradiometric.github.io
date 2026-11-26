@@ -5,7 +5,7 @@
 # record (src/evaluation.jl), as src/residual_summary.jl is.
 # =============================================================================
 const EXPERIMENT_RECORD_SCHEMAS = (
-    chrome_evaluation = "experiments/chrome_evaluation/v1.0",
+    chrome_evaluation = "experiments/chrome_evaluation/v2.0",
     chrome_index_grid_rows = "experiments/chrome_index_grid_rows/v1.0",
     chrome_index_grid_table = "experiments/chrome_index_grid_table/v1.0",
     chrome_index_photos = "experiments/chrome_index_photos/v1.0",

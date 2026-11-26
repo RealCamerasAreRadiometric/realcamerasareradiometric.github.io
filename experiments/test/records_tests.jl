@@ -9,7 +9,7 @@
 
     @test allunique(values(EXPERIMENT_RECORD_SCHEMAS))
     for (k, s) in pairs(EXPERIMENT_RECORD_SCHEMAS)
-        @test s == "experiments/$(k)/v1.0"                                         # "<owner>/<kind>/v<major>.<minor>"
+        @test s == "experiments/$(k)/v$(k == :chrome_evaluation ? "2.0" : "1.0")"   # "<owner>/<kind>/v<major>.<minor>" (chrome_evaluation: v2.0, its v1.0 read by its step)
         f = joinpath(mktempdir(), "$(k).json")
         VgtkIO.write_record(f, (; schema = s, label = String(k), x = [1.0, 2.5], n = 3, table = Dict("a" => [1, 2])))
         r = VgtkIO.read_record(f)

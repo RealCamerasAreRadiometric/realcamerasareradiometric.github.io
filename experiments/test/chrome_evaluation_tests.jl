@@ -696,11 +696,13 @@
         sums = evaluate_grid_models(dir, grid, es, out; W = 5184, H = 3888, models = [("rec", "lens:" * lpath)])
         @test [x.variant for x in sums] == ["motion"]
         @test sort(filter(f -> startswith(f, "vectors_"), readdir(out))) == ["vectors_rec_motion.json"]
-        rec = VgtkIO.read_record(joinpath(out, "eval_rec.json"))
+        rec = read_chrome_evaluation(joinpath(out, "eval_rec.json"))
+        @test rec["schema"] == "experiments/chrome_evaluation/v2.0"
         @test !haskey(rec, "free") && !haskey(rec, "fixed") && haskey(rec, "motion")
         f = rec["fit"]["in_sample"]
         # the rotation-centre refine: Core's LevenbergMarquardt on Estimation's CameraPosesProblem, converged, at the index stage's pooled scale handed down
-        @test f["converged"] && f["retcode"] == "Success" && f["iterations"] < 80 && f["scale_source"] == "ScaleUpstream"
+        @test f["successful_retcode"] && f["retcode"] == "Success" && f["stats"]["nsteps"] < 80 && f["scale_source"] == "ScaleUpstream"
+        @test rec["fit"]["max_iter"] == 80 && !haskey(f, "converged") && !haskey(f, "iterations")
         @test 0 < f["scale_px"] < 1 && f["scale_px"] ≈ rec["pooled_scale"]["scale_px"] && f["loss_width_px"] ≈ 3.0 * f["scale_px"]
         @test rec["pooled_scale"]["photos"] == 5 && !isempty(rec["fit"]["held_camera"])          # every camera parameter held
         @test rec["pooled_scale"]["left_out"] == 0 && isempty(rec["pooled_scale"]["without_scale"])  # none left out of the pool, and that is recorded
@@ -795,7 +797,7 @@
         @test T["rec"]["coverage_dots"] == ndots && T["rec"]["coverage_fraction"] == 1.0           # the camera of record evaluates every dot
         @test T["rim"]["coverage_dots"] == inside < ndots && T["rim"]["coverage_fraction"] ≈ inside / ndots   # the rim model loses its rim dots, reported
         @test T["rec"]["dots"] == T["rim"]["dots"] == inside                                        # the head-to-head: the same dots for both
-        R4 = Dict(l => VgtkIO.read_record(joinpath(out4, "eval_$l.json")) for l in ("rec", "rim"))
+        R4 = Dict(l => read_chrome_evaluation(joinpath(out4, "eval_$l.json")) for l in ("rec", "rim"))
         @test R4["rec"]["motion"]["common"]["n"] == R4["rim"]["motion"]["common"]["n"] == inside
         @test R4["rec"]["motion"]["coverage"]["coverage_dots"] == ndots && R4["rim"]["motion"]["coverage"]["coverage_dots"] == inside
         # the camera of record on ALL of its dots: a score of its own (the rim dots in), not the head-to-head's
@@ -862,12 +864,13 @@
               holdout = true, iterations = 80, profile_bins = 4,
               centre = SVector(2592.0, 1944.0), rmax = 3240.0, centre_rho = 0.4, edge_rho = 0.6, max_unassigned = 0)
         evaluate_grid_models(dir, grid, es, out; W = 5184, H = 3888, models = [("fish", "lens:" * lpath)])
-        rec = VgtkIO.read_record(joinpath(out, "eval_fish.json"))
+        rec = read_chrome_evaluation(joinpath(out, "eval_fish.json"))
         regs = read_registrations(dir, grid); ndots = sum(r -> length(r.xy), regs)
-        @test ndots == 5 * 289 && isempty(rec["refused"]) && rec["fit"]["in_sample"]["converged"]
+        @test ndots == 5 * 289 && isempty(rec["refused"]) && rec["fit"]["in_sample"]["successful_retcode"]
         # the start projects neither the outlier nor photograph 5's rim corner: both are left out of the fit (its start residuals) …
         @test rec["start"]["unprojected_at_start"] == 2 && !haskey(rec["start"], "dropped_unprojected")
         @test rec["fit"]["in_sample"]["dots"] == ndots - 2
+        @test all(p -> rec["fit"]["held_out"][p]["successful_retcode"] && rec["fit"]["held_out"][p]["stats"]["nsteps"] >= 1, ("even", "odd"))
         outlier = only(r.xy[273] for r in regs if r.name == "p2")
         # held out (the headline): re-tested at the estimate — the corner, which it projects, is scored; the outlier it does not
         # project is counted, not scored
@@ -1275,4 +1278,63 @@ end
     # the photographs are the unit: one entry per photograph, its dots in the region
     ps = paired_photos(synth(StableRNG(3))["motion"]["a"], synth(StableRNG(3))["motion"]["b"], common_dots(values(synth(StableRNG(3))["motion"])), ρ -> ρ > 0.6)
     @test length(ps) == 40 && all(p -> length(p.model) == length(p.reference) && 0 < length(p.model) < 60, ps)
+end
+
+# The eval record's version step (decision 11, experiments/chrome_evaluation v1.0 → v2.0): a v1.0 record reads as v2.0 — each fit's
+# `converged` its `successful_retcode`, its `iterations` its `stats.nsteps`, the fit's cap `iterations` its `max_iter` — every value
+# identical (`===`: the same bits) to the file's and every other key as stored; the file is not rewritten. On the fixture (the run of
+# record's values, test/fixtures/chrome_evaluation/README.md) always; on every eval record under results_root()'s
+# chrome_evaluation/evaluate/ where one is bound and holds them (the run of record's tree: VGTK_RESULTS_ROOT), a recorded skip otherwise.
+@testitem "chrome_evaluation record v1.0" default_imports = false begin
+    using Test
+    using DrWatson
+    import VisualGeometryToolkitIO as VgtkIO
+    import JSON
+    include(srcdir("experiments.jl"))
+    include(srcdir("drivers.jl"))
+    include(srcdir("radiometric_refinement.jl"))
+    include(srcdir("chrome_evaluation.jl"))
+
+    # the same tree: the same keys, every leaf `===` (a number's bits, its type)
+    same(a::AbstractDict, b::AbstractDict) = Set(String.(keys(a))) == Set(String.(keys(b))) && all(k -> same(a[k], b[String(k)]), keys(a))
+    same(a::AbstractVector, b::AbstractVector) = length(a) == length(b) && all(same(x, y) for (x, y) in zip(a, b))
+    same(a, b) = a === b || (a isa AbstractString && b isa AbstractString && String(a) == String(b))
+    fit1(r) = Dict{String, Any}(String(k) => v for (k, v) in r if !(String(k) in ("converged", "iterations")))
+    fit2(r) = Dict{String, Any}(String(k) => v for (k, v) in r if !(String(k) in ("successful_retcode", "stats")))
+    function check(path)
+        old = VgtkIO.read_record(path)
+        bytes = read(path)
+        new = read_chrome_evaluation(path)
+        @test read(path) == bytes                                              # the file as it was
+        @test new["schema"] == "experiments/chrome_evaluation/v2.0"
+        @test same(Dict(k => v for (k, v) in old if !(String(k) in ("schema", "fit"))), Dict(k => v for (k, v) in new if !(String(k) in ("schema", "fit"))))
+        fo, fn = old["fit"], new["fit"]
+        @test same(fo["iterations"], fn["max_iter"]) && !haskey(fn, "iterations")
+        @test Set(String.(keys(fn))) == setdiff(union(Set(String.(keys(fo))), Set(["max_iter"])), Set(["iterations"]))
+        pairs_ = [(fo["in_sample"], fn["in_sample"]); haskey(fo, "held_out") ? [(fo["held_out"][p], fn["held_out"][p]) for p in ("even", "odd")] : []]
+        for (a, b) in pairs_
+            @test same(a["converged"], b["successful_retcode"]) && same(a["iterations"], b["stats"]["nsteps"]) && length(b["stats"]) == 1
+            @test same(fit1(a), fit2(b))
+        end
+        for k in keys(fo)
+            String(k) in ("iterations", "in_sample", "held_out") || @test same(fo[k], fn[k])
+        end
+        return length(pairs_)
+    end
+    @test check(projectdir("test", "fixtures", "chrome_evaluation", "eval_v1.0.json")) == 3
+    # a current record reads as it is; a version neither current nor v1.0 is refused, naming the current one
+    v2 = joinpath(mktempdir(), "eval_v2.json")
+    write(v2, JSON.json(_chrome_evaluation_v2(VgtkIO.read_record(projectdir("test", "fixtures", "chrome_evaluation", "eval_v1.0.json")))))
+    @test same(read_chrome_evaluation(v2), VgtkIO.read_record(v2))
+    v3 = joinpath(mktempdir(), "eval_v3.json"); write(v3, replace(read(v2, String), "chrome_evaluation/v2.0" => "chrome_evaluation/v3.0"))
+    @test_throws "experiments/chrome_evaluation/v2.0" read_chrome_evaluation(v3)
+    # the run of record's records (results_root()'s evaluate runs), where bound
+    root = try joinpath(results_root(), "chrome_evaluation", "evaluate") catch; "" end
+    files = isdir(root) ? [joinpath(d, f) for d in readdir(root; join = true) if isdir(d) for f in readdir(d) if startswith(f, "eval_") && endswith(f, ".json")] : String[]
+    if isempty(files)
+        @test_skip "no evaluate run under results_root(): the run of record's records are not bound here"
+    else
+        @test all(f -> check(f) >= 1, files)
+        @info "chrome_evaluation record v1.0: $(length(files)) eval records under $root read through the version step"
+    end
 end

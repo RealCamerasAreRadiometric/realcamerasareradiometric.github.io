@@ -347,6 +347,7 @@ using VisualGeometryToolkitCore: FitResult
 using Random: AbstractRNG
 using VisualGeometryToolkitEval.Stats: bootstrap_ci      # the stack's one bootstrap interval (the paired photograph bootstrap of stage evaluate)
 import VisualGeometryToolkitIO as VgtkIO
+import JSON                                  # the eval record's version step: its v2.0 tree parsed as a file is (read_chrome_evaluation)
 using StaticArrays: SVector, SMatrix, StaticVector
 using LinearAlgebra: norm, dot, I, normalize, det, svdvals
 using Hungarian: hungarian             # the scorer's one-to-one assignment of dots to board nodes (the stack has no assignment solver)
@@ -1206,7 +1207,9 @@ end
 #      their index pixel residuals, handed down: `ScaleUpstream`; a refine estimates no scale). No scorer, no re-selection: the refine is the stack's.
 # The gauge: none when the
 # photographs turned about two axes; a set turned about one axis is refused by Estimation. The fit is capped at [evaluate] iterations,
-# and eval_<label>.json `fit` records its retcode, iterations, scale and its source, loss width and down-weighted dots; `start` the
+# and eval_<label>.json `fit` records the cap (`max_iter`) and per fit its retcode, successful_retcode, stats.nsteps, scale and its
+# source, loss width and down-weighted dots (experiments/chrome_evaluation v2.0; a v1.0 record reads through
+# `read_chrome_evaluation`'s version step); `start` the
 # start's c, d, retcode and conditioning (the whitened system's singular values, normalized and not). The translation residual of the
 # start against the index poses says how far the capture was from one rotation centre: it is recorded per photograph
 # (`start_translation_residual_mm`) and summarised in summary.md.
@@ -1842,8 +1845,8 @@ must be T. Schöps's own camera (`schoeps_own_camera`), refused otherwise. Write
 strategy and iteration cap, and the held-out variant `motion_heldout` (the fits on one parity of the grid nodes scoring the other,
 pooled). The start reads the dots' Förstner covariances (the index run's points records) when `detections` (the detect run's
 `detections/` directory) is given; unit pixel noise without it (the rotation-centre refine whitens no dot). Every eval record holds
-the start (`start`: c, d, its retcode and the conditioning) and under `fit` the refine's retcode, iterations, scale, its source and
-the loss width. A photograph the start projects none of the dots of (held out: none of one parity) has no view in the refine: it is
+the start (`start`: c, d, its retcode and the conditioning) and under `fit` the iteration cap (`max_iter`) and the refine's retcode,
+`successful_retcode`, `stats.nsteps`, scale, its source and the loss width ([`read_chrome_evaluation`](@ref) reads it back). A photograph the start projects none of the dots of (held out: none of one parity) has no view in the refine: it is
 refused for that model — `refused` in its eval record (photograph, reason) and a note in summary.md — and never looked up.
 """
 function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out::AbstractString; W::Integer, H::Integer, models,
@@ -1968,7 +1971,9 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
             pose(k) = VgtkEst.rotation_center_pose(VgtkCore.Rotations.RotMatrix{3, Float64}(SMatrix{3, 3, Float64, 9}(v.rotations[names[k]])), v.center, v.offset)
             return (; r, pose, c = v.center, d = v.offset, seconds = time() - t0)
         end
-        fitof(f) = (; retcode = f.r.retcode, stop_rule = f.r.stop_rule, converged = successful_retcode(f.r), iterations = f.r.stats.nsteps,
+        # the refine's FitResult under its own field names (decision 11, experiments/chrome_evaluation v2.0): retcode, stop_rule,
+        # successful_retcode, stats.nsteps (its LM iterations)
+        fitof(f) = (; retcode = f.r.retcode, stop_rule = f.r.stop_rule, successful_retcode = successful_retcode(f.r), stats = (; nsteps = f.r.stats.nsteps),
                       scale_px = VgtkCore.noise_scale(f.r), scale_source = VgtkCore.scale_source(f.r), loss_width_px = f.r.metadata.loss_width,
                       downweighted = count(<(0.5), VgtkCore.weights(f.r)), dots = f.r.n, rms_px = f.r.rms, ν = VgtkCore.dof(f.r), seconds = f.seconds,
                       # the dots the refine made no row of (on bearings, every camera: no bearing, or a Jacobian that cannot whiten it),
@@ -1996,7 +2001,7 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
                                 "ray_offset_mm" => (; median = median(offset_mm), max = maximum(offset_mm)), "start" => startrec,
                                 "pooled_scale" => (; scale_px = VgtkCore.noise_scale(pooled), photos = pooled.metadata.pooled, dof = VgtkCore.dof(pooled),
                                                    left_out = length(no_scale), without_scale = no_scale))
-        rec["fit"] = merge(Dict{String, Any}("optimization_strategy" => s.optimization_strategy_table, "iterations" => s.iterations,
+        rec["fit"] = merge(Dict{String, Any}("optimization_strategy" => s.optimization_strategy_table, "max_iter" => s.iterations,
                                              "holdout" => holdout, "held_camera" => collect(String.(held))), fitrec)
         sums = Dict{String, Any}()
         for variant in variant_names
@@ -2095,6 +2100,43 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
     write_tsv(joinpath(out, "summary.tsv"), EVALUATE_SUMMARY_COLUMNS, rows)          # VisualGeometryToolkitEval's table
     write(joinpath(out, "summary.md"), join(md, '\n') * '\n')
     return summaries
+end
+
+# ---- the eval record's version step (decision 11: the FitResult's field names): chrome_evaluation v1.0 → v2.0 -------------------
+# v1.0 recorded each fit's `converged` (successful_retcode of its FitResult) and `iterations` (its stats.nsteps), and the fit's
+# iteration cap as `fit.iterations` (the LmStops' max_iter). v2.0 names them `successful_retcode`, `stats.nsteps` and `max_iter`;
+# every other key and every value as stored. A v1.0 record reads through this step in memory; the file is never rewritten. The
+# run of record wrote v1.0 under the project's earlier name (the owner token of its schema), so a v1.0 record is read under any owner.
+function _fit_v2(r::AbstractDict)
+    r = Dict{String, Any}(r)
+    r["successful_retcode"] = pop!(r, "converged")
+    r["stats"] = Dict{String, Any}("nsteps" => pop!(r, "iterations"))
+    return r
+end
+function _chrome_evaluation_v2(t::AbstractDict)
+    t = Dict{String, Any}(t); t["schema"] = EXPERIMENT_RECORD_SCHEMAS.chrome_evaluation
+    f = Dict{String, Any}(t["fit"])
+    f["max_iter"] = pop!(f, "iterations")
+    f["in_sample"] = _fit_v2(f["in_sample"])
+    haskey(f, "held_out") && (f["held_out"] = Dict{String, Any}(k => _fit_v2(v) for (k, v) in f["held_out"]))
+    t["fit"] = f
+    return t
+end
+
+"""
+    read_chrome_evaluation(path) -> JSON.Object
+
+An evaluate run's `eval_<label>.json` (`evaluate_grid_models`) as its current record, `experiments/chrome_evaluation/v2.0`: a
+v1.0 record (the run of record's) through its version step (`_chrome_evaluation_v2`), in memory; the file is not rewritten. Any
+other version is refused, naming the current one.
+"""
+function read_chrome_evaluation(path::AbstractString)
+    rec = VgtkIO.read_record(path)
+    schema = String(rec["schema"])
+    schema == EXPERIMENT_RECORD_SCHEMAS.chrome_evaluation && return rec
+    endswith(schema, "/chrome_evaluation/v1.0") ||
+        throw(ArgumentError("$path: a $schema record, not $(EXPERIMENT_RECORD_SCHEMAS.chrome_evaluation) or its v1.0"))
+    return VgtkIO.read_record(IOBuffer(JSON.json(_chrome_evaluation_v2(rec))))   # what a v2.0 file parses as
 end
 
 "The dots a model scores, `(photograph, registered dot) => (error px, error mrad, ρ)` (`evaluate_grid_models`)."
