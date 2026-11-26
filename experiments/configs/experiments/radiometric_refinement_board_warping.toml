@@ -20,7 +20,7 @@
 # channel black (Core's reason DarkOutOfBand), with the record's Poisson–Gaussian noise and its defects, which are per ISO: what each
 # case's camera.sensor_characterisation states for a frame outside the measured exposures.
 #
-# Paths are relative to data_root() (VGTK_DATA_ROOT). Raw photographs: the share's folder board-warping (data/DATA_LOCATIONS.md).
+# Paths are relative to data_root() (VGTK_DATA_ROOT). Raw photographs: the entries rc_raw_board_warping_* of configs/data_artifacts.toml.
 
 [experiment]
 name = "radiometric_refinement"
