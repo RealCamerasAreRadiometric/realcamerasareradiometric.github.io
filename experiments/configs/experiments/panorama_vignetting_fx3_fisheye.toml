@@ -95,7 +95,7 @@ check_tracks = true                                # after the bundle, observati
 
 [example.domain]                                   # the pixels an observation may use (fit and seam score)
 saturation_margin_px = 4.5                         # the saturation masks' dilation (camera px) before they are made symmetric over the frames: about 3 × the sweep's rotation-bundle RMS (≈ 1.5 px)
-rim_margin_px = 48.0                               # px inside the lens coverage's rim an observation must lie: the learned vignetting is not used over the outermost ring of the image circle, where it leaves bright arcs at the frames' rims in the panorama
+rim_margin_px = 48.0                               # px inside the lens coverage's rim an observation must lie: the learned vignetting is not used over the outermost ring of the image circle, which the lens's refinement does not fit (its masks.lens_coverage_scale = 0.95) and where it leaves arcs at the frames' rims in the panorama
 fov_deg = 89.0
 plane = 2                                          # the GREEN plane
 
