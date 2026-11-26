@@ -45,7 +45,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   - `CalibrationCache` holds `prob` (the started `RefineProblem`; was `state`); `load_calibration_start` returns the
     `RefineProblem` (`solve(prob, alg.refinement; stops)`, was `solve(EstimationProblem(CalibrationEstimate, state), alg; stops)`);
     `save_calibration_start(dir, f, u0; options)`; the retired View-form `CalibrationState` and `lens(::CalibrationState)` stubs are
-    gone with the type. No arithmetic moves: the same kernels on the same values.
+    gone with the type. No arithmetic moves: the same kernels on the same values;
+  - `RadiometricCalibration`'s `init` runs its refinement stage through the front end (spec §9 G-l): its cache is
+    `init(RefineProblem(f, u0), refinement; stops)`, an `EstimationCache` of the `CalibrationCache` (`c.cache.prob` the started
+    problem, as before), so `solve!` records the stage's problem and algorithm before relabelling the result with the calibration's.
 - **Experiments: `experiments/chrome_evaluation/v2.0`, the FitResult's names in the eval record (decision 11).** Each fit of
   `eval_<label>.json`'s `fit` (`in_sample`, `held_out.even` / `.odd`) records `successful_retcode` (was `converged`) and
   `stats.nsteps` (was `iterations`), and the fit's iteration cap is `fit.max_iter` (was `fit.iterations`, the `LmStops`' `max_iter`

@@ -102,8 +102,9 @@ them. A run's TOML gives both it and the solve's stops, [`read_calibration`](@re
 centre, the aperture from the f-number, the image circle measured where the run names its frames, the masks, the photographs'
 observations streamed, the vignetting and the lighting by the closed-form start, the grid smoothness.
 
-`init` returns the start, a [`CalibrationCache`](@ref) (its `prob`, the started `RefineProblem(f, u0)`); `solve!` of it, as `solve`, the
-refinement — its result [`RadiometricRefinement`](@ref)'s. A started calibration (`load_calibration_start`'s, or a caller's
+`init` returns the start: its cache is the refinement stage's `init(RefineProblem(f, u0), refinement; stops)` (an `EstimationCache` of a
+[`CalibrationCache`](@ref); its `prob`, the started `RefineProblem(f, u0)`); `solve!` of it, as `solve`, the refinement — its result
+[`RadiometricRefinement`](@ref)'s, recorded by the front end for the stage and relabelled for the calibration (spec §9 G-l). A started calibration (`load_calibration_start`'s, or a caller's
 `RefineProblem(f, u0)`) is solved by the refinement itself: `solve(RefineProblem(f, u0), refinement; stops)`.
 
 ```julia
@@ -125,8 +126,8 @@ VgtkCore.estimator_kind(::RadiometricCalibration) = VgtkCore.FitKind()
 """
     CalibrationCache
 
-The cache of a [`RadiometricRefinement`](@ref) (`init`'s, and [`RadiometricCalibration`](@ref)'s after its start; Core's
-`EstimationCache` holds it as its `cache`): the refinement's problem `prob`, `RefineProblem(f, u0)` of the calibration's data `f`
+The cache of a [`RadiometricRefinement`](@ref) (its `init`'s; Core's `EstimationCache` holds it as its `cache`, and
+[`RadiometricCalibration`](@ref)'s `init` returns that refinement stage's `EstimationCache` after its start): the refinement's problem `prob`, `RefineProblem(f, u0)` of the calibration's data `f`
 ([`CalibrationData`](@ref): its `start` holds what the refinement and its records read — the start views, the observations, the
 costs of the start) and its parameters `u0` ([`CalibrationParameters`](@ref)), the `refinement` and the solve's `stops`. `solve!`
 refines `prob.u0` in place.
@@ -158,7 +159,7 @@ function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <
     refinement = alg.refinement
     f, θ = _start_state(geometry, photographs, _start_run_options(refinement.options), nothing; backend = _calibration_device(prob.p),
                         damping = refinement.optimizer.damping, refinement.radiometry)
-    return CalibrationCache(VgtkCore.RefineProblem(f, θ), refinement, stops)
+    return VgtkCore.init(VgtkCore.RefineProblem(f, θ), refinement; stops)   # the refinement stage through the front end (spec §9 G-l)
 end
 VgtkCore.__init(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters, VgtkCore.NullParameters}, alg::RadiometricRefinement;
                 stops::VgtkCore.LmStops = _calibration_stops()) =

@@ -70,7 +70,7 @@ refused.
 Its stages are the API: [`read_calibration`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
 calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into the refinement's problem (the masks, the
 photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, (geometry, photographs)),
-algorithm; stops)`, a [`CalibrationCache`](@ref) of `RefineProblem(f, u0)`: the data [`CalibrationData`](@ref), the parameters
+algorithm; stops)`, the refinement stage's `init` — an `EstimationCache` of a [`CalibrationCache`](@ref) of `RefineProblem(f, u0)`: the data [`CalibrationData`](@ref), the parameters
 [`CalibrationParameters`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
 (`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's problem from one (`--start=<dir>`),
 `solve!` of the cache — or `solve(problem, algorithm.refinement; stops)` of a loaded problem ([`RadiometricRefinement`](@ref)) —
