@@ -115,7 +115,7 @@ function boolean_switch_violations(config_dirs; data = ())
                 push!(out, "$path: does not parse ($(sprint(showerror, e)))")
                 continue
             end
-            for (p, v) in VgtkCore._toml_leaves(doc, "", Pair{String, Any}[])
+            for (p, v) in VgtkCore.toml_leaves(doc)
                 v isa Bool && !any(rx -> (m = match(rx, p); m !== nothing && m.match == p), data) && push!(out, "$path:$p = $v")
             end
         end

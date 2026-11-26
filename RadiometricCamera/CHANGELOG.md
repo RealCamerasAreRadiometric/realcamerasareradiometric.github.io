@@ -22,6 +22,8 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **Core's public `matvec!` and `toml_leaves`** (VisualGeometryToolkitCore 0.14, Phase 1A): the device Jacobian's `Jᵀr` and the
+  boolean-switch scan called the internal `_matvec!` and `_toml_leaves` (R22); they read the public functions, the same code, bit for bit.
 - **Breaking: the refinement is a refine, `solve(RefineProblem(f, u0), RadiometricRefinement(…); stops)` (#18).**
   `CalibrationState` (data and estimate in one mutable struct) is removed, with no alias and no property forwarding:
   - `CalibrationData` (the problem's `f`: the board's design, the render settings, the masks and pixel lists, the photographs and

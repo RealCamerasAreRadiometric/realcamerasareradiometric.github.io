@@ -250,7 +250,7 @@ on the device as a dense matrix, `T` was an upload and three small dense product
 products, whose other terms are exact zeros; a channel tie's sums may round differently.)
 """
 function _gauss_newton_blocks(J, r, T::Matrix{Float64}, lay, run::_LmRun)
-    products() = (Array(VgtkCore._matvec!(similar(r, size(J, 1)), J, r)), Array(J * J'))   # J r: Core's (its CUDA method a one-column gemm)
+    products() = (Array(VgtkCore.matvec!(similar(r, size(J, 1)), J, r)), Array(J * J'))   # J r: Core's (its CUDA method a one-column gemm)
     g, H = products()
     if !(all(isfinite, g) && all(isfinite, H))
         # a non-finite Jacobian entry makes its column's diagonal of J Jᵀ non-finite: scrubbed (`_scrub_entries!`) and formed again —
