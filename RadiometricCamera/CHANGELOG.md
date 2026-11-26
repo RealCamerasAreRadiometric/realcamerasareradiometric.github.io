@@ -22,6 +22,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **The geometry image `"raw_green"` through Features' public `bilinear_green`** (VisualGeometryToolkitFeatures 0.10's export):
+  `raw_green_image` called the internal `_bilinear_green` kernel (R22); it now reads the public function, the same kernel, bit for
+  bit. The experiments' check that the decode is the chrome detect's image compares with `bilinear_green` and no longer reads
+  Features' source text (experiments/test/drivers_tests.jl).
 - **Breaking: a smoothness weight chosen by GCV is Estimation's `GeneralizedCrossValidation()` (spec §9 G-j).** Estimation retired
   `gcv_select` and the weight `:gcv`; RC follows, with no alias:
   - `PSplineSmoothness(order, :gcv)` / `BendingSmoothness(:gcv)` → `PSplineSmoothness(order, GeneralizedCrossValidation())` (a weight is a

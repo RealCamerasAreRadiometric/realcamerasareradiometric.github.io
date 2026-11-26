@@ -205,15 +205,15 @@ end
 
 The geometry image `"raw_green"` of the mosaic `m` (on the host): VisualGeometryToolkitFeatures' bilinear green on the raw grid under
 the frame's `sensor_model` — the image Features' `detect_sfop(m::RawMosaic)` and the seeded `detect_foerstner(m, seeds)` detect on
-(the chrome detect), computed on `device` by Features' one kernel (`_bilinear_green`, raw_green.jl: a green photosite its own value,
+(the chrome detect), computed on `device` by Features' one kernel (`bilinear_green`, public since VisualGeometryToolkitFeatures 0.10: a green photosite its own value,
 a red or blue one the mean of its usable green 4-neighbours; defects missing, saturation censored at 1). Linear values (Core's
 `linearview` under the model), in the raw's COLMAP pixels (the mosaic's `raw_frame_map`: the identity as decoded); NaN where no usable
-green is in the 3×3 (a defect cluster). No second implementation: Features exports no name for the plane alone (a Features API is the
-follow-up), so this is the one caller outside its detectors.
+green is in the 3×3 (a defect cluster). No second implementation: the plane is Features' public `bilinear_green`'s `value`, the
+detectors' one path.
 """
 raw_green_image(m::VgtkCore.RawMosaic; kw...) = raw_green_image(Float32, m; kw...)
 raw_green_image(::Type{T}, m::VgtkCore.RawMosaic; sensor_model::VgtkCore.SensorModel, device) where {T <: AbstractFloat} =
-    Array(VgtkFeatures._bilinear_green(T, device, m, sensor_model).value)
+    Array(VgtkFeatures.bilinear_green(T, m; sensor_model, device).value)
 
 """
     raw_image_size(path) -> (W, H)

@@ -542,10 +542,9 @@ end
     cpu = RadiometricCamera.rc_backend("cpu")
     for model in (VgtkCore.SensorModel(),)
         img = RadiometricCamera.raw_green_image(mo; sensor_model = model, device = cpu)
-        @test isequal(img, Array(VgtkFeatures._bilinear_green(Float32, cpu, mo, model).value))
+        # Features' public bilinear green: the one kernel its mosaic detectors read (its docstring's contract, Features' tests' to hold)
+        @test isequal(img, Array(VgtkFeatures.bilinear_green(Float32, mo; sensor_model = model, device = cpu).value))
     end
-    feat = read(joinpath(pkgdir(VgtkFeatures), "src", "raw_green.jl"), String)
-    @test count("_bilinear_green(Float32, device, m, sensor_model)", feat) == 1        # detect_sfop(m::RawMosaic)'s image: the same call
     drv = read(srcdir("drivers.jl"), String); che = read(srcdir("chrome_evaluation.jl"), String); fe = read(srcdir("frontends.jl"), String)
     @test occursin("Base.invokelatest(RadiometricCamera.raw_green_image, Float32, m; sensor_model = models[i], device)", drv)   # the decode
     @test occursin("raw_sensor_models(files, characterization;", drv) && occursin("raw_sensor_models(files, spec;", che)   # one model resolution
