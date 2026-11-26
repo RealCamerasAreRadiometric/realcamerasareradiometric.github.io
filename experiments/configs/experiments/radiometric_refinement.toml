@@ -72,9 +72,9 @@ provenance = "the AprilGrid's printed-edge distance map (8 px per mm), a vgio/ra
 [inputs.fx3_sensor_characterisation]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
-sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "refine"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw_14mm_siemens_central30cm]
 tier = "rc_raw_photos"
@@ -174,9 +174,9 @@ provenance = "every third (136: DSC06979, DSC06982, … DSC07384) of the 407 Apr
 # the Tamron, the zoom; the coordinator's classification, job 18294).
 [image_regions.fx3_fisheye_aprilgrid_10cm]
 input = "raw_fisheye_aprilgrid_10cm"
-frames = { "DSC06999.ARW" = "9f247c56446c1a412785ba98cbd5e3e2789909e2be9d0001c65a3807caf09da4", "DSC07081.ARW" = "a8a7f909671525c4dad94722cd1436031e49a51869cf9e57a59b45f43c9b2ab1", "DSC07182.ARW" = "6ac0bcd5d011e539c24d25788e92f043faf61ad0a5cc5bebc34de83b957fff5b", "DSC07283.ARW" = "c59987c562de3ff54f87dcb3202b45ed24085ba22b430251296cbe66e4cb686e", "DSC07365.ARW" = "d8ad8543f23092ab23673815b6a0437c9f1fa233bc325d51b4dcbea3efaad9ef" }   # sha256sum on dgx01 (2026-11-15)
+frames = { "DSC06999.ARW" = "9f247c56446c1a412785ba98cbd5e3e2789909e2be9d0001c65a3807caf09da4", "DSC07081.ARW" = "a8a7f909671525c4dad94722cd1436031e49a51869cf9e57a59b45f43c9b2ab1", "DSC07182.ARW" = "6ac0bcd5d011e539c24d25788e92f043faf61ad0a5cc5bebc34de83b957fff5b", "DSC07283.ARW" = "c59987c562de3ff54f87dcb3202b45ed24085ba22b430251296cbe66e4cb686e", "DSC07365.ARW" = "d8ad8543f23092ab23673815b6a0437c9f1fa233bc325d51b4dcbea3efaad9ef" }   # sha256sum on the B200 server (2026-11-15)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
-outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, the B200 server rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
 seed = 1                       # the RANSAC ellipse fit's StableRNG seed: the cases' masks.seed, which seeded the in-run measurement before 2026-11-15
 
 [inputs.raw_tamron_siemens_largeaperture]
@@ -339,7 +339,7 @@ provenance = "the zoom set's start: T. Schöps's camera_calibration (detection +
 [inputs.zoom48_f10_si_green_bc5_cv2_json]
 tier = "rc_baselines"
 path = "geometric_accuracy/records/zoom48_f10_si_all/zoom48_f10_si_all_green_bc5_cv2.json"
-sha256 = "92f3fc8a151cfd809da2b3a4885bfb193915567966dab19c53b4c7d2550feab2"   # sha256sum of the record of record (dgx01, 2026-11-17)
+sha256 = "92f3fc8a151cfd809da2b3a4885bfb193915567966dab19c53b4c7d2550feab2"   # sha256sum of the record of record (the B200 server, 2026-11-17)
 stage = "detect"
 provenance = "a camera record (vgio/cameras/v4): OpenCV's cv2.calibrateCamera, its default model (k1 k2 p1 p2 k3), on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 4.12.0) of the zoom set's Schöps run of record (frontends.toml [schoeps.zoom48_f10_siemens_w20], dataset.bin), by T. Harder's experiments/tools/opencv_calibrate_schoeps.py (verbatim from v0.10.0 frontends_history/scripts; fe_si7.sh's arguments) and experiments/tools/ocv_record.jl (owner GO 2026-11-17): the start of cases sizl_bc5_warped and sizl_bc5_pinhole_warped"
 
@@ -350,13 +350,13 @@ provenance = "a camera record (vgio/cameras/v4): OpenCV's cv2.calibrateCamera, i
 tier = "rc_raw_photos"
 path = "paper-data/geometric-accuracy/fisheye_30cm/siemens-stars"
 stage = "prepare"
-provenance = "the 301 Siemens-star photographs (Sony FX3 ARW, every one f/32 by its EXIF FNumber, read on dgx01 2026-11-16) of the 1 m Siemens board with the 8 mm fisheye (\"DT 8mm F4 SAM\") at ≈ 30 cm (frontends.toml [inputs.raw_fisheye_siemens_30cm]); its chrome photographs are the chrome evaluation's set"
+provenance = "the 301 Siemens-star photographs (Sony FX3 ARW, every one f/32 by its EXIF FNumber, read on the B200 server 2026-11-16) of the 1 m Siemens board with the 8 mm fisheye (\"DT 8mm F4 SAM\") at ≈ 30 cm (frontends.toml [inputs.raw_fisheye_siemens_30cm]); its chrome photographs are the chrome evaluation's set"
 
 # The set's lens coverage: the front end's and the chrome evaluation's step (frontends.toml / chrome_evaluation_fx3_fisheye_30cm_si.toml
 # [image_regions.fx3_fisheye_siemens_30cm]: the same table, the same key, so the same product)
 [image_regions.fx3_fisheye_siemens_30cm]
 input = "raw_fisheye_siemens_30cm"
-frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on dgx01 (2026-11-16)
+frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on the B200 server (2026-11-16)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
 outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames), as every fisheye region of record
 seed = 1                       # as every region of record
@@ -385,7 +385,7 @@ provenance = "the Double Sphere camera VisualGeometryToolkitEstimation fitted to
 [inputs.fisheye30cm_si_green_ocv14_cv2_json]
 tier = "rc_baselines"
 path = "geometric_accuracy/records/fisheye30cm_si_all/fisheye30cm_si_all_green_ocv14_cv2.json"
-sha256 = "034de45cca9ad2c94b5b8c016314411efb51b1deb89102784cefbee2af97ee5f"   # sha256sum of the record of record (dgx01, 2026-11-17)
+sha256 = "034de45cca9ad2c94b5b8c016314411efb51b1deb89102784cefbee2af97ee5f"   # sha256sum of the record of record (the B200 server, 2026-11-17)
 stage = "detect"
 provenance = "a camera record (vgio/cameras/v4): OpenCV's cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL (OpenCV-14) on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 4.12.0) of the set's Schöps run of record (frontends.toml [schoeps.fisheye30cm_siemens_w30], dataset.bin), by T. Harder's experiments/tools/opencv_calibrate_schoeps.py (verbatim from v0.10.0 frontends_history/scripts; fe_si7.sh's arguments) and experiments/tools/ocv_record.jl (owner GO 2026-11-17 05:00): the start of case si30fe_ocv14_warped"
 
@@ -431,7 +431,7 @@ mode = "photosites"               # the RAW photographs read, not decoded: compa
 
 [views]
 # 162 views: the views of record (301) registered with ≥ 20 stars by the start of record, frontends.toml [schoeps.fisheye30cm_siemens_w30]
-# (views.txt of its window-study product dgx01 schoeps-window/results/frontends/schoeps/22f1dc6d01c1bd5a, 2026-11-16: 162 of 301, the frontends record's "localised 162 / 34 of 301")
+# (views.txt of its window-study product the B200 server schoeps-window/results/frontends/schoeps/22f1dc6d01c1bd5a, 2026-11-16: 162 of 301, the frontends record's "localised 162 / 34 of 301")
 fx3_fisheye_siemens_30cm_si = ["DSC04707.png", "DSC04708.png", "DSC04709.png", "DSC04710.png", "DSC04711.png", "DSC04718.png", "DSC04719.png", "DSC04720.png", "DSC04721.png", "DSC04722.png", "DSC04724.png", "DSC04725.png", "DSC04726.png", "DSC04727.png", "DSC04728.png", "DSC04730.png", "DSC04731.png", "DSC04732.png", "DSC04733.png", "DSC04734.png", "DSC04735.png", "DSC04736.png", "DSC04737.png", "DSC04738.png", "DSC04739.png", "DSC04740.png", "DSC04741.png", "DSC04744.png", "DSC04745.png", "DSC04747.png", "DSC04748.png", "DSC04749.png", "DSC04750.png", "DSC04753.png", "DSC04754.png", "DSC04755.png", "DSC04756.png", "DSC04759.png", "DSC04760.png", "DSC04761.png", "DSC04762.png", "DSC04763.png", "DSC04766.png", "DSC04767.png", "DSC04768.png", "DSC04769.png", "DSC04770.png", "DSC04775.png", "DSC04780.png", "DSC04782.png", "DSC04783.png", "DSC04784.png", "DSC04785.png", "DSC04786.png", "DSC04790.png", "DSC04793.png", "DSC04794.png", "DSC04795.png", "DSC04796.png", "DSC04799.png", "DSC04800.png", "DSC04801.png", "DSC04804.png", "DSC04805.png", "DSC04806.png", "DSC04808.png", "DSC04813.png", "DSC04814.png", "DSC04815.png", "DSC04817.png", "DSC04818.png", "DSC04823.png", "DSC04824.png", "DSC04827.png", "DSC04835.png", "DSC04837.png", "DSC04843.png", "DSC04844.png", "DSC04845.png", "DSC04848.png", "DSC04849.png", "DSC04854.png", "DSC04855.png", "DSC04856.png", "DSC04857.png", "DSC04858.png", "DSC04860.png", "DSC04863.png", "DSC04867.png", "DSC04868.png", "DSC04869.png", "DSC04870.png", "DSC04871.png", "DSC04872.png", "DSC04874.png", "DSC04875.png", "DSC04876.png", "DSC04879.png", "DSC04880.png", "DSC04881.png", "DSC04882.png", "DSC04888.png", "DSC04889.png", "DSC04890.png", "DSC04891.png", "DSC04895.png", "DSC04896.png", "DSC04897.png", "DSC04898.png", "DSC04899.png", "DSC04902.png", "DSC04903.png", "DSC04904.png", "DSC04905.png", "DSC04909.png", "DSC04910.png", "DSC04912.png", "DSC04924.png", "DSC04926.png", "DSC04927.png", "DSC04932.png", "DSC04933.png", "DSC04934.png", "DSC04935.png", "DSC04939.png", "DSC04940.png", "DSC04941.png", "DSC04942.png", "DSC04943.png", "DSC04944.png", "DSC04946.png", "DSC04947.png", "DSC04948.png", "DSC04949.png", "DSC04953.png", "DSC04954.png", "DSC04955.png", "DSC04956.png", "DSC04957.png", "DSC04958.png", "DSC04959.png", "DSC04962.png", "DSC04964.png", "DSC04965.png", "DSC04966.png", "DSC04967.png", "DSC04968.png", "DSC04969.png", "DSC04973.png", "DSC04976.png", "DSC04994.png", "DSC04995.png", "DSC04996.png", "DSC04997.png", "DSC04998.png", "DSC04999.png", "DSC05000.png", "DSC05004.png", "DSC05005.png", "DSC05006.png", "DSC05007.png", "DSC05008.png"]
 # 470 views: the views of record (475) registered with ≥ 20 stars by the start of record, frontends.toml [schoeps.texcal_14mm_siemens_w25]
 # (views.txt; 470 photographs have ≥ 20 stars there; 2026-11-16: the list stays within the earlier one, so the other front ends' starts of the set keep every view)
@@ -2541,7 +2541,7 @@ print_scale = 1.0
 [cases.si30fe_spline_warped.pipeline.camera]
 sensor_mm = 35.6
 f_mm = 7.8057                     # the fisheye's nominal focal length of record (the same 8 mm lens as the 10 cm cases, ag10fe_*)
-fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on dgx01, 2026-11-16)
+fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
 sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
@@ -2611,7 +2611,7 @@ print_scale = 1.0
 [cases.si30fe_kb_warped.pipeline.camera]
 sensor_mm = 35.6
 f_mm = 7.8057                     # the fisheye's nominal focal length of record (the same 8 mm lens as the 10 cm cases, ag10fe_*)
-fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on dgx01, 2026-11-16)
+fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
 sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
@@ -2674,7 +2674,7 @@ print_scale = 1.0
 [cases.si30fe_ds_warped.pipeline.camera]
 sensor_mm = 35.6
 f_mm = 7.8057                     # the fisheye's nominal focal length of record (the same 8 mm lens as the 10 cm cases, ag10fe_*)
-fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on dgx01, 2026-11-16)
+fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
 sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
@@ -2735,7 +2735,7 @@ print_scale = 1.0
 [cases.si30fe_ocv14_warped.pipeline.camera]
 sensor_mm = 35.6
 f_mm = 7.8057                     # the fisheye's nominal focal length of record (the same 8 mm lens as the 10 cm cases, ag10fe_*)
-fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on dgx01, 2026-11-16)
+fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
 sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)

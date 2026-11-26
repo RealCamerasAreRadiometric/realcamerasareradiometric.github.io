@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
-# The observation model of a calibrated camera (RC 0.11.1, owner 2026-11-15: "if a sensor was estimated with a model, then it must be
-# used to predict the model"): how the photographs a camera was calibrated on were read into observations — the sensor statement (the
+# The observation model of a calibrated camera (if a sensor was estimated with a model, then it must be used to predict the
+# model): how the photographs a camera was calibrated on were read into observations — the sensor statement (the
 # sensor characterisation the RAW photographs were linearised under, identified by its sha256, or the statement that there is none)
 # and the photographs' kind (RAW photosites, or decoded images) with the channel measured. A `CalibratedCamera` is the camera model
 # with its observation model and its render settings: the complete calibration, the unit the records save and load. Every reading of
@@ -84,7 +84,7 @@ const CHANNEL_NAMES = ("R", "G", "B")
 """The observation model's channel of a state's channel index (0: `:RGB`; 1–3: `:R`, `:G`, `:B`)."""
 _channel_symbol(c::Integer) = c == 0 ? :RGB : Symbol(CHANNEL_NAMES[c])
 
-# ---- the run's use of the sensor model: `camera.sensor_model` (RC 0.11.2, owner 2026-11-15) -----------------------------------
+# ---- the run's use of the sensor model: `camera.sensor_model` -----------------------------------
 """Whether a run uses the sensor model (`camera.sensor_model`, parsed once by [`sensor_model_mode`](@ref)): [`AutoSensorModel`](@ref),
 [`OnSensorModel`](@ref) or [`OffSensorModel`](@ref). Every decision on it is a dispatch on these types."""
 abstract type SensorModelMode end
@@ -137,7 +137,7 @@ The sensor record of `camera.sensor_characterisation = spec`: the [`SensorRecord
 """
 function sensor_statement(spec::AbstractString)
     spec == NO_SENSOR_CHARACTERISATION &&
-        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired (RC 0.11.2): `camera.sensor_model = \"off\"` does not use a record present"))
+        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired: `camera.sensor_model = \"off\"` does not use a record present"))
     isempty(spec) && throw(ArgumentError("`camera.sensor_characterisation` names no record"))
     isfile(spec) || throw(ArgumentError("`camera.sensor_characterisation`: no file $spec (a named record must exist: a typo never turns the sensor model off)"))
     return SensorRecord(open(VgtkCore.sha256_hex, spec))

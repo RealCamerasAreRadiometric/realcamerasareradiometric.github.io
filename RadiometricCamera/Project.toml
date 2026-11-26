@@ -1,6 +1,6 @@
 name = "RadiometricCamera"
 uuid = "7c1f0a52-9d3e-4b6a-9f1e-3d2a8c5b7e01"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ties Harder <TiesHarder@icloud.com>"]
 
 [workspace]
@@ -70,12 +70,12 @@ Statistics = "1"
 StatsBase = "0.34.13"
 Test = "1"
 TOML = "1"
-VisualGeometryToolkitCore = "0.12"
-VisualGeometryToolkitEstimation = "0.12.1"
-VisualGeometryToolkitFeatures = "0.9.9"
-VisualGeometryToolkitIO = "0.11"
-VisualRadiometryToolkitCore = "0.1"
-VisualRadiometryToolkitIO = "0.1"
+VisualGeometryToolkitCore = "0.13.4"
+VisualGeometryToolkitEstimation = "0.12.2"
+VisualGeometryToolkitFeatures = "0.9.11"
+VisualGeometryToolkitIO = "0.11.2"
+VisualRadiometryToolkitCore = "0.1.1"
+VisualRadiometryToolkitIO = "0.1.1"
 julia = "1.13"
 
 [extras]

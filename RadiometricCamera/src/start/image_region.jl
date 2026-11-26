@@ -8,7 +8,7 @@
 run_sensor(opts::PipelineOptions, W::Integer, H::Integer) = VgtkCore.Sensor(VgtkCore.Size2(Int(W), Int(H)), _sensor_width(opts) / W)
 
 """
-    measure_image_region(files; image, outlier_halfwidth_px, seed, device = default_device(), detect = detect_image_circle) -> NamedTuple
+    measure_image_region(files; image, outlier_halfwidth_px, seed, device = default_backend(), detect = detect_image_circle) -> NamedTuple
 
 The image region of a capture set — where light falls on the sensor (the lens's lit region, an `Ellipse` in COLMAP pixels of the
 raw grid) — MEASURED on the set's own photographs `files` (RAW files, or full-resolution decoded `.png`), never predicted from a lens
@@ -24,10 +24,10 @@ a mixed set is refused; no ellipse found is an error (the set's config must then
 frames). Returns `(; lens_coverage, extent, frames, center_scale, axes_scale, inliers, candidates, rim_gap, cut, seconds)`, the fields
 of the record ([`save_image_region`](@ref)).
 The measurement is GEOMETRIC (a rim threshold on log-brightness drops): its frames are read under the file's black, no sensor model —
-exempt from the observation model (RC 0.11.1; every photograph a camera is calibrated on or predicts goes through `photo_set`).
+exempt from the observation model (every photograph a camera is calibrated on or predicts goes through `photo_set`).
 """
 function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,
-                              device = VgtkCore.default_device(), detect = VgtkFeatures.detect_image_circle)
+                              device = default_backend(), detect = VgtkFeatures.detect_image_circle)
     isempty(files) && throw(ArgumentError("measure_image_region: no photographs"))
     check_geometry_image(Dict("image" => image), "measure_image_region")
     isfinite(outlier_halfwidth_px) && outlier_halfwidth_px > 0 ||

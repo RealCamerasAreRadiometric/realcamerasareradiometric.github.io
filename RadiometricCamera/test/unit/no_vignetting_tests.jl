@@ -83,6 +83,6 @@ end
     dev_flat = render_view(1, a.flat, a.pose, a.mat, a.light, a.board, a.st, a.mask; backend = CUDABackend())
     @test dev_none == dev_unit                                                        # bit for bit, in the device's Float32
     @test maximum(abs, dev_none - dev_flat) <= 1e-5 * maximum(abs, dev_none)          # the flat spline is 1 to Float32 rounding
-    host = render_view(1, a.none, a.pose, a.mat, a.light, a.board, a.st, a.mask)
+    host = render_view(1, a.none, a.pose, a.mat, a.light, a.board, a.st, a.mask; backend = RadiometricCamera.KernelAbstractions.CPU())
     @test maximum(abs, dev_none - host) <= 1e-4 * maximum(abs, host)                  # the CPU's image to Float32 rounding
 end

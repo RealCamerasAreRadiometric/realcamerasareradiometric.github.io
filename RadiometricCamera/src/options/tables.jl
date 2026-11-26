@@ -38,10 +38,10 @@ const INPLANE_KINDS = ("none", "aspect_skew")
 # are `nothing`, which TOML cannot state; the file documents them in a comment.
 using VisualGeometryToolkitCore: toml_default, parse_defaults
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
-# `parse_defaults`/`toml_default`, as every stack package's file is (DUPLICATION.toml: the name is each package's own data).
-const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
+# `parse_defaults`/`toml_default`, as every stack package's file is (its own name: Estimation's parsed file is another package's data).
+const _RC_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
 """The default of the field `f` of the options table `T`: its configs/default.toml value, read as the TOML reader reads a config's."""
-_option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_TOML_DEFAULTS, t, k), "$t.$k"))
+_option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_RC_DEFAULTS, t, k), "$t.$k"))
 """The TOML table of the options table type `T` (its field of `PipelineOptions`)."""
 _table_name(::Type{T}) where {T} = String(only(n for n in fieldnames(PipelineOptions) if fieldtype(PipelineOptions, n) === T))
 
@@ -106,7 +106,7 @@ Base.@kwdef struct CameraOptions <: AbstractOptionsTable
                                                      #   once by `sensor_model_mode`): "auto" (a record present is used, none: the file's black),
                                                      #   "on" (a record required), "off" (a record present is NOT used: a loud warning)
 end
-"""The RETIRED value of `camera.sensor_characterisation` that stated there is none (RC ≤ 0.11.1): refused since 0.11.2, naming
+"""The RETIRED value of `camera.sensor_characterisation` that stated there is none (an earlier release's): refused, naming
 `camera.sensor_model = "off"` (a record present, not used) — a run that names no record leaves the key empty."""
 const NO_SENSOR_CHARACTERISATION = "none"
 """The `camera.lens_coverage` that states a lens lighting the whole sensor: the coverage is the sensor's rectangle (Core's default
@@ -199,7 +199,7 @@ Base.@kwdef struct VignettingOptions <: AbstractOptionsTable
     boundary_order::Int = _option_default(VignettingOptions, :boundary_order)                           # the dependent nodes' extrapolation past the supported nodes, 2 Δ²c = 0 | 3 Δ³c = 0 (`BOUNDARY_ORDERS`)
     chart::Symbol = _option_default(VignettingOptions, :chart)                           # the chart of the normalized radius (Core's `RADIAL_CHARTS`, 2026-11-10): linear ρ = d / r_max, uniform
                                                      #   knots over the imaged region | projective ρ = d / (r_max + d) (VisualRadiometryToolkitCore's `RadialVignetting(…; chart = :projective)`: the linear chart's pixel
-                                                     #   spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1 (Core 0.10.11): no pixel is ever clamped)
+                                                     #   spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1 (VisualGeometryToolkitCore's rule): no pixel is ever clamped)
 end
 
 """`[warping]`: the board warping h (thin plate spline through nodal heights) and the in-plane print error (Core's `Aspect ∘ Skew`)."""
@@ -262,7 +262,7 @@ them). Read from TOML with [`pipeline_options`](@ref), written for the run recor
 A `selfcheck.only` run reads no photograph: it needs no `io.images`.
 """
 Base.@kwdef struct PipelineOptions
-    fixed::Vector{String} = String.(toml_default(_TOML_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
+    fixed::Vector{String} = String.(toml_default(_RC_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default
     io::IOOptions = IOOptions()
     frontend::FrontendOptions = FrontendOptions()
     camera::CameraOptions = CameraOptions()

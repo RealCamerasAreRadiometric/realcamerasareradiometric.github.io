@@ -8,25 +8,30 @@ This tutorial renders two photographs of a printed board through a radiometric c
 are known, then starts a calibration from wrong values of those three blocks and recovers them from the photographs. Every
 block below runs when the documentation is built.
 
-## The scene and the camera
+## The board and the camera
 
 The board is a printed 2 m × 2 m checkerboard (a 256 × 256 texture of 8 × 8 squares, linear values in [0, 1]). The geometric camera
 `geometric` is VisualGeometryToolkitCore's pixel camera: a `BoundedCamera` of a `CameraModel` whose K is in the image's COLMAP pixels,
-over a double-sphere fisheye lens; any Core lens plugs in the same way. The image is `W × H` = 320 × 240 pixels (the
+over a double-sphere fisheye lens; any Core lens plugs in the same way. The image is `sz` = 320 × 240 pixels (the
 `BoundedCamera`'s `Size2`: the sensor the camera images onto), small enough that this page runs in seconds; a real calibration
 runs at the sensor's full resolution. The principal point is the image's centre and the focal length is 412 pixels.
 
+Every kernel runs on the GPU when one is functional, once its package is loaded (`using CUDA`; [`default_backend`](@ref)), and
+otherwise on the CPU, with a warning that the run will be very slow; KernelAbstractions' `backend = CPU()` chooses the CPU. On a GPU the kernels
+compute in Float32, so the checks below hold to Float32's precision on either device.
+
 ```@example tutorial
+using CUDA                                      # the GPU, when there is one: RadiometricCamera's default device
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
-using VisualRadiometryToolkitCore: Focus, Material, with_vignetting   # the generic radiometric types: the focus surface, the material, a camera's parts
-using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius, 𝔟
+using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, 𝔟   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
+using RadiometricCamera: RenderSettings, compute_mask, render_view, solve_linear_blocks!, sphere_radius
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
 board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
-W, H = 320, 240                                   # the image, in pixels
-K = CameraCalibrationMat(412.0, 0.0, 0.0, 0.0, 412.0, 0.0, W / 2, H / 2, 1.0)
-geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
+sz = Size2(320, 240)                              # the image, in pixels
+K = CameraCalibrationMat(412.0, sz)
+geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), sz)
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 nothing # hide
 ```
@@ -62,12 +67,12 @@ the photograph's index `k`, which keys its Monte Carlo samples).
 
 ```@example tutorial
 xs = range(-0.5, 0.5; length = 4)
-vignetting_true = VisualRadiometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
-camera_true = RadiometricCameraModel(geometric, Focus(3, 1.5, W, H), 0.04, vignetting_true)   # geometric camera, focus surface, aperture radius (m), vignetting
+vignetting_true = VisualRadiometryToolkitCore.with_control_points(TensorProductVignetting((4, 4), Rect(extent(geometric)); degree = 2), [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])
+camera_true = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04, vignetting = vignetting_true)   # focused at 1.5 m (Focus(geometric, 1.5)), aperture radius 4 cm
 a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
 light_true = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)   # VisualRadiometryToolkitCore's light: degree 2 per channel on the sphere (b, r_SH)
 material_true = Material(; diffuse_weight = 0.4)
-masks = [compute_mask(camera_true, p, board, settings; δ = 0.02, backend = RadiometricCamera.rc_backend("cpu")) for p in poses]
+masks = [compute_mask(camera_true, p, board, settings; δ = 0.02) for p in poses]
 photos = [render_view(k, camera_true, poses[k], material_true, light_true, board, settings, masks[k]) for k in 1:2]
 size(photos[1])
 ```
@@ -79,7 +84,7 @@ Here the geometry is known: the state starts from the true camera with a flat vi
 lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² and the relative RMS residual.
 
 ```@example tutorial
-camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2))   # V ≡ 1
+camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(extent(geometric)); degree = 2))   # V ≡ 1
 s = CalibrationState(board, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
                      masks)
 cost(s)
@@ -93,7 +98,7 @@ parts) and reproduces the photographs exactly:
 
 ```@example tutorial
 solve_linear_blocks!(s; joint = true)
-cost(s)[2] < 1e-10, s.mat.diffuse_weight ≈ 0.4
+cost(s)[2] < 1e-4, isapprox(s.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
 ```
 
 The vignetting and the lighting come back up to their common gauge: the state pins V = 1 at the sensor's centre, and the

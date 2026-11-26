@@ -110,7 +110,7 @@ end
     _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, ::Val{N}, sensor, lensw,
                    bases, P0, pxy, light_scale, Z)
 
-THE row kernel of the LM's Jacobian, both routes (Core's `_launch_rows_on!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
+THE row kernel of the LM's Jacobian, both routes (Core's `_launch_rows_on!` over a block's pixels, Core's `OnBackend`, `host_workgroupsize = 16`): pixel `i` of the block (buffer pixel
 `bufidx[i]` of the kernels' outputs, its id in `ids`) writes the residual `r` and the Jacobian rows (`J`, columns × rows) of its
 measured channels `chs`, in the layout's full columns (`klay`, `_kernel_layout`): the AD scatter from the slots `S` (`_slot_rows`), the
 focus chain through the nodal weights `G[:, ks, gidx[i]]` (`_focus_chain!`), a tile's patch fan-out on its window lens `lensw` with
@@ -207,7 +207,7 @@ without an upload each.
 """
 function _device_copy(s::CalibrationState, A::AbstractArray)
     be = s.backend
-    be isa KA.CPU && return A
+    KA.isgpu(be) || return A
     return lock(_DEVICE_CACHE_LOCK) do
         get!(() -> _shared_read_only!(be, adapt(be, A)), _DEVICE_COPIES, A)
     end
@@ -313,14 +313,14 @@ function _jacobian_buffers(s::CalibrationState, ncol::Integer, M::Integer)
     return J, view(rb, 1:M)
 end
 
-"""Per-state kernel data (the scene in the kernels' float type, adapted to the backend; the pixel-id lists and their index lists,
+"""Per-state kernel data (the board in the kernels' float type, adapted to the backend; the pixel-id lists and their index lists,
 `_index_list`), built lazily."""
 function _ensure_device!(s::CalibrationState)
     s.device_cache === nothing || return s.device_cache
     be = s.backend
-    F = _kernel_float(be)
-    # the CPU backend's kernels read the host scene itself (Float64 already: no copy of the board's maps)
-    board32 = be isa KA.CPU && F === _float_of(s.settings) ? s.board : adapt(be, VgtkCore.convert_eltype(F, s.board))
+    F = VgtkCore.kernel_float(be)
+    # the CPU backend's kernels read the host board itself (Float64 already: no copy of the board's maps)
+    board32 = VgtkCore.on_device(F, _float_of(s.settings), be, s.board)
     px = [adapt(be, UInt32.(UInt32.((getindex.(p, 1) .- 1) .* _image_height(s) .+ getindex.(p, 2)))) for p in s.px]
     idx = [_index_list(be, length(p)) for p in px]
     # read by every chunk of every view, written only here: out of the device's per-buffer queue tracking, the lists one by one (an
@@ -331,14 +331,14 @@ function _ensure_device!(s::CalibrationState)
     return s.device_cache
 end
 
-"""The scene of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
-kernels' scene itself where the two float types agree)."""
+"""The board of the nodal heights' path (`HIGH_FLOAT`) on the state's backend, adapted once and kept in the device cache (the
+kernels' board itself where the two float types agree)."""
 function _height_board(s::CalibrationState)
     dc = _ensure_device!(s)
     hasproperty(dc, :board_h) && return dc.board_h
     be = s.backend
     G = HIGH_FLOAT
-    sh = G === _kernel_float(be) ? dc.board : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, s.board)))
+    sh = G === VgtkCore.kernel_float(be) ? dc.board : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, s.board)))
     s.device_cache = merge(s.device_cache, (; board_h = sh))
     return sh
 end
@@ -359,7 +359,7 @@ function _height_inputs(s::CalibrationState, view::View, vig, m::MaterialVar, li
 end
 """The parameter pack of a per-view state in the kernels' float type."""
 _pack32(s::CalibrationState, view::View, vig::AbstractVignetting, mat::Material, light::EnvironmentLight) =
-    (F = _kernel_float(s.backend); (VgtkCore.convert_eltype(F, view), VgtkCore.convert_eltype(F, vig), VgtkCore.convert_eltype(F, mat),
+    (F = VgtkCore.kernel_float(s.backend); (VgtkCore.convert_eltype(F, view), VgtkCore.convert_eltype(F, vig), VgtkCore.convert_eltype(F, mat),
                                     VgtkCore.convert_eltype(F, light), VgtkCore.convert_eltype(F, s.settings)))
 
 """Masked flux vector (3·npx, Float64 host) of view `k` at (view, vig, mat, light, surface) on the device backend (`surf` defaults to the
@@ -383,7 +383,7 @@ end
 surface (converted here)."""
 function _flux_functor(s::CalibrationState, k::Integer, v32, vig::AbstractVignetting, mat::Material, light::EnvironmentLight,
                        surf::TargetState = s.board.state)
-    F = _kernel_float(s.backend)
+    F = VgtkCore.kernel_float(s.backend)
     vig32, m32, l32, st32 = VgtkCore.convert_eltype(F, vig), VgtkCore.convert_eltype(F, mat), VgtkCore.convert_eltype(F, light), VgtkCore.convert_eltype(F, s.settings)
     board32 = with_state(_ensure_device!(s).board, VgtkCore.convert_eltype(F, surf))
     return _FluxAt(Int32(k), Int32(_image_height(s)), v32, vig32, m32, l32, board32, st32)
@@ -396,7 +396,7 @@ end
     _view_jacobian(varflags, r, pose, dist, foc, ap, m, vg, lt) -> (; J, res, flux, lay, T)
 
 A view's Jacobian on the state's backend (`PerViewResidual`), every backend: chunked dual kernels over all blocks (the aperture radius
-is one of the dual slots) in the kernels' float type (`_kernel_float`: Float32 on a device, Float64 on the CPU backend; `_jac_chunk`
+is one of the dual slots) in the kernels' float type (Core's `kernel_float`: Float32 on a device, Float64 on the CPU backend; Core's `dual_chunk`
 partials per chunk), the nodal heights by the height kernel, the linear blocks' analytic columns by the parts kernel, the flux by the
 flux kernel — all kept on the device and assembled by the row kernel (`_jacobian_row!`): `J` (the layout's full columns × the measured
 rows) and the residual `res` on the backend, the flux (device), the layout and the column map `T` to the problem's coordinates
@@ -408,7 +408,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     s = r.state
     dc = _ensure_device!(s)
     be = s.backend
-    F = _kernel_float(be)
+    F = VgtkCore.kernel_float(be)
     NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
     NS = length(s.settings.sensor); ND = VgtkCore.tangent_size(dist); NH = n_height(m); NI = n_inplane(m)
     lay = _jacobian_layout(varflags, N, NS, VgtkCore.tangent_size(vg), NV, J, ND; NH, NI, fixed = material_fixed(m))
@@ -420,7 +420,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     need_f = !isempty(lay.focus_cols)
     need_h = !isempty(lay.height_cols)
     stk = VgtkCore.convert_eltype(F, s.settings)
-    C = _jac_chunk(s, P)
+    C = VgtkCore.dual_chunk(s.backend, P, s.jacobian_chunk)
     c0s = _chunk_starts(P, C)                                        # (the heights: the height kernel's, below; no dual slots)
     # linear blocks: analytic columns from the parts kernel, so vignetting and lighting are plain here (not duals with zero
     # partials: the same values and partials, fewer registers)
@@ -457,7 +457,7 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::_PoseBlock, dist:
     chs = fit_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
+    VgtkCore._launch_rows_on!(VgtkCore.OnBackend(be; host_workgroupsize = 16), _jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
                            nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
@@ -508,7 +508,7 @@ end
 
 """One chunk of the per-view Jacobian (`_view_jacobian`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded,
 the plain vignetting, lighting and settings, the board `board` (its state replaced by the seeded one) and the record `rays` all in
-`F` (`_kernel_float`, or `HIGH_FLOAT` for the pose's chunks)."""
+`F` (Core's `kernel_float`, or `HIGH_FLOAT` for the pose's chunks)."""
 function _view_chunk(::Val{F}, s::CalibrationState, r::PerViewResidual{N}, lay, c0, C, pose, dist, foc, ap, m, vigk, lk, board, stk,
                      rays) where {F, N}
     be = s.backend

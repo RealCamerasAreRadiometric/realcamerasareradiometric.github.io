@@ -17,7 +17,7 @@
 
     """A board of `aspect` = height / width (2 m wide), seen from z > 0."""
     page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
-    hh = SVector{HEIGHT_NC}([saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
+    hh = SVector{HEIGHT_NC}(VgtkCore.Synthetic.saddle_height.(RC.HEIGHT_NODES))
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a two-view scene of the blob fixture; the truth = a saddle with a 2 % sag of the board width at the edge (≈ 0.6 px at 40°)
     tex_h = fixture_board()
@@ -167,7 +167,7 @@ end
         prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
-        s_c = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
+        s_c = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = RadiometricCamera.KernelAbstractions.CPU())
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
@@ -227,9 +227,9 @@ end
         @test wd isa VgtkCore.MappedSurface                                     # the flat field's system on the device
         board_t = RadiometricCamera.with_state(tall, TargetState(h = 0.5 * height_true))
         masks_t = [compute_mask(camera_h, p, tall, st_h; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_h]
-        targets_t = render_all(CalibrationState(RadiometricCamera.with_state(tall, TargetState(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t))
+        targets_t = render_all(CalibrationState(RadiometricCamera.with_state(tall, TargetState(h = height_true)), st_h, camera_h, poses_h, mat_h, light_h, blank_h; masks = masks_t, backend = RadiometricCamera.KernelAbstractions.CPU()))
         s_g = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
-        s_c = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t)
+        s_c = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = RadiometricCamera.KernelAbstractions.CPU())
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g), render_all(s_c))) < 2e-3 * maximum(maximum, render_all(s_c))
         prob_g, _ = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
         prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)

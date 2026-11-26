@@ -156,7 +156,7 @@ in Float64 on every backend, as the nodal heights' path (`_height_float`): the c
 function all_parts(s::CalibrationState)
     be = s.backend
     dc = _ensure_device!(s)
-    board = _height_board(s)                                                  # the Float64 scene on the backend
+    board = _height_board(s)                                                  # the Float64 board on the backend
     G = Float64
     mat = VgtkCore.convert_eltype(G, s.mat); light = VgtkCore.convert_eltype(G, s.light); st = VgtkCore.convert_eltype(G, s.settings)
     R = _parts_type(light, st)

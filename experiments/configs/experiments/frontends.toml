@@ -28,7 +28,7 @@ name = "frontends"
 tier = "rc_raw_photos"
 path = "paper-data/defocus/zoom-lens/siemens-stars"
 stage = "prepare"
-provenance = "the 171 Siemens-star photographs DSC03526 … DSC03705 (nine frame numbers absent) of the 1 m board, Sony ILME-FX3 with the zoom (EXIF lens \"DT 24-70mm F3 SAM\", 48 mm, f/10, ISO 100, 0.8 s, manual focus), the zoom-lens defocus set (configs/data_artifacts.toml [[unpacked.rc_raw_photos]] defocus/zoom-lens/siemens-stars; dgx01 manifest defocus/zoom-lens/MANIFEST.tsv)"
+provenance = "the 171 Siemens-star photographs DSC03526 … DSC03705 (nine frame numbers absent) of the 1 m board, Sony ILME-FX3 with the zoom (EXIF lens \"DT 24-70mm F3 SAM\", 48 mm, f/10, ISO 100, 0.8 s, manual focus), the zoom-lens defocus set (configs/data_artifacts.toml [[unpacked.rc_raw_photos]] defocus/zoom-lens/siemens-stars; the B200 server manifest defocus/zoom-lens/MANIFEST.tsv)"
 
 [inputs.raw_tamron_siemens_largeaperture]
 tier = "rc_raw_photos"
@@ -129,9 +129,9 @@ provenance = "the 1 m Siemens-star board record (target.json: the identity the i
 [inputs.schoeps_image]
 tier = "unpublished"
 path = "schoeps-camera_calibration-00ef4de-sm100.sqsh"
-sha256 = "3cd90af2292622fd49209b27fc8ed2550967d375481845c6d49236b002af1704"   # sha256sum of the image of record (dgx01, 2026-11-13; containers/README.md)
+sha256 = "3cd90af2292622fd49209b27fc8ed2550967d375481845c6d49236b002af1704"   # sha256sum of the image of record (the B200 server, 2026-11-13; containers/README.md)
 stage = "detect"
-provenance = "T. Schöps's camera_calibration at puzzlepaint/camera_calibration 00ef4deca274377f00c3654b75b857dd20382cc2 (opengv 306a54e6) on docker.io/nvidia/cuda:12.8.1-devel-ubuntu22.04 (sha256:a99a1860…), the %post of frontends_history/containers/schoeps.def verbatim but -arch=sm_120 → sm_100 (B200), an enroot image (dgx01 job 7283, build_frontend_containers.sbatch, 2026-11-11)"
+provenance = "T. Schöps's camera_calibration at puzzlepaint/camera_calibration 00ef4deca274377f00c3654b75b857dd20382cc2 (opengv 306a54e6) on docker.io/nvidia/cuda:12.8.1-devel-ubuntu22.04 (sha256:a99a1860…), the %post of frontends_history/containers/schoeps.def verbatim but -arch=sm_120 → sm_100 (B200), an enroot image (the B200 server job 7283, build_frontend_containers.sbatch, 2026-11-11)"
 
 [inputs.siemens_board_fit]
 tier = "rc_calibration"
@@ -142,7 +142,7 @@ provenance = "the 1 m Siemens-star board record: the stars' design positions the
 [inputs.fx3_sensor_characterisation]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
-sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14), the chrome configs'
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14), the chrome configs'
 stage = "prepare"
 provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0), the chrome configs' input fx3_sensor_characterisation: each RAW photograph's geometry image is read under its frame's model (its black, its defects missing, saturation censored), as the chrome detect reads its photographs"
 
@@ -186,7 +186,7 @@ lens_coverage = "sensor"         # the lens lights the whole sensor (no housing;
 # measured on five of its own frames (the 1st, 76th, 151st, 226th and 301st), as every fisheye region of record.
 [image_regions.fx3_fisheye_siemens_30cm]
 input = "raw_fisheye_siemens_30cm"
-frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on dgx01 (2026-11-16)
+frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on the B200 server (2026-11-16)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
 outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames), as every fisheye region of record
 seed = 1                       # as every region of record
@@ -201,16 +201,16 @@ lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image 
 # The vignetting sets of 2026-10-28 (the lens coverage as radiometric_refinement_vignetting.toml measures it: the same tables, one step each).
 [image_regions.fx3_14mm_f4_20261028]
 input = "raw_14mm_diffuser_20261028"
-frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # sha256sum on dgx01 (2026-11-15)
+frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # sha256sum on the B200 server (2026-11-15)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
-outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, the B200 server rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
 seed = 1                       # the RANSAC ellipse fit's StableRNG seed: the cases' masks.seed, which seeded the in-run measurement before 2026-11-15
 
 [image_regions.fx3_fisheye_siemens_20261028]
 input = "raw_fisheye_siemens_20261028"
-frames = { "DSC04845.ARW" = "c489a8df1c700b12c34f34466ad25375f8b22fb8d07eb8f29d11c9215cce5639", "DSC04846.ARW" = "fadcc183d874c1c6b7e2bddb3b93fd7c62639c4f048812e0f3752566d357e4f2", "DSC04847.ARW" = "651d8845ba8a645af944bea43e4f7db705bb75472dc6486414251e69e4469a59", "DSC04848.ARW" = "a8abfe3ad4315ca7d1a9fc3ff1cfd5d7aa9ecf8d675dad75faec38856406a023", "DSC04853.ARW" = "6f7168c0451410ea6d5b474ddf6fda2f1f8dd8f5bdead4201068a2036f101d4b" }   # sha256sum on dgx01 (2026-11-15)
+frames = { "DSC04845.ARW" = "c489a8df1c700b12c34f34466ad25375f8b22fb8d07eb8f29d11c9215cce5639", "DSC04846.ARW" = "fadcc183d874c1c6b7e2bddb3b93fd7c62639c4f048812e0f3752566d357e4f2", "DSC04847.ARW" = "651d8845ba8a645af944bea43e4f7db705bb75472dc6486414251e69e4469a59", "DSC04848.ARW" = "a8abfe3ad4315ca7d1a9fc3ff1cfd5d7aa9ecf8d675dad75faec38856406a023", "DSC04853.ARW" = "6f7168c0451410ea6d5b474ddf6fda2f1f8dd8f5bdead4201068a2036f101d4b" }   # sha256sum on the B200 server (2026-11-15)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
-outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, dgx01 rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
+outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames: every set single-basin for 750–2000, the B200 server rc-image-circle-halfwidth.md §9), measured on the raw grid as chosen (before 2026-11-16: 500 green-cell px)
 seed = 1                       # as above
 
 [cases.vig14mm_f4_siemens]
@@ -277,7 +277,7 @@ lens_coverage = "sensor"         # the lens lights the whole sensor, as the Tamr
 #   question    which refinement window gives the zoom (48 mm, f/10) start of record?
 #   hypothesis  the frozen 40, its half or its double scores the lowest held-out Thorlabs median
 #   decides     [schoeps.zoom48_f10_siemens_w20]
-#   evidence    dgx01 window study (chrome_evaluation_sw_zoom48: 9a2d68eaf794a012; chrome_evaluation_sw_zoom4880: 2300ce36da2173af)
+#   evidence    the B200 server window study (chrome_evaluation_sw_zoom48: 9a2d68eaf794a012; chrome_evaluation_sw_zoom4880: 2300ce36da2173af)
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  the smallest window scores best although it localises the fewest photographs (91 of 171); its coverage of the common dots is the highest (100 %)
@@ -292,7 +292,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the Tamron f/8 start of record?
 #   hypothesis  the frozen 40, its half or its double scores the lowest held-out Thorlabs median
 #   decides     [schoeps.tamron_la_siemens_w20]
-#   evidence    dgx01 window study (chrome_evaluation_sw_tamron_la: c5100cff95d9ec36; chrome_evaluation_sw_tamron_la80: 7ea4406f46a7a3fd)
+#   evidence    the B200 server window study (chrome_evaluation_sw_tamron_la: c5100cff95d9ec36; chrome_evaluation_sw_tamron_la80: 7ea4406f46a7a3fd)
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  the smallest window is best in the centre and at the edge, on 91 of 340 localised photographs; the refinement's views list (radiometric_refinement.toml) follows the start's registered views
@@ -307,7 +307,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the 14 mm central_30cm start of record?
 #   hypothesis  the frozen default 10 or its double scores the lower held-out Thorlabs median
 #   decides     [schoeps.central30cm_14mm_siemens_w20] and, by the same-lens rule, the 14 mm sets without a Thorlabs pair (texcal_14mm, vig14mm_f4)
-#   evidence    dgx01 window study (/raid/data/jpr/schoeps-window, chrome_evaluation_sw_central30cm: evaluate e60875c16fcdb04e)
+#   evidence    the B200 server window study (its scratch root schoeps-window/, chrome_evaluation_sw_central30cm: evaluate e60875c16fcdb04e)
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  both cover 98.1 % of the sensor lattice; the edge gains most (Δ −0.230 px)
@@ -322,7 +322,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the Tamron 17 cm start of record?
 #   hypothesis  the frozen 40 or a larger window scores the lower held-out Thorlabs median
 #   decides     [schoeps.tamron17_siemens_w80] and, with the Tamron f/8 set, the Tamron f/2.8 vignetting set's window
-#   evidence    dgx01 window study (chrome_evaluation_sw_tamron17: evaluate 1e09137aaa964846)
+#   evidence    the B200 server window study (chrome_evaluation_sw_tamron17: evaluate 1e09137aaa964846)
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  coverage 99.4 % vs 100 % of the common dots; the centre and the edge both improve (−0.008, −0.029 px)
@@ -337,7 +337,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the 14 mm texture-calibration start?
 #   hypothesis  the 14 mm's rule (the larger window) carries over
 #   decides     [schoeps.texcal_14mm_siemens_w25]
-#   evidence    dgx01 window study: 25 → 470/479 localised, median reprojection 0.124 px; 13 → 439/479, 0.114 px
+#   evidence    the B200 server window study: 25 → 470/479 localised, median reprojection 0.124 px; 13 → 439/479, 0.114 px
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  no chrome set was photographed with this calibration: the decision rests on the other 14 mm set
@@ -352,7 +352,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the fisheye 30 cm start of record?
 #   hypothesis  the default 10 or a larger window scores the lower held-out Thorlabs median
 #   decides     [schoeps.fisheye30cm_siemens_w30], the fisheye 30 cm rows of the paper's chrome evaluation and, by the same lens, the fisheye f/4 vignetting set's tie-break
-#   evidence    dgx01 window study (testtree, chrome_evaluation_sw2_fisheye30cm: evaluate 0bd5c9e365a1c0ef); localised 162 / 34 of 301; the default 10 failed once in dense initialization
+#   evidence    the B200 server window study (testtree, chrome_evaluation_sw2_fisheye30cm: evaluate 0bd5c9e365a1c0ef); localised 162 / 34 of 301; the default 10 failed once in dense initialization
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  98 of 254 chrome photographs register (rim views: the dot rows merge; misses, not loosened), 82 assign all but ≤ 13 dots; the edge gains most (Δ −0.97 px)
@@ -382,7 +382,7 @@ args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels
 #   question    which refinement window gives the fisheye f/4 vignetting start?
 #   hypothesis  the fisheye's rule (coverage, then the localised count) carries over
 #   decides     [schoeps.vigfisheye_f4_siemens_w10]
-#   evidence    dgx01 window study: 10 → 71/160, 99.8 %; 30 → 58/160, 98.9 %
+#   evidence    the B200 server window study: 10 → 71/160, 99.8 %; 30 → 58/160, 98.9 %
 #   owner       J. Pritts (2026-11-16: raw_green, the frozen arguments verbatim, the window on the held-out Thorlabs median)
 #   date        2026-11-16
 #   discussion  the frozen run on the sRGB copies used 63 views (excluded.txt: two dropped)

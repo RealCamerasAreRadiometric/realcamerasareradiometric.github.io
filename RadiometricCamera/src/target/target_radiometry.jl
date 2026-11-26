@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # The target's radiometry: what a refinement learns about the PRINT, as one record (the camera's share is the
 # `RadiometricCameraModel`). It is the value the IO phase persists for a calibration target (keyed by the target's content id);
-# the calibration's working containers are the state's `mat` (Θ_m) and the scene's `TargetState.edge` (δ, σ_print in mm), which
+# the calibration's working containers are the state's `mat` (Θ_m) and the board's `TargetState.edge` (δ, σ_print in mm), which
 # `TargetRadiometry(mat, surface)` reads and `material` / `edge_parameters` give back.
 # ---------------------------------------------------------------------------
 

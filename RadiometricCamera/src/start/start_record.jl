@@ -23,7 +23,7 @@
     REFINE_ONLY_KEYS
 
 The [`PipelineOptions`](@ref) keys (`table.key`) that only the refinement reads (`refine_calibration!`, after the start): the LM's iteration and
-time caps and its stop tolerances (RC 0.11.4), the per-iteration checkpoints, the closed-form sweeps between LM chunks, a resumed run's iteration offset and its sweep.
+time caps and its stop tolerances, the per-iteration checkpoints, the closed-form sweeps between LM chunks, a resumed run's iteration offset and its sweep.
 A start is computed from [`start_options`](@ref), which holds them at their defaults, so a change of one never changes (or
 recomputes) a start. `resume.state` is not among them: the front end reads its page frame.
 """

@@ -28,7 +28,8 @@ rec = Dict{String, Any}(
     "nllssolver_version" => entry("NLLSsolver")["version"], "staticarrays_version" => entry("StaticArrays")["version"],
     "forwarddiff_version" => entry("ForwardDiff")["version"], "stablerngs_version" => entry("StableRNGs")["version"],
     "visualgeometrytoolkitcore" => stack_source("VisualGeometryToolkitCore"), "visualgeometrytoolkitio" => stack_source("VisualGeometryToolkitIO"),
-    "visualgeometrytoolkitestimation" => stack_source("VisualGeometryToolkitEstimation"), "panoramastitching" => stack_source("PanoramaStitching"),
+    "visualgeometrytoolkitestimation" => stack_source("VisualGeometryToolkitEstimation"),
+    "visualradiometrytoolkitcore" => stack_source("VisualRadiometryToolkitCore"),
     "date" => string(Dates.today()), "julia_num_threads" => parse(Int, threads), "device" => device)
 open(joinpath(root, "RECORDED.toml"), "w") do io
     println(io, "# The environment the pipeline goldens were recorded in (experiments/test/pipeline/record_environment.jl). compare_outputs.jl compares")

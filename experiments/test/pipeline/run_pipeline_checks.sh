@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # PIPELINE CHECKS: the refinement driver bin/refine.jl end to end, run by the paper project's scripts/calibrate.jl, on the published
-# case data (the tier rc_calibration of experiments/configs/data_artifacts.toml; CPU, a few minutes each), against golden outputs recorded
+# case data (the tier rc_calibration of experiments/configs/data_artifacts.toml: its entries rc_golden_<date> and rc_targets_<date>; CPU, a few minutes each), against golden outputs recorded
 # from this branch (experiments/test/pipeline/golden/<case>/).
 # The package tests check the numerical core on small fixed scenes; these check the front-ends, the initialisation, the masks, the closed-form start, the LM drivers and the output files.
 #   siemens_coarse_full  Schöps central-generic run on the synthetic Siemens board (2 views) → the 35 × 25 grid with the board warping h, the
 #                        material, V and the lighting free (per-tile LM), the printed-edge albedo
 # Usage: bash experiments/test/pipeline/run_pipeline_checks.sh [--record] [case …]      exit code 0 = every case matches
 #   --record   write the golden outputs from the CURRENT code and golden/RECORDED.toml (Julia, Manifest sha256, …) — only on purpose; say why
-#              in the commit. compare_outputs.jl is bit-exact in the recorded environment and a tolerance comparison elsewhere.
+#              in the commit. compare_outputs.jl is bit-exact in the recorded environment and a tolerance comparison elsewhere
+#              (its 1e-9 tolerances are meaningful only in the recorded environment: Julia, Manifest and device).
 # THE GATE OF RECORD is the exact comparison on Julia 1.13 (golden/RECORDED.toml), the stack's one Julia.
 # Each case runs through the paper project's driver on its config of record: experiments/scripts/calibrate.jl
 # --config=experiments/configs/calibration/<case>.toml --stage=start,refine --force, which runs bin/refine.jl --stage=start, then --start=<it> (the package's environment) on
 # the config's [pipeline] table into the refinement's product <results_root()>/calibrate/refine/<key>/ (its start in calibrate/start/<key>/); that directory is compared. The
 # driver's trees are bound here: data_root() is VGTK_DATA_ROOT when set, else experiments/data/exp_raw (the author's link or the
-# artifact view of scripts/fetch_data.jl --only=rc_calibration_<date>: experiments/data/README.md) — the cases' inputs, which the
+# artifact view of scripts/fetch_data.jl --only=rc_golden_<date>,rc_targets_<date>: experiments/data/README.md) — the cases' inputs, which the
 # configs' paths are relative to; results_root() (VGTK_RESULTS_ROOT) is experiments/test/pipeline/work/run-<time>/<case>/ (git-ignored).
 # WRITE POLICY: no driver writes under data_root(). A listing of the data root (every file, link and directory, with its size and
 # modification time) is taken before and after the cases and must not change (a new or touched file there fails the gate).
@@ -35,10 +36,10 @@ DEVICE=$(julia --startup-file=no --project=RadiometricCamera -e 'import CUDA; pr
 export PIPELINE_DEVICE=$DEVICE
 echo "device: $DEVICE (CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset})"
 export VGTK_DATA_ROOT=${VGTK_DATA_ROOT:-$RC/experiments/data/exp_raw}
-for f in geometric_accuracy/data/target/siemens_1m/board/sdf.f32 geometric_accuracy/detector_bias/data/blobs_fisheye/session \
-         geometric_accuracy/night_stars/data/fx3-fisheye/schoeps; do
+for f in geometric_accuracy/data/target/siemens_1m/board/sdf.f32 geometric_accuracy/detector_bias/data/fisheye_full/schoeps \
+         geometric_accuracy/detector_bias/data/fisheye_full/gt/images_linear; do
   [ -e "$VGTK_DATA_ROOT/$f" ] || { echo "the case data are not under the data root $VGTK_DATA_ROOT (missing $f): bind VGTK_DATA_ROOT or" \
-                                        "julia --project=experiments experiments/scripts/fetch_data.jl --only=<the rc_calibration tier>"; exit 2; }
+                                        "julia --project=experiments experiments/scripts/fetch_data.jl --only=<the rc_golden and rc_targets entries>"; exit 2; }
 done
 snapshot() { find -L "$VGTK_DATA_ROOT" -printf '%P %y %s %T@\n' | sort; }
 BEFORE=$(snapshot)

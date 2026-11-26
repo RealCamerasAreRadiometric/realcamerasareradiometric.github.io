@@ -2,7 +2,7 @@
 # The photosite sample's edge strength (owner design, 2026-11-15): `[masks] edge_detector` gives each usable observation of a view an
 # edge strength g, `edge_rank` its ECDF rank u (ties at their mean rank) over the view's usable observations (rank-based: invariant to the photograph's contrast
 # and exposure), and the draw (`draw_samples`, masks.jl) weights each by u^α (`[masks] gradient_bias = α`). The detector, a table
-# dispatched by its `type` (one type in RC 0.11.4: the L0 band and the importance weights of the sweep were left out, no gain):
+# dispatched by its `type` (one type: the L0 band and the importance weights of the sweep were left out, no gain):
 #   {type = "gaussian_derivative", sigma}   g = |∇(G_σ ∗ photograph)|: Features' `gaussian_gradient` (Förstner's Gaussian-derivative
 #                                           filters), NORMALIZED over the usable observations (its mask: a RAW photograph's green
 #                                           photosites alone, the red and blue sites and the defects never read)
@@ -43,10 +43,10 @@ edge_detector_table(d::GaussianDerivativeEdges) = Dict{String, Any}("type" => "g
 """
     edge_plane(img, channels) -> Matrix{Float32}
 
-The plane the edge detector reads, the one host copy of the photograph the detector makes (RC 0.11.5, the 0.11.4 review's item 7b:
-before, 4–5 full-frame copies per view), in the detector's `Float32`: an `H × W` image itself (a RAW photograph's linear mosaic, whose
+The plane the edge detector reads, the one host copy of the photograph the detector makes (an earlier release
+made 4–5 full-frame copies per view), in the detector's `Float32`: an `H × W` image itself (a RAW photograph's linear mosaic, whose
 usable green photosites the detector's support keeps), an `H × W × C` image's measured `channels` summed (in `Float64`, in channel
-order); an uncertain image's values (Core's `value_of`). Each value `Float32(Float64(x))`: RC ≤ 0.11.4's `Float64` plane converted
+order); an uncertain image's values (Core's `value_of`). Each value `Float32(Float64(x))`: the earlier `Float64` plane converted
 on upload, bit for bit.
 """
 edge_plane(img::AbstractMatrix, channels) = map(x -> Float32(Float64(VgtkCore.value_of(x))), img)
@@ -63,7 +63,7 @@ Each pixel's edge strength g (`H × W`, on the host) of the image `plane` (`edge
 on `device`: the plane crosses to the device once (none on the CPU: the plane itself), the support as its `Bool`s (one byte per pixel, Core's
 narrow upload, converted there), g is formed there and comes back once (none on the CPU).
 """
-function edge_strength(d::GaussianDerivativeEdges, plane::AbstractMatrix{<:Real}, support::AbstractMatrix{Bool}; device = VgtkCore.default_device())
+function edge_strength(d::GaussianDerivativeEdges, plane::AbstractMatrix{<:Real}, support::AbstractMatrix{Bool}; device = default_backend())
     a = VgtkCore.on_device(Float32, device, plane)
     m = VgtkCore.on_device(Float32, device, Matrix{Bool}(support))   # a BitMatrix has no device backend: its Bools (1 B/px)
     gx, gy = VgtkFeatures.gaussian_gradient(a, d.sigma, m)      # the normalized convolution over the support (gaussian_blur's)

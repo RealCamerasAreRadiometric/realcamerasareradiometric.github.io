@@ -26,10 +26,8 @@
     @test_throws "VisualRadiometryToolkitCore's `TargetState(; h, edge, inplane)`" RC.BoardSurface()
     @test_throws "there is no scene type. The image size is the camera's" RC.Scene(nothing, 4, 4)
     @test_throws "VisualRadiometryToolkitCore's `with_state(board, state)`" RC.with_surface(nothing, nothing)
-    @test_throws "`albedo` (the paper's symbol stays its alias, `ρ_c`)" RC.ρ_c(nothing, nothing)
-    @test_throws "`edge_albedo(target, 𝐛)`" RC.edge_albedo(nothing, nothing, nothing)
-    @test_throws "`posed_target(target)`" RC.posed_target(nothing)
-    @test_throws "`physical_chart`" RC.physical_chart(nothing, nothing, nothing)
+    # the names that moved to VisualRadiometryToolkitCore are not defined here (no refusal stub): call VisualRadiometryToolkitCore's
+    @test all(n -> !isdefined(RC, n) || parentmodule(getfield(RC, n)) !== RC, (:ρ_c, :edge_albedo, :posed_target, :physical_chart))
     for n in (:sphere_radius, :HEIGHT_NFREE, :height_basis, :height_manifold, :height_nparams, :board_surface, :set_surface!, :load_distance_map)
         @test Base.ispublic(RC, n)                                                 # the calibration's share of the board stays here
     end

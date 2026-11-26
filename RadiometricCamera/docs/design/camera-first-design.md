@@ -10,9 +10,9 @@
 
 Branch `perf/optimize-and-compose` (from `main` at 8b3ba04), 2026-11-20. Not a published docs page. Measurements: the
 benchmark scripts in `RadiometricCamera/benchmark/` and `experiments/tools/texture_benchmark.jl`, run as Slurm jobs on
-poseidon (one whole NVIDIA B200 per GPU job; CPU jobs 16 threads on Emerald Rapids), Julia 1.13.3. Wall times are
+a cluster node (one whole NVIDIA B200 per GPU job; CPU jobs 16 threads on Emerald Rapids), Julia 1.13.3. Wall times are
 `time_ns` around calls that return their values to the host (device kernels awaited); no vendor profiler was used
-except where a line says so. Records: `/cluster/projects/vgtk/logs/rc-perf/results/*.json`.
+except where a line says so. The records of the measurement are kept with the measurement's JSON results.
 
 Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the texture experiment · 5 performance · 6 decisions.
 
@@ -448,9 +448,9 @@ confirmed findings fixed, and the gates again (suite, goldens, GPU tier, experim
 
 ## 7. Round 3 (2026-11-21, branch `perf/round3` from `main` 5ea1358)
 
-Measured on poseidon (one whole B200 per GPU job; CPU jobs 16 threads), Julia 1.13.4, baseline = `main` 5ea1358 under the
+Measured on a cluster node (one whole B200 per GPU job; CPU jobs 16 threads), Julia 1.13.4, baseline = `main` 5ea1358 under the
 branch's fixed benchmark scripts (the port onto the textured target had broken `benchmark/run.jl` and `linearization.jl`), in
-the same job as the branch where a table says so. Records: `/cluster/projects/vgtk/logs/rc-round3/results/`.
+the same job as the branch where a table says so. The records of the measurement are kept with its results.
 
 ### 7.1 Decision outcomes
 
@@ -524,7 +524,7 @@ only the removed report `focus_ab.json` carried, is now in the run record (`para
 ### 7.6 Other items of the round
 
 - **Φ_pixel's 4.4 kB a call** (3.2, recommendation 8): not Φ_pixel's. `Φ_pixel`, `_Φ_pixel`, `View(pose, camera)` and
-  `BoardRays` allocate 0 bytes called with their arguments (1.13.4, poseidon); `benchmark/run.jl`'s tile stage rebound the pixel
+  `BoardRays` allocate 0 bytes called with their arguments (1.13.4, the cluster node); `benchmark/run.jl`'s tile stage rebound the pixel
   stage's captured `v`, which boxed it in every stage. Renamed.
 - **Tests:** the focus columns against central differences (the sensor-grid spline; the check of the removed direction-chart
   focus had been the only one), `focus_metrics` of the sampling-strategy study.

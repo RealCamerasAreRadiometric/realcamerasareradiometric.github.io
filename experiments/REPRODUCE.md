@@ -23,18 +23,20 @@ figure and table numbers below are the paper's (main paper Sec. 1–6, supplemen
 Every result, figure, table and number of the paper, from the published inputs, on a machine of record:
 
 ```
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh --dry-run       # dgx01 (Slurm): the job graph, the missing inputs; nothing runs
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh                 # submit it: every stage an sbatch job, chained with afterok
-bash experiments/scripts/reproduce/reproduce_results_dgx.sh status          # per stage: the jobs' states, the log, the first error line
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh --dry-run       # the vcai cluster (Slurm): the job graph, the missing inputs; nothing runs
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh                 # submit it: every stage an sbatch job, chained with afterok
+bash experiments/scripts/reproduce/reproduce_results_vcai.sh status          # per stage: the jobs' states, the log, the first error line
 bash experiments/scripts/reproduce/reproduce_results_desktop.sh --only=texture_recovery   # the desktop (one RTX 4090, no Slurm): here, in order
 ```
 
 The stage graph of record is `configs/reproduce.toml` (which launcher runs which driver on which config of record, after what);
 the runner is VisualGeometryToolkitEval's (Reproduce: `reproduce_main`, its docs' "One command: the runner"), and so are the
-machine profiles (`dgx01`: one Slurm node, 8 × B200, partition `gpu`, one GPU per GPU task; `desktop`: one RTX 4090, no
-scheduler, `CUDA_VISIBLE_DEVICES=0`). Each stage's CPUs and memory are the graph's (`cpus_per_task`, `mem_per_cpu` per stage).
-Where this project's data and results are on each machine is `[sites.<name>]` of the graph — the one place the paths are written —
-and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_SITE` or `--data-root` / `--results-root` override them.
+machine profiles (`vcai`: the Slurm cluster, its
+NFS project space; `desktop`: one RTX 4090, no scheduler, `CUDA_VISIBLE_DEVICES=0`). Each stage's CPUs and memory are the graph's (`cpus_per_task`, `mem_per_cpu` per stage).
+Where this project's data and results are on each machine is the site profile's `[storage]` (`data_root`, `results_root`,
+`artifact_store`) — the one place a machine's paths are written — and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_ARTIFACT_STORE`
+or `--data-root` / `--results-root` override them; a machine whose profile names no data root reads the artifact view of the
+store (`scripts/fetch_data.jl`).
 
 - **Hierarchical.** No flags: every stage of record — setup, the front ends, the image regions and distance maps, the chrome
   refinements (decode first), the chrome evaluations, the texture sets, the f/4 refinements, then `regenerate_paper`
@@ -52,25 +54,26 @@ and `VGTK_DATA_ROOT` / `VGTK_RESULTS_ROOT` / `VGTK_SITE` or `--data-root` / `--r
 
 ### The run of record
 
-The paper's run of record runs on a registered release, in one command on dgx01 (`configs/run_of_record.toml`,
+The paper's run of record runs on a registered release, in one command on a Slurm site (`configs/run_of_record.toml`,
 `scripts/run_of_record.jl`, `src/run_of_record.jl`): its `[launch] stages` are the MAIN and SUPPLEMENT groups' stages — never a
 study's.
 
 ```
-bash experiments/scripts/slurm/run_of_record.sh <version> --plan    # verify the registry, make the tree, print the job graph and its projected wall-clock
-bash experiments/scripts/slurm/run_of_record.sh <version>           # the same, then every stage submitted
+VGTK_SITE=<site> bash experiments/scripts/slurm/run_of_record.sh <version> --results-base=<dir> --plan   # verify the registry, make the tree, print the job graph and its projected wall-clock
+VGTK_SITE=<site> bash experiments/scripts/slurm/run_of_record.sh <version> --results-base=<dir>          # the same, then every stage submitted
 ```
 
-It refuses (nothing runs) unless RadiometricCamera `<version>` is in CauRegistry and resolves in a fresh environment from the
-registries alone; it clones the repository at `v<version>` into `/raid/data/jpr/ror-<version>/tree`, instantiates it in a CPU job
-and runs the runner on the stages of `[launch] stages` into the new results root `/raid/data/jpr/rc-results-<version>`. The
+It refuses (nothing runs) unless RadiometricCamera `<version>` is in General and resolves in a fresh environment from the
+registries alone; it clones the repository at `v<version>` into `<results base>/ror-<version>/tree`, instantiates it in a CPU job
+and runs the runner on the stages of `[launch] stages` into the new results root `<results base>/rc-results-<version>` (the results
+base: `--results-base`, else `VGTK_RESULTS_ROOT`; the site profile's `[storage] results_root` is the value to give). The
 paper's results branch are those of 2026-11-17 (RC 0.11.5 with the configs of record): the reference every
 product of a later run of record must reproduce.
 
 ### Adding your machine
 
-Copy VisualGeometryToolkitEval's `configs/sites/_template.toml` to `<machine>.toml`, add `[sites.<machine>]` `data_root` and
-`results_root` to `configs/reproduce.toml` (or set `VGTK_DATA_ROOT` and `VGTK_RESULTS_ROOT`), and run
+Copy VisualGeometryToolkitEval's `configs/sites/_template.toml` to `<machine>.toml` with its `[storage]` roots and artifact store
+(or set `VGTK_DATA_ROOT`, `VGTK_RESULTS_ROOT` and `VGTK_ARTIFACT_STORE`), run `scripts/fetch_data.jl` with `VGTK_SITE` naming it (unless its data root holds the inputs), and run
 `bash experiments/scripts/reproduce/reproduce.sh --site=path/to/<machine>.toml --dry-run`: the commands, the roots and the missing
 inputs, with nothing run.
 
@@ -146,7 +149,7 @@ julia --project=experiments experiments/scripts/radiometric_refinement.jl --conf
 ```
 
 **The stochastic LM** (not moved in: it changes `src/` of the package). Branch `exp-stochastic-lm`, results root
-`/raid/data/jpr/rc-results-exp-slm` on dgx01: the LM's samples redrawn every iteration (16,384 per photograph, λ carried across the
+the scratch results root `rc-results-exp-slm` on the B200 server: the LM's samples redrawn every iteration (16,384 per photograph, λ carried across the
 redraws) on `si30_spline_warped` against its run of record (7a66fb15e2329e87): held-out Thorlabs median Δ −0.0003 [−0.0055, +0.0039]
 px, n.s.; RMS −0.0099 [−0.019, −0.003] px, from the rim; 2.3× the time. 4,096 per photograph per iteration is worse on the median.
 Decided: the fixed draw of record stays.
@@ -231,35 +234,24 @@ Inputs are read from `data_root()` (read-only: `VGTK_DATA_ROOT`, else
 (`VGTK_RESULTS_ROOT`, else `data/exp_pro`), one directory per run key, each
 with its `_config.toml` and `_provenance.toml`.
 
-Every input of a config of record names its catalog tier — `rc_raw_photos`
-(the RAW photographs: the author's published folder on the university's MDS share, bound under `data_root()` as
-`paper-data/`, see `data/DATA_LOCATIONS.md`; a config's subset of a folder is stated beside its path, `frames` or `exclude`),
-`rc_synthetic` (the synthetic renders and their truth),
-`rc_baselines` (the outputs of the external detectors and calibrations:
-Schöps, Kalibr, OpenCV, BlobBoards, the parametric fits; the decoded chrome photographs, the flat fields, image-circle frames and
-exported vignetting maps), `rc_calibration` (the calibration targets and cases) and `rc_thorlabs` (the
-Thorlabs R3L3S7N1 distortion target and its photographs) — and its path under
-`data_root()`; each config states how its inputs were made. The tiers are
-catalogued in `configs/data_artifacts.toml`. The photographs and the baseline tier of record live on the MDS share
-(`data/DATA_LOCATIONS.md`: the photographs bound as `paper-data/`, the front ends' outputs and the decoded chrome photographs as
-`derived/rc_baselines_2026-11-10/`, laid over the data root); the packed tiers of 2026-10-29 that `Artifacts.toml` binds are
-superseded by them and are rebound when the final run's tiers are packed. The packed tiers, on a new machine, fetch
-into the artifact view `data/exp_raw` (`data/README.md`):
+Every input of a config of record names its tier — `rc_raw_photos` (the RAW photographs: the author's published folder on the
+university's MDS share, under `data_root()` as `paper-data/`; a config's subset of a folder is stated beside its path, `frames` or
+`exclude`), `rc_baselines` (the external tools' outputs: Schöps, Kalibr, OpenCV, BlobBoards, the parametric fits, and the frozen
+starts the front ends are checked against), `rc_calibration` (the printed targets and the golden calibration set), `rc_thorlabs`
+(the Thorlabs R3L3S7N1 target's record) and `unpublished` (the sensor model, its frames and the calibrator's container image: the
+name is historical, the files are tiers of record like the rest) — and its path under `data_root()`; each config states how its
+inputs were made. `configs/data_artifacts.toml` catalogues the tiers of record, one entry per tarball of the paper's Zenodo
+records, each naming the tier its inputs use. On a new machine they install into the artifact store and link into the artifact
+view `data/exp_raw` (`data/README.md`):
 
 ```
-julia --project=experiments experiments/scripts/fetch_data.jl --all            # or --only=rc_calibration_20261029,…; --list
+julia --project=experiments experiments/scripts/fetch_data.jl                  # the required tiers; --all, --only=…, --list
 julia --project=experiments experiments/scripts/regenerate_paper.jl --gpu
 ```
 
-An author's own copy is bound instead with `VGTK_DATA_ROOT=<data root>` (or a
-`data/exp_raw` link); `scripts/make_artifacts.jl` packs the tiers from it.
-
-**The derived inputs.** Most inputs of the experiments below are newer than the packed tiers of 2026-10-29: each is an
-`[[unpacked.<tier>]]` entry of `configs/data_artifacts.toml` (its paths, the configs that read it, where it lies, how it was
-made). The baseline tier (`rc_baselines`: the front ends' outputs, the decoded chrome photographs, the flat fields and image-circle
-frames) is on the share since 2026-11-10 (`derived/rc_baselines_2026-11-10/`, `data/DATA_LOCATIONS.md`), and so are the targets the
-configs read (`derived/rc_calibration_2026-11-10/`) and the synthetic set with its renders (`derived/rc_synthetic_2026-11-10/`): a
-data root built from the share's folders holds every input of the configs of record. A fetch of the packed tiers alone does not.
+A machine's site profile (VisualGeometryToolkitEval `configs/sites/<site>.toml`, selected by `VGTK_SITE`) names its data root,
+results root and artifact store; an author's own copy is bound instead with `VGTK_DATA_ROOT=<data root>` (or a `data/exp_raw`
+link), and `scripts/make_artifacts.jl` packs the tiers from it.
 
 
 **Inputs to re-derive after the release (the deleted rawpy decoder's).** The decoded photographs of these configs are inputs of
@@ -293,9 +285,9 @@ the design) are checked by `test/boards_tests.jl` against the package's designs.
 ## Running on Slurm
 
 The launchers in `scripts/slurm/` run the paper experiments' drivers on a Slurm cluster, each on its config of record, in
-parallel: one GPU per case of the chrome-board refinements and the f/4 refinements and per texture set. Their resources are those of dgx01 (one node: 224 CPUs, 1900 GB, 8 GPUs, partition
+parallel: one GPU per case of the chrome-board refinements and the f/4 refinements and per texture set. Their resources are those of the B200 server (one node: 224 CPUs, 1900 GB, 8 GPUs, partition
 `gpu`; memory per CPU at the node's ratio, `--mem-per-cpu=8G`). The one command (above) submits them all
-(`reproduce_results_dgx.sh`: `setup.sbatch` — instantiate the workspace and precompile experiments and the package, CUDA and the GPU
+(`reproduce_results_vcai.sh`: `setup.sbatch` — instantiate the workspace and precompile experiments and the package, CUDA and the GPU
 extensions included — and then the others with `--dependency=afterok` on what they read, printing the job ids); each is also
 submitted by hand from the repository root (`sbatch experiments/scripts/slurm/<launcher>.sbatch`, an array with `--array=0-<n-1>`; `case_task.sbatch` with `EXPERIMENT`,
 `STAGES` and `--job-name` as configs/reproduce.toml states them).

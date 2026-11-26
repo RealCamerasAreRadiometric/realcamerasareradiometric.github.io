@@ -29,7 +29,7 @@
     ],
     "provenance": {
         "model": "fisheye10cm_all_green_kb_cv2",
-        "source": "/scratch/shared/tha/rc-data/vgtk-root-main/geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-10cm-all/opencv/fisheye/calibration.json",
+        "source": "geometric_accuracy/night_stars/data/fx3-fisheye-aprilgrid-10cm-all/opencv/fisheye/calibration.json",
         "note": "cv2.fisheye.calibrate (Kannala–Brandt k1..k4) on the ArucoDetector corners of the green copies"
     }
 }

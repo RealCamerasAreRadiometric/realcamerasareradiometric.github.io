@@ -19,6 +19,19 @@ chunks, so the thread count is part of the arithmetic, and 8 is the `JULIA_NUM_T
 name matches the pattern (in every run); `RETESTITEMS_NWORKERS=0` runs every item serially in the calling process, for
 debugging. The long pole is the GPU run on its one worker.
 
+The package itself reads no environment variable. The suite and its harnesses read these:
+
+| variable | read by | effect |
+|---|---|---|
+| `RETESTITEMS_NWORKERS` | `test/runtests.jl` | the pool's worker count (`0`: every item serially in the calling process) |
+| `RC_TEST_GPU` | `test/runtests.jl` | `0` skips the `:gpu` items even when a functional GPU is visible |
+| `RC_GPU_DECIDED` | the `:gpu` worker | set by the runner (its verdict, handed to the worker); never set by hand |
+| `RC_TEST_PRECOMPILE_ONLY` | `test/runtests.jl` | `1` loads and caches the test environment and runs no item; `check` reports stale caches |
+| `VGTK_RAW_TEST_FILE` | the RAW-decoding items | a RAW photograph to decode; without it the checks that need one are recorded as broken (`@test_skip`) |
+| `CUDA_VISIBLE_DEVICES` | CUDA.jl | the device the `:gpu` items see |
+| `RC_MIG_FIX`, `RC_MIG_WORK`, `RC_MIG_GOLDEN`, `RC_MIG_RECORD`, `RC_MIG_REFINE`, `RC_MIG_REFINE_ITERATIONS`, `RC_MIG_VIEWS` | `test/integration_blobboards/` | the integration harness's fixture, work directory and modes (its scripts' headers) |
+| `GOLDEN_OLD_STACK` | `test/regression/` | records the board-space golden from the package before the second migration (record only) |
+
 Two items hold the documentation: `docs` (every public name has a docstring, attached to its definition, whose signature
 lines match the methods) and `README` (the README's example runs verbatim in a fresh environment built from its install
 line, and the landing page shows the same install line and example). `Pkg.test(; test_args = ["docs|README"])` runs them.

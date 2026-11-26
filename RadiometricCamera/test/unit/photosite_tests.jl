@@ -147,7 +147,7 @@ end
         ph = [read_photosites(mosaic_of(r, κ)) for r in f.renders]
         masks = [f.masks[k] .& ph[k][2] for k in 1:2]
         light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-        s_cpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2)
+        s_cpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2, backend = RadiometricCamera.KernelAbstractions.CPU())
         s_gpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
         @test s_gpu.px == s_cpu.px                                                         # the same green photosites

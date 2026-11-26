@@ -7,7 +7,7 @@
 #
 # Variable blocks (NLLSsolver duck-typed interface: `nvars`, `update`):
 #   the pose (6, per view: Core's LeftRigidManifold6)   the lens (`lens_manifold`: Core's ParameterManifold of the pixel camera, boxed, scaled, restricted)   focus_block (N, Core's restricted ParameterManifold)   ApertureVar (1)
-#   MaterialVar (9 = 8 nonlinear + μ; in the grid route also the board warping h and the printed-edge parameters of the scene's
+#   MaterialVar (9 = 8 nonlinear + μ; in the grid route also the board warping h and the printed-edge parameters of the board's
 #   TargetState)   Θ_v: Core's restrict(ParameterManifold(vig), Z) (the V(0)=1 gauge held exactly: `gauge_basis`)   LightingVar (3J)
 # Cost block: one `PerViewResidual` per view with the per-pixel residual
 #   𝔯 = Φ_c(𝐮; Θ̄) − ϕ_c(𝐮)  over the mask (`computeresidual`), and a custom
@@ -130,7 +130,7 @@ end
     ApertureVar(r)
 
 Θ_r block: the aperture radius `r` (metres), one variable on its log chart (the step is d ln r, `NLLSsolver.update` below). It has
-no bounds: the chart keeps r > 0 (RC 0.11.0: the inert `lo` / `hi`, once `camera.r_min` / `camera.r_max`, are gone; a held aperture is
+no bounds: the chart keeps r > 0 (the inert `lo` / `hi`, once `camera.r_min` / `camera.r_max`, are gone; a held aperture is
 `fixed = ["aperture"]`, the block removed from the solve).
 """
 struct ApertureVar{T}
@@ -148,7 +148,7 @@ NLLSsolver.update(v::ApertureVar, u, start = 1) = ApertureVar(v.r * exp(u[start]
 """
     MaterialVar(mat, surface, board = nothing; height = 0, inplane = false, fixed = (), mu_bounds = (0.0, 1.0))
 
-Θ_m block: the 8 nonlinear parameters (`roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper`; boxed by `bounds`), μ ∈ [0, 1] and the scene's
+Θ_m block: the 8 nonlinear parameters (`roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper`; boxed by `bounds`), μ ∈ [0, 1] and the board's
 `TargetState` (its printed edge, δ and σ_print, is never a parameter): with `height > 0` (`NH = height_nparams(height)`) the board warping h through its
 `HEIGHT_NFREE` free parameters (h += B y with `B = height_basis(board)`, the board's page: Core's TargetManifold of that
 warping's height field — the piston and the two tilts, the poses', are never parameters; dual-number columns), with `inplane = true`
@@ -466,7 +466,7 @@ function _window_width(s::CalibrationState, list)
     n = length(list)
     n == 0 && return 1
     be = s.backend
-    be isa KA.CPU && return clamp(Threads.nthreads(), 1, n)
+    KA.isgpu(be) || return clamp(VgtkCore.device_resident_threads(be), 1, n)
     cap = lock(() -> get(_CAPACITY, typeof(be), nothing), _DEVICE_CACHE_LOCK)
     if cap === nothing
         @warn "no resident-thread query for $(typeof(be)): the LM's blocks run one at a time" maxlog = 1
@@ -822,7 +822,7 @@ mat, surface, light)` sees the current best variables after every iteration and 
 `LmProblem` under `LmStops` (`_lm_stops`: Levenberg's λ·I, `LM_DAMPING`) — the RELATIVE cost decrease `reldcost` (its `ftol`), the
 relative step test `xtol_rel` (`[lm] xtol_rel`) and the absolute step max-norm `xtol` (Core's of record by default); no absolute cost decrease test — the cost is in the photographs' squared units, dimensionless when the rows
 are whitened (a two-view 32 × 32 fixture starts at ≈ 2e-4), so an absolute threshold of 1e-12 stopped the solver with the aperture, μ and the lighting still drifting together
-along a flat direction. Returns Core's termination record (`code`, a `ReturnCode`: `Success` at a tolerance stop — Core 0.11.0, converged by definition
+along a flat direction. Returns VisualGeometryToolkitCore's termination record (`code`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
 — or at a stationary point after the rejection cap; `rule`, a `StopRule`; `iterations`; `cost`, ‖r‖² at the solution).
 """
 function run_lm!(s::CalibrationState; maxiters::Integer = 10, maxtime::Real = 7200.0, fixed = (),
@@ -847,8 +847,8 @@ end
     LM_DAMPING
 
 The damping of every LM of RC (the per-view and the per-tile grid refinements, the closed-form blocks' joint LM): Levenberg's λ·I
-(Core's `LevenbergDamping`, RC 0.8.0's), not Core's default λ·DᵀD — the owner's ruling (2026-11-14): measured on RC's refinements
-(Core 0.10.2's `LmDamping`), λ·I converged on the origins of the then non-central lens where λ·DᵀD stalled at 1.2e-8 of its start cost, and reaches
+(VisualGeometryToolkitCore's `LevenbergDamping`), not VisualGeometryToolkitCore's default λ·DᵀD: measured on RC's refinements
+(VisualGeometryToolkitCore's `LmDamping`), λ·I converged on the origins of the then non-central lens where λ·DᵀD stalled at 1.2e-8 of its start cost, and reaches
 a slightly lower cost 1.6–1.8× faster on the Tamron and grid cases; λ·DᵀD wins only on the fisheye bc5. One value, no option.
 """
 const LM_DAMPING = VgtkCore.LevenbergDamping()

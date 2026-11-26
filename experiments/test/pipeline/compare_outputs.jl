@@ -5,7 +5,9 @@
 #   exact      the running Julia has the recorded major.minor AND the active Manifest has the recorded sha256 AND it runs on the recorded
 #              device (PIPELINE_DEVICE, gpu | cpu): every numeric leaf
 #              must be bit-identical (timings excluded);
-#   tolerance  any other environment: the determined quantities within fixed tolerances —
+#   tolerance  any other environment: the determined quantities within fixed tolerances (meaningful only near the recorded
+#              environment: another device or Manifest rounds the device Jacobian's Float32 chunks differently, and an LM step
+#              amplifies it far past 1e-9 — a failure there calls for a re-record, not a bisect, once the cause is known) —
 #                poses (poses_*.json, trajectory   rotation ≤ 1e-6° (the angle of R_goldenᵀ R), translation ≤ 1e-6 relative to |t|
 #                records)
 #                grid-lens nodes (grid.json, the   ≤ 1e-9 relative, ONLY nodes the golden LM moved (grid.json ≠ grid_init.json): a node

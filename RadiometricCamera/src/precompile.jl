@@ -1,6 +1,6 @@
 # The precompile workload (PrecompileTools): tiny but real instances of the package's hot paths, run once while the package image is
 # built, so that their native code is cached in it and a fresh process (a test worker, a pipeline run) does not compile it again.
-# The suite's items spent 89 % of their time compiling (the RC 0.3.0 gate), most of it in these paths. CPU only, no data files, no
+# The suite's items spent 89 % of their time compiling (a release gate), most of it in these paths. CPU only, no data files, no
 # output: a synthetic texture and two views of the 24 × 24 test scene. The types are the ones the tests and the pipeline use
 # (Float64, a 3 × 3 focus spline, a 4 × 4 vignetting surface, lighting of order 2), since compiled code is cached per argument type.
 #
@@ -39,9 +39,10 @@
         # a state of the scene seen through `lens`, its targets rendered at the truth
         function state(lens, board_ = board, st_ = st; kw...)
             camera = RadiometricCameraModel(lens, focus_t, 0.0386, vignetting())
-            masks = [compute_mask(camera, p, board_, st_; δ = 0.02, backend = KernelAbstractions.CPU()) for p in poses]   # the workload's CPU states
-            targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]) for k in 1:2]
-            return CalibrationState(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, kw...)
+            cpu = KernelAbstractions.CPU()                                       # the workload's CPU states, chosen (no default's warning)
+            masks = [compute_mask(camera, p, board_, st_; δ = 0.02, backend = cpu) for p in poses]
+            targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
+            return CalibrationState(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
         per_view(s; kw...) = ((prob, _) = build_problem(s; kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
         per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))

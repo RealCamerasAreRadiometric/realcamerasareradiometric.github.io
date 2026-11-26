@@ -18,16 +18,16 @@
 # records on rendered photographs) and the Schöps calibration of the FX3 fisheye (`geometric_accuracy/night_stars/data/fx3-fisheye/schoeps`).
 
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
-using RadiometricCamera: aperture_radius, cost, focus, Focus, FocusSpline, grid_angular_error, grid_dims, grid_model, geometric,
-                         load_session, Material, render_all, RenderSettings, run_lm_grid!, save_grid, schoeps_gridlens,
-                         solve_linear_blocks!, sphere_radius, t̂, 𝔟
-import CUDA
-const VrtkCore = RadiometricCamera.VrtkCore                                  # VisualRadiometryToolkitCore through the package
-const VgtkCore = RadiometricCamera.VgtkCore                                  # VisualGeometryToolkitCore through the package
-const RC = RadiometricCamera
+using RadiometricCamera: grid_angular_error, grid_dims, grid_model, load_session, render_all, RenderSettings, run_lm_grid!,
+                         save_grid, schoeps_gridlens, solve_linear_blocks!, sphere_radius
+using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
+using VisualGeometryToolkitCore: cost                                        # a state's ½ Σ (Φ − ϕ)² and its relative RMS
+import CUDA, KernelAbstractions
+import VisualRadiometryToolkitCore as VrtkCore
+import VisualGeometryToolkitCore as VgtkCore
 EXP = joinpath(ENV["VGTK_DATA_ROOT"], "geometric_accuracy")                       # the data root (experiments/data/README.md)
 OUT = isempty(ARGS) ? joinpath(@__DIR__, "output") : ARGS[1]; mkpath(OUT)    # the output directory: the first argument, or examples/output
-backend = CUDA.functional() ? CUDA.CUDABackend(; always_inline = true) : RC.KernelAbstractions.CPU();   # inlined: RC's kernels' fast build
+backend = CUDA.functional() ? CUDA.CUDABackend(; always_inline = true) : KernelAbstractions.CPU();   # inlined: the kernels' fast build
 
 # ## 1. A geometric central model
 #
@@ -35,7 +35,7 @@ backend = CUDA.functional() ? CUDA.CUDABackend(; always_inline = true) : RC.Kern
 #
 # **(a) A calibration session's records** (BlobBoards' own feature-based calibration, stored as VisualGeometryToolkitIO records by
 # CaliBlobs: the camera — here a division camera `x_u = x_d / (1 + k₁ρ² + k₂ρ⁴)` — the board's target with its printed texture, the
-# frames' poses). `load_session` builds the scene, the initial poses and loads the photographs (16-bit linear PNGs here, so
+# frames' poses). `load_session` builds the board, the initial poses and loads the photographs (16-bit linear PNGs here, so
 # `linearize = false`); `downsample = 8` keeps this walkthrough at 648 × 432.
 
 SESSION = joinpath(EXP, "detector_bias", "data", "blobs_fisheye", "session")                # camera.json, targets_1.json, trajectory_1.json
@@ -51,9 +51,9 @@ W₀, H₀ = ds.extent; W, H = Tuple(VgtkCore.extent(ds.lens₀))               
 # its K the Schöps model's gauge (the pinhole at the pixel imaging the optical axis).
 
 g_schoeps = schoeps_gridlens(joinpath(EXP, "night_stars", "data", "fx3-fisheye", "schoeps", "intrinsics0.yaml"), W₀, H₀)
-@printf("Schöps → grid model %d × %d; central ray %s\n", grid_dims(g_schoeps)..., string(round.(normalize(VgtkCore.backproject(g_schoeps, SVector(W₀ / 2, H₀ / 2))); digits = 4)))
+@printf("Schöps → grid model %d × %d; central ray %s\n", grid_dims(g_schoeps)..., string(round.(normalize(VgtkCore.backproject(g_schoeps, SVector(VgtkCore.centroid(VgtkCore.Rect(0, 0, W₀, H₀))...))); digits = 4)))
 
-# **(c) Any VisualGeometryToolkitCore lens** (Kannala–Brandt, Brown–Conrady, equidistant, pinhole…) as Core's pixel camera: a
+# **(c) Any VisualGeometryToolkitCore lens** (Kannala–Brandt, Brown–Conrady, equidistant, pinhole…) as VisualGeometryToolkitCore's pixel camera: a
 # `BoundedCamera` of `CameraModel(LogicalIntrinsics(K), lens)` with K in pixels of the image, whose parameters are Core's parameter
 # protocol. Sampled into the grid model (`grid_model`) it is refined per tile — the route below.
 
@@ -70,15 +70,15 @@ lens0 = grid_model(ds.lens₀, 35, 25);
 #
 # * `Focus`: inverse focus depth `t̂` on a 5 × 5 TPS node grid over the sensor's pixels, here a plane at the taped focus distance 0.5 m —
 #   `t̂ᵢ = cos αᵢ / 0.5 m` with αᵢ the angle between the ray π⁻¹(𝐩ᵢ) and the optical axis;
-# * `TensorProductVignetting((5, 5), Rect(0, 0, W, H); degree = 2)` (VisualGeometryToolkitCore's): B-spline `V` with 5 × 5 nodes
+# * `TensorProductVignetting((5, 5), Rect(0, 0, W, H); degree = 2)` (VisualRadiometryToolkitCore's): B-spline `V` with 5 × 5 nodes
 #   over the sensor, V = 1 at its centre pinned, flat at the start;
-# * `RadiometricCameraModel(lens, focus, r, vignetting)`: the radiometric camera, one object — the lens, the focus surface, the
+# * `RadiometricCameraModel(geometric, focus, r, vignetting)`: the radiometric camera, one object — the geometric camera, the focus surface, the
 #   aperture radius r and the vignetting V; no image distance. A photograph is the camera at a pose: its extrinsics `Θ_e`, the
 #   camera → world `EuclideanMap` (`ds.poses`);
-# * `EnvironmentLight(SphericalHarmonicMap(radiance, l_max), 𝔟, r_SH)` (VisualGeometryToolkitCore's): SH light of order l_max on the
+# * `EnvironmentLight(SphericalHarmonicMap(radiance, l_max), 𝔟, r_SH)` (VisualRadiometryToolkitCore's): SH light of order l_max on the
 #   sphere of radius `r_SH` around the board centre `𝔟` (`sphere_radius` = the sphere through the farthest camera);
 # * `Material(; roughness_ink, roughness_paper, refractive_index_ink, refractive_index_paper, diffuse_weight)`: Θ_m — GGX roughness and refractive index of ink and paper (blended by the texture
-#   value) and the diffuse weight μ; the board warping h and the printed-edge parameters are the scene's `TargetState` (flat here);
+#   value) and the diffuse weight μ; the board warping h and the printed-edge parameters are the board's `TargetState` (flat here);
 # * `RenderSettings(; n_𝐩, n_ρ, n_φ, N)`: n_𝐩² sensor nodes per pixel, n_ρ × n_φ polar aperture nodes, N VNDF samples per node.
 
 f_m = VgtkCore.model(ds.lens₀).intrinsics.K[1, 1] * (22.3e-3 / W); d_f = 0.5; d_s = f_m * d_f / (d_f - f_m)   # f_px × the pixel pitch; d_s derived (thin lens)
@@ -95,7 +95,7 @@ st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 
 # ## 3. The state, masks and the start prediction
 #
-# `CalibrationState` holds the scene, every block of `Θ̄`, the photographs ϕ and the masks (pixels whose whole circle of confusion lands
+# `CalibrationState` holds the board, every block of `Θ̄`, the photographs ϕ and the masks (pixels whose whole circle of confusion lands
 # on the board, `compute_mask`). Four views keep the walkthrough short. The one thing the start cannot know is the absolute scale of
 # the light (the photographs' units): the closed-form Θ_l solve below sets it. `render_all` renders Φ for every masked pixel; `cost`
 # returns `(½ Σ (Φ − ϕ)², rel-RMS = √(Σ(Φ − ϕ)² / Σ ϕ²))`.
@@ -128,7 +128,7 @@ res = run_lm_grid!(s; maxiters = 3, trace, iter_callback = monitor, verbose = fa
 c2, rms2 = cost(s)
 @printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.rule)
 
-# The loss curve and the refined lens. `save_grid` stores the grid as VisualGeometryToolkitIO's generic camera record for the
+# The loss curve and the refined lens. `save_grid` stores the grid as VisualGeometryToolkitIO's camera record for the
 # evaluation scripts (`grid:<file>` model spec).
 
 ϕ² = sum(sum(abs2, p) for p in s.ϕ)

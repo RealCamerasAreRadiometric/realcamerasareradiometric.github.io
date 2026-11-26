@@ -16,7 +16,7 @@
 #            and the fit's diagnostics)
 #
 #   julia --project=experiments experiments/scripts/image_regions.jl [--config=<toml>] [--plan] [--stage=detect] [--force]
-# On a GPU (detect_image_circle's resampling, device = Core's default_device()): CUDA_VISIBLE_DEVICES=0.
+# On a GPU (detect_image_circle's resampling, device = RadiometricCamera.default_backend()): CUDA_VISIBLE_DEVICES=0.
 # =============================================================================
 using DrWatson
 @quickactivate "experiments"

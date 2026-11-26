@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# RadiometricCamera's API surface — the one file that states it (owner D13, 2026-11-15).
+# RadiometricCamera's API surface — the one file that states it.
 #
 #   export   the headline API: the verbs of a radiometric calibration (start, refine, the one-call calibrate), their inputs and
 #            result types, the options and their TOML reader. Everything a user writes unqualified.
@@ -46,30 +46,30 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
        config_dict, write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
        StartPerturbationOptions, FocusOptions, MaskOptions, RenderingOptions, LightingOptions, MaterialOptions,
        VignettingOptions, WarpingOptions, EdgeOptions, LMOptions, SweepOptions, ResumeOptions, SelfcheckOptions,
-       ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, FIXABLE_BLOCKS,
+       ComputeOptions, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, default_backend, FIXABLE_BLOCKS,
        PIPELINE_PATH_KEYS, AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend,
        CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule,
        DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
 
-# ---- retired names (RC 0.11.0), each refused by name with its replacement (no alias, no forwarding)
-"""Retired (RC 0.11.0, owner 2026-11-15): VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""
-π⁻¹(args...; kwargs...) = throw(ArgumentError("π⁻¹ is retired (RC 0.11.0): use VisualGeometryToolkitCore's `backproject(camera, 𝐩)` " *
+# ---- retired names (an earlier release's), each refused by name with its replacement (no alias, no forwarding)
+"""Retired in an earlier release: VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""
+π⁻¹(args...; kwargs...) = throw(ArgumentError("π⁻¹ is retired: use VisualGeometryToolkitCore's `backproject(camera, 𝐩)` " *
                                                "(a unit ray, NaN where the lens does not image 𝐩)"))
-"""Retired (RC 0.11.0, owner 2026-11-15): VisualGeometryToolkitCore's `project`."""
-project_pixel(args...; kwargs...) = throw(ArgumentError("project_pixel is retired (RC 0.11.0): use VisualGeometryToolkitCore's `project(camera, X)`; " *
+"""Retired in an earlier release: VisualGeometryToolkitCore's `project`."""
+project_pixel(args...; kwargs...) = throw(ArgumentError("project_pixel is retired: use VisualGeometryToolkitCore's `project(camera, X)`; " *
                                                         "a SplineLens camera's batched `project(model(camera), rays, seeds)`, the detections as the seeds"))
-# (RC 0.11.1, owner 2026-11-15: ONE entry point for photographs, the calibrated camera's observation model — no second decode path)
-"""Retired (RC 0.11.1): photographs are read through THE entry point, `photo_set(camera_or_observation_model, files; characterisation)` and `observe(set, k, mask)`."""
-photo_observations(args...; kwargs...) = throw(ArgumentError("photo_observations is retired (RC 0.11.1): read photographs through the entry point, " *
+# (ONE entry point for photographs, the calibrated camera's observation model — no second decode path)
+"""Retired in an earlier release: photographs are read through THE entry point, `photo_set(camera_or_observation_model, files; characterisation)` and `observe(set, k, mask)`."""
+photo_observations(args...; kwargs...) = throw(ArgumentError("photo_observations is retired: read photographs through the entry point, " *
                                                              "`observe(photo_set(camera, files; characterisation), k, mask)` — the camera's observation model decides the decode"))
-"""Retired (RC 0.11.1): each photograph's sensor model is `photo_set(...).models`."""
-photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_models is retired (RC 0.11.1): `photo_set(observation_model(files, spec), files; characterisation).models` " *
+"""Retired in an earlier release: each photograph's sensor model is `photo_set(...).models`."""
+photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_models is retired: `photo_set(observation_model(files, spec), files; characterisation).models` " *
                                                               "— the frames' models of the camera's own record"))
-"""Retired (RC 0.11.1): a characterisation is stated by `sensor_statement(spec)` and read by `photo_set`."""
-sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_characterisation is retired (RC 0.11.1): `sensor_statement(spec)` states the record " *
+"""Retired in an earlier release: a characterisation is stated by `sensor_statement(spec)` and read by `photo_set`."""
+sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_characterisation is retired: `sensor_statement(spec)` states the record " *
                                                                   "(its sha256), `photo_set` reads it at the location given"))
 
-# ---- retired call forms (owner 2026-11-20: the camera-first API). A radiometric camera is ONE object, a `RadiometricCameraModel`
+# ---- retired call forms (the camera-first API). A radiometric camera is ONE object, a `RadiometricCameraModel`
 # (geometric camera, focus surface, aperture radius, vignetting); a photograph is the camera at a pose. The forms that took a `View` assembled
 # from the camera's parts, with the vignetting as a separate argument, are refused by name with their replacement (no alias, no
 # forwarding). `View` itself is the kernels' internal record (`View(pose, camera)`).
@@ -88,10 +88,10 @@ compute_mask(::View, ::TexturedTarget, ::RenderSettings; kwargs...) =
 pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
     _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, board, settings)`")
 
-# ---- retired names (owner 2026-11-20: `lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
+# ---- retired names (`lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
 # camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of a state, the replacer.
 # The old spellings are refused by name with their replacement (no alias, no forwarding).
-"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `with_geometric`."""
+"""Retired: VisualRadiometryToolkitCore's `with_geometric`."""
 with_lens(args...; kwargs...) = throw(ArgumentError("with_lens is retired: a radiometric camera's geometric camera is its `geometric` — " *
                                                     "use VisualRadiometryToolkitCore's `with_geometric(camera, geometric)`"))
 _retired_lens_accessor(what) =
@@ -99,54 +99,26 @@ _retired_lens_accessor(what) =
                         "a radiometric camera or a calibration state is `VisualRadiometryToolkitCore.geometric($what)`; its lens model `lens(geometric($what))`"))
 VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 
-# ---- moved names (owner 2026-11-20: the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
-# imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
-# their replacement (no alias, no forwarding).
-# VisualRadiometryToolkitCore's public names are descriptive; a symbol of the paper is its public alias of the same function, and a
-# plain old spelling has no alias: each row names what to call there.
-_moved_to_radiometry(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
-    "RadiometricCamera.$name moved to VisualRadiometryToolkitCore: $replacement"))
-for (name, replacement) in (
-        :with_geometric => "`with_geometric`", :with_focus => "`with_focus`", :with_aperture_radius => "`with_aperture_radius`",
-        :aperture_samples => "`aperture_samples`", :aperture_border => "`aperture_border`", :luma => "`luma`", :n_nodes => "`n_nodes`",
-        :pixel_of_𝐩 => "`pixel_position` (the paper's symbol stays its alias, `pixel_of_𝐩`)",
-        :ℐ_𝐮 => "`pixel_footprint` (the paper's symbol stays its alias, `ℐ_𝐮`)",
-        :𝔱 => "`focus_distance` (the paper's symbol stays its alias, `𝔱`)",
-        :Λ_ggx => "`ggx_lambda` (the paper's symbol stays its alias, `Λ_ggx`)",
-        :G1_ggx => "`ggx_masking`", :D_ggx => "`ggx_distribution`", :G2_ggx => "`ggx_masking_shadowing`",
-        :F_dielectric => "`fresnel_dielectric`", :D_v => "`visible_normal_density`",
-        :chief_dir => "`chief_direction`", :sample_vndf_caps => "`sample_visible_normal`", :PDF_reflect => "`reflection_pdf`",
-        :f_CT_parts => "`cook_torrance_terms`", :f_CT => "`cook_torrance`",
-        :ae_chart => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `project(Lens(Equidistant()), d)`",
-        :ae_dir => "the azimuthal-equidistant chart is VisualGeometryToolkitCore's equidistant lens, `backproject(Lens(Equidistant()), ξ)`",
-        # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
-        :posed_target => "`posed_target(target)` (under its state) or `posed_target(target, state)`", :texture_size => "`texture_size`",
-        :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`", :physical_chart => "`physical_chart`",
-        :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
-        :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
-    @eval begin
-        @doc $("Moved (owner 2026-11-20) to VisualRadiometryToolkitCore: $replacement.")
-        $name(args...; kwargs...) = _moved_to_radiometry($(QuoteNode(name)), $replacement)
-    end
-end
+# ---- moved names: the generic radiometric layer is VisualRadiometryToolkitCore's. The names this package uses are imported from
+# there (src/RadiometricCamera.jl) and are not public here; the others are not defined here (no stub, no alias, no forwarding).
 
-# ---- retired names (owner 2026-11-20: the board is VisualRadiometryToolkitCore's textured target, and there is no scene). The board's
+# ---- retired names (the board is VisualRadiometryToolkitCore's textured target, and there is no scene). The board's
 # surface parameters are the target's OWN state; the image size is the camera's; a render takes the camera, the pose and the board.
 # Each old name is refused by name with its replacement (no alias, no forwarding).
-"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `TexturedTarget`."""
+"""Retired: VisualRadiometryToolkitCore's `TexturedTarget`."""
 PrintedTarget(args...; kwargs...) = throw(ArgumentError(
     "PrintedTarget is retired: the board is VisualRadiometryToolkitCore's `TexturedTarget` (the same constructors: " *
     "`TexturedTarget(target, texture; facing, sdf, page_mm)`, `TexturedTarget(𝐨, 𝐮_B, 𝐯_B, texture; …)`), which holds its own state"))
-"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `TargetState`, the state of a `TexturedTarget`."""
+"""Retired: VisualRadiometryToolkitCore's `TargetState`, the state of a `TexturedTarget`."""
 BoardSurface(args...; kwargs...) = throw(ArgumentError(
     "BoardSurface is retired: the board's warping h, printed edge and in-plane print error are the textured target's own state, " *
     "VisualRadiometryToolkitCore's `TargetState(; h, edge, inplane)` — `with_state(board, state)`, or `with_h`, `with_edge`, `with_inplane` on the board"))
-"""Retired (owner 2026-11-20): there is no scene; a render takes the camera, the pose and the board."""
+"""Retired: there is no scene; a render takes the camera, the pose and the board."""
 Scene(args...; kwargs...) = throw(ArgumentError(
     "Scene is retired: there is no scene type. The image size is the camera's (`extent(geometric(camera))`) and the board holds its own " *
     "state: give the board itself, a `TexturedTarget` (`with_state(board, state)` for a warped or printed-edge board) — " *
     "`render_view(k, camera, pose, mat, light, board, settings, mask)`, `CalibrationState(board, settings, camera, poses, …)`"))
-"""Retired (owner 2026-11-20): VisualRadiometryToolkitCore's `with_state`."""
+"""Retired: VisualRadiometryToolkitCore's `with_state`."""
 with_surface(args...; kwargs...) = throw(ArgumentError(
     "with_surface is retired: the surface parameters are the board's own state — VisualRadiometryToolkitCore's `with_state(board, state)`"))
 

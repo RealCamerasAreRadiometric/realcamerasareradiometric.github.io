@@ -289,13 +289,13 @@
 end
 
 # The one command (configs/reproduce.toml on VisualGeometryToolkitEval's runner, scripts/reproduce/): the stage graph of record
-# and its --only subsets; the dry run on dgx01 (Slurm) and on the desktop (local), whose commands are the launchers of
+# and its --only subsets; the dry run on the B200 server's site (Slurm) and on the desktop (local), whose commands are the launchers of
 # scripts/slurm/ and nothing else; the missing-input report as data; the launchers' case selections are the graph's.
-@testitem "the one command: the stage graph of record on dgx01 and the desktop" default_imports = false begin
+@testitem "the one command: the stage graph of record on a Slurm site and the desktop" default_imports = false begin
     using Test
     using DrWatson
     using TOML: TOML
-    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, select_stages, missing_inputs, reproduce_main
+    using VisualGeometryToolkitEval.Reproduce: load_stage_graph, select_stages, missing_inputs, reproduce_main, load_site, site_root
 
     graph = projectdir("configs", "reproduce.toml")
     g = load_stage_graph(graph)
@@ -310,7 +310,7 @@ end
              "radiometric_refinement_vignetting", "chrome_evaluation", "chrome_evaluation_score", "regenerate_paper",
              "results_branch"]
     env0 = filter(p -> !(first(p) in ("VGTK_DATA_ROOT", "VGTK_RESULTS_ROOT", "CASES", "CHROME_CASES", "VIG_CASES",
-                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "DETECTOR_BIAS_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED")), Dict(ENV))   # hermetic: no machine tier root
+                                      "TEXTURE_SETS", "SETS", "CONVERGENCE_CASES", "DETECTOR_BIAS_CASES", "WARP_MODES", "VGTK_DATA_ROOT_UNPUBLISHED", "VGTK_SITE", "VGTK_ARTIFACT_STORE")), Dict(ENV))   # hermetic: no machine tier root
 
     @testset "--only: a subset with its prerequisites, or alone" begin
         @test select_stages(g) == paper                            # no flags: every paper stage, nothing else
@@ -356,7 +356,7 @@ end
     @test join([ph["env"]["TEXTURE_STAGES"] for ph in tex.phases], ",") == "prepare,detect,sheet,init,refine,folds,evaluate,fold_report,compare,report"
     @test [ph["gpu"] for ph in tex.phases] == [false, true, false]
 
-    # the GPU split (dgx01, 2026-11-13): GPU tasks never compile and never hold a GPU through CPU work. setup (the one precompile) and
+    # the GPU split (the B200 server, 2026-11-13): GPU tasks never compile and never hold a GPU through CPU work. setup (the one precompile) and
     # every prepare (the RAW decode) are CPU stages; every GPU stage runs after setup, transitively, so it only loads
     stage(n) = only(filter(x -> x.name == n, g.stages))
     upstream(n) = setdiff(Set(select_stages(g; only = [n])), [n])       # every stage n runs after, transitively (Eval's select_stages)
@@ -366,19 +366,21 @@ end
         (s.gpu || !isempty(s.gres)) && @test "setup" in upstream(s.name)
     end
 
+    # the shipped Slurm profile (VisualGeometryToolkitEval 0.11 ships vcai and desktop)
+    slurm_site = "vcai"
     dry(site, more...) = (io = IOBuffer(); code = reproduce_main(["--graph=$graph", "--site=$site", "--dry-run", more...]; io, env = env0);
                           (code, String(take!(io))))
     data, results = mktempdir(), mktempdir()
 
-    @testset "the dry run on dgx01: sbatch of the existing launchers, chained with afterok" begin
-        code, out = dry("dgx01", "--data-root=$data", "--results-root=$results")
-        @test code == 0 && occursin("reproduce experiments on dgx01 (slurm): $(length(paper)) stage(s)", out)
+    @testset "the dry run on the Slurm site: sbatch of the existing launchers, chained with afterok" begin
+        code, out = dry(slurm_site, "--data-root=$data", "--results-root=$results")
+        @test code == 0 && occursin("reproduce experiments on $slurm_site (slurm): $(length(paper)) stage(s)", out)
         submits = [strip(l) for l in split(out, '\n') if startswith(strip(l), "submit")]
         @test length(submits) >= length(paper)                       # a stage with phases submits one job per phase (and the precompile)
         used = sort(unique([m.match for l in submits for m in eachmatch(r"experiments/scripts/slurm/[a-z_]+\.sbatch", l)]))
         @test all(f -> isfile(joinpath(root, f)), used)
         @test used == sort(unique(filter(!isempty, [s.sbatch for s in g.stages if s.name in paper])))
-        @test all(l -> occursin("--partition=gpu", l), submits)
+        @test all(l -> occursin("--exclude=athena", l), submits)          # the vcai profile's sbatch options
         # each stage's own CPUs and memory (configs/reproduce.toml, over the site's 28): one thread count, 8, for every keyed stage
         @test all(l -> occursin("--mem-per-cpu=8480M", l), submits)
         for name in paper
@@ -398,9 +400,13 @@ end
         @test occursin("results_branch_of_run", out) && occursin("--dependency=afterok:\$regenerate_paper", out)
         @test occursin("driver   julia --project=experiments experiments/scripts/radiometric_refinement.jl --config=experiments/configs/experiments/radiometric_refinement.toml", out)
         @test !isdir(joinpath(results, "_reproduce"))                   # a dry run writes nothing
-        # the site's own roots when none is given
-        code, out = dry("dgx01")
-        @test occursin("data     /raid/data/jpr/rc-vgtk-root", out) && occursin("results  /raid/data/jpr/rc-results", out)
+        # a site profile's own roots when none is given: the shipped vcai profile's [storage] (machine paths live in the site
+        # profiles alone; the project's graph names none)
+        code, out = dry("vcai")
+        vcai = load_site("vcai")
+        @test occursin("data     $(site_root(vcai, "data_root", g.name))", out) &&
+              occursin("results  $(site_root(vcai, "results_root", g.name))", out)
+        @test !haskey(g.site_roots, "vcai")
     end
 
     @testset "the dry run on the desktop: the same launchers under bash, device 0 only" begin

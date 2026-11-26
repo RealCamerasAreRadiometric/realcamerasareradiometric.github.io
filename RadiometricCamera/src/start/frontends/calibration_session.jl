@@ -1,5 +1,5 @@
 """The blob front-end: a calibration session's records (`load_session`: the camera → the start grid, the board's target and printed
-image, the frames' poses; the scene's world is the board's frame) and its observations (`observations.json`, the session's
+image, the frames' poses; the world is the board's frame) and its observations (`observations.json`, the session's
 VisualGeometryToolkitIO observations record: `_session_observations`)."""
 function _frontend(::Type{BlobFrontend}, opts::PipelineOptions, start::NamedTuple)   # reads start.R0 (a blob session's frame is its records';
     R0 = start.R0                                                                       #   it places no board features of its own)
@@ -20,7 +20,7 @@ function _frontend(::Type{BlobFrontend}, opts::PipelineOptions, start::NamedTupl
     @printf("blob front-end: %d views of %s, image %d × %d, init grid %s from %s\n", length(names), opts.frontend.session, W₀, H₀, _lattice_line(lens0),
             isempty(opts.io.init) ? "the session's camera" : opts.io.init); flush(stdout)
     # the observations (the session's IO record: the image point, COLMAP px, of each target point id) → features with the target's
-    # points (its frame, the scene's world, plain metres); the board's y sign is chosen by the self-check
+    # points (its frame, the world, plain metres); the board's y sign is chosen by the self-check
     frame_of = Dict(n => t for (n, t) in zip(ds.names, ds.frames))
     raw = _session_observations(obs_file, board.target)
     fpx0 = fpx_of(lens0, W₀, H₀)

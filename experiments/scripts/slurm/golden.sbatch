@@ -2,7 +2,7 @@
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit from the repository
 # root (`sbatch experiments/scripts/slurm/golden.sbatch`: an array, one task per case of the default GOLDEN_CASES;
-# `sbatch --array=0-<n-1> …` for n other GOLDEN_CASES), or `bash experiments/scripts/reproduce/reproduce_results_dgx.sh`); logs go to ./logs/,
+# `sbatch --array=0-<n-1> …` for n other GOLDEN_CASES), or `bash experiments/scripts/reproduce/reproduce_results_vcai.sh`); logs go to ./logs/,
 # which must exist before submission.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh).
 #SBATCH --partition=gpu

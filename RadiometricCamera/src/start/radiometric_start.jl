@@ -8,7 +8,7 @@ function _height_start(opts::PipelineOptions)
     if !isempty(opts.warping.heights_mm)
         c = VgtkCore.ustrip.(VgtkCore.m, opts.warping.heights_mm .* VgtkCore.mm)
         length(c) == HEIGHT_NC || error("warping.heights_mm: $(length(c)) values — expected the $(HEIGHT_NC) nodal heights (the 3 / 7 legacy " *
-                                         "polynomial coefficients are retired, RC 0.11.0)")
+                                         "polynomial coefficients of an earlier release are retired)")
         h = c
     end
     return h

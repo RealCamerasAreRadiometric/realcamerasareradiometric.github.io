@@ -49,8 +49,8 @@
     Base.include(readme, $(repr(joinpath(env, "readme_example.jl"))))
     using Test
     @testset "README example" begin
-        @test count(readme.mask) == readme.W * readme.H == 76800  # "76800 = W × H: the board covers every pixel"
-        @test readme.Φ ≈ readme.img[120, 160, :]                 # "true: the render is Φ_c(𝐮) of each pixel" (row v, column u)
+        @test count(readme.mask) == prod(Tuple(readme.sz)) == 76800  # "76800 = 320 × 240: the board covers every pixel"
+        @test isapprox(readme.Φ, readme.img[120, 160, :]; rtol = 1e-4)   # "true: the render is Φ_c(𝐮) of each pixel" (row v, column u), to Float32 on a GPU
         @test all(>(0), readme.img[:, :, 1][readme.mask])
     end
     """)

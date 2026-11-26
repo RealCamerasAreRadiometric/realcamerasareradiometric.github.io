@@ -147,6 +147,7 @@ end
     root = normpath(pkgdir(RadiometricCamera), "..")   # the repository: the package and the experiments side by side
     # the booleans that stay booleans, each with its reason (the survey of 2026-11-15, ledgered): a fact, or a key another package reads
     data = [r"artifacts\.[^.]+\.required",                                     # a fact; VisualGeometryToolkitEval DataArtifacts' catalog
+            r"artifacts\.[^.]+\.retired",                                      # a fact of the catalog (src/data.jl entries_of_record): a superseded tier
             r"stage\[\d+\]\.(default|gpu|results_branch)",                     # VisualGeometryToolkitEval Reproduce's stage graph
             r"stage\[\d+\]\.phases\[\d+\]\.(gpu|per_item)",                   # (the same schema: a stage's phases, the warping ablation's)
             r"results_branch\.assets\[\d+\]\.submitted_only",                  # (the same schema)

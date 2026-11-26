@@ -10,7 +10,7 @@
 # =============================================================================
 # scripts/regenerate_paper.jl — THE entry point that regenerates every generated paper asset (REPRODUCE.md indexes each asset:
 # label → asset → generator → config → data) from the listed drivers' runs; the refinements those drivers read
-# (scripts/radiometric_refinement.jl) are run before it: scripts/reproduce/reproduce_results_dgx.sh (configs/reproduce.toml). `make figures` in paper/ runs it; `make
+# (scripts/radiometric_refinement.jl) are run before it: scripts/reproduce/reproduce_results_vcai.sh (configs/reproduce.toml). `make figures` in paper/ runs it; `make
 # figures-gpu` adds the GPU stages. Config of record: configs/figures/regenerate_paper.toml.
 #
 #   julia --project=experiments experiments/scripts/regenerate_paper.jl [--gpu] [--plan] [--stage=a,b] [--force] [--config=<toml>]

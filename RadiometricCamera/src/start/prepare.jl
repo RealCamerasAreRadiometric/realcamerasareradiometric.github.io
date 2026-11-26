@@ -103,7 +103,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     @printf("f %.2f mm (%.1f px), sensor %.1f mm, s′ %.3f mm (derived, thin lens), focus plane through the mean board centre %.3f m, aperture r₀ %.3f mm (f/%.1f); backend %s\n",
             _mm(f_m), fpx, VgtkCore.ustrip(VgtkCore.mm, _sensor_width(opts)), _mm(d_s), d_c, _mm(R0), opts.camera.fnumber, nameof(typeof(backend))); flush(stdout)
 
-    # scene (+ the printed edge), settings, masks, streamed observations
+    # board (+ the printed edge), settings, masks, streamed observations
     if !isempty(opts.edge.sdf)
         sdf, page_mm = load_distance_map(opts.edge.sdf)
         board = with_sdf(board, sdf, page_mm)

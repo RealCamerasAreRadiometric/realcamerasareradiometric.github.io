@@ -27,18 +27,14 @@
     # `lens` is Core's lens model everywhere: RC's old spelling of the replacer is refused by name with the replacement
     @test_throws "with_lens is retired" RC.with_lens(c, lens2)
     @test !isdefined(RC, :lens) && !Base.ispublic(RC, :with_lens)
-    # what moved to VisualRadiometryToolkitCore is not a public name here; a moved name this package does not use is refused by name
+    # what moved to VisualRadiometryToolkitCore is not a public name here, and this package defines none of the moved names
     @test !Base.ispublic(RC, :geometric) && !Base.ispublic(RC, :Focus) && Base.ispublic(RC, :flat_vignetting) && Base.isexported(RC, :RadiometricCameraModel)
     @test RC.geometric === VrtkCore.geometric && RC.Focus === VrtkCore.Focus && RC.Material === VrtkCore.Material
     for n in (:with_geometric, :with_focus, :with_aperture_radius, :pixel_of_𝐩, :ℐ_𝐮, :aperture_samples, :aperture_border, :Λ_ggx, :G1_ggx, :D_ggx, :G2_ggx, :F_dielectric, :D_v, :luma, :n_nodes, :𝔱,
-              :chief_dir, :sample_vndf_caps, :PDF_reflect, :f_CT_parts, :f_CT, :ae_chart, :ae_dir)
-        @test_throws "moved to VisualRadiometryToolkitCore" getfield(RC, n)(1)
+              :chief_dir, :sample_vndf_caps, :PDF_reflect, :f_CT_parts, :f_CT, :ae_chart, :ae_dir, :posed_target, :texture_size, :has_sdf,
+              :warping_field, :board_relief, :physical_chart, :ρ_c, :edge_albedo)
+        @test !Base.ispublic(RC, n) && (!isdefined(RC, n) || parentmodule(getfield(RC, n)) !== RC)
     end
-    # VisualRadiometryToolkitCore's public names are descriptive; the refusal names the one to call, and the paper's symbols this
-    # package's source keeps are its aliases of the same functions (π̂⁻¹ is VisualGeometryToolkitCore's `backproject`)
-    @test_throws "`chief_direction`" RC.chief_dir(1)
-    @test_throws "`cook_torrance`" RC.f_CT(1)
-    @test_throws "`backproject(Lens(Equidistant()), ξ)`" RC.ae_dir(1)
     @test_throws "t̂_dir was removed" RC.t̂_dir(1)                                       # the focus surfaces on the chief directions are removed: no replacement there
     @test RC.𝔣 === VrtkCore.focus_point && RC.t̂ === VrtkCore.inverse_focus_distance && RC.π̂⁻¹ === VgtkCore.backproject && RC.𝔭 === VrtkCore.center_of_projection
     @test RC.π̂⁻¹(v, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0)) === VrtkCore.aperture_direction(v.geometric, v.focus, SVector(5.0, 7.0), SVector(0.001, 0.0, 0.0))

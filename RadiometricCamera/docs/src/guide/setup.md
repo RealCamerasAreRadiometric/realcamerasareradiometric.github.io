@@ -4,13 +4,13 @@
 CurrentModule = RadiometricCamera
 ```
 
-The package installs as the [Installation](../index.md#Installation) says, with every dependency from the General registry.
+The package installs as the [Installation](../index.md#Installation) says, from Julia's General registry.
 This page is for what the package does not install: the hardware a calibration runs on, and the data of the experiments.
 
 ## Clone
 
 The repository holds the package (`RadiometricCamera/`), the experiments that reproduce the paper (`experiments/`), the
-manuscript and the project page, and no data:
+manuscript and the project page, and no data. Its environment resolves from Julia's General registry:
 
 ```bash
 git clone https://github.com/RealCamerasAreRadiometric/realcamerasareradiometric.github.io.git

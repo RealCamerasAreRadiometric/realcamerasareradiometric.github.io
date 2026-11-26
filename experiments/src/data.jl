@@ -1,47 +1,53 @@
 # =============================================================================
 # src/data.jl — module DataTiers: the tiers of the project's published data (configs/data_artifacts.toml), VisualGeometryToolkitEval
 # DataArtifacts `tree` entries with a `filter`: every file below `dir` (relative to its mount root, data_root()) whose path relative
-# to the mount root matches one of the `filter` globs and none of the `!`-prefixed ones (Eval's glob rules). The tiers of a catalog:
-# `rc_raw_photos_<date>`, `rc_synthetic_<date>`, `rc_baselines_<date>`, `rc_calibration_<date>`; the configs' inputs name the tier
-# without its date (`tier_name`), the catalog's entry is that tier's current version.
+# to the mount root matches one of the `filter` globs and none of the `!`-prefixed ones (Eval's glob rules). An entry is one tarball,
+# `<tarball>_<yyyymmdd>`; its `tier` is the tier name the configs' inputs use (`rc_raw_photos`, `rc_baselines`, …: an input's tier
+# keys its runs), so one tier is held by several entries. The retired entries (`retired = true`) hold no tier of record. And the
+# privacy rule: the photographs no tier and no record may ever hold.
 # =============================================================================
 module DataTiers
 
 using VisualGeometryToolkitEval.DataArtifacts: DataCatalog
 using TOML: TOML
 
-export tier_name, tier_entries, unpacked_entries, is_unpacked, is_cache_dir
+export tier_of, entries_of_record, tier_entries, unpacked_entries, is_unpacked, is_cache_dir, PRIVATE_PHOTOGRAPHS, private_photographs
 
-"The tier an artifact name versions: `rc_synthetic_20261029` → `rc_synthetic`."
-tier_name(artifact::AbstractString) = replace(artifact, r"_[0-9]{8}$" => "")
+"The tier an entry's files' inputs name in the configs (its `tier`)."
+tier_of(cat::DataCatalog, entry::AbstractString) = String(cat.artifacts[entry]["tier"])
 
-"The catalog's tiers: `tier name => artifact name` (one current version each; two versions of one tier are an error)."
+"The entries of record (sorted): every entry but the retired ones (`retired = true`)."
+entries_of_record(cat::DataCatalog) = sort([n for (n, a) in cat.artifacts if get(a, "retired", false) !== true])
+
+"The tiers of record: `tier => [entry, …]` (sorted), over [`entries_of_record`](@ref)."
 function tier_entries(cat::DataCatalog)
-    out = Dict{String,String}()
-    for n in keys(cat.artifacts)
-        t = tier_name(n)
-        haskey(out, t) && error("the catalog holds two versions of tier $t: $(out[t]) and $n")
-        out[t] = n
+    out = Dict{String,Vector{String}}()
+    for n in entries_of_record(cat)
+        push!(get!(out, tier_of(cat, n), String[]), n)
     end
     return out
 end
 
-"""The catalog's `[[unpacked.<tier>]]` entries (files of data_root() that no packed version of the tier holds yet; the header of
-configs/data_artifacts.toml): `tier => [(; paths, configs, where, provenance)]`. `configs` is empty for files that no config of
-record reads yet."""
+"""The photographs that are never published (owner 2026-11-21: the 14 mm Siemens-star session of 2026-11-03, DSC06045 and
+DSC06052–DSC06055, show another person): no tier, tarball or record may hold one, under any directory, prefix or extension."""
+const PRIVATE_PHOTOGRAPHS = ("DSC06045", "DSC06052", "DSC06053", "DSC06054", "DSC06055")
+
+"The paths of `paths` with a component (a file or a directory name) that names a photograph of [`PRIVATE_PHOTOGRAPHS`](@ref)
+(case-insensitive, any prefix or extension)."
+private_photographs(paths) =
+    [String(p) for p in paths if any(c -> any(x -> occursin(x, uppercase(c)), PRIVATE_PHOTOGRAPHS), splitpath(String(p)))]
+
+"""The catalog's `[[unpacked.<tier>]]` entries (files of the author's folders that no config reads and no tier holds; the catalog's
+header): `tier => [(; paths, configs, where, provenance)]`."""
 function unpacked_entries(catalog_toml::AbstractString)
     u = get(TOML.parsefile(catalog_toml), "unpacked", Dict{String,Any}())
     return Dict(t => [(; paths = String.(e["paths"]), configs = String.(e["configs"]), where = String(e["where"]),
                        provenance = String(e["provenance"])) for e in es] for (t, es) in u)
 end
 
-"""Whether the data_root()-relative path `p` lies at or below a path of `unpacked` (`unpacked_entries`): of `tier`'s entries, or
-of any tier's when `tier === nothing`."""
-function is_unpacked(unpacked, tier, p::AbstractString)
-    under(q) = p == q || startswith(p, q * "/")
-    tiers = tier === nothing ? keys(unpacked) : (tier,)
-    return any(t -> haskey(unpacked, t) && any(e -> any(under, e.paths), unpacked[t]), tiers)
-end
+"Whether the data_root()-relative path `p` lies at or below a path of `unpacked` (`unpacked_entries`)."
+is_unpacked(unpacked, p::AbstractString) =
+    any(e -> any(q -> p == q || startswith(p, q * "/"), e.paths), Iterators.flatten(values(unpacked)))
 
 """Whether the directory `dir` is a cache by the Cache Directory Tagging Standard (https://bford.info/cachedir/): it holds a
 `CACHEDIR.TAG` that begins with the standard's signature — as the Hugging Face CLI's `.cache/huggingface/` of a `--local-dir`

@@ -10,7 +10,7 @@
 #   date:       2026-11-17
 #
 # The OpenCV front-end step of 2026-11-17 (AUTHOR-SIDE: its outputs are inputs of record, tier rc_baselines_2026-11-17 — the documented
-# exception for initial guesses from other systems, imported through IO). OpenCV (cv2) is not on dgx01, so no driver stage of the run of
+# exception for initial guesses from other systems, imported through IO). OpenCV (cv2) is not on the B200 server, so no driver stage of the run of
 # record can run it; this file is its record: the tool, its version, its inputs and arguments, its outputs (each pinned where a config
 # reads it). The exact commands: experiments/tools/ocv_starts_20261117.sh (opencv_calibrate_schoeps.py, T. Harder's script of record
 # frozen at tag v0.10.0, then ocv_record.jl: IO's opencv_camera → a vgio/cameras record).

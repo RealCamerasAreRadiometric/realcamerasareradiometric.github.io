@@ -13,7 +13,7 @@
 #   question    does Schöps's start of the fisheye 30 cm set hold on held-out chrome dots, and at which refinement window?
 #   hypothesis  the window of record scores the lower held-out median (the chrome evaluation's scorer, paired photograph bootstrap)
 #   decides     the fisheye Siemens rows of the paper's chrome evaluation (in place of the 27.10 set) and frontends.toml's window
-#   evidence    the window study on branch schoeps-window (dgx01 /raid/data/jpr/schoeps-window; the report beside it)
+#   evidence    the window study on branch schoeps-window (its scratch root on the B200 server, schoeps-window/, with the report beside it)
 #   owner       J. Pritts (2026-11-16: raw_green for Schöps and the Thorlabs detect; the 30 cm set replaces the 27.10 set)
 #   date        2026-11-16
 #   discussion  the excluded 27.10 set had 40 usable views; the 30 cm set has 301 Siemens and 254 chrome photographs
@@ -27,9 +27,9 @@ radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
 [inputs.fx3_sensor_characterisation]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
-sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (dgx01, 2026-11-14)
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "detect"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on dgx01 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on dgx01 under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from photon_transfer on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 
 [inputs.raw]
@@ -48,7 +48,7 @@ provenance = "the 301 Siemens-star photographs of the same session (frontends.to
 # at the same f/32 — the front end's step (frontends.toml [image_regions.fx3_fisheye_siemens_30cm]: the same table, the same key).
 [image_regions.fx3_fisheye_siemens_30cm]
 input = "raw_fisheye_siemens_30cm"
-frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on dgx01 (2026-11-16)
+frames = { "DSC04702.ARW" = "a94aca8f0baf0607ec929f4a5a24ccc942475227af15ab41687121ca166fd0dc", "DSC04777.ARW" = "e924aa327cf8d667794ee736ebd3ec940aafbc53cdeda8e796910c887ab5902c", "DSC04854.ARW" = "bbba2e2934e5ec291f061bae4ad17f6786a66927464c207c3d9ff8efdfa2535e", "DSC04931.ARW" = "9879362fade0ec547613f22e25257ce61289f9bd77e819ef8922b1a9f3919e64", "DSC05008.ARW" = "648425aeb159dc1950113970d08715acad15e8fb548f6a36f2e33267fa558d0c" }   # sha256sum on the B200 server (2026-11-16)
 image = "raw_green"           # the geometry image (owner 2026-11-16): the bilinear green on the raw grid at full resolution, the chrome detect's image
 outlier_halfwidth_px = 1000.0  # raw px: the owner's 1000 px (ruling 2026-11-12, chosen on full-resolution frames), as every fisheye region of record
 seed = 1                       # as every region of record
@@ -56,7 +56,7 @@ seed = 1                       # as every region of record
 [inputs.target]
 tier = "rc_thorlabs"
 path = "geometric_accuracy/data/target/thorlabs_r3l3s7n1/target.json"
-sha256 = "9fd2754a2aa7e278a18d95df15e07140b87bc115dec47be169adebe085fab880"   # sha256sum of the file of record (the local data root and dgx01's rc-vgtk-root agree, 2026-11-12)
+sha256 = "9fd2754a2aa7e278a18d95df15e07140b87bc115dec47be169adebe085fab880"   # sha256sum of the file of record (the local data root and the B200 server's rc-vgtk-root agree, 2026-11-12)
 stage = "index"
 provenance = "scripts/make_targets.jl from configs/targets/thorlabs_r3l3s7n1.toml (the maker's drawing R3L3S7N1, 15 Nov 2024): 17 x 17 dots at 5.000 mm, calibration Rigid (vgio/target/v3 by vgio_migrate_tree)"
 
@@ -402,7 +402,7 @@ provenance = "the Double Sphere camera Estimation fitted to the set's imported S
 [inputs.start_si30fe_ocv14]
 tier = "rc_baselines"
 path = "geometric_accuracy/records/fisheye30cm_si_all/fisheye30cm_si_all_green_ocv14_cv2.json"
-sha256 = "034de45cca9ad2c94b5b8c016314411efb51b1deb89102784cefbee2af97ee5f"   # sha256sum of the record of record (dgx01, 2026-11-17)
+sha256 = "034de45cca9ad2c94b5b8c016314411efb51b1deb89102784cefbee2af97ee5f"   # sha256sum of the record of record (the B200 server, 2026-11-17)
 stage = "evaluate"
 provenance = "the start of case si30fe_ocv14_warped (configs/experiments/radiometric_refinement.toml): OpenCV's own calibration of the model, cv2.calibrateCamera with CALIB_RATIONAL_MODEL | CALIB_THIN_PRISM_MODEL | CALIB_TILTED_MODEL on Schöps's star detections (views >= 20 features: fe_si7.sh's MINF = 20, as every Siemens-set OpenCV record of record; OpenCV 4.12.0) of the set's Schöps run of record (frontends.toml [schoeps.fisheye30cm_siemens_w30], dataset.bin) by T. Harder's experiments/tools/opencv_calibrate_schoeps.py (verbatim from v0.10.0 frontends_history/scripts; fe_si7.sh's arguments), converted to vgio/cameras/v4 by experiments/tools/ocv_record.jl (owner GO 2026-11-17 05:00)"
 

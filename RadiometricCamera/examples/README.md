@@ -14,8 +14,9 @@
    (`BoundedCamera(CameraModel(K, VgtkCore.KannalaBrandt(…)), extent)`); each becomes the refinable generic grid model —
    VisualGeometryToolkitCore's SplineLens camera — with `grid_model(camera, G_x, G_y)`.
 2. **The radiometric model around it** — `Focus` (inverse depth `t̂`, TPS), the vignetting (`V`), the camera that holds them with
-   the lens and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at a pose), `Lighting`
-   (`L_SH` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` — and what each symbol is in the paper.
+   the geometric camera (`geometric`) and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at
+   a pose), the light `EnvironmentLight` (a `SphericalHarmonicMap` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` —
+   and what each symbol is in the paper.
 3. **State, masks, start prediction** — `CalibrationState`, `compute_mask`, `render_all`, `cost`.
 4. **Calibration** — the closed-form linear sweep (`solve_linear_blocks!`: Θ_l, Θ_v, μ), the joint LM over all blocks on the GPU
    (`run_lm_grid!`), the loss curve, `save_grid`.
@@ -26,8 +27,10 @@ output in `examples/output/`, git-ignored). Data: a BlobBoards session of the pa
 
 ## Plugging in your own geometric model
 
-The radiometric camera needs one thing from a geometric model: Core's `backproject(camera, 𝐩)` — the ray direction of the sensor point 𝐩, in the
-COLMAP pixels of the image (𝓘 = [0, W] × [0, H], Core's `Rect(sensor)`), plus `in_domain` and, to be refined per view,
+The radiometric camera needs one thing from a geometric model: its chief ray, VisualRadiometryToolkitCore's `chief_ray(camera, 𝐩)`
+(one of its `CONTRACT_GENERICS`; for any VisualGeometryToolkitCore camera its `backproject(camera, 𝐩)`) — the ray direction of the
+sensor point 𝐩, in the COLMAP pixels of the image (𝓘 = [0, W] × [0, H], VisualGeometryToolkitCore's `Rect(sensor)`), plus
+`in_domain` and, to be refined per view,
 VisualGeometryToolkitCore's parameter protocol (`parameter_vector`, `parameter_names`, `with_parameters`, `convert_eltype`). Any
 VisualGeometryToolkitCore lens gets all of this as Core's pixel camera (a `BoundedCamera` of `CameraModel(LogicalIntrinsics(K), lens)`, K
 in pixels; its LM block is Core's `ParameterManifold` with the box `lm_box` and the image-size coordinate scale `lm_scale`); every other

@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # The grid lenses ARE VisualGeometryToolkitCore's spline cameras (the central generic spline camera model, the one the pipeline of
-# Schöps et al., CVPR 2020, calibrates; as Core 0.9 folds it in): a central grid
+# Schöps et al. calibrates, as VisualGeometryToolkitCore implements it): a central grid
 # is a `BoundedCamera` of a `CameraModel(K, SplineLens)` — a uniform bicubic B-spline lattice of direction controls over the
 # K-normalized plane x = K⁻¹𝐩, K a skew-0 gauge (the initializing camera's own K). The bound is the image's extent, and the lens coverage (where
 # light falls: the capture set's image region, `camera.lens_coverage`: the sensor or its measured record) is the bounded camera's; every consumer reads Core's
@@ -94,8 +94,8 @@ camera is bounded by `src`'s image, its lens coverage `coverage` (the capture se
 step's record, never the source lens's fold) or, without one, `src`'s own.
 
 No tolerance is asked of the resample and its fidelity is not reported (Estimation's held-out errors of a resample are not yet
-right; 2026-11-15). A start whose optical-axis fit did not converge (`fit_camera`'s retcode) proceeds on the lattice
-`fit_camera` returned (the stalled axis's rotation 0, as before 0.11.0): the start is not axis-gauged for that run, and one line
+right). A start whose optical-axis fit did not converge (`fit_camera`'s retcode) proceeds on the lattice
+`fit_camera` returned (the stalled axis's rotation 0): the start is not axis-gauged for that run, and one line
 says so.
 """
 function grid_model(src, G_x::Integer, G_y::Integer; coverage = nothing)
@@ -123,19 +123,19 @@ resampled over and the coverage assertion ([`check_coverage`](@ref)) holds the s
 coverage_region(camera::BoundedCamera) = VgtkCore.Rect(0.0, 0.0, Float64.(Tuple(VgtkCore.extent(camera)))...) ∩ VgtkCore.lens_coverage(camera)
 
 """
-    check_coverage(camera, region; who, device = default_device()) -> region
+    check_coverage(camera, region; who, device = default_backend()) -> region
 
 The coverage assertion, set-level: `region ⊆ valid_domain(model(camera))` (Core's `check_region_support`, a
 `RegionBeyondSupport` naming `who` otherwise) and every pixel of `region` imaged — the camera's batched `backproject` on `device`
 of each pixel centre in it (Core's `pixel_mask` convention) finite; an `ArgumentError` naming `who` and the count otherwise.
 
-The containment is tested on `region` itself: Core ≥ 0.10.9 decides `RegionIntersection ⊆ Rect` by the intersection (the sensor ∩
-a housing's image circle whose sensor reaches past the lattice on one axis and circle on the other), so RC 0.11.3's test of the
-region's bounding box is gone.
+The containment is tested on `region` itself: VisualGeometryToolkitCore decides `RegionIntersection ⊆ Rect` by the intersection (the
+sensor ∩ a housing's image circle whose sensor reaches past the lattice on one axis and circle on the other), not by the region's
+bounding box.
 """
-function check_coverage(camera::BoundedCamera, region; who::AbstractString, device = VgtkCore.default_device())
+function check_coverage(camera::BoundedCamera, region; who::AbstractString, device = default_backend())
     m = VgtkCore.model(camera)
-    VgtkCore.check_region_support(m, region; who)                 # Core ≥ 0.10.9: a RegionIntersection ⊆ Rect holds by its parts' intersection
+    VgtkCore.check_region_support(m, region; who)                 # a RegionIntersection ⊆ Rect holds by its parts' intersection
     W, H = Tuple(VgtkCore.extent(camera))
     px = VgtkCore.pixel_centres(region, 1:Int(W), 1:Int(H))
     rays = Array(VgtkCore.backproject(m, px; device))
@@ -145,7 +145,7 @@ function check_coverage(camera::BoundedCamera, region; who::AbstractString, devi
     return region
 end
 
-# ---- the geometry lattice's mode: `[grid] lattice` (owner ruling 2026-11-15) -----------------------------------------------------
+# ---- the geometry lattice's mode: `[grid] lattice` ---
 """How a grid start's geometry lattice is made (`[grid] lattice`, parsed ONCE by `read_switch` through [`LATTICE_TAGS`](@ref)):
 [`DerivedLattice`](@ref) or [`NodeCountLattice`](@ref). Every decision on it is a dispatch ([`start_grid`](@ref))."""
 abstract type LatticeRule end
@@ -160,7 +160,7 @@ struct NodeCountLattice <: LatticeRule end
 const LATTICE_TAGS = VgtkCore.TagRegistry(:lattice, "Lattice", "derived" => DerivedLattice, "node_count" => NodeCountLattice; paths = [r"grid\.lattice"])
 
 """
-    start_grid(source, grid::GridOptions; coverage = nothing, device = default_device()) -> (; camera, resample)
+    start_grid(source, grid::GridOptions; coverage = nothing, device = default_backend()) -> (; camera, resample)
 
 The grid start of a source camera, by its TYPE and the lattice's mode `grid.lattice`: a SplineLens source (a Schöps run's model)
 under `"derived"` is resampled EXACTLY on its own lattice, m = 1 ([`exact_start`](@ref)); a parametric source under `"node_count"`
@@ -168,7 +168,7 @@ has its lattice laid over the image region and fitted at `grid.node_count` suppo
 `resample = nothing`). The other two combinations are refused, naming the key and the fix (a TOML value the input makes unusable
 is an error, never ignored). `coverage`: the run's lens coverage (its measured image region; `nothing`, the source's own).
 """
-function start_grid(src, grid; coverage = nothing, device = VgtkCore.default_device())
+function start_grid(src, grid; coverage = nothing, device = default_backend())
     r = lattice_refusal(grid.lattice, lattice_source(src))
     r === nothing || throw(ArgumentError(r * " (the start's source: $(_lattice_source_label(src)))"))
     return _start_grid(src, grid.lattice, grid; coverage, device)
@@ -195,8 +195,8 @@ lattice_refusal(::DerivedLattice, ::Val{:parametric}) =
     "(e.g. 7875, the 105 × 75 lattice's nodes)"
 lattice_refusal(::LatticeRule, ::Val) = nothing
 
-# ---- a parametric start's lattice over the image region (RC 0.11.4, owner 2026-11-15) ----------------------------------------
-# STOPGAP (the owner's no-duplication rule, 2026-11-15): Estimation's fit_camera(SplineLens, parametric source, region; grid_size)
+# ---- a parametric start's lattice over the image region ----------------------------------------
+# STOPGAP (the stack's no-duplication rule): Estimation's fit_camera(SplineLens, parametric source, region; grid_size)
 # lays Core's full-image lattice over the source's bound, its origin the image's (0, 0), and takes no lattice area. Until it does,
 # the region's lattice is that fit on the source CROPPED to the lattice's box: the same camera in the pixels of the box (K's
 # principal point moved by the box's origin: `_origin_shifted`; the region moved with it: `_in_frame`), the fitted camera moved back.
@@ -213,8 +213,8 @@ end
 _origin_shifted(m, _) = throw(ArgumentError("a parametric start's lattice: a $(nameof(typeof(m))) source is no CameraModel of LogicalIntrinsics " *
                                          "(K in pixels), whose pixel frame the lattice's box is laid in"))
 # A region of the pixel plane in the frame whose origin is the pixel `o`: Core's similarity action on regions, the translation by −o —
-# one method for every region Core has (rectangles, ellipses, circles, the whole plane, intersections part by part, and since Core
-# 0.10.10 the star `PolygonRegion` of a lens that is not radially symmetric: Brown–Conrady, OpenCV, a tilt).
+# one method for every region Core has (rectangles, ellipses, circles, the whole plane, intersections part by part, and the
+# star `PolygonRegion` of a lens that is not radially symmetric: Brown–Conrady, OpenCV, a tilt).
 _in_frame(r, o) = VgtkCore.SimilarityMap(Translation(-SVector{2, Float64}(o)))(r)
 
 """
@@ -248,7 +248,7 @@ _supported_nodes(m, region, h) = (layout = region_layout(region, h); count(VgtkC
 
 The cell (px, an integer, one for both axes) of the lattice over `region`'s bounding box ([`region_layout`](@ref)) whose nodes that
 `region` supports (Core's `node_mask`) come nearest `node_count` FROM BELOW — `node_count` is the case's bound on its present nodes
-(owner 2026-11-15: a slow-lattice regression impossible): the count falls as the cell grows, so the cell is bracketed from the box's
+(a slow-lattice regression impossible): the count falls as the cell grows, so the cell is bracketed from the box's
 area over `node_count` and bisected to a cell whose count is at most `node_count` while the next finer one's exceeds it, then the
 largest count at most `node_count` among the cells within two of that crossing (the count falls only up to the ceilings and the
 centring; ties to the finer). `m` is the source camera model, whose pixel frame the lattice is laid in.
@@ -275,7 +275,7 @@ end
 """
     region_start(src, node_count; coverage = nothing) -> (; camera, spacing, origin, supported)
 
-A PARAMETRIC start's lattice (the owner's design, 2026-11-15): the SplineLens camera of the parametric camera `src` on a lattice of
+A PARAMETRIC start's lattice: the SplineLens camera of the parametric camera `src` on a lattice of
 square cells laid over the bounding box of the image region — the sensor ∩ the lens coverage `coverage` (the capture set's image
 region; `nothing`, `src`'s own: [`coverage_region`](@ref)) — whose cell (`region_spacing`, an integer px) makes the nodes the
 region supports (Core's present-node rule, `node_mask`) come nearest `node_count`. Its controls are Estimation's public
@@ -352,7 +352,7 @@ end
 """
     exact_subdivision(m, region, node_count) -> (; m, present, nodes)
 
-The subdivision factor of an exact start (`grid.lattice = "derived"` with its target `grid.node_count`, owner 2026-11-15): the source
+The subdivision factor of an exact start (`grid.lattice = "derived"` with its target `grid.node_count`): the source
 model `m`'s lattice extended over `region` (Core's `extend_lattice`) and split k × k (Core's `subdivide_lattice`, exact knot
 insertion); the largest k whose present nodes over `region` (Core's `node_mask`) are at most `node_count` — closest to the target
 without exceeding it. `node_count = nothing`: k = 1. Refused when even his own cell (k = 1) exceeds the target: the target is the
@@ -375,20 +375,20 @@ function exact_subdivision(m, region, node_count)
 end
 
 """
-    exact_start(source::SplineCamera; node_count = nothing, coverage = nothing, device = default_device()) -> (; camera, resample)
+    exact_start(source::SplineCamera; node_count = nothing, coverage = nothing, device = default_backend()) -> (; camera, resample)
 
 The start of a SplineLens `source` (Schöps's lattice, `grid.lattice = "derived"`), resampled exactly by Estimation's
 `fit_camera(SplineLens, source, region; forward = false)` over `region` = the sensor ∩ the lens coverage
 (`coverage`, else the source's: [`coverage_region`](@ref)): his lattice extended on his own spacing until every node whose support
 meets the region exists (his present nodes bit for bit, the new ones by Core's bending-energy continuation, marked
 `extrapolated`), subdivided by the integer m whose PRESENT nodes over the region come closest to `node_count` without exceeding it
-(owner 2026-11-15, 23:25: the target of present nodes doubles as their bound; `nothing`: m = 1, his own cell — the 40 px subdivision of
-0.11.0–0.11.3 cost the 14 mm cases ≈ 9.6 k nodes and a ≈ 200 s host factorisation per LM step; `exact_subdivision`), Core's exact
+(the target of present nodes doubles as their bound; `nothing`: m = 1, his own cell — a fixed 40 px subdivision, as an earlier
+release had, cost the 14 mm cases ≈ 9.6 k nodes and a ≈ 200 s host factorisation per LM step; `exact_subdivision`), Core's exact
 cubic B-spline knot insertion (the start stays his camera), turned onto
 his optical axis (Core's exact `axis_gauged`). The start keeps the full region: a fold of the extension is REPORTED (`resample.folds`,
 Core's `folded_pixels` over the region), nothing trimmed or masked — the refinement may unfold it, and the calibrated camera is
 checked ([`calibrated_folds`](@ref)). The lattice is then padded at its right and bottom edges to the grid route's patch multiple
-(`pad_lattice`, RC 0.11.2: nodes outside the region, absent but where the region's edge is a knot; the camera unchanged on it). The start is held to the coverage
+(`pad_lattice`: nodes outside the region, absent but where the region's edge is a knot; the camera unchanged on it). The start is held to the coverage
 assertion ([`check_coverage`](@ref)).
 
 `resample` is the start record's entry (`start.json`, `resample`): the start's lattice's `grid_size` (padded), the `subdivision`
@@ -398,7 +398,7 @@ assertion ([`check_coverage`](@ref)).
 `folds` (`folded` pixels, `samples`, `unimaged`), the fidelity to his rays where he images one (`max_px`, `max_px_edge`, `rms`) and
 the axis turn (`axis_rotation`, the rows of R: every control of his is R·c in the start).
 """
-function exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = nothing, coverage = nothing, device = VgtkCore.default_device())
+function exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = nothing, coverage = nothing, device = default_backend())
     s = coverage === nothing ? src : with_lens_coverage(src, coverage)
     region = coverage_region(s)
     sub = exact_subdivision(VgtkCore.model(s), region, node_count)
@@ -434,19 +434,19 @@ function exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = no
 end
 
 """
-    calibrated_folds(camera; device = default_device()) -> Union{Nothing, NamedTuple}
+    calibrated_folds(camera; device = default_backend()) -> Union{Nothing, NamedTuple}
 
-The calibrated camera's check on output (the owner's fold policy, 2026-11-15), by its type: a SplineLens camera is held to the
+The calibrated camera's check on output (the fold policy), by its type: a SplineLens camera is held to the
 coverage assertion ([`check_coverage`](@ref)) over [`coverage_region`](@ref) and its folds are Core's `folded_pixels` over it
 (`(; folded, samples, unimaged)`); a parametric camera has no lattice to fold (`nothing`). A remaining fold flags the calibration
 non-converged (`fold_termination`).
 """
-function calibrated_folds(camera::SplineCamera; device = VgtkCore.default_device())
+function calibrated_folds(camera::SplineCamera; device = default_backend())
     region = coverage_region(camera)
     check_coverage(camera, region; who = "the calibrated camera", device)
     return VgtkCore.folded_pixels(camera, region)
 end
-calibrated_folds(camera; device = VgtkCore.default_device()) = nothing
+calibrated_folds(camera; device = default_backend()) = nothing
 
 """
     fold_termination(code, rule, folds) -> (ReturnCode.T, StopRule)

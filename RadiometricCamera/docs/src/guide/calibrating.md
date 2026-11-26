@@ -6,9 +6,11 @@ CurrentModule = RadiometricCamera
 
 ## Plug in a geometric model
 
-The radiometric camera needs one thing from a geometric model: Core's `backproject(camera, 𝐩)`, the ray direction of the sensor
-point 𝐩 in the COLMAP pixels of the image (𝓘 = [0, W] × [0, H], Core's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be
-refined, VisualGeometryToolkitCore's parameter protocol.
+The radiometric camera needs one thing from a geometric model: its chief ray, VisualRadiometryToolkitCore's
+`chief_ray(camera, 𝐩)` (one of its `CONTRACT_GENERICS`), the ray direction of the sensor point 𝐩 in the COLMAP pixels of the image
+(𝓘 = [0, W] × [0, H], VisualGeometryToolkitCore's `Rect(sensor)`), plus [`in_domain`](@ref) and, to be refined,
+VisualGeometryToolkitCore's parameter protocol. For any VisualGeometryToolkitCore camera the chief ray is its `backproject(camera, 𝐩)`;
+a camera type of another package answers `chief_ray` with a method.
 
 Any VisualGeometryToolkitCore lens plugs into the `RadiometricCameraModel` as Core's pixel camera — a `BoundedCamera` of
 `CameraModel(LogicalIntrinsics(K), lens)`, K in the image's pixels (isbits: it travels into the GPU kernels as it is) — whose
@@ -26,14 +28,15 @@ own session, so it is not run here:
 
 ```julia
 # Illustrative: needs a calibration session's records and its photographs.
-using RadiometricCamera, VisualGeometryToolkitCore
-using VisualRadiometryToolkitCore: Material, geometric
-using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius, 𝔟
+using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
+using VisualRadiometryToolkitCore: Material, geometric, 𝔟
+using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, solve_linear_blocks!, sphere_radius
 ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
 b = 𝔟(ds.board)
 r_SH = sphere_radius(b, [p.t for p in ds.poses])
-W, H = Tuple(extent(ds.lens₀))                    # the image is the camera's
-camera = RadiometricCameraModel(ds.lens₀, ds.focus₀, ds.r₀, RadialVignetting(16, Point2(W / 2, H / 2), hypot(W, H) / 2))
+sz = extent(ds.lens₀)                             # the image is the camera's
+camera = RadiometricCameraModel(ds.lens₀; focus = ds.focus₀, aperture_radius = ds.r₀,
+                                vignetting = RadialVignetting(16, centroid(Rect(sz)), hypot(sz[1], sz[2]) / 2))
 s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
                      EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # VisualRadiometryToolkitCore's light
 solve_linear_blocks!(s)              # closed-form Θ_l, Θ_v, μ
@@ -53,7 +56,7 @@ with the options of [`PipelineOptions`](@ref) read from one TOML file (`bin/refi
 `parameters.json` and the run's options (`pipeline_config.toml`), and, with `[io] checkpoint_each = "on"`, a lens / poses /
 state file after every iteration (the convergence monitors of the experiments read them). It uses the GPU when CUDA is
 functional; `[compute] backend = "cpu"` forces the CPU ([`start_calibration`](@ref)'s and [`load_calibration_start`](@ref)'s
-default device is Core's `default_device()`, GPU first).
+default device is [`default_backend`](@ref): the GPU when one is functional, else the CPU with a warning).
 
 A run on RAW photographs names the camera's sensor characterisation: `[camera] sensor_characterisation` is the path of the
 body's `vgio/sensor_characterisation` record (VisualGeometryToolkitCore's `SensorCharacterisation`, read by
