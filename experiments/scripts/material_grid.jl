@@ -40,9 +40,10 @@ function _cli(args)
     return config, init, out, set, parse.(Float64, split(alphas, ",")), parse.(Float64, split(etas, ",")), limit
 end
 config, initpath, out, set, αs, ηs, limit = _cli(ARGS)
-opts = pipeline_options(config; set)
+alg, stops = RC.read_calibration(config; set)                           # the calibration (its options and optimizer), its solve's stops
+opts = alg.options
 mkpath(out)
-RC.write_pipeline_config(out, opts;
+RC.write_pipeline_config(out, alg, stops;
                          header = "# the options of this material grid (experiments/scripts/material_grid.jl --config=$config$(isempty(set) ? "" : " --set " * join(set, " --set ")))")
 init = RC.load_state(initpath)
 # the state's masks and photographs: the init's start record when it is one (its state.json), else a start of these options written
@@ -53,7 +54,7 @@ sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
 else
     so = RC._start_run_options(opts); g = RC.start_geometry(so)
     RC.save_calibration_start(joinpath(out, "start"), VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = RC.KernelAbstractions.CPU())),
-                                                                RC.RadiometricCalibration(so)).cache.state; options = so)
+                                                                alg; stops).cache.state; options = so)
 end
 s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.start
 RC.load_state_into!(s, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V

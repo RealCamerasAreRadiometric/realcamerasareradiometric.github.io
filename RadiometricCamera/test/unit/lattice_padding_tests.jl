@@ -85,7 +85,7 @@ end
 
 @testitem "lattice padding: a start whose node counts are not patch multiples runs through build_problem_grid and the LM" setup = [RCFixtures, SchoepsSource] begin
     using RadiometricCamera: build_problem_grid, compute_mask, exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, grid_model,
-                             grid_present, Material, TexturedTarget, render_view, RenderSettings, run_lm_grid!, sphere_radius, 𝔟
+                             grid_present, Material, TexturedTarget, render_view, RenderSettings, _lm_tiles!, sphere_radius, 𝔟
     using RadiometricCamera, StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -110,8 +110,8 @@ end
     masks = [compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
     s = CalibrationState(board, rs, camera, copy(poses), mat, light, targets; masks)
-    prob, idx = build_problem_grid(s)                                      # the patch default: GRID_PATCH, which divides the padded lattice
+    prob, idx = build_problem_grid(s; damping = VgtkCore.LevenbergDamping())                                      # the patch default: GRID_PATCH, which divides the padded lattice
     @test GRID_PATCH == (5, 5) && size(idx.patches) == (4, 4)
-    out = run_lm_grid!(s; maxiters = 1, fixed = (:focus, :aperture, :vignetting, :lighting))
+    out = _lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting))
     @test out.iterations >= 1 && isfinite(out.cost)
 end

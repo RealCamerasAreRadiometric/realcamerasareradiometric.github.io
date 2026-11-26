@@ -19,7 +19,7 @@
    and what each symbol is in the paper.
 3. **State, masks, start prediction** — `CalibrationState`, `compute_mask`, `render_all`, `cost`.
 4. **Calibration** — the closed-form linear sweep (`update_radiometry!`: Θ_l, Θ_v, μ), the joint LM over all blocks on the GPU
-   (`run_lm_grid!`), the loss curve, `save_grid`.
+   (`_lm_tiles!`), the loss curve, `save_grid`.
 5. **Validation** — night stars (the paper project's star evaluation), difference images.
 
 Run: `VGTK_DATA_ROOT=<data root> julia --project=. examples/radiometric_calibration.jl` (4 views at 1/8 resolution, 3 LM iterations, a few minutes on a GPU;

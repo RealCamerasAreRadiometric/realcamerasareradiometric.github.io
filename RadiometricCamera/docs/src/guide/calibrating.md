@@ -14,45 +14,39 @@ a camera type of another package answers `chief_ray` with a method.
 
 Any VisualGeometryToolkitCore lens plugs into the `RadiometricCameraModel` as Core's pixel camera — a `BoundedCamera` of
 `CameraModel(LogicalIntrinsics(K), lens)`, K in the image's pixels (isbits: it travels into the GPU kernels as it is) — whose
-back-projection is Core's `backproject` and whose parameters are Core's parameter protocol; [`run_lm!`](@ref) refines it in its own
+back-projection is Core's `backproject` and whose parameters are Core's parameter protocol; the calibration refines it per view in its own
 parameters (Core's `ParameterManifold` with the search box [`lm_box`](@ref) and the image-size coordinate scale
 [`lm_scale`](@ref)). Any camera is sampled into the grid model, VisualGeometryToolkitCore's SplineLens camera (`CameraModel(K, SplineLens)`), by
-[`grid_model`](@ref)`(camera, G_x, G_y)` and refined per tile by [`run_lm_grid!`](@ref) — the route of the paper's generic model.
+[`grid_model`](@ref)`(camera, G_x, G_y)` and refined per tile — the route of the paper's generic model (`lm_route`: the camera's type
+picks it).
 
 ## Calibrate a session
 
 A calibration session stored as VisualGeometryToolkitIO records (a camera, the board's target and the trajectory of its
-frames) and its photographs give the board, the camera's starting lens and focus surface and the photographs' poses
-([`load_session`](@ref)). The block below needs the reader's
+frames) and its photographs give the start's geometry ([`start_geometry`](@ref): the camera, the poses, the observations and the
+target), and the calibration is VisualGeometryToolkitCore's `solve` of it ([`RadiometricCalibration`](@ref): the options, the
+optimizer; the stops its solve's, [`read_calibration`](@ref) reads all three from a run's TOML). The block below needs the reader's
 own session, so it is not run here:
 
 ```julia
-# Illustrative: needs a calibration session's records and its photographs.
-using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using VisualRadiometryToolkitCore: Material, geometric, 𝔟
-using RadiometricCamera: RenderSettings, load_session, run_lm_grid!, save_grid, update_radiometry!, sphere_radius
-ds = load_session("session/records", "session/images"; lens = :grid, grid_size = (35, 25), focus_init = :board_center, downsample = 8)
-b = 𝔟(ds.board)
-r_SH = sphere_radius(b, [p.t for p in ds.poses])
-sz = extent(ds.lens₀)                             # the image is the camera's
-camera = RadiometricCameraModel(ds.lens₀; focus = ds.focus₀, aperture_radius = ds.r₀,
-                                vignetting = RadialVignetting(16, centroid(Rect(sz)), hypot(sz[1], sz[2]) / 2))
-s = CalibrationState(ds.board, RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8), camera, ds.poses, Material(),
-                     EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), ds.targets; δ = 0.01)   # VisualRadiometryToolkitCore's light
-update_radiometry!(s)              # closed-form Θ_l, Θ_v, μ
-run_lm_grid!(s; maxiters = 15)       # the joint LM over Θ̄ (poses, grid, focus, r, material, V, lighting)
-save_grid("grid.json", geometric(s))
+# Illustrative: needs a calibration session's records and its photographs (run.toml names them, [io] and [frontend]).
+using RadiometricCamera, VisualGeometryToolkitCore
+alg, stops = read_calibration("run.toml"; set = ["optimizer.max_iter=15"])   # the options, the optimizer, the solve's stops
+g = start_geometry(alg.options)                                               # the front end's geometric calibration
+fit = calibrate(g, start_photographs(alg.options, g.names), alg; stops)      # the start, then the joint LM over Θ̄
+fit.u.camera                                                                  # the radiometric camera (lens, focus, r, V)
 ```
 
-`lens = :grid` samples the session's camera into the generic grid model; `lens = :camera` keeps the pixel camera, which
-[`run_lm!`](@ref) refines instead. The GPU backend is opt-in: `backend = CUDA.CUDABackend()` of [`CalibrationState`](@ref).
+A SplineLens camera (the generic grid model) is refined per tile, any other camera per view in its own parameters. The device is
+the problem's (`EstimationProblem(CalibrationEstimate, data, (; device))`; [`default_backend`](@ref) by default).
 `JULIA_NUM_THREADS=auto`: the CPU backend is multithreaded over pixels.
 
 ## Run the refinement driver
 
 The driver `bin/refine.jl` does this on real sessions (two front-ends: BlobBoards sessions and Schöps runs on a printed page)
-with the options of [`PipelineOptions`](@ref) read from one TOML file (`bin/refine.jl --config=<run.toml> [--set table.key=value …]`;
-`configs/default.toml` lists every key with its default). It writes `grid.json` / `lens.json` (a grid with its start's `initialization_region.json` beside it, so that every grid it writes, the checkpoints included, starts another run), `state.json`, `radiometric_camera.json`, `radiometric_target.json`, the poses,
+with the options of [`PipelineOptions`](@ref), the optimizer and the solve's stops read from one TOML file ([`read_calibration`](@ref)) (`bin/refine.jl --config=<run.toml> [--set table.key=value …]`;
+`configs/default.toml` lists every key with its default; a file without `config_version`, an RC ≤ 0.3 one with its `[lm]` table,
+is read through the converter, [`RC_CONFIG_VERSIONS`](@ref): `[lm]` is the `[optimizer]` table). It writes `grid.json` / `lens.json` (a grid with its start's `initialization_region.json` beside it, so that every grid it writes, the checkpoints included, starts another run), `state.json`, `radiometric_camera.json`, `radiometric_target.json`, the poses,
 `parameters.json` and the run's options (`pipeline_config.toml`), and, with `[io] checkpoint_each = "on"`, a lens / poses /
 state file after every iteration (the convergence monitors of the experiments read them). It uses the GPU when CUDA is
 functional; `[compute] backend = "cpu"` forces the CPU (the default device of a [`RadiometricCalibration`](@ref)'s start and of [`load_calibration_start`](@ref)
@@ -73,12 +67,12 @@ weighting option: the sensor model decides. `parameters.json` records the key an
 the model's identity ([`sensor_record`](@ref RadiometricCamera.sensor_record)). Decoded (PNG) photographs have no sensor model: naming a record for them is
 refused.
 
-Its stages are the API: [`pipeline_options`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
+Its stages are the API: [`read_calibration`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
 calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into a radiometric state (the masks, the
 photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, (geometry, photographs)),
-RadiometricCalibration(options))`, a [`CalibrationCache`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
+algorithm; stops)`, a [`CalibrationCache`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
 (`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's state from one (`--start=<dir>`),
-`solve!` of the cache — or `solve(EstimationProblem(CalibrationEstimate, state), RadiometricCalibration(options))` of a loaded state —
+`solve!` of the cache — or `solve(EstimationProblem(CalibrationEstimate, state), algorithm; stops)` of a loaded state —
 runs the sweeps and the LM (a `FitResult` of a [`CalibrationEstimate`](@ref), [`RadiometricCalibration`](@ref)), and
 [`save_radiometric_calibration`](@ref) writes the records; [`calibrate`](@ref) is the start and the refinement in one call. A run
 with neither flag computes its start, writes it (into `io.out/start/`, or `--start-out=<dir>`) and refines from it in the same

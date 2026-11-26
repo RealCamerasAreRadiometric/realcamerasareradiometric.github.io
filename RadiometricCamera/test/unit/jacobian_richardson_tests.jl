@@ -60,7 +60,7 @@
     masks_g = [compute_mask(camera_g, p, board_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
     targets_g = render_all(CalibrationState(board_r, st_r, camera_g, poses_r, mat_r, light_r, blank_r; masks = masks_g))
     s_g = CalibrationState(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
-    prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 1)
+    prob_g, idx_g = build_problem_grid(s_g; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
     tiles_g = RC.tile_costs(prob_g)
     res_g = tiles_g[argmax([length(t.pix) for t in tiles_g])]
     vars_g = collect(RC.NLLSsolver.getvars(res_g, prob_g.variables))
@@ -112,7 +112,7 @@ end
     targets_r = render_all(CalibrationState(board_r, st_r, camera_r, poses_r, mat_r, light_r, blank_r; masks = masks_r))
     s_v = CalibrationState(board_r, st_r, with_vignetting(camera_r, with_control_points(vig_r, 1.05 .* Matrix(control_points(vig_r)))), poses_r, with_μ(mat_r, 0.55),
                            with_coefficients(light_r, 0.9 .* a_r), targets_r; masks = masks_r)          # away from the truth: residuals ≠ 0
-    prob_v, idx_v = build_problem(s_v)
+    prob_v, idx_v = build_problem(s_v; damping = VgtkCore.LevenbergDamping())
     res_v = get(prob_v.problem.costs, PerViewResidual{9})[1]
     vars_v = collect(RC.NLLSsolver.getvars(res_v, prob_v.variables))
     r0_v, J_v = RC.NLLSsolver.computeresjac(RC.static(127), res_v, vars_v...)
@@ -191,7 +191,7 @@ end
     targets_e_r = render_all(CalibrationState(RadiometricCamera.with_state(board_e_r, TargetState(edge = SVector(0.6, 3.0))), st_r,
                                               camera_e_r, poses_r, mat_r, light_r, blank_r; masks = masks_e_r))
     s_e = CalibrationState(board_e_r, st_r, camera_e_r, poses_r, mat_r, light_r, targets_e_r; masks = masks_e_r)
-    prob_e, _ = build_problem_grid(s_e; patch = (5, 5))
+    prob_e, _ = build_problem_grid(s_e; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     tiles_e = RC.tile_costs(prob_e)
     res_e = tiles_e[argmax([length(t.pix) for t in tiles_e])]
     vars_e = collect(RC.NLLSsolver.getvars(res_e, prob_e.variables))
@@ -218,7 +218,7 @@ end
     if RC_GPU_TESTS
         s_gd = CalibrationState(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
                                 backend = CUDA.CUDABackend())
-        prob_gd, idx_gd = build_problem_grid(s_gd; patch = (5, 5), height_degree = 1)
+        prob_gd, idx_gd = build_problem_grid(s_gd; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
         tiles_gd = RC.tile_costs(prob_gd)
         res_gd = tiles_gd[findfirst(t -> t.k == res_g.k && t.P0 == res_g.P0 && length(t.pix) == length(res_g.pix), tiles_gd)]
         vars_gd = RC.NLLSsolver.getvars(res_gd, prob_gd.variables)

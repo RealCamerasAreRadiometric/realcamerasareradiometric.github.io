@@ -46,7 +46,7 @@
     masks = [compute_mask(camera_r, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_r, poses[k], mat_r, light_r, board, st, masks[k]) for k in 1:2]
     s = CalibrationState(board, st, camera_r, poses, mat_r, light_r, targets; masks)
-    prob, idx = build_problem(s; fixed = (:aspect,))
+    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed = (:aspect,))
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     @test vars[2] isa VgtkCore.SubsetManifold && free_names(vars[2]) == (:f, :cx, :cy, :d1, :d2) && (q = pinhole_θ(block_camera(vars[2], lens)); q[2] / q[1] ≈ 0.76 / 1.35)

@@ -52,7 +52,6 @@
         "_NO_ROTATION_GAUGE" => "the empty gauge slice (no held coordinate), a sentinel",
         # ---- numerical machinery no experiment varies ----
         "WINDOW_MEMORY_FOOTPRINT" => "the device scheduler's memory estimate: how many blocks are in flight, never what they compute",
-        "LM_DAMPING" => "Levenberg's λ·I: the owner's ruling 2026-11-14 'one value, no option' (the retired key lm.iterator names it)",
         "_SAME_POSE_RTOL" => "a numerical identity: whether two representations of one pose are the same map (~4500 ulps), not a run setting")
     DEFERRED = Dict(
         "FRONTEND_DECODE_MODE" => "experiments/src/frontends.jl, frontends_runs.jl: removed by the schoeps-window branch",

@@ -37,9 +37,25 @@ const INPLANE_KINDS = ("none", "aspect_skew")
 # (`io.lens_identity`, `grid.start_perturbation`: no value until a config states one)
 # are `nothing`, which TOML cannot state; the file documents them in a comment.
 using VisualGeometryToolkitCore: toml_default, parse_defaults
+"""
+    RC_CONFIG_VERSIONS
+
+RadiometricCamera's configuration converter (VisualGeometryToolkitCore's `ConfigVersions`): a run's TOML states `config_version`
+(configs/default.toml: the current one, 2). Version 1 (RC ≤ 0.3: the LM's settings in `[lm]`) is read at version 2 through
+`migrate_config`: `[lm]` is the `[optimizer]` table, its keys kept, and the key `camera.sensor_characteris…ation` (the British
+spelling, before owner decision 11: American in identifiers) is `camera.sensor_characterization`, its value as it was, so every
+config of record of version 1 loads as it is on disk.
+"""
+const RC_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera",
+    VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
+                                         "vignetting", "warping", "edge", "lm", "sweep", "resume", "selfcheck", "compute"],
+                              renames = ["lm" => "optimizer",
+                                         "camera.sensor_characteris" * "ation" => "camera.sensor_characterization"]);   # (the old spelling split: check_naming's banned word)
+    tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material", "vignetting", "warping",
+              "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"])
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
 # `parse_defaults`/`toml_default`, as every stack package's file is (the binding name is per-package infrastructure in Core's check_duplication).
-const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")))
+const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")); versions = RC_CONFIG_VERSIONS)
 """The default of the field `f` of the options table `T`: its configs/default.toml value, read as the TOML reader reads a config's."""
 _option_default(::Type{T}, f::Symbol) where {T} = (t = _table_name(T); k = toml_key(T, f); _option_from_toml(T, Val(f), toml_default(_TOML_DEFAULTS, t, k), "$t.$k"))
 """The TOML table of the options table type `T` (its field of `PipelineOptions`)."""
@@ -217,20 +233,27 @@ Base.@kwdef struct EdgeOptions <: AbstractOptionsTable
     print_sigma_mm::Float64 = _option_default(EdgeOptions, :print_sigma_mm)                   # the print's blur σ_print [mm], the edge's width, held
 end
 
-"""`[lm]`: the Levenberg–Marquardt over Θ̄."""
-Base.@kwdef struct LMOptions <: AbstractOptionsTable
-    max_iter::Int = _option_default(LMOptions, :max_iter)                                # iterations at most
-    max_time::Float64 = _option_default(LMOptions, :max_time)                       # wall-clock budget [s]
-    ftol::Float64 = _option_default(LMOptions, :ftol)                               # Core's LmStops ftol: a step's relative cost decrease below it stops (CostDecrease)
-    xtol_rel::Float64 = _option_default(LMOptions, :xtol_rel)                       # Core's LmStops xtol_rel: ‖Δx‖ ≤ xtol_rel·(‖x‖ + xtol_rel) stops (IncrementSize; Ceres' parameter tolerance)
-    log::String = _option_default(LMOptions, :log)                                  # EXPERIMENT (nlls5): a per-iteration line appended to this file (`_lm_log`); empty = none
+"""The optimizer registry: `optimizer.type` tag → the refinement's optimizer, VisualGeometryToolkitCore's `LevenbergMarquardt`."""
+const OPTIMIZER_TAGS = TagRegistry(:optimizer, "", "levenberg_marquardt" => VgtkCore.LevenbergMarquardt; paths = [r"optimizer\.type"])
+
+"""`[optimizer]` (version 1: `[lm]`): the refinement's optimizer (`type`, a tag of [`OPTIMIZER_TAGS`](@ref)), its stop settings (the
+solve's `stops`, VisualGeometryToolkitCore's `LmStops`) and its per-iteration log: the table [`read_calibration`](@ref) reads into a
+[`RadiometricCalibration`](@ref) and its stops. Not a table of [`PipelineOptions`](@ref)."""
+Base.@kwdef struct OptimizerTable <: AbstractOptionsTable
+    type::Type = _option_default(OptimizerTable, :type)                                  # levenberg_marquardt
+    max_iter::Int = _option_default(OptimizerTable, :max_iter)                           # iterations at most (LmStops max_iter)
+    max_time::Float64 = _option_default(OptimizerTable, :max_time)                       # wall-clock budget [s] (LmStops max_time)
+    ftol::Float64 = _option_default(OptimizerTable, :ftol)                               # Core's LmStops ftol: a step's relative cost decrease below it stops (CostDecrease)
+    xtol_rel::Float64 = _option_default(OptimizerTable, :xtol_rel)                       # Core's LmStops xtol_rel: ‖Δx‖ ≤ xtol_rel·(‖x‖ + xtol_rel) stops (IncrementSize; Ceres' parameter tolerance)
+    log::String = _option_default(OptimizerTable, :log)                                  # EXPERIMENT (nlls5): a per-iteration line appended to this file (`_lm_log`); empty = none
 end
+_table_name(::Type{OptimizerTable}) = "optimizer"
 
 """`[sweep]`: the closed-form (lighting, vignetting, μ) sweep between LM chunks."""
 Base.@kwdef struct SweepOptions <: AbstractOptionsTable
     lm_chunk::Int = _option_default(SweepOptions, :lm_chunk)                                 # LM iterations between sweeps (0 = no sweeps)
     iterations::Int = _option_default(SweepOptions, :iterations)                               # block-solve iterations of one sweep
-    joint::Bool = _option_default(SweepOptions, :joint)                               # the closed-form blocks jointly (radiometry_lmsolve!)
+    joint::Bool = _option_default(SweepOptions, :joint)                               # the closed-form blocks jointly (_lm_radiometry!)
 end
 
 """`[resume]`: continuing a finished run."""
@@ -253,11 +276,12 @@ Base.@kwdef struct ComputeOptions <: AbstractOptionsTable
 end
 
 """
-    PipelineOptions(; io, frontend, camera, grid, masks, rendering, lighting, material, vignetting, warping, edge, lm, sweep, resume,
+    PipelineOptions(; io, frontend, camera, grid, masks, rendering, lighting, material, vignetting, warping, edge, sweep, resume,
                     selfcheck, compute)
 
 The options of a refinement, one table each (see the table structs for every key and its default; `configs/default.toml` lists
-them). Read from TOML with [`pipeline_options`](@ref), written for the run record with [`config_dict`](@ref). Required: `io.images`,
+them; the optimizer's `[optimizer]` table is the algorithm's, [`read_calibration`](@ref)). Read from TOML with [`pipeline_options`](@ref),
+written for the run record with [`config_dict`](@ref). Required: `io.images`,
 `io.out` and the front-end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`).
 A `selfcheck.only` run reads no photograph: it needs no `io.images`.
 """
@@ -275,7 +299,6 @@ Base.@kwdef struct PipelineOptions
     vignetting::VignettingOptions = VignettingOptions()
     warping::WarpingOptions = WarpingOptions()
     edge::EdgeOptions = EdgeOptions()
-    lm::LMOptions = LMOptions()
     sweep::SweepOptions = SweepOptions()
     resume::ResumeOptions = ResumeOptions()
     selfcheck::SelfcheckOptions = SelfcheckOptions()

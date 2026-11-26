@@ -15,7 +15,7 @@
     h_w = SVector{HEIGHT_NC}([0.5 * saddle(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
     s_c = warped(edge_state(edge_s, targets_e))
-    prob, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 1)
+    prob, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
     tiles = RC.tile_costs(prob)
     r = tiles[argmax([length(t.pix) for t in tiles])]
     vars = collect(RC.NLLSsolver.getvars(r, prob.variables))
@@ -86,7 +86,7 @@ end
         warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
         pair(; kw...) = (warped(edge_state(edge_s, targets_e; kw...)), warped(edge_state(edge_s, targets_e; backend = CUDA.CUDABackend(), kw...)))
         tile_pair(sc, sg) = begin
-            pc, _ = build_problem_grid(sc; patch = (5, 5), height_degree = 1); pg, _ = build_problem_grid(sg; patch = (5, 5), height_degree = 1)
+            pc, _ = build_problem_grid(sc; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1); pg, _ = build_problem_grid(sg; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
             tg = RC.tile_costs(pg); rg = tg[argmax([length(t.pix) for t in tg])]
             tc = RC.tile_costs(pc); rc = tc[findfirst(t -> t.k == rg.k && t.P0 == rg.P0, tc)]
             vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)

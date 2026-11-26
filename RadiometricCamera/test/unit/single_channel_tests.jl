@@ -51,7 +51,7 @@ end
     @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-12
     @test cost(one)[2] ≈ cost(ref)[2] rtol = 1e-12                                       # the relative RMS is the same
     # the residual and Jacobian of the per-view block: the reference's channel rows; the columns of the single-channel blocks
-    p1, i1 = build_problem(one); p0, i0 = build_problem(ref)
+    p1, i1 = build_problem(one; damping = VgtkCore.LevenbergDamping()); p0, i0 = build_problem(ref; damping = VgtkCore.LevenbergDamping())
     @test Int(RC.NLLSsolver.nvars(p1.variables[i1.lighting])) == 9 && Int(RC.NLLSsolver.nvars(p0.variables[i0.lighting])) == 27
     @test Int(RC.NLLSsolver.nvars(p1.variables[i1.material])) == 5 && Int(RC.NLLSsolver.nvars(p0.variables[i0.material])) == 9
     r1 = get(p1.problem.costs, PerViewResidual{9})[1]; r0 = get(p0.problem.costs, PerViewResidual{9})[1]
@@ -70,12 +70,12 @@ end
 end
 
 @testitem "single channel: a fit reaches today's parameters" setup = [RCFixtures, SingleChannelScene] begin
-    using RadiometricCamera: cost, run_lm!
+    using RadiometricCamera: cost, _lm_views!
     using Rotations: rotation_angle, RotMatrix
     f = single_channel_board(; perturbed = true)
     ref, one, c = f.ref, f.one, f.c
-    run_lm!(ref; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
-    run_lm!(one; maxiters = 200, reldcost = 1e-12, fixed = (:focus, :aperture))
+    _lm_views!(ref; stops = RC._calibration_stops(; max_iter = 200, ftol = 1e-12), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture))
+    _lm_views!(one; stops = RC._calibration_stops(; max_iter = 200, ftol = 1e-12), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture))
     @test cost(one)[1] ≈ cost(ref)[1] / 3 rtol = 1e-6 atol = 1e-20
     @test all(rad2deg(rotation_angle(RotMatrix{3}(one.poses[k].R' * ref.poses[k].R))) < 1e-6 for k in 1:2)
     @test maximum(abs, VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(one))) .- VgtkCore.parameter_vector(VgtkCore.model(RC.geometric(ref)))) < 1e-6
@@ -91,7 +91,7 @@ end
     copied = [repeat(t[:, :, c:c], 1, 1, 3) for t in targets]
     ref = CalibrationState(board, st, camera_t, copy(poses), RC.tie_channels(mat_t, c), RC.tie_channels(light_t, c), copied; masks)
     one = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, channel = c)
-    p0, _ = build_problem_grid(ref; patch = (5, 5)); p1, _ = build_problem_grid(one; patch = (5, 5))
+    p0, _ = build_problem_grid(ref; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); p1, _ = build_problem_grid(one; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     t0 = RC.tile_costs(p0); t1 = RC.tile_costs(p1)
     @test length(t0) == length(t1)
     for (a, b) in zip(t0, t1)
@@ -113,7 +113,7 @@ end
     if RC_GPU_TESTS
         cpu = single_channel_board().one
         gpu = single_channel_board(; backend = CUDABackend(; always_inline = true)).one
-        pc, ic = build_problem(cpu); pg, ig = build_problem(gpu)
+        pc, ic = build_problem(cpu; damping = VgtkCore.LevenbergDamping()); pg, ig = build_problem(gpu; damping = VgtkCore.LevenbergDamping())
         rc = get(pc.problem.costs, PerViewResidual{9})[1]; rg = get(pg.problem.costs, PerViewResidual{9})[1]
         vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)
         ec, Jc = RC.NLLSsolver.computeresjac(RC.static(127), rc, vc...)

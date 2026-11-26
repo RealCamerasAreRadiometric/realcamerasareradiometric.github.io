@@ -29,7 +29,7 @@ input path, an output path or declared no path).
 """
 const PIPELINE_INPUT_KEYS = RadiometricCamera.PIPELINE_PATH_KEYS
 
-"The `[pipeline]` keys that name an output (`RadiometricCamera.PIPELINE_OUTPUT_KEYS`): `io.out` is set by the driver; `io.save_init` (a diagnostic dump) and `lm.log` are refused."
+"The `[pipeline]` keys that name an output (`RadiometricCamera.PIPELINE_OUTPUT_KEYS`; current keys, a table names them as its version does, `config_key`): `io.out` is set by the driver; `io.save_init` (a diagnostic dump) and the optimizer's log are refused."
 const PIPELINE_OUTPUT_KEYS = RadiometricCamera.PIPELINE_OUTPUT_KEYS
 
 # The value of `table.key` in a [pipeline] table, "" when absent.
@@ -67,7 +67,7 @@ function load_calibration_config(path::AbstractString)
     _pipeline_value(cfg["pipeline"], "camera.lens_coverage") == RadiometricCamera.SENSOR_LENS_COVERAGE ||
         throw(ArgumentError("$path [pipeline.camera] lens_coverage: a calibration case states \"sensor\" (its lens lights the whole sensor; " *
                             "a measured image region is a step of the paper's configs, src/image_region.jl)"))
-    for k in PIPELINE_OUTPUT_KEYS
+    for k in (RadiometricCamera.config_key(cfg["pipeline"], k) for k in PIPELINE_OUTPUT_KEYS)
         isempty(_pipeline_value(cfg["pipeline"], k)) ||
             throw(ArgumentError("$path: [pipeline] $k is an output; the driver writes the run into its keyed directory"))
     end

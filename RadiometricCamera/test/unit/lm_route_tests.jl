@@ -1,5 +1,5 @@
 # The refinement's route by the camera's TYPE (the dispatch-not-flags rule, RC 0.11.0): a SplineLens camera is refined per tile
-# (run_lm_grid!), any other pixel camera per view in its own parameters (run_lm!). No Bool chooses it: `lm_route(camera)` is the one
+# (_lm_tiles!), any other pixel camera per view in its own parameters (_lm_views!). No Bool chooses it: `lm_route(camera)` is the one
 # decision, and the problem spec dispatches on the route.
 
 @testitem "LM route: by the camera's type; the problem spec dispatches on it" setup = [RCFixtures] begin

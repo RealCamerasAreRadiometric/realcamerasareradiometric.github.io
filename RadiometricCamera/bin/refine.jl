@@ -61,9 +61,10 @@ function _cli(args)
     return config, set, plan, repeat, start_only, start, start_out
 end
 config, set, plan, repeat, start_only, start_dir, start_out = _cli(ARGS)
-opts = pipeline_options(config; set)
+alg, stops = read_calibration(config; set)              # the calibration (its options and optimizer) and its solve's stops
+opts = alg.options
 if plan
-    TOML.print(stdout, RC.config_dict(opts); sorted = true)
+    TOML.print(stdout, RC.config_dict(alg, stops); sorted = true)
     exit(0)
 end
 # the device (RC's one resolver, inlined): flux and Jacobian share this one backend, so the residual stays bitwise the one
@@ -76,7 +77,7 @@ isempty(start_out) || abspath(start_out) != abspath(opts.io.out) ||
     throw(ArgumentError("--start-out=$start_out is the run's io.out: the start record is written beside the refinement, never into its outputs"))
 isempty(opts.io.images) && !opts.selfcheck.only &&
     throw(ArgumentError("$config: io.images is required (only a self-check, selfcheck.only, runs without photographs)"))
-RC.write_pipeline_config(opts.io.out, opts;
+RC.write_pipeline_config(opts.io.out, alg, stops;
                          header = "# the options of this run (bin/refine.jl --config=$config$(isempty(set) ? "" : " --set " * join(set, " --set ")))")
 # the start: written (--stage=start: into io.out, and done; else into io.out/start/), or read (--start=<dir>)
 # a default run (neither flag): the start computed, written into `--start-out=<dir>` (a driver's start product) or io.out/start/, and the
@@ -92,7 +93,7 @@ if isempty(start_dir)
     start_dir = start_only ? opts.io.out : isempty(start_out) ? joinpath(opts.io.out, "start") : start_out
     ts = @timed begin
         g = RC.start_geometry(so)
-        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), RadiometricCalibration(so)).cache.state
+        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), alg; stops).cache.state
     end
     s0 = ts.value
     if !isempty(so.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
@@ -109,7 +110,7 @@ if isempty(start_dir)
     computed = s0.start.observations; s0 = nothing; ts = nothing; GC.gc()  # the start's state released before the refinement's is built
 end
 """
-    _print_free_parameters(s, opts)
+    _print_free_parameters(s, alg)
 
 A timing measurement's context (`--repeat`): the free parameters of the refinement's LM over the loaded state `s`, per block of THE
 problem the refinement builds (`_refinement_lm`, the per-tile route's `build_problem_grid`; the coordinates of its free variables), as
@@ -117,14 +118,15 @@ one `PARAMETERS key=value …` line. The grid lens's are its present direction c
 the common rotation with the poses (`rotation_gauge_coordinates`); its patch blocks' solver coordinates (`lens_solver_coordinates`, which
 also carry the absent nodes of a partly present patch) beside them. A parametric (per-view) start prints its route alone.
 """
-function _print_free_parameters(s, opts)
+function _print_free_parameters(s, alg)
+    opts = alg.options
     meta = s.start
     route = RC.lm_route(meta.lens0)
     if !(route isa RC.PerTileRoute)
         println("PARAMETERS route=$(nameof(typeof(route)))"); flush(stdout); return nothing
     end
     lp = RC._refinement_lm(opts, route; smoothness = meta.grid_smoothness)
-    problem, idx = RC.build_problem_grid(s; lp.kw...)
+    problem, idx = RC.build_problem_grid(s; damping = alg.optimizer.damping, lp.kw...)
     vars = problem.problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)
     present = count(VgtkCore.present_nodes(VgtkCore.model(s.camera.geometric)))
@@ -144,7 +146,7 @@ for r in 1:repeat
     obs = computed; global computed = nothing                               # the start's streamed observations: handed to repeat 1 only, then released
     tp = @timed load_calibration_start(start_dir; options = opts, device = backend, observations = obs); obs = nothing
     global s = tp.value
-    tr = @timed VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, s), RadiometricCalibration(opts))
+    tr = @timed VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, s), alg; stops)
     global result = tr.value
     tw = @timed save_radiometric_calibration(s, result; options = opts)
     println("TIMING $r/$repeat refine_s=$(tr.time) save_s=$(tw.time) refine_gc_s=$(tr.gctime) refine_compile_s=$(tr.compile_time) ",
@@ -153,4 +155,4 @@ for r in 1:repeat
                   "refinement $(round(tr.time; digits = 1)) s ($(round(tr.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tr.gctime; digits = 1)) s, compile $(round(tr.compile_time; digits = 1)) s)"), "; "))
     flush(stdout)
 end
-repeat > 1 && _print_free_parameters(s, opts)                               # a timing measurement's context, after every timed span
+repeat > 1 && _print_free_parameters(s, alg)                               # a timing measurement's context, after every timed span

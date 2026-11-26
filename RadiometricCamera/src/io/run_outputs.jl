@@ -37,7 +37,7 @@ end
 
 The termination record of the refinement's LM: `res` is the last chunk's record (VisualGeometryToolkitCore's `lmsolve_chart!` on the
 LM's `LmProblem`: `(; code, rule, iterations, cost)`), decided at the point the chunk returned (VisualGeometryToolkitCore's rule): a cost-decrease or
-step-size tolerance stop (`[lm] ftol`, `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
+step-size tolerance stop (`[optimizer] ftol`, `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
 cap is `Success` only at a stationary point and `Stalled` otherwise; the iteration and time caps `MaxIters` / `MaxTime`. A run of chunks ends on one
 that did not iterate, at the final state. `nothing` (the LM did not run): `(ReturnCode.Default, NoRule)`.
 """

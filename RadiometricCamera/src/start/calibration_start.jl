@@ -67,7 +67,7 @@ refinement takes from its start (start/start_record.jl), so [`load_calibration_s
 photographs and this record without computing it again.
 """
 save_calibration_start(dir::AbstractString, state::CalibrationState; options::PipelineOptions) =
-    (save_start(dir, state, state.start, start_options(options)); dir)   # the record keys by the start options alone (no output: io.out, lm.log)
+    (save_start(dir, state, state.start, start_options(options)); dir)   # the record keys by the start options alone (no output: io.out, optimizer.log)
 
 """
     load_calibration_start(dir; options, device = default_backend(), observations = nothing, photographs) -> CalibrationState
@@ -84,7 +84,7 @@ function load_calibration_start(dir::AbstractString; options::PipelineOptions, d
     check_start_options(record, options)
     g = start_geometry(options; record, load_state)
     files = photographs === nothing ? start_photographs(options, g.names) : photographs
-    return _start_state(g, files, options, record; backend = device, observations)
+    return _start_state(g, files, options, record; backend = device, observations, damping = nothing)   # a record's start: no closed-form solve, no LM
 end
 
 """The photographs of the views `names` of the run `options` (`io.images`; a RAW file by its stem, `photo_file`)."""

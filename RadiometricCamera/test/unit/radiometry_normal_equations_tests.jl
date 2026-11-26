@@ -104,7 +104,7 @@ end
 end
 
 @testitem "closed-form blocks: device normal equations (GPU)" tags = [:gpu] setup = [RCGPU, NEScene] begin
-    using RadiometricCamera: all_parts, update_radiometry!, radiometry_lmsolve!
+    using RadiometricCamera: all_parts, update_radiometry!, _lm_radiometry!
     using StaticArrays, LinearAlgebra
     using CUDA: CUDABackend
     require_gpu()
@@ -118,7 +118,7 @@ end
         # the block sweep and the joint solve on the device land where the CPU's do
         for (s_, p_) in ((sc, pc), (sg, pg)); update_radiometry!(s_; parts = p_, sweeps = 2); end
         @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.diffuse_weight - sc.mat.diffuse_weight) < 1e-10
-        rc = radiometry_lmsolve!(sc, pc; max_iter = 80); rg = radiometry_lmsolve!(sg, pg; max_iter = 80)
+        rc = _lm_radiometry!(sc, pc; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg, pg; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80))
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success
         @test relerr(vec(Matrix(control_points(sg.camera.vignetting))), vec(Matrix(control_points(sc.camera.vignetting)))) < 1e-8
     end

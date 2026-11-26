@@ -36,8 +36,8 @@ and those `fixed` names — the stack's one parameter-holding keyword, expanded 
 groups such as `:k`, `:p`; an entry that names nothing is an `ArgumentError`). Holding `:aspect` (f_y/f_x) moves the two focal
 lengths together at their ratio. Holding `cx, cy` removes the principal-point ↔ rotation gauge of narrow-FOV lenses.
 `held`: no parameter is free (`fixed = parameter_names(model(camera))`, a Core lens to be sampled into a grid) — the block then keeps
-the default names, which NLLSsolver requires to be non-empty, and `run_lm!` holds it fixed. The grid lenses have no such block:
-they are refined per tile (`run_lm_grid!`).
+the default names, which NLLSsolver requires to be non-empty, and `_lm_views!` holds it fixed. The grid lenses have no such block:
+they are refined per tile (`_lm_tiles!`).
 """
 function lens_free(c::_PixelCamera; fixed = ())
     m = VgtkCore.model(c)
@@ -48,7 +48,7 @@ function lens_free(c::_PixelCamera; fixed = ())
     return names, held
 end
 lens_free(lens; kwargs...) =
-    throw(ArgumentError("$(nameof(typeof(lens))): a grid lens has no per-view lens block; use the per-tile grid route (build_problem_grid / run_lm_grid!)"))
+    throw(ArgumentError("$(nameof(typeof(lens))): a grid lens has no per-view lens block; use the per-tile grid route (build_problem_grid / _lm_tiles!)"))
 
 """
     lens_manifold(camera; fixed = ()) -> SubsetManifold
@@ -256,7 +256,7 @@ end
 
 THE bounded chart of μ (decision 2026-10-31): `μ′ = lo + (hi − lo) σ(w₀ + w)`, `w₀` the logit of μ on `(lo, hi)` (clamped 1e-9 inside,
 so a μ at a bound stays movable): the calibration LM's material block (`MaterialVar`) and the closed-form joint solve
-(`radiometry_lmsolve!`) step μ on it. Device-safe.
+(`_lm_radiometry!`) step μ on it. Device-safe.
 """
 @inline function _μ_chart(μ, w, lo, hi)
     t = clamp((μ - lo) / (hi - lo), 1e-9, 1 - 1e-9)
@@ -502,7 +502,7 @@ const WINDOW_MEMORY_FOOTPRINT = 0.4
 
 Enable the concurrent evaluation (`_windowed`) of the residual blocks of `problem` whose type `select` accepts (in the problem's order,
 as NLLSsolver visits them): `width` blocks ahead of each request, or (`nothing`) `_window_width`'s, derived after the first block.
-`run_lm!` (the views), `run_lm_grid!` (the tiles) and the stall postcondition register their problem and unregister it on exit
+`_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall postcondition register their problem and unregister it on exit
 (`_unregister_window!`).
 """
 _register_window!(s::CalibrationState, p::VgtkCore.LmProblem, select; width::Union{Nothing, Integer} = nothing) =
@@ -524,7 +524,7 @@ _register_view_problem!(s::CalibrationState, problem; width = nothing) = _regist
     _with_registered(f, s, problem, idx = nothing; concurrent = true) -> f()
 
 `f()` with the LM problem `problem` registered on the state `s`, and unregistered on exit whatever `f` does — the one teardown of
-`run_lm!`, `run_lm_grid!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view
+`_lm_views!`, `_lm_tiles!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view
 batches (`_register_grid_problem!`); with `concurrent` its blocks in the window (`_register_window!`: the views of a per-view
 problem, the tiles of a grid problem).
 """
@@ -626,7 +626,7 @@ Replace non-finite Jacobian entries by zero (an isolated derivative singularity 
 state's run record (`run.scrubbed`, `_LmRun`) under `block` (a Symbol, or a layout — `_jacobian_layout`, `_tile_layout` — counting each
 column under its block, `_column_block`); `J`'s columns are along dimension `3 - dims` (`dims = 1`: rows × columns; `dims = 2`:
 columns × rows, the device Jacobian, `_scrub!`). A non-finite derivative is a defect to find, not a case to absorb: a masked or off-board pixel has a finite zero
-row, so every count here is unexpected, and `run_lm!` / `run_lm_grid!` warn with the counts of the fit (`_report_scrubbed`). (A NaN
+row, so every count here is unexpected, and `_lm_views!` / `_lm_tiles!` warn with the counts of the fit (`_report_scrubbed`). (A NaN
 derivative in the light sphere's exit point, zeroed here silently, made the Jacobian rows of every wide-angle pixel zero and stalled
 a fit started at the truth.) Array-generic: the count and the replacement run on `J`'s backend (the LM's device Jacobian, `_scrub!`).
 """
@@ -689,7 +689,7 @@ _hold_material(blocks_held, rides::Bool) =
     :material in blocks_held && rides ? ((:material,), Tuple(k for k in blocks_held if k !== :material)) : ((), Tuple(blocks_held))
 
 """
-    build_problem(s::CalibrationState; fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
+    build_problem(s::CalibrationState; damping, fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
 
 The per-view LM problem at the state `s`: VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`) with one pose
 variable (`VgtkCore.LeftRigidManifold6{Float64}`) per view, the shared distortion / focus / aperture / material / vignetting / lighting variables and one
@@ -702,9 +702,10 @@ Core's names in the lens block (`lens_free`; `(:cx, :cy, :k3)`, `:aspect` the as
 `ArgumentError`. A lens with no free parameter is held. The model's structure (as the grid route's `build_problem_grid`): with
 `height_degree > 0` the material block carries the board warping's `HEIGHT_NC` nodal heights (`MaterialVar{Float64, HEIGHT_NC}`:
 HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(s.board)`); with `inplane` the in-plane print error `(a, u)` of
-the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it.
+the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it. `damping` the LM's (its optimizer's,
+VisualGeometryToolkitCore's `LmDamping`: the `LmProblem`'s).
 """
-function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Integer = 0,
+function build_problem(s::CalibrationState{N}; damping::VgtkCore.LmDamping, fixed = (), height_degree::Integer = 0,
                        inplane::Bool = false) where {N}
     K = n_views(s)
     vv = VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), vignetting_basis(s))   # Θ_v: Core's LinearSubspaceManifold
@@ -725,7 +726,7 @@ function build_problem(s::CalibrationState{N}; fixed = (), height_degree::Intege
     free = trues(length(variables))
     last(lens_free(geometric(s); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
     _free_mask!(free, idx, blocks_held; lens_key = :distortion, lens_idx = i_d)
-    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free), damping = LM_DAMPING), (; idx..., free)
+    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free), damping), (; idx..., free)
 end
 
 """
@@ -787,11 +788,11 @@ end
 """
     _lm_callback(s, idx, extract; trace, trace_meta, iter_callback, verbose, lm_log) -> callback
 
-The per-iteration callback of a calibration LM (`run_lm!`'s and `run_lm_grid!`'s one): with a `trace` or an `iter_callback`, after
+The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one): with a `trace` or an `iter_callback`, after
 every iteration the current best variables (`varnext` once allocated, else `variables`) read through `extract(s, vars, idx)` (the
 route's `extract_variables` / `extract_variables_grid`) into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace`
 (`trace_meta` merged, `phase = :lm`) and `iter_callback(it, cost, camera, poses, mat, surface, light)` called; else NLLSsolver's
-print-out (`verbose`) or null callback. Either way wrapped by `_lm_log` (the file `lm_log`, `lm.log`; empty: none).
+print-out (`verbose`) or null callback. Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none).
 """
 function _lm_callback(s::CalibrationState, idx, extract; trace = nothing, trace_meta = (;), iter_callback = nothing, verbose::Bool = false,
                       lm_log::AbstractString = "")
@@ -813,61 +814,53 @@ function _lm_callback(s::CalibrationState, idx, extract; trace = nothing, trace_
 end
 
 """
-    run_lm!(s; maxiters = 10, maxtime = 7200.0, fixed = (), height_degree = 0, inplane = false, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_views!(s; stops, damping, fixed = (), height_degree = 0, inplane = false, kwargs...) -> (; code, rule, iterations, cost)
 
 Levenberg–Marquardt over all parameter blocks but those `fixed` names (of `(:poses, :distortion, :focus, :aperture, :material,
 :vignetting, :lighting)`), the surface parameters it names (`:height`, `:inplane`) and the lens block's parameters `fixed` names by
 Core's parameter names (`lens_free`; default none: every parameter but the skew is free; `:aspect` ties the focal lengths): one
 holding keyword (`build_problem`, with the model's structure `height_degree` and `inplane`). `iter_callback(it, cost, camera, poses,
 mat, surface, light)` sees the current best variables after every iteration and `trace` collects the per-iteration snapshots
-(`_lm_callback`, as `run_lm_grid!`); with a file `lm_log` (`lm.log`) a line per iteration is appended to it (`_lm_log`). The solve is VisualGeometryToolkitCore's one LM, `lmsolve_chart!` on `build_problem`'s
-`LmProblem` under `LmStops` (`_lm_stops`: Levenberg's λ·I, `LM_DAMPING`) — the RELATIVE cost decrease `reldcost` (its `ftol`), the
-relative step test `xtol_rel` (`[lm] xtol_rel`) and the absolute step max-norm `xtol` (Core's of record by default); no absolute cost decrease test — the cost is in the photographs' squared units, dimensionless when the rows
+(`_lm_callback`, as `_lm_tiles!`); with a file `lm_log` (the algorithm's `log`) a line per iteration is appended to it (`_lm_log`). The solve is VisualGeometryToolkitCore's one LM, `lmsolve_chart!` on `build_problem`'s
+`LmProblem` at the optimizer's `damping` under the solve's `stops` (Core's `LmStops`, their residual resolution the state's: `_lm_stops`) — the RELATIVE cost decrease `ftol`, the
+relative step test `xtol_rel` and the absolute step max-norm `xtol`; no absolute cost decrease test — the cost is in the photographs' squared units, dimensionless when the rows
 are whitened (a two-view 32 × 32 fixture starts at ≈ 2e-4), so an absolute threshold of 1e-12 stopped the solver with the aperture, μ and the lighting still drifting together
 along a flat direction. Returns VisualGeometryToolkitCore's termination record (`code`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
 — or at a stationary point after the rejection cap; `rule`, a `StopRule`; `iterations`; `cost`, ‖r‖² at the solution).
 """
-function run_lm!(s::CalibrationState; maxiters::Integer = 10, maxtime::Real = 7200.0, fixed = (),
-                 reldcost = LMOptions().ftol, xtol_rel = LMOptions().xtol_rel, xtol = CORE_LM_XTOL, verbose::Bool = false,
-                 trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
-                 lm_log::AbstractString = "")
-    problem, idx = build_problem(s; fixed, height_degree, inplane)
+function _lm_views!(s::CalibrationState; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, fixed = (), verbose::Bool = false,
+                    trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
+                    lm_log::AbstractString = "")
+    problem, idx = build_problem(s; damping, fixed, height_degree, inplane)
     callback = _lm_callback(s, idx, extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
     _reset_scrubbed!(s.run)
     result = try                                           # (Core's stall postcondition runs inside, the views still concurrent)
         _with_registered(s, problem) do
-            VgtkCore.lmsolve_chart!(problem, _lm_stops(s, maxiters, maxtime, reldcost, xtol_rel, xtol); callback)
+            VgtkCore.lmsolve_chart!(problem, _lm_stops(s, stops); callback)
         end
     finally
-        _report_scrubbed(s.run, "run_lm!")
+        _report_scrubbed(s.run, "_lm_views!")
     end
     read_back!(s, problem, idx)
     return result
 end
 
-"""
-    LM_DAMPING
-
-The damping of every LM of RC (the per-view and the per-tile grid refinements, the closed-form blocks' joint LM): Levenberg's λ·I
-(VisualGeometryToolkitCore's `LevenbergDamping`), not VisualGeometryToolkitCore's default λ·DᵀD: measured on RC's refinements
-(VisualGeometryToolkitCore's `LmDamping`), λ·I converged on the origins of the then non-central lens where λ·DᵀD stalled at 1.2e-8 of its start cost, and reaches
-a slightly lower cost 1.6–1.8× faster on the Tamron and grid cases; λ·DᵀD wins only on the fisheye bc5. One value, no option.
-"""
-const LM_DAMPING = VgtkCore.LevenbergDamping()
-"""The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[lm]` key."""
+"""The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[optimizer]` key."""
 const CORE_LM_XTOL = VgtkCore.LmStops().xtol
-"""The stop settings of the calibration LM of the state `s` (VisualGeometryToolkitCore's `LmStops`, the one owner of the LM's knobs):
-the iteration cap, the wall-clock cap `maxtime` (s), the relative cost tolerance, the relative step tolerance `xtol_rel` and the
-absolute one `xtol` (Core's of record, `CORE_LM_XTOL`, unless a caller states it); the stationarity tolerance
-Core's of record; the residual norm the data resolve, the photographs' RAW quantisation in the cost's norm, never the noise level
-(`lm_abstol`)."""
-_lm_stops(s, maxiters, maxtime, reldcost, xtol_rel, xtol = CORE_LM_XTOL) =
-    VgtkCore.LmStops(; max_iter = maxiters, ftol = reldcost, xtol, xtol_rel, max_time = Float64(maxtime),
+"""The solve's stop settings `stops` (VisualGeometryToolkitCore's `LmStops`) of the calibration LM of the state `s`: as given, their
+residual resolution the norm the data resolve — the photographs' RAW quantisation in the cost's norm, never the noise level
+(`lm_abstol`), a fact of the state."""
+_lm_stops(s, stops::VgtkCore.LmStops) =
+    VgtkCore.LmStops(; stops.max_iter, stops.ftol, stops.xtol, stops.xtol_rel, stops.stationarity_tol, stops.max_time,
                      residual_resolution = lm_abstol(s))
+"""The stops of one LM chunk of a refinement: `stops` with its iteration cap `n` and its wall-clock cap `max_time` (s), the others kept."""
+_chunk_stops(stops::VgtkCore.LmStops, n::Integer, max_time::Real) =
+    VgtkCore.LmStops(; max_iter = n, stops.ftol, stops.xtol, stops.xtol_rel, stops.stationarity_tol, max_time = Float64(max_time),
+                     stops.residual_resolution)
 """
     _lm_log(cb, ϕ², path) -> callback
 
-With a `path` (`lm.log`, the LMs' `lm_log` keyword; empty: `cb` itself) `cb` followed by a per-iteration line (tab-separated) appended
+With a `path` (the algorithm's `log`, the LMs' `lm_log` keyword; empty: `cb` itself) `cb` followed by a per-iteration line (tab-separated) appended
 to that file: iteration, cost, rel-RMS (√(2 cost / ϕ²)), the best cost before the iteration, λ after its update, the linear solves of
 the iteration (1 = accepted at once; each further solve is a rejected step that raised λ), and the DᵀD scaling's min / max / number
 of entries at its floor (1e-8 × max).

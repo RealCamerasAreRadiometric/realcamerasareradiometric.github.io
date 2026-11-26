@@ -3,14 +3,14 @@
 # item shows the gauge direction and that the parametrization has no coordinate along it.
 
 @testitem "gauges: the grid's common rotation is held by three coordinates of two nodes" setup = [RCFixtures, GridTilesScene] begin
-    using RadiometricCamera: build_problem_grid, cost, run_lm_grid!
+    using RadiometricCamera: build_problem_grid, cost, _lm_tiles!
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     # the near-gauge: one infinitesimal rotation ω of every node direction (its tangent coordinates t_k · (ω × d)) and of every
     # pose (left: the camera frame turns, ξ = (ω, 0)) leaves the tile residuals all but unchanged (only the aperture disc and the
     # focus, fixed in the camera frame, do not turn with it)
     sp = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
-    prob0, idx0 = build_problem_grid(sp; patch = (5, 5), rotation_gauge = false)
+    prob0, idx0 = build_problem_grid(sp; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), rotation_gauge = false)
     pin = RC.rotation_gauge_coordinates(glens_p, nothing)
     @test length(pin) == 3 && pin[1][1:2] == pin[2][1:2] && pin[1][3] == 1 && pin[2][3] == 2 && pin[3][1:2] != pin[1][1:2]
     # transversal: the three held coordinates of the rotation's field are a nonsingular map of ω (a slice of the gauge orbit)
@@ -19,9 +19,9 @@
     M = [held_coord(SVector{3}(I[1:3, j]), p) for p in pin, j in 1:3]
     @test cond(M) < 1e3
     # with the gauge held: every tile's and the smoothness's columns of the held coordinates are exactly zero
-    prob1, idx1 = build_problem_grid(sp; patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
-    # its kept NLLSsolver cache is built for the solve's damping (LM_DAMPING), so it is reused, never rebuilt per solve (RC 0.9.0 review, finding 1)
-    @test same_cache_type(prob1, RC.LM_DAMPING) && !same_cache_type(prob1, VgtkCore.MarquardtDamping())
+    prob1, idx1 = build_problem_grid(sp; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
+    # its kept NLLSsolver cache is built for the solve's damping (the optimizer's, λ·I), so it is reused, never rebuilt per solve (RC 0.9.0 review, finding 1)
+    @test same_cache_type(prob1, VgtkCore.LevenbergDamping()) && !same_cache_type(prob1, VgtkCore.MarquardtDamping())
     G_x = size(D, 2)
     px_n = 5
     for T in keys(prob1.problem.costs), c in get(prob1.problem.costs, T)
@@ -52,13 +52,12 @@
     (gx1, gy1, _) = pin[1]; (gx3, gy3, c3) = pin[3]
     node(lens, gx, gy) = normalize(SVector{3, Float64}(VgtkCore.directions(VgtkCore.model(lens))[gy, gx]))
     roll = [node(sl.camera.geometric, gx3, gy3)]; chief = [node(sl.camera.geometric, gx1, gy1)]
-    run_lm_grid!(sl; patch = (5, 5), maxiters = 3, fixed = (:focus, :aperture, :vignetting, :lighting),
-                 iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
+    _lm_tiles!(sl; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:focus, :aperture, :vignetting, :lighting), iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
     @test length(roll) == 4 && all(d -> norm(d - chief[1]) < 1e-14, chief)                       # the chief node: both coordinates held
     moves = [roll[k + 1] - roll[k] for k in 1:3]
     @test norm(roll[end] - roll[1]) > 0
     # the roll node: its held coordinate, per step — to the rounding of the move, a difference of two unit vectors, whose floor is
-    # ABSOLUTE (a few eps), not relative to the move: measured 1.0e-16 at |move| = 2.4e-5 under λ·I's shorter steps (LM_DAMPING)
+    # ABSOLUTE (a few eps), not relative to the move: measured 1.0e-16 at |move| = 2.4e-5 under λ·I's shorter steps (the default optimizer's)
     @test all(k -> abs(RC._control_tangents(roll[k])[c3] ⋅ moves[k]) <= 1e-12 * norm(moves[k]) + 4eps(), 1:3)
 end
 

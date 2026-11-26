@@ -4,7 +4,7 @@
 @testitem "Kannala–Brandt / 14-coefficient lenses (cv2, parametric LM)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens_type_name, load_lens,
                              load_model, load_parametric_lens, Material, PerViewResidual, TexturedTarget, render_view,
-                             RenderSettings, run_lm!, save_lens, sphere_radius, View, chief_ray, 𝔟
+                             RenderSettings, _lm_views!, save_lens, sphere_radius, View, chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
@@ -108,10 +108,10 @@
     @test all(count(m) > 100 for m in masks)
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     s = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks)
-    prob, idx = build_problem(s)
+    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping())
     dv = prob.variables[idx.distortion]
     @test dv isa VgtkCore.SubsetManifold && Int(RC.NLLSsolver.nvars(dv)) == 18 && free_names(dv) == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(lens_t)))
-    @test_throws ArgumentError build_problem(s; fixed = (:k7,))
+    @test_throws ArgumentError build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed = (:k7,))
     lay = RC._jacobian_layout(RC.static(127), 9, 4, 15, 16, 9, 18)                 # 15 free vignetting directions of 16 nodes (the hard pin)
     @test lay.off_d == 6 && lay.off_f == 24 && lay.off_m == 28 && lay.off_r == 36 && lay.P == 37 && lay.ncol == 6 + 18 + 9 + 1 + 9 + 15 + 27
     res = get(prob.problem.costs, PerViewResidual{9})[1]
@@ -142,7 +142,7 @@
     end
     # a restricted block and the aspect held (`:aspect` in `fixed`: f_x and f_y move together at their ratio); a few LM iterations from a perturbed lens
     # lower the cost
-    probm, _ = build_problem(s; fixed = (:cx, :cy, :tx, :ty, :k3, :d, :p, :sx, :sy, :aspect))
+    probm, _ = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed = (:cx, :cy, :tx, :ty, :k3, :d, :p, :sx, :sy, :aspect))
     dm = probm.variables[idx.distortion]; @test free_names(dm) == (:f, :k1, :k2) && Int(RC.NLLSsolver.nvars(dm)) == 3
     l0, l1 = pinhole_θ(block_camera(dm, lens_t)), pinhole_θ(block_camera(RC.NLLSsolver.update(dm, [1e-3, 0.0, 0.0]), lens_t))
     @test l1[1] ≈ l0[1] * exp(1e-3) && l1[2] / l1[1] ≈ l0[2] / l0[1] && l1[3] == l0[3]
@@ -153,7 +153,7 @@
     s2 = CalibrationState(board, st, RadiometricCameraModel(lens_start, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets; masks)
     c0 = cost(s2)[1]
     its = Int[]
-    result = run_lm!(s2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
+    result = _lm_views!(s2; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping(), fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy), iter_callback = (it, c, camera, poses, mat, surface, light) -> push!(its, it))
     @test result.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2), typeof(VgtkIO.opencv_lens(zeros(14))))
     @test abs(pinhole_θ(RC.geometric(s2))[1] - pinhole_θ(lens_t)[1]) < 0.24

@@ -1,6 +1,6 @@
 @testitem "calibration" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, aperture_radius, build_problem, compute_mask, cost, focus, Focus, FocusSpline, Material,
-                             PerViewResidual, TexturedTarget, render_view, RenderSettings, run_lm!, radiometry_lmsolve!,
+                             PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, _lm_radiometry!,
                              update_lighting!, update_vignetting!, update_diffuse_weight!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -47,7 +47,7 @@
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
     s = CalibrationState(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
-    parts_j = all_parts(s); radiometry_lmsolve!(s, parts_j; max_iter = 80); cj = RC.parts_cost(s, parts_j)
+    parts_j = all_parts(s); _lm_radiometry!(s, parts_j; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj = RC.parts_cost(s, parts_j)
     @test cj < 1e-16 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_j = [s.camera.vignetting(SVector(x, y)) / vig_t(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_j) / minimum(ratio_j) - 1 < 1e-6
@@ -55,7 +55,7 @@
     # Jacobian of the per-view residual vs finite differences (the pin V(𝐜) = 1 held exactly: the centre's direction is no column)
     # (the state's V is the truth's normalized to V(𝐜) = 1, the gauge: the truth's lighting carries the V(𝐜), so the residual vanishes)
     s = CalibrationState(board, st, camera_t, poses, mat_t, with_coefficients(light_t, coefficients(light_t) .* vig_t(center(vig_t))), targets; masks)
-    prob, idx = build_problem(s)
+    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping())
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0 = RC.NLLSsolver.computeresidual(res, vars...)
@@ -80,7 +80,7 @@
     sh = CalibrationState(board, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !hasfield(typeof(sh), :pin_center)                                   # always held: no switch
     @test sh.camera.vignetting(center(sh.camera.vignetting)) ≈ 1 atol = 1e-12
-    prob_h, idx_h = build_problem(sh); vv_h = prob_h.variables[idx_h.vignetting]
+    prob_h, idx_h = build_problem(sh; damping = VgtkCore.LevenbergDamping()); vv_h = prob_h.variables[idx_h.vignetting]
     @test Int(RC.NLLSsolver.nvars(vv_h)) == 15
     @test VgtkCore.model(RC.NLLSsolver.update(vv_h, randn(15)))(center(sh.camera.vignetting)) ≈ 1 atol = 1e-12
     res_h = get(prob_h.problem.costs, PerViewResidual{9})[1]; vars_h = RC.NLLSsolver.getvars(res_h, prob_h.variables)
@@ -99,7 +99,7 @@
     # 1e-12: cost/c0 2e-26, r and 𝛂 to 1e-14, μ and the lighting to 1e-12). The (aperture radius, μ, lighting, focus) direction is flat but not
     # degenerate: with the absolute cost-decrease test at 1e-12 (the former default) the solver stopped at a cost of ≈ 2e-12 with r −8 %,
     # μ +0.09 and the light 3.5 % off, which looked like an identifiability limit and was the stopping test.
-    result = run_lm!(s2; maxiters = 200, reldcost = 1e-12)
+    result = _lm_views!(s2; stops = RC._calibration_stops(; max_iter = 200, ftol = 1e-12), damping = VgtkCore.LevenbergDamping())
     @test result.cost / 2 < 1e-20 * c0          # (Core's record: ‖r‖²; `cost` ½‖r‖²)
     @test aperture_radius(s2) ≈ r_t rtol = 1e-9
     @test pinhole_θ(RC.geometric(s2))[3] ≈ pinhole_θ(lens_t)[3] atol = 1e-9 * W      # (`lens` is shadowed by a test variable)
@@ -114,7 +114,7 @@
     @test g_2 ≈ 1 atol = 1e-6
     @test maximum(abs, Matrix(s2.camera.vignetting.P) ./ g_2 .- Matrix(vig_t.P) ./ g_t) < 1e-9
     @test maximum(abs, Matrix(coefficients(s2.light)) .* g_2 .- a_t .* g_t) / maximum(abs, a_t) < 1e-9
-    # rounds of the joint LM (`run_lm!`, the per-view route) from wrong everything: must decrease the cost monotonically (the retired
+    # rounds of the joint LM (`_lm_views!`, the per-view route) from wrong everything: must decrease the cost monotonically (the retired
     # `calibrate!` loop's test, ported: its rounds of n_inner iterations until a relative cost change below 1e-4)
     s3 = CalibrationState(board, st, RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.45)), 30.24, (12.0, 12.0), W, H), Focus(tps_t, fill(1 / 1.6, 9)), 0.035,
                                                             TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)),
@@ -122,7 +122,7 @@
                           Material(), EnvironmentLight(SphericalHarmonicMap(1.0, 2), b, r_SH), targets; masks)
     hist = [cost(s3)[1]]
     for _ in 1:3
-        run_lm!(s3; maxiters = 4)
+        _lm_views!(s3; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping())
         push!(hist, cost(s3)[1])
         abs(hist[end - 1] - hist[end]) <= 1e-4 * hist[end - 1] && break
     end
@@ -139,7 +139,7 @@
     @test θ2[3] == θ0[3] && θ2[4] == θ0[4]                                                        # fixed
     ξ0, α0 = VgtkCore.parameter_vector(VgtkCore.lens(lens_t)); ξ2, α2 = VgtkCore.parameter_vector(VgtkCore.lens(l2))
     @test ξ2 ≈ -1 + (ξ0 + 1) * exp(0.02) && α2 ≈ α0 - 0.03                                    # α's ends are closed: the plain chart (a mirror at 0 and 1)
-    probm, idxm = build_problem(s; fixed = (:cx, :cy, :aspect))
+    probm, idxm = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed = (:cx, :cy, :aspect))
     resm = get(probm.problem.costs, PerViewResidual{9})[1]
     varsm = RC.NLLSsolver.getvars(resm, probm.variables)
     _, Jm = RC.NLLSsolver.computeresjac(RC.static(31), resm, varsm...)
@@ -148,7 +148,7 @@
     # trace recording
     s5 = CalibrationState(board, st, camera_t, poses, mat_t, EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
     trc = NamedTuple[]
-    run_lm!(s5; maxiters = 2, trace = trc, trace_meta = (; stage = 1, factor = 1, ϕ² = sum(sum(abs2, p) for p in s5.ϕ)))
+    _lm_views!(s5; stops = RC._calibration_stops(; max_iter = 2), damping = VgtkCore.LevenbergDamping(), trace = trc, trace_meta = (; stage = 1, factor = 1, ϕ² = sum(sum(abs2, p) for p in s5.ϕ)))
     @test !isempty(trc) && all(t.phase == :lm for t in trc)
     @test haskey(trc[end].snap, :camera) && length(trc[end].snap.poses) == 2
     @test all(isfinite(sqrt(2t.cost / t.ϕ²)) for t in trc)
@@ -165,12 +165,12 @@
     s = CalibrationState(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
     update_vignetting!(s); @test maximum(abs, Matrix(VrtkCore.control_points(s.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
     s = CalibrationState(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
-    parts_r = all_parts(s); radiometry_lmsolve!(s, parts_r; max_iter = 80); cj_r = RC.parts_cost(s, parts_r)
+    parts_r = all_parts(s); _lm_radiometry!(s, parts_r; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj_r = RC.parts_cost(s, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.ϕ)
     ratio_r = [s.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_r) / minimum(ratio_r) - 1 < 1e-5
     @test s.mat.diffuse_weight ≈ 0.4 atol = 1e-5
-    prob_r, idx_r = build_problem(s)
+    prob_r, idx_r = build_problem(s; damping = VgtkCore.LevenbergDamping())
     vv_r = prob_r.variables[idx_r.vignetting]; @test Int(RC.NLLSsolver.nvars(vv_r)) == 3                # 5 coefficients, the first two tied and, under the hard pin, not a column (V(𝐜) = P_0 = 1)
     @test s.camera.vignetting(𝐜r) ≈ 1 atol = 1e-12
     res_r = get(prob_r.problem.costs, PerViewResidual{9})[1]; vars_r = RC.NLLSsolver.getvars(res_r, prob_r.variables)
@@ -181,7 +181,7 @@ end
     using RadiometricCamera: board_surface, TargetState, build_problem, compute_mask, cost, Focus, FocusSpline, HEIGHT_NC,
                              HEIGHT_NFREE, height_on, Material, PerViewResidual, TexturedTarget, render_view, RenderSettings,
                              sphere_radius, with_state, 𝔟
-    # 2026-10-30: the parametric (per-view) route with a FREE board warping — `build_problem(; height_degree = 1)` / `run_lm!(; height_degree)`:
+    # 2026-10-30: the parametric (per-view) route with a FREE board warping — `build_problem(; height_degree = 1)` / `_lm_views!(; height_degree)`:
     # the nodal heights ride in the material block as in the grid route (MaterialVar{Float64, HEIGHT_NC}: 9 + HEIGHT_NFREE columns,
     # h = h₀ + B y, B the board's height_basis), seeded as duals from a FLAT start h₀ = 0 (ForwardDiff's `iszero` of a seeded dual is false, so the
     # height field is on for the Jacobian evaluation although the start is the plane)
@@ -214,7 +214,7 @@ end
 
     s = CalibrationState(board_0, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !height_on(board_surface(s))
-    prob, idx = build_problem(s; height_degree = 1)
+    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = 1)
     mv0 = prob.variables[idx.material]
     @test Int(RC.NLLSsolver.nvars(mv0)) == 9 + HEIGHT_NFREE && RC.n_height(mv0) == HEIGHT_NC
     res = get(prob.problem.costs, PerViewResidual{9})[1]
@@ -246,14 +246,14 @@ end
     @test mv.basis == RC.height_basis(board)
     @test v_up.surface.h ≈ mv.surface.h + 1e-3 * mv.basis[:, 1] && v_up.mat == mv.mat && maximum(abs, Aff * (v_up.surface.h - mv.surface.h)) < 1e-12
     # without the flag nothing changes: the material block has 9 columns and the Jacobian its former width
-    prob0, idx0 = build_problem(s)
+    prob0, idx0 = build_problem(s; damping = VgtkCore.LevenbergDamping())
     @test Int(RC.NLLSsolver.nvars(prob0.variables[idx0.material])) == 9
     res0 = get(prob0.problem.costs, PerViewResidual{9})[1]
     @test size(RC.NLLSsolver.computeresjac(RC.static(127), res0, RC.NLLSsolver.getvars(res0, prob0.variables)...)[2], 2) == c0 + 15 + 27
     # a few LM iterations from the flat start (poses + material block free, the rest held) lower the cost and bend the board towards the truth
     s2 = CalibrationState(board_0, st, camera_t, poses, mat_t, light_t, targets; masks)
     c_before = cost(s2)[1]
-    RC.run_lm!(s2; maxiters = 8, height_degree = 1, fixed = (:distortion, :focus, :aperture, :vignetting, :lighting))
+    RC._lm_views!(s2; stops = RC._calibration_stops(; max_iter = 8), damping = VgtkCore.LevenbergDamping(), height_degree = 1, fixed = (:distortion, :focus, :aperture, :vignetting, :lighting))
     @test cost(s2)[1] < c_before
     @test height_on(board_surface(s2))
     # the bending part of the heights (the oblique projection v ↦ v − M a(v) along the plane fields: what board_height sees; the

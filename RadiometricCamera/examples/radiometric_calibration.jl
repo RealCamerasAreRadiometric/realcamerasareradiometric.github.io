@@ -18,7 +18,7 @@
 # records on rendered photographs) and the Schöps calibration of the FX3 fisheye (`geometric_accuracy/night_stars/data/fx3-fisheye/schoeps`).
 
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
-using RadiometricCamera: grid_angular_error, grid_dims, grid_model, load_session, render_all, RenderSettings, run_lm_grid!,
+using RadiometricCamera: grid_angular_error, grid_dims, grid_model, load_session, render_all, RenderSettings, _lm_tiles!,
                          save_grid, schoeps_gridlens, update_radiometry!, sphere_radius
 using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
 using VisualGeometryToolkitCore: cost                                        # a state's ½ Σ (Φ − ϕ)² and its relative RMS
@@ -116,7 +116,7 @@ end
 #
 # The blocks that enter Φ linearly — `Θ_v`, `Θ_l` and μ — have closed-form least-squares solutions (`update_radiometry!`: one linear
 # sweep from the per-pixel light / vignetting responses). Then the joint Levenberg–Marquardt over every block: poses `Θ_e`, the grid
-# directions (per-tile cost blocks, `run_lm_grid!`), focus `Θ_f`, aperture r, material `Θ_m`, vignetting `Θ_v`, lighting `Θ_l`; the
+# directions (per-tile cost blocks, `_lm_tiles!`), focus `Θ_f`, aperture r, material `Θ_m`, vignetting `Θ_v`, lighting `Θ_l`; the
 # vignetting gauge V(𝐜) = 1 is exact (the centre's free direction eliminated, `gauge_basis`), no geometric prior.
 
 update_radiometry!(s; light = true, vignetting = true, mu = true); c1, rms1 = cost(s)
@@ -124,7 +124,7 @@ update_radiometry!(s; light = true, vignetting = true, mu = true); c1, rms1 = co
 trace = NamedTuple[]
 monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", it, cst,
                                                                1e3 * camera.aperture_radius, mat.diffuse_weight, mat.roughness_paper, mat.roughness_ink)
-res = run_lm_grid!(s; maxiters = 3, trace, iter_callback = monitor, verbose = false)
+res = _lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, iter_callback = monitor, verbose = false)
 c2, rms2 = cost(s)
 @printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.rule)
 

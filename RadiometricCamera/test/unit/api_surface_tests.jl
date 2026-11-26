@@ -14,7 +14,7 @@
     @test exported == documented
     @test length(exported) <= 20                                                   # a headline, not the package
     @test !Base.ispublic(RC, :𝔣) && !Base.ispublic(RC, :𝔭) && RC.𝔣 === RC.VrtkCore.𝔣     # the paper's camera symbols are VisualRadiometryToolkitCore's
-    for n in (:Φ_pixel, :render_view, :build_problem, :run_lm!, :save_state, :load_distance_map, :selfcheck)
+    for n in (:Φ_pixel, :render_view, :build_problem, :build_problem_grid, :save_state, :load_distance_map, :selfcheck)
         @test Base.ispublic(RC, n) && !Base.isexported(RC, n)
     end
     # the board is VisualRadiometryToolkitCore's textured target with its own state, and there is no scene (owner 2026-11-20): its names

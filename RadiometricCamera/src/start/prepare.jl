@@ -48,7 +48,8 @@ the start takes it (and refuses a front end whose start disagrees); its start re
 """
 start_is_grid(opts::PipelineOptions) = !startswith(opts.io.init, "lens:")
 
-function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, opts::PipelineOptions, start; backend, observations = nothing)
+function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, opts::PipelineOptions, start; backend, damping,
+                      observations = nothing)
     isempty(opts.io.out) && error("io.out required")
     mkpath(opts.io.out)
     t_start = time()
@@ -60,7 +61,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     start === nothing || (W₀, H₀) == (start.W₀, start.H₀) ||
         throw(ArgumentError("the start record $(start.dir) is of $(start.W₀) × $(start.H₀) photographs, the front end's $(W₀) × $(H₀)"))
     fpx = start === nothing ? fpx_of(lens0, W₀, H₀) : _recorded(start, :fpx, fpx_of(lens0, W₀, H₀))
-    route = lm_route(lens0)                                # the refinement's route, by the start camera's type (a parametric camera: per view, run_lm!)
+    route = lm_route(lens0)                                # the refinement's route, by the start camera's type (a parametric camera: per view, _lm_views!)
     is_grid_lens(lens0) == start_is_grid(opts) || error("io.init = $(repr(opts.io.init)): the front end's start is a $(_route_label(route)) " *
                                                         "camera, but start_is_grid says otherwise (one decision of the start's kind: fix start_is_grid)")
     _print_start_route(route, lens0)
@@ -256,7 +257,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     c0, rms0 = cost(s)
     @printf("lighting solve; init cost %.4e rel-RMS %.4f\n", c0, rms0); flush(stdout)
     t1 = time()
-    update_radiometry!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint,
+    update_radiometry!(s; parts, light = true, vignetting = true, mu = !("material" in opts.fixed), joint = opts.sweep.joint, damping,
                          vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
     c1, rms1 = cost(s); μ_lin = s.mat.diffuse_weight
@@ -268,7 +269,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     if grid_gcv                                                 # the grid smoothness's weight by GCV, on the linearization at this start
         tg = time()
         lp = _refinement_lm(opts, route)                          # the refinement's problem (its blocks and holds, Θ_m's among them)
-        grid_sm, sel = select_grid_smoothness_weight(s, opts.grid.smoothness, grid_int; lp.kw...)
+        grid_sm, sel = select_grid_smoothness_weight(s, opts.grid.smoothness, grid_int; damping, lp.kw...)
         @printf("grid smoothness %s: weight %.4g by GCV (%.0f s; minimum %.6g, %.1f effective parameters of %d columns, %d observations%s)\n",
                 smoothness_line(with_weight(opts.grid.smoothness, sel.β)), sel.β, time() - tg, sel.gcv, sel.dof, sel.n_columns, sel.n_observations,
                 sel.at_bracket_end ? "; AT THE END of the bracket" : ""); flush(stdout)

@@ -34,7 +34,7 @@
 #   forward        mask, render (on the backend), pixel (1000 × Φ_pixel), flux (the flux kernel of one view), cost (every view's residual)
 #   closed form    parts (all_parts), radiometry_normal_equations, linear_blocks (Θ_l → Θ_v → μ), linear_joint (the joint LM)
 #   per view       view_jacobian (record, dual chunks, parts, rows), view_products (JᵀJ, Jᵀr of that Jacobian),
-#                  view_normal_equations (the two), lm1_view, lm3_view (run_lm!, 1 and 3 iterations)
+#                  view_normal_equations (the two), lm1_view, lm3_view (_lm_views!, 1 and 3 iterations)
 #   per tile       tile_normal_equations (every tile of one view: the batch and the tiles' rows and products),
 #                  tile_rows_products (the tiles' rows and products alone, the view's batch memoized; its value the cost sum
 #                  plus the number of tiles), lm1_grid
@@ -162,10 +162,10 @@ function stages(c)
     add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s))))
     add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s); () -> RC.radiometry_normal_equations(s, parts)))
     add("linear_blocks", () -> () -> (s = c.state(); RC.update_radiometry!(s); cost(s)[1]))
-    add("linear_joint", () -> () -> (s = c.state(); RC.update_radiometry!(s; joint = true); cost(s)[1]))
+    add("linear_joint", () -> () -> (s = c.state(); RC.update_radiometry!(s; damping = VgtkCore.LevenbergDamping(), joint = true); cost(s)[1]))
     # per view
     function view_setup()
-        s = c.state(); problem, _ = RC.build_problem(s; height_degree = HEIGHT_DEGREE)
+        s = c.state(); problem, _ = RC.build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         r, vars, flags = first_block(problem, view_blocks(problem))
         return s, r, vars, flags
     end
@@ -173,13 +173,13 @@ function stages(c)
     add("view_products", () -> ((s, r, vars, flags) = view_setup(); j = RC._view_jacobian(flags, r, vars...);
                                 () -> RC._gauss_newton_blocks(j.J, j.res, j.T, j.lay, s.run)))
     add("view_normal_equations", () -> ((s, r, vars, flags) = view_setup(); () -> RC._block_normal_equations(flags, r, vars)))
-    add("lm1_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))
-    add("lm3_view", () -> () -> (s = c.state(); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm1_view", () -> () -> (s = c.state(); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm3_view", () -> () -> (s = c.state(); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # per tile
     grid = Ref{Any}(nothing)
     grid_state() = (grid[] === nothing && (grid[] = RC.grid_model(c.lens, GRID...)); c.state(grid[]))
     add("tile_normal_equations", () -> begin
-        s = grid_state(); problem, idx = RC.build_problem_grid(s; height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         () -> RC._with_registered(s, problem, idx) do
@@ -187,7 +187,7 @@ function stages(c)
         end
     end)
     add("tile_rows_products", () -> begin           # the same tiles again within one registration: the view's batch is its memoized one
-        s = grid_state(); problem, idx = RC.build_problem_grid(s; height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
@@ -196,9 +196,9 @@ function stages(c)
             t0 = time_ns(); x = sweep(); Span(x + length(tiles), (time_ns() - t0) / 1e9)   # (not `v`: that rebound the pixel's v, boxed it in every stage, 4.4 kB a Φ_pixel call)
         end
     end)
-    add("lm1_grid", () -> () -> (s = grid_state(); RC.run_lm_grid!(s; maxiters = 1, height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm1_grid", () -> () -> (s = grid_state(); RC._lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); RC.update_radiometry!(s; joint = true); RC.run_lm!(s; maxiters = 3, height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("calibration", () -> () -> (s = c.state(); RC.update_radiometry!(s; damping = VgtkCore.LevenbergDamping(), joint = true); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
     return list
 end
 

@@ -93,11 +93,11 @@ cost(s)
 The flux is linear in the lighting `Θ_l` with the vignetting held, linear in the vignetting `Θ_v` with the lighting held
 (bilinear in the two together) and affine in μ, so each block alone has a closed-form solve. Block by block, the solves creep
 along the coupling of `Θ_l` and `Θ_v`; [`update_radiometry!`](@ref) with `joint = true` solves the three together instead (the
-pixel quadratures run once, into [`PixelParts`](@ref); then [`radiometry_lmsolve!`](@ref), a Levenberg–Marquardt on those
-parts) and reproduces the photographs exactly:
+pixel quadratures run once, into [`PixelParts`](@ref); then a Levenberg–Marquardt on those parts, at the `damping` given: here
+Levenberg's λ·I, a [`RadiometricCalibration`](@ref)'s default) and reproduces the photographs exactly:
 
 ```@example tutorial
-update_radiometry!(s; joint = true)
+update_radiometry!(s; joint = true, damping = VisualGeometryToolkitCore.LevenbergDamping())
 cost(s)[2] < 1e-4, isapprox(s.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
 ```
 
@@ -107,6 +107,6 @@ lighting absorbs the true field's value there.
 ## Next
 
 The geometric blocks — the poses `Θ_e`, the lens `Θ_d`, the focus `Θ_f` and the aperture radius r — enter the flux nonlinearly.
-[`run_lm!`](@ref) refines them jointly with the radiometry by Levenberg–Marquardt with pathwise Jacobians, and
-[`run_lm_grid!`](@ref) does so for the generic grid model, tile by tile. [Calibrate a camera](calibrating.md) does this on
-real sessions; [The radiometric camera model](model.md) states the model these blocks belong to.
+The calibration, [`RadiometricCalibration`](@ref) (VisualGeometryToolkitCore's `solve`), refines them jointly with the radiometry
+by Levenberg–Marquardt with pathwise Jacobians — per view in a parametric camera's own parameters, tile by tile for the generic grid
+model. [Calibrate a camera](calibrating.md) does this on real sessions; [The radiometric camera model](model.md) states the model these blocks belong to.

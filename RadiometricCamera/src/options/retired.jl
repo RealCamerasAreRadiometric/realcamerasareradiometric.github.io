@@ -8,7 +8,7 @@ _focus_ab_key_removed(note::AbstractString) =
 const RETIRED_KEYS = (
     ("io", "photosites") => "a RAW photograph is read as one by its file (`load_photo`: VisualGeometryToolkitCore's RawMosaic, its green photosites; " *
                             "`io.channel = \"G\"`), a decoded image as one — never by a flag; delete the key",
-    ("lm", "iterator")   => "the LM is VisualGeometryToolkitCore's one (`lmsolve_chart!`), its damping Levenberg's λ·I (`LM_DAMPING`), no knob; " *
+    ("lm", "iterator")   => "the LM is VisualGeometryToolkitCore's one (`lmsolve_chart!`), its damping the algorithm's (`RadiometricCalibration`'s optimizer, Levenberg's λ·I by default); " *
                             "delete the key",
     ("io", "save_init")  => "the start is a step of its own: `bin/refine.jl --stage=start` writes the start record (start.json, state.json, " *
                             "grid.json | lens.json, masks/; a `RadiometricCalibration` start), `--start=<dir>` refines from it; delete the key",
@@ -30,8 +30,6 @@ const RETIRED_KEYS = (
                             "`edge.print_sigma_mm`); delete the key",
     ("refine", "weighting") => "weighting follows the camera's sensor model: give a characterisation with a gain to weight " *
                             "(`camera.sensor_characterization`; no flag); delete the key",
-    ("camera", "sensor_characteris" * "ation") => "renamed `camera.sensor_characterization` (American in identifiers, owner decision 11; " *
-                            "the value, the record's location, as it was)",
     ("camera", "image_circle_min_hole_area_px") => "the image circle is measured on the rim's log-polar profiles (VisualGeometryToolkitFeatures' " *
                             "`detect_image_circle`), with no dark-region hull and no hole to drop; delete the key",
     ("camera", "image_circle_frames") => "the image region is a step of its own, per capture set: its record " *

@@ -50,7 +50,7 @@
     rec2 = NamedTuple[]
     s5 = state(); update_radiometry!(s5; parts, light = false, mu = false, vignetting_smoothness = :gcv, gcv_record = rec2)
     @test length(rec2) == 1 && s5.camera.vignetting.P ≈ s3.camera.vignetting.P
-    @test_throws ArgumentError update_radiometry!(state(); parts, joint = true, vignetting_smoothness = 0.1)
+    @test_throws ArgumentError update_radiometry!(state(); damping = VgtkCore.LevenbergDamping(), parts, joint = true, vignetting_smoothness = 0.1)
     @test_throws ArgumentError update_vignetting!(state(), parts; smoothness_weight = -1.0)
     @test_throws ArgumentError update_vignetting!(state(), parts; smoothness_weight = :aic)
     # the boundary order: 2 is the natural rule (Δ²c = 0), 3 the curvature-preserving Δ³c = 0 — Core's BoundaryRule(m, region; order)
@@ -82,16 +82,16 @@ end
     @test RC.grid_smoothness_cost(pr, glens_t) == 0.0
     @test length(RC.grid_smoothness(RC.PSplineSmoothness(3, 0.5), glens_t, 7.0, all10).rows) == 2 * 10 * 7
     # in a problem: rows on the present nodes only, zero at the start
-    prob_p, _ = build_problem_grid(s; patch = (5, 5), smoothness = pr)
+    prob_p, _ = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
     @test sum(c -> length(c.terms), [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]) == length(pr.rows)
     # the weight by GCV on the linearization at a perturbed start: the smoothness of that weight, the selection recorded
     sp = CalibrationState(board, st, camera_p, poses_p, mat_t, light_t, targets; masks)
     held_p = RC.interior_nodes(RC.grid_present(glens_p))
-    smooth, sel = RC.select_grid_smoothness_weight(sp, RC.PSplineSmoothness(3, :gcv), held_p)
+    smooth, sel = RC.select_grid_smoothness_weight(sp, RC.PSplineSmoothness(3, :gcv), held_p; damping = VgtkCore.LevenbergDamping())
     @test smooth.type === :pspline && smooth.β == sel.β && sel.kind === :pspline && isfinite(sel.gcv) && sel.n_columns == 4 * 50
     @test sel.n_observations == 3 * sum(length, sp.px) && 0 < sel.dof <= sel.n_columns
     @test 1e-8 <= sel.β <= 1e4
-    @test RC.select_grid_smoothness_weight(sp, RC.NoSmoothness(), held_p) == (nothing, nothing)
+    @test RC.select_grid_smoothness_weight(sp, RC.NoSmoothness(), held_p; damping = VgtkCore.LevenbergDamping()) == (nothing, nothing)
     # the nodes held: Core's footprint rule; :all every node the lens holds
     @test RC.grid_present(glens_t) == VgtkCore.node_mask(VgtkCore.model(glens_t), VgtkCore.imaged_region(glens_t))
     @test RC.grid_present(glens_t; nodes = :all) == trues(10, 10)

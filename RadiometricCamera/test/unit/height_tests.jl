@@ -42,7 +42,7 @@ end
 
 @testitem "board height field" setup = [RCFixtures, HeightScene] begin
     using RadiometricCamera: board_height, board_normal, board_surface, TargetState, build_problem_grid, chart, cost, EDGE_NC,
-                             HEIGHT_NC, height_nparams, height_on, intersect_board, TexturedTarget, render_all, run_lm_grid!,
+                             HEIGHT_NC, height_nparams, height_on, intersect_board, TexturedTarget, render_all, _lm_tiles!,
                              with_edge, with_h, with_state, world_point
     using VisualRadiometryToolkitCore: posed_target
     import VisualGeometryToolkitCore as VgtkCore
@@ -109,7 +109,7 @@ end
     # 3. Jacobian columns of the free height parameters (material block: HEIGHT_NFREE AD columns after the 9 BRDF parameters; h = h₀ + B y) vs differences of the tile
     #    residual through `update`; the pose columns still match (duals flow through the surface intersection)
     s_h = CalibrationState(board_hh(0.5 * height_true), st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
-    prob_h, idx_h = build_problem_grid(s_h; patch = (5, 5), height_degree = 2)
+    prob_h, idx_h = build_problem_grid(s_h; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
     tiles_h = RC.tile_costs(prob_h)
     r_h = tiles_h[argmax([length(t.pix) for t in tiles_h])]
     vars_h = collect(RC.NLLSsolver.getvars(r_h, prob_h.variables))
@@ -144,8 +144,7 @@ end
     # 4. LM recovery of the saddle from the flat start, everything else at the truth
     s_hr = CalibrationState(board_h, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
     c0h = cost(s_hr)[1]
-    run_lm_grid!(s_hr; patch = (5, 5), maxiters = 25, height_degree = 2,
-                 fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
+    _lm_tiles!(s_hr; stops = RC._calibration_stops(; max_iter = 25), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2, fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
     @test cost(s_hr)[1] < 1e-3 * c0h
     let pts = [SVector(x, y) for x in 0.05:0.3:0.95 for y in 0.05:0.3:0.95], zt = [board_height(W1, height_true, 𝐛) for 𝐛 in pts], zr = [board_height(W1, board_surface(s_hr).h, 𝐛) for 𝐛 in pts]
         @test maximum(abs.(zr .- zt)) < 0.1 * maximum(abs.(zt))                           # the SURFACE is recovered (the affine null directions of the nodal heights are not observable)
@@ -164,11 +163,11 @@ end
     if RC_GPU_TESTS
         board_hg = board_hh(0.5 * height_true)
         s_g = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
+        prob_g, idx_g = build_problem_grid(s_g; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         s_c = CalibrationState(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = RadiometricCamera.KernelAbstractions.CPU())
-        prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
+        prob_c, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
         varsg = RC.NLLSsolver.getvars(rg, prob_g.variables)
@@ -231,8 +230,8 @@ end
         s_g = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
         s_c = CalibrationState(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = RadiometricCamera.KernelAbstractions.CPU())
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g), render_all(s_c))) < 2e-3 * maximum(maximum, render_all(s_c))
-        prob_g, _ = build_problem_grid(s_g; patch = (5, 5), height_degree = 2)
-        prob_c, _ = build_problem_grid(s_c; patch = (5, 5), height_degree = 2)
+        prob_g, _ = build_problem_grid(s_g; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
+        prob_c, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g); tiles_c = RC.tile_costs(prob_c)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]

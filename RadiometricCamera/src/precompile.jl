@@ -44,8 +44,9 @@
             targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
             return CalibrationState(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
-        per_view(s; kw...) = ((prob, _) = build_problem(s; kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
-        per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
+        damping = RadiometricCalibration(PipelineOptions()).optimizer.damping   # the algorithm's default
+        per_view(s; kw...) = ((prob, _) = build_problem(s; damping, kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
+        per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; damping, patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
 
         # the closed-form radiometry and the parametric (per-view) blocks on Core's lenses: the double sphere (a free board
         # warping), Kannala–Brandt, OpenCV's 14 coefficients, the division lens and a fixed lens
@@ -53,7 +54,7 @@
         s = state(ds)
         parts = all_parts(s)
         update_lighting!(s, parts); update_vignetting!(s, parts); update_diffuse_weight!(s, parts)
-        radiometry_lmsolve!(s, parts; max_iter = 1)
+        _lm_radiometry!(s, parts; damping, stops = VgtkCore.LmStops(; max_iter = 1))
         cost(s); render_all(s)
         per_view(s)
         per_view(state(ds); height_degree = 1)
@@ -73,9 +74,10 @@
         per_tile(sg; height_degree = 2)
 
         # the pipeline's options: the defaults, an override, the record's round trip through TOML
-        opts = pipeline_options(Dict{String, Any}(); set = ["lm.max_iter=2"])
-        TOML.print(IOBuffer(), config_dict(opts))
-        pipeline_options(config_dict(opts))
+        alg, stops = read_calibration(Dict{String, Any}("config_version" => 2); set = ["optimizer.max_iter=2"])
+        TOML.print(IOBuffer(), config_dict(alg, stops))
+        read_calibration(config_dict(alg, stops))
+        pipeline_options(config_dict(alg.options))
         _drain_device_pool!()          # the evaluations' pooled workers: a package image cannot hold a task
     end
 end

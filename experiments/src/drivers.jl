@@ -231,7 +231,8 @@ function load_driver_config(path::AbstractString, name::AbstractString; tables, 
         t isa AbstractDict || throw(ArgumentError("$where must be a table"))
         VgtkCore.check_keys(t, case_keys, where)
         haskey(t, "pipeline") || continue
-        for k in RadiometricCamera.PIPELINE_OUTPUT_KEYS                  # io.out, io.save_init, lm.log: the driver's (the run's keyed directory)
+        for k in RadiometricCamera.PIPELINE_OUTPUT_KEYS                  # io.out, the optimizer's log: the driver's (the run's keyed directory)
+            k = RadiometricCamera.config_key(t["pipeline"], k)           # as the table's version names it (version 1: lm.log)
             tb, f = split(k, '.')
             isempty(get(get(t["pipeline"], tb, Dict()), f, "")) || throw(ArgumentError("$where: $k is the driver's (the run's keyed directory)"))
         end
@@ -425,7 +426,7 @@ IS the case — its name, its table, so its run key: the run of record is reused
 `<case>__<table.key>=<value>[…]` (`<table.key>=unset` for a deleted key), in key order.
 """
 function override_variant(case::AbstractString, t::AbstractDict, v; unset = ())
-    resolved = RadiometricCamera.config_dict(pipeline_options(t["pipeline"]))
+    resolved = _resolved_as_written(t["pipeline"])
     stated = [k for k in unset if _override_stated(t["pipeline"], k)]
     all(kx -> _override_value(resolved, kx[1]) == kx[2], v) && isempty(stated) && return (String(case), t)
     t2 = deepcopy(t)
@@ -433,6 +434,13 @@ function override_variant(case::AbstractString, t::AbstractDict, v; unset = ())
     foreach(k -> _unset_override!(t2["pipeline"], k), stated)
     parts = sort([[(String(k), "$k=$(_override_label(x))") for (k, x) in v]; [(String(k), "$k=unset") for k in stated]]; by = first)
     return (String(case) * "__" * join(last.(parts), "__"), t2)
+end
+# the [pipeline] table `pipe` resolved (configs/default.toml ← `pipe`: its options, its optimizer and stops, `read_calibration`), its
+# tables named as `pipe`'s configuration version names them (`config_key`): an override's key is a key of the table it is set in
+function _resolved_as_written(pipe::AbstractDict)
+    d = RadiometricCamera.config_dict(RadiometricCamera.read_calibration(pipe)...)
+    delete!(d, VgtkCore.CONFIG_VERSION_KEY)
+    return Dict{String, Any}(RadiometricCamera.config_key(pipe, k) => v for (k, v) in d)
 end
 # whether the [pipeline] table `pipe` states the key `k` (`table.key` or a top-level key); the key deleted (its table dropped when emptied)
 _override_stated(pipe, k) = (p = split(k, '.'; limit = 2); length(p) == 1 ? haskey(pipe, k) : haskey(get(pipe, p[1], Dict()), p[2]))

@@ -22,10 +22,11 @@ end
     _refinement_lm(opts, route; smoothness = nothing) -> (; kw, blocks)
 
 THE refinement's LM problem, derived once from the options: `blocks` (`_lm_blocks`: which blocks are solved) and `kw`, the keywords
-of the route's builder and LM (`lm_route`: `build_problem` / `run_lm!` per view, `build_problem_grid` / `run_lm_grid!` per tile): the held blocks as `fixed` (`:grid` the
+of the route's builder and LM (`lm_route`: `build_problem` / `_lm_views!` per view, `build_problem_grid` / `_lm_tiles!` per tile): the held blocks as `fixed` (`:grid` the
 per-view route's `:distortion`; `:material` whenever "material" is in `fixed` — the builders hold Θ_m alone inside a block that
 stays variable for its free surface parameters, `_hold_material`, as `_material_rides` reports it), the
-surface's holds from `fixed`, the model's structure (`_lm_structure`) and the grid smoothness `smoothness`. The calibration's refinement, the grid smoothness's GCV, the Jacobian parity
+surface's holds from `fixed`, the model's structure (`_lm_structure`) and the grid smoothness `smoothness` (the LM's `damping`, the
+optimizer's, is the caller's: a builder takes it beside these). The calibration's refinement, the grid smoothness's GCV, the Jacobian parity
 check and the tests build their problems from it alone.
 """
 function _refinement_lm(opts::PipelineOptions, route::LmRoute; smoothness = nothing)
@@ -43,9 +44,9 @@ function _route_kw(::PerViewRoute, held, opts::PipelineOptions)
 end
 _route_kw(::PerTileRoute, held, opts::PipelineOptions) =
     (; fixed = (held..., _lm_surface_holds(opts)...), _lm_structure(opts)...)
-"""The route's LM (`lm_route`): `run_lm!` per view, `run_lm_grid!` per tile."""
-_run_lm!(s::CalibrationState, ::PerViewRoute; kwargs...) = run_lm!(s; kwargs...)
-_run_lm!(s::CalibrationState, ::PerTileRoute; kwargs...) = run_lm_grid!(s; kwargs...)
+"""The route's LM (`lm_route`): `_lm_views!` per view, `_lm_tiles!` per tile."""
+_lm_route!(s::CalibrationState, ::PerViewRoute; kwargs...) = _lm_views!(s; kwargs...)
+_lm_route!(s::CalibrationState, ::PerTileRoute; kwargs...) = _lm_tiles!(s; kwargs...)
 """Whether the run models an in-plane print error on the surface `surf`: `warping.inplane` names one, or the surface carries one
 (`inplane_on`; a start or a resumed state's). Considered: `_surface_free(opts, :inplane)` (free, not modelled — a held print error is modelled)."""
 _inplane_modelled(opts::PipelineOptions, surf) = opts.warping.inplane != "none" || inplane_on(surf)

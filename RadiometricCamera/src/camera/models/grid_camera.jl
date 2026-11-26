@@ -23,15 +23,15 @@ is_grid_lens(l) = l isa GridLike
     lm_route(camera) -> PerViewRoute() | PerTileRoute()
 
 The refinement's LM route, by the camera's TYPE (never a flag): a SplineLens camera is refined per tile (its lattice's patches,
-`run_lm_grid!`: [`PerTileRoute`](@ref)), any other pixel camera per view in its own parameters (`run_lm!`: [`PerViewRoute`](@ref)).
+`_lm_tiles!`: [`PerTileRoute`](@ref)), any other pixel camera per view in its own parameters (`_lm_views!`: [`PerViewRoute`](@ref)).
 The problem spec (`_refinement_lm`), the LM's call and the run's camera records dispatch on it.
 """
 function lm_route end
 """The LM route of a camera ([`lm_route`](@ref)): `PerViewRoute` or `PerTileRoute`."""
 abstract type LmRoute end
-"""The per-view route: a parametric pixel camera, its parameters the lens block of every view's residual (`run_lm!`)."""
+"""The per-view route: a parametric pixel camera, its parameters the lens block of every view's residual (`_lm_views!`)."""
 struct PerViewRoute <: LmRoute end
-"""The per-tile route: a SplineLens camera, its lattice refined per tile (`run_lm_grid!`)."""
+"""The per-tile route: a SplineLens camera, its lattice refined per tile (`_lm_tiles!`)."""
 struct PerTileRoute <: LmRoute end
 lm_route(::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}) = PerTileRoute()
 lm_route(::BoundedCamera{<:CameraModel}) = PerViewRoute()

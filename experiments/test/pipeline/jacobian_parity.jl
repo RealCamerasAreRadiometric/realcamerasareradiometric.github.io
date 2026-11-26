@@ -1,7 +1,7 @@
 # JACOBIAN PARITY on the paper-like Siemens case: the one Jacobian implementation on the device against the same on the CPU backend
 # (Float64), tile by tile, at the start of the paper's f4_14mm_spline_warped refinement (experiments
 # configs/experiments/radiometric_refinement_vignetting.toml: Sigma 14 mm f/4, the 1 m Siemens print with its distance-map edge, n_p 2,
-# N 16 Hammersley, ≤ 12 048 px per view, warping degree 1, radial V) on its first NVIEWS photographs, and after a 3-iteration grid LM
+# N 16 Hammersley, ≤ 12 048 px per view, warping degree 1, radial V) on its first NVIEWS photographs, and after the refinement at a 3-iteration grid LM
 # from there. The package's GPU items use small scenes whose height columns are benign; on this case the warping's columns are
 # sensitive (the print's 0.03 mm edge): the 0.9 port before perf-lm (25 nodal-height slots through the Float32 radiance estimator)
 # was 6 % off in a column and 14–94 % in single tiles, a Float32 height path 0.2–1.3 % stacked and ≤ 5.6 % in a tile, the
@@ -30,17 +30,18 @@ function jacobian_parity(root, images, nviews = 2)
     end
     p["io"]["views"] = cfg["views"][t["views"]][1:nviews]; p["io"]["images"] = images
     p["io"]["out"] = mktempdir(); p["io"]["checkpoint_each"] = "off"
-    opts = RC.pipeline_options(p)
+    alg, stops = RC.read_calibration(p)                                  # the calibration (its options and optimizer), its solve's stops
+    opts = alg.options
     s = redirect_stdout(devnull) do
         so = RC._start_run_options(opts); g = RC.start_geometry(so); dir = joinpath(opts.io.out, "start")
         RC.save_calibration_start(dir, VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = CUDA.CUDABackend())),
-                                                   RC.RadiometricCalibration(so)).cache.state; options = so)
+                                                   alg; stops).cache.state; options = so)
         RC.load_calibration_start(dir; options = opts, device = CUDA.CUDABackend())
     end
     meta = s.start
     # the problem as the RadiometricCalibration solve builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
     lp = RC._refinement_lm(opts, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
-    problem(st) = RC.build_problem_grid(st; kw...)
+    problem(st) = RC.build_problem_grid(st; damping = alg.optimizer.damping, kw...)
     host(st) = (h = typeof(st)(ntuple(i -> getfield(st, i), fieldcount(typeof(st)))...); h.backend = RC.KernelAbstractions.CPU(); h.device_cache = nothing; h)
 
     failed = false
@@ -82,7 +83,8 @@ function jacobian_parity(root, images, nviews = 2)
     end
     check!("start")
     redirect_stdout(devnull) do
-        RC.run_lm_grid!(s; maxiters = 3, kw...)
+        VgtkCore.solve(VgtkCore.EstimationProblem(RC.CalibrationEstimate, s), alg;     # the refinement, three LM iterations
+                       stops = last(RC.read_calibration(p; set = [RC.config_key(p, "optimizer.max_iter") * "=3"])))
     end
     check!("lm3")
     return failed ? 1 : 0

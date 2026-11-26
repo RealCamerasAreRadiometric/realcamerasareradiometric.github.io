@@ -3,7 +3,7 @@
 # refinable), Float32 cleanliness, duals through Core's lens inverses, and the per-view problem with the lens block fixed.
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, grid_model, in_domain,
-                             Material, PerViewResidual, TexturedTarget, render_view, RenderSettings, run_lm!, sphere_radius,
+                             Material, PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, sphere_radius,
                              chief_ray, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -66,7 +66,7 @@
     targets = [render_view(k, camera_k, poses[k], mat_k, light_k, board, st, masks[k]) for k in 1:2]
     s = CalibrationState(board, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
     fixed = VgtkCore.parameter_names(VgtkCore.model(lk))   # every parameter held
-    prob, idx = build_problem(s; fixed)
+    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed)
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0, J = RC.NLLSsolver.computeresjac(RC.static(125), res, vars...)                 # the LM's flags: every block but the fixed lens
@@ -75,7 +75,7 @@
     s2 = CalibrationState(board, st, camera_k, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.004), SVector(0.003, -0.003, 0.004))) for p in poses],
                           mat_k, light_k, targets; masks)
     c0 = cost(s2)[1]
-    run_lm!(s2; maxiters = 8, fixed)
+    _lm_views!(s2; stops = RC._calibration_stops(; max_iter = 8), damping = VgtkCore.LevenbergDamping(), fixed)
     @test cost(s2)[1] < 1e-3 * c0
     @test pinhole_θ(RC.geometric(s2)) ≈ pinhole_θ(lk) && VgtkCore.lens(RC.geometric(s2)) == VgtkCore.lens(lk)   # untouched by the LM
 end

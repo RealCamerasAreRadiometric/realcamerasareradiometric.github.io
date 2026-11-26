@@ -206,7 +206,7 @@ function select_grid_smoothness_weight(s::CalibrationState, sm::AbstractSmoothne
         off[i] = ncol; ncol += Int(NLLSsolver.nvars(problem.variables[i]))
     end
     G = zeros(ncol, ncol); h = zeros(ncol); Q = zeros(ncol, ncol); q = zeros(ncol); rr = 0.0; n = 0
-    # the tiles of a view are evaluated in one batch, as run_lm_grid! does (bitwise the per-tile path's values)
+    # the tiles of a view are evaluated in one batch, as _lm_tiles! does (bitwise the per-tile path's values)
     _with_registered(s, problem, idx; concurrent = false) do       # the tiles of a view in its batch; one at a time
         for T in keys(problem.problem.costs)
             data = T <: PerTileResidual

@@ -12,7 +12,7 @@
     const RC = RCg
 
     @testset "start_options: exactly the refinement-only keys (and the outputs) at their defaults" begin
-        d0 = RC.config_dict(RC.PipelineOptions())
+        d0 = RC.config_dict(RC.RadiometricCalibration(RC.PipelineOptions()), RC._calibration_stops())   # the options, the optimizer's table
         for k in RC.REFINE_ONLY_KEYS                                    # every key is an option of the pipeline
             t, key = split(k, '.'; limit = 2)
             @test haskey(d0, t) && haskey(d0[t], key)
@@ -24,13 +24,13 @@
         so = RC.start_options(o)
         @test so == RC.start_options(RC.pipeline_options(Dict("fixed" => ["material"], "grid" => Dict("lattice" => "node_count", "node_count" => 875),
                                                               "resume" => Dict("state" => "s.json"))))
-        @test so.lm.max_iter == RC.PipelineOptions().lm.max_iter && so.io.out == "" && !so.io.checkpoint_each
+        @test so.io.out == "" && !so.io.checkpoint_each                    # (the optimizer's table is the algorithm's, no option: RC 0.4.0)
         @test so.fixed == ["material"] && so.grid.node_count == 875 && so.resume.state == "s.json"   # every other key kept
         # a refine-only change: the same start options; a start change: others
         @test RC.start_options(RC.pipeline_options(Dict("lm" => Dict("max_iter" => 24)))) == RC.start_options(RC.pipeline_options(Dict("lm" => Dict("max_iter" => 50))))
         # the LM's stop tolerances are the refinement's alone (RC 0.11.4, code review): a change never re-keys or refuses a start
         @test RC.start_options(RC.pipeline_options(Dict("lm" => Dict("ftol" => 1e-3, "xtol_rel" => 1e-6)))) == RC.start_options(RC.PipelineOptions())
-        @test all(k -> k in RC.REFINE_ONLY_KEYS, ("lm.ftol", "lm.xtol_rel"))
+        @test all(k -> k in RC.REFINE_ONLY_KEYS, ("optimizer.ftol", "optimizer.xtol_rel", "optimizer.max_iter", "optimizer.max_time", "optimizer.type"))
         @test RC.start_options(RC.pipeline_options(Dict("grid" => Dict("lattice" => "node_count", "node_count" => 900)))) != RC.start_options(RC.PipelineOptions())
     end
 

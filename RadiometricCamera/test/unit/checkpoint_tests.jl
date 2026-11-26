@@ -30,13 +30,13 @@
             PNGFiles.save(photos[k], [RGB{N0f16}(clamp.(imgs[k][i, j, :], 0, 1)...) for i in 1:H, j in 1:W])
         end
         out = joinpath(dir, "out")
-        opts = RC.pipeline_options(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
+        alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
                                         "lm" => lm, "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
         start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
-                                                                      (; device = RC.KernelAbstractions.CPU())), RC.RadiometricCalibration(opts)).cache.state
-        fit = RC.calibrate(glens, poses, obs, photos; target = board, options = opts, device = RC.KernelAbstractions.CPU())
+                                                                      (; device = RC.KernelAbstractions.CPU())), alg; stops).cache.state
+        fit = RC.calibrate(glens, poses, obs, photos, alg; target = board, stops, device = RC.KernelAbstractions.CPU())
         return (; fit, out, photos)
     end
     export run_board
@@ -72,8 +72,8 @@ end
         @test capped.stats.nsteps == 3 && capped.stop_rule == VgtkCore.IterationCap
         @test capped.retcode == VgtkCore.ReturnCode.MaxIters && !VgtkCore.successful_retcode(capped)
     end
-    @test RC.PipelineOptions().lm.ftol == 5.0e-4 && RC.PipelineOptions().lm.xtol_rel == 1.0e-8    # configs/default.toml's (the owner's, 2026-11-15)
-    @test RC.PipelineOptions().lm.max_iter == 50                                                     # the safety cap (owner ruling 2026-11-11)
+    @test RC._calibration_stops().ftol == 5.0e-4 && RC._calibration_stops().xtol_rel == 1.0e-8     # configs/default.toml's (the owner's, 2026-11-15)
+    @test RC._calibration_stops().max_iter == 50                                                     # the safety cap (owner ruling 2026-11-11)
     src = join(read.(joinpath.(pkgdir(RadiometricCamera), "src", "calibration", "lm", ("per_view.jl", "per_tile.jl")), String))
     @test !occursin("LM_RELDCOST", src) && !occursin("xtol = 1e-12", src)                    # no hard-coded tolerance
 end
@@ -85,7 +85,7 @@ end
         f = run_board(dir, Dict("max_iter" => 6, "ftol" => 0.0, "xtol_rel" => 0.5), fixture_board(), cam; checkpoint = "off").fit
         @test f.stats.nsteps < 6 && f.stop_rule == VgtkCore.IncrementSize
     end
-    @test RC.PipelineOptions().lm.xtol_rel == 1.0e-8 && !hasfield(RC.LMOptions, :xtol)
+    @test RC._calibration_stops().xtol_rel == 1.0e-8 && !hasfield(RC.OptimizerTable, :xtol)
     e = try RC.pipeline_options(Dict("lm" => Dict("xtol" => 1.0e-8))); nothing catch err; err end
     @test e isa ArgumentError && occursin("xtol_rel", sprint(showerror, e))
 end

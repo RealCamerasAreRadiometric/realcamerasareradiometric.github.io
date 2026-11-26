@@ -85,7 +85,7 @@ end
 end
 
 @testitem "photosites: one residual per green photosite; the refinement recovers the camera; red and blue never enter" setup = [RCFixtures, PhotositeScene] begin
-    using RadiometricCamera: cost, Focus, run_lm!, View
+    using RadiometricCamera: cost, Focus, _lm_views!, View
     using StaticArrays, LinearAlgebra
     using Rotations: rotation_angle, RotMatrix
     import VisualGeometryToolkitCore as VgtkCore
@@ -116,7 +116,7 @@ end
     poses_0 = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in f.poses]
     s = CalibrationState(f.board, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
     c0 = cost(s)[1]
-    run_lm!(s; maxiters = 100, reldcost = 1e-12, fixed = (:focus, :aperture, :vignetting, :lighting, :material))
+    _lm_views!(s; stops = RC._calibration_stops(; max_iter = 100, ftol = 1e-12), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting, :material))
     @test cost(s)[1] < 1e-3 * c0 && cost(s)[1] <= 1.01 * c_truth + 1e-12
     @test all(rad2deg(rotation_angle(RotMatrix{3}(s.poses[k].R' * f.poses[k].R))) < 1e-3 for k in 1:2)
     @test maximum(abs, pinhole_θ(RC.geometric(s))[3:4] .- pinhole_θ(f.lens_t)[3:4]) < 1e-3 * f.W
@@ -137,7 +137,7 @@ end
         s_gpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
         @test s_gpu.px == s_cpu.px                                                         # the same green photosites
-        prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)
+        prob_c, _ = build_problem(s_cpu; damping = VgtkCore.LevenbergDamping()); prob_g, _ = build_problem(s_gpu; damping = VgtkCore.LevenbergDamping())
         rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]
         r_c = RC.NLLSsolver.computeresidual(rc, RC.NLLSsolver.getvars(rc, prob_c.variables)...)
         r_g = RC.NLLSsolver.computeresidual(rg, RC.NLLSsolver.getvars(rg, prob_g.variables)...)

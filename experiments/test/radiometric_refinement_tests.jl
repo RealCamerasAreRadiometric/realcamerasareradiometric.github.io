@@ -35,7 +35,7 @@
     @testset "the case si30_bc5_warped: the 03.11 run's values" begin
         t = rc["cases"]["si30_bc5_warped"]
         @test t["kind"] == "lens"
-        o = RadiometricCamera.pipeline_options(t["pipeline"])
+        alg, stops = RadiometricCamera.read_calibration(t["pipeline"]); o = alg.options
         @test o.frontend.type === RadiometricCamera.SchoepsFrontend && o.frontend.page_mm == (1000.0, 1000.0)
         @test o.frontend.texture_features_size == (4000, 4000)
         @test o.camera.sensor_mm == 35.6 && o.camera.f_mm == 14.6776 && o.camera.fnumber == 22.0 && !("aperture" in o.fixed)
@@ -43,7 +43,7 @@
         @test o.rendering.N == 16 && o.rendering.n_p == 2 && o.rendering.hammersley
         @test (o.material.alpha_ink, o.material.alpha_noink, o.material.eta_ink, o.material.eta_noink, o.material.mu) == (0.6, 0.6, 2.0, 1.3, 0.244)
         @test o.vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && o.vignetting.node_count == 19 && o.vignetting.chart === :projective
-        @test o.warping.degree == 1 && o.edge.print_sigma_mm == 0.0277 && o.lm.max_iter == 25 && isempty(o.fixed)
+        @test o.warping.degree == 1 && o.edge.print_sigma_mm == 0.0277 && stops.max_iter == 25 && isempty(o.fixed)
         @test o.io.checkpoint_each && o.io.channel == "G" && o.compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)
         p = resolve_pipeline(rc, t; produce = false)                     # the paths alone: nothing produced (the run inputs are produced only by a run)

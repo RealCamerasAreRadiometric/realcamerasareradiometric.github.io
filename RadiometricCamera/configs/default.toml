@@ -4,6 +4,8 @@
 # [--set table.key=value ...]) states only what differs; an unknown table or key is refused.
 # A switch is the string "on" | "off" (RC 0.11.4, owner 2026-11-15): TOML true/false is refused, naming the new spelling.
 
+config_version = 2   # the configuration's version (RadiometricCamera's RC_CONFIG_VERSIONS): 1 (RC ≤ 0.3) named the optimizer's table [lm],
+                     #   read at 2 as [optimizer]; a config without the key is version 1
 fixed = []           # the blocks held at their start: poses, camera (the geometric camera's parameters), focus, aperture, material,
                      #   vignetting, lighting, inplane; none by default (RC 0.11.0: lm.fixed moved here, "grid" renamed "camera")
 
@@ -163,7 +165,10 @@ sdf = ""                            # the design's distance map → the printed-
 ink_spread_mm = 0.0                 # ink spread δ [mm], held
 print_sigma_mm = 0.028              # print blur σ_print [mm], the edge's width, held
 
-[lm]
+[optimizer]
+# The refinement's optimizer (RadiometricCamera's RadiometricCalibration: its `optimizer` and its solve's `stops`, Core's LmStops; read
+# by `read_calibration`). Version 1 named this table [lm].
+type = "levenberg_marquardt"   # VisualGeometryToolkitCore's LevenbergMarquardt, its damping Levenberg's λ·I (the algorithm's default)
 max_iter = 50        # LM iterations at most: the safety cap (owner ruling 2026-11-11); a tolerance stop ends a converged run first
 max_time = 10800.0   # wall-clock budget of the LM [s]
 ftol = 5.0e-4        # Core's LmStops `ftol` (NLLSsolver reldcost): stop once an accepted step lowers the cost by less than ftol · F.
@@ -180,7 +185,7 @@ log = ""             # EXPERIMENT (nlls5): append a per-iteration line of the LM
 [sweep]
 lm_chunk = 0         # LM iterations between closed-form (lighting, vignetting, μ) sweeps; 0 = no sweeps
 iterations = 5       # block-solve iterations of one sweep
-joint = "off"        # solve the closed-form blocks jointly (radiometry_lmsolve!)
+joint = "off"        # solve the closed-form blocks jointly (their joint Levenberg–Marquardt)
 
 [resume]
 state = ""             # continue from this state file (state.json)

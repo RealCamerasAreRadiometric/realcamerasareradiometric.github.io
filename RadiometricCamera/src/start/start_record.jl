@@ -27,7 +27,8 @@ time caps and its stop tolerances, the per-iteration checkpoints, the closed-for
 A start is computed from [`start_options`](@ref), which holds them at their defaults, so a change of one never changes (or
 recomputes) a start. `resume.state` is not among them: the front end reads its page frame.
 """
-const REFINE_ONLY_KEYS = ("lm.max_iter", "lm.max_time", "lm.ftol", "lm.xtol_rel", "io.checkpoint_each", "sweep.iterations", "sweep.lm_chunk",
+const REFINE_ONLY_KEYS = ("optimizer.max_iter", "optimizer.max_time", "optimizer.ftol", "optimizer.xtol_rel", "optimizer.type", "io.checkpoint_each",
+                          "sweep.iterations", "sweep.lm_chunk",
                           "resume.iteration_offset", "resume.sweep")
 
 """
@@ -35,12 +36,14 @@ const REFINE_ONLY_KEYS = ("lm.max_iter", "lm.max_time", "lm.ftol", "lm.xtol_rel"
 
 A `[pipeline]` table (or `config_dict`) split in two: `start`, the table without `keys` (the tables they leave empty dropped), and
 `refine`, those of `keys` it states. THE split of a run's options into its start's and its refinement's: `start_options` and the
-paper project's drivers (the start's and the refinement's keys) read it.
+paper project's drivers (the start's and the refinement's keys) read it. `keys` are current keys, looked up as the table's version
+names them ([`config_key`](@ref): a version-1 table, the configs of record, names the optimizer's table `[lm]`): the table is split as
+it is written, so a driver's start and refinement keys of a version-1 table are the ones it always had.
 """
 function split_refine_only(table::AbstractDict; keys = REFINE_ONLY_KEYS)
     start = deepcopy(Dict{String, Any}(table)); refine = Dict{String, Any}()
     for k in keys
-        t, key = split(k, '.'; limit = 2)
+        t, key = split(config_key(table, k), '.'; limit = 2)           # the key as the table's version names it
         haskey(start, t) && start[t] isa AbstractDict && haskey(start[t], key) || continue
         get!(refine, t, Dict{String, Any}())[key] = pop!(start[t], key)
         isempty(start[t]) && delete!(start, t)
@@ -52,7 +55,7 @@ end
     start_options(opts) -> PipelineOptions
 
 The options a start is computed from and keyed by: `opts` with [`REFINE_ONLY_KEYS`](@ref) and the output keys
-(`PIPELINE_OUTPUT_KEYS`: `io.out`, `lm.log`) at their defaults (`split_refine_only`).
+(`PIPELINE_OUTPUT_KEYS`: `io.out`, `optimizer.log`) at their defaults (`split_refine_only`).
 """
 start_options(opts::PipelineOptions) = pipeline_options(start_pipeline_table(config_dict(opts)))
 
@@ -60,7 +63,7 @@ start_options(opts::PipelineOptions) = pipeline_options(start_pipeline_table(con
     start_pipeline_table(table) -> Dict
 
 The `[pipeline]` table `table` as its start reads it: without the refinement-only keys (`REFINE_ONLY_KEYS`) and the outputs
-(`PIPELINE_OUTPUT_KEYS`: `io.out`, `lm.log`) — THE definition of what a start reads, `start_options`' and a driver's start key's.
+(`PIPELINE_OUTPUT_KEYS`: `io.out`, `optimizer.log`) — THE definition of what a start reads, `start_options`' and a driver's start key's.
 """
 start_pipeline_table(table::AbstractDict) = first(split_refine_only(table; keys = (REFINE_ONLY_KEYS..., PIPELINE_OUTPUT_KEYS...)))
 
@@ -156,6 +159,7 @@ function check_start_options(start, opts::PipelineOptions)
     have = start.options
     have == want && return nothing
     a, b = config_dict(have), config_dict(want)
+    delete!(a, VgtkCore.CONFIG_VERSION_KEY); delete!(b, VgtkCore.CONFIG_VERSION_KEY)   # both the current one: tables and keys compared
     diff = sort!(["$t.$k" for t in union(keys(a), keys(b)) for k in union(keys(get(a, t, Dict())), keys(get(b, t, Dict())))
                   if get(get(a, t, Dict()), k, nothing) != get(get(b, t, Dict()), k, nothing)])
     throw(ArgumentError("the start record $(start.dir) was computed from other start options than this run's: $(join(diff, ", ")) " *

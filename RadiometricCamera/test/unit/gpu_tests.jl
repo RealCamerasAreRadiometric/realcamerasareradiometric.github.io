@@ -77,7 +77,7 @@ end
 
 @testitem "GPU backend" tags = [:gpu] setup = [RCFixtures, RCGPU, GPUDomainScene] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, Material, PerViewResidual, TexturedTarget,
-                             render_all, render_view, RenderSettings, run_lm!, update_vignetting!, sphere_radius, View, with_nonlinear,
+                             render_all, render_view, RenderSettings, _lm_views!, update_vignetting!, sphere_radius, View, with_nonlinear,
                              chief_ray, 𝐩_of_pixel, 𝔟
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
@@ -117,7 +117,7 @@ end
         @test size(img_dev) == size(targets[1]) && maximum(abs, img_dev .- targets[1]) / maximum(targets[1]) < 2e-3
         @test render_view(1, camera_t, poses[1], mat_t, light_t, board, st, masks[1]; backend = cpu) == targets[1]
         # residual and Jacobian parity
-        prob_c, _ = build_problem(s_cpu); prob_g, _ = build_problem(s_gpu)
+        prob_c, _ = build_problem(s_cpu; damping = VgtkCore.LevenbergDamping()); prob_g, _ = build_problem(s_gpu; damping = VgtkCore.LevenbergDamping())
         rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]
         vc = RC.NLLSsolver.getvars(rc, prob_c.variables); vgg = RC.NLLSsolver.getvars(rg, prob_g.variables)
         r_c = RC.NLLSsolver.computeresidual(rc, vc...); r_g = RC.NLLSsolver.computeresidual(rg, vgg...)
@@ -152,7 +152,7 @@ end
         s2 = CalibrationState(board, st, camera_2, poses_2, with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), light_t, targets;
                               masks, backend = CUDABackend())
         c0 = cost(s2)[1]
-        result = run_lm!(s2; maxiters = 20)
+        result = _lm_views!(s2; stops = RC._calibration_stops(; max_iter = 20), damping = VgtkCore.LevenbergDamping())
         @test result.cost / 2 < 1e-2 * c0                     # Float32 J (80 dual slots, all blocks free) stalls above the Float64 floor
         # the same parity for the 18-coordinate lens block of the 14-coefficient lens (3 dual chunks of 15 on the device path)
         cv_o = [-0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005]            # cv2's coefficient order
@@ -162,7 +162,7 @@ end
         targets_o = [render_view(k, camera_o, poses[k], mat_t, light_t, board, st, masks_o[k]; backend = cpu) for k in 1:2]
         so_cpu = CalibrationState(board, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o, backend = cpu)
         so_gpu = CalibrationState(board, st, camera_o, poses, mat_t, light_t, targets_o; masks = masks_o, backend = CUDABackend())
-        po_c, _ = build_problem(so_cpu); po_g, _ = build_problem(so_gpu)
+        po_c, _ = build_problem(so_cpu; damping = VgtkCore.LevenbergDamping()); po_g, _ = build_problem(so_gpu; damping = VgtkCore.LevenbergDamping())
         ro_c = get(po_c.problem.costs, PerViewResidual{9})[1]; ro_g = get(po_g.problem.costs, PerViewResidual{9})[1]
         vo_c = RC.NLLSsolver.getvars(ro_c, po_c.variables); vo_g = RC.NLLSsolver.getvars(ro_g, po_g.variables)
         @test vo_g[2] isa VgtkCore.SubsetManifold && Int(RC.NLLSsolver.nvars(vo_g[2])) == 18
@@ -182,7 +182,7 @@ end
         so2 = CalibrationState(board, st, RadiometricCameraModel(lens_o2, focus_t, 0.0386, vig_t), poses, mat_t, light_t, targets_o;
                                masks = masks_o, backend = CUDABackend())
         co0 = cost(so2)[1]
-        ro = run_lm!(so2; maxiters = 4, fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
+        ro = _lm_views!(so2; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping(), fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
         @test ro.cost / 2 < 0.05 * co0 && has_lens(RC.geometric(so2), typeof(VgtkIO.opencv_lens(zeros(14))))
         # radial vignetting profile on the device (2026-10-21): render parity, and the closed-form V solve from the DEVICE parts
@@ -200,7 +200,7 @@ end
         pts_r = [𝐩_of_pixel(u, v) for (u, v) in sr_fit.px[1]]
         @test maximum(abs(sr_fit.camera.vignetting(𝐩) - vig_r(𝐩)) for 𝐩 in pts_r) < 5e-3
         # the LM problem with the radial block on the device: residual parity with the CPU and finite columns
-        probr_c, _ = build_problem(sr_cpu); probr_g, _ = build_problem(sr_gpu)
+        probr_c, _ = build_problem(sr_cpu; damping = VgtkCore.LevenbergDamping()); probr_g, _ = build_problem(sr_gpu; damping = VgtkCore.LevenbergDamping())
         rr_c = get(probr_c.problem.costs, PerViewResidual{9})[1]; rr_g = get(probr_g.problem.costs, PerViewResidual{9})[1]
         vr_c = RC.NLLSsolver.getvars(rr_c, probr_c.variables); vr_g = RC.NLLSsolver.getvars(rr_g, probr_g.variables)
         @test maximum(abs, RC.NLLSsolver.computeresidual(rr_c, vr_c...) .- RC.NLLSsolver.computeresidual(rr_g, vr_g...)) < 2e-3

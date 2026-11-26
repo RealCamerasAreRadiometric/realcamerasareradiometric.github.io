@@ -285,7 +285,7 @@ _patch_nodes(lens0, rows, cols) = [SVector{3, Float64}(_direction_node(lens0, gx
 _aperture_var(::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, s::CalibrationState) = ApertureVar(aperture_radius(s))
 
 """
-    build_problem_grid(s; patch = GRID_PATCH, fixed = (), height_degree = 0,
+    build_problem_grid(s; damping, patch = GRID_PATCH, fixed = (), height_degree = 0,
                        smoothness = nothing, inplane = false) -> (problem::LmProblem, idx)
 
 The per-tile LM problem over the grid-lens state, VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`):
@@ -313,7 +313,7 @@ The parameters are the nodes the lens holds (Core's `present_nodes`; `with_prese
 an absent node is an `ArgumentError` (no residual reads an absent node), and a patch block with no present node is no variable.
 * `smoothness` (a `GridSmoothness`, `grid_smoothness`; `nothing` = none): its rows, one cost block per patch block or pair of them.
 """
-function build_problem_grid(s::CalibrationState{N}; patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
+function build_problem_grid(s::CalibrationState{N}; damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
                             height_degree::Integer = 0,
                             smoothness = nothing, rotation_gauge::Bool = !(:poses in Symbol.(fixed)),
                             inplane::Bool = false) where {N}
@@ -390,7 +390,7 @@ function build_problem_grid(s::CalibrationState{N}; patch::Tuple{Int, Int} = GRI
     free_vars = trues(length(variables))
     free_vars[dependent_patches] .= false                # a patch block without a present node is no variable of the solve
     _free_mask!(free_vars, idx, Tuple(k for k in blocks_held if !(k in SURFACE_HOLDS)); lens_key = :grid, lens_idx = vec(ip))
-    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free_vars), damping = LM_DAMPING), (; idx..., free = free_vars)
+    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free_vars), damping), (; idx..., free = free_vars)
 end
 
 """No residual reads an absent node: every sensor sample of pixel `(u, v)` (view `k`) has its whole 4 × 4 window of present nodes
@@ -436,26 +436,24 @@ function extract_variables_grid(s::CalibrationState, vars::Vector, idx)
 end
 
 """
-    run_lm_grid!(s; patch = GRID_PATCH, maxiters = 10, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_tiles!(s; stops, damping, patch = GRID_PATCH, kwargs...) -> (; code, rule, iterations, cost)
 
-Joint LM over the per-tile grid problem (all blocks; `fixed` as in `run_lm!` with `:grid` for the patch blocks in place of
+Joint LM over the per-tile grid problem (all blocks; `fixed` as in `_lm_views!` with `:grid` for the patch blocks in place of
 `:distortion`). `height_degree` and `smoothness` as in `build_problem_grid`, the problem and its held blocks
-its; `iter_callback(it, cost, camera, poses, mat, surface, light)` sees the current best variables after every iteration, and `lm_log` as `run_lm!`'s. The solve
-and its stopping tests and termination record as `run_lm!`'s (VisualGeometryToolkitCore's `lmsolve_chart!` under `_lm_stops`).
+its; `iter_callback(it, cost, camera, poses, mat, surface, light)` sees the current best variables after every iteration, and `lm_log` as `_lm_views!`'s. The solve
+and its stopping tests and termination record as `_lm_views!`'s (VisualGeometryToolkitCore's `lmsolve_chart!` under `_lm_stops`).
 """
-function run_lm_grid!(s::CalibrationState; patch::Tuple{Int, Int} = GRID_PATCH, maxiters::Integer = 10,
-                      maxtime::Real = 7200.0, fixed = (),
-                      reldcost = LMOptions().ftol, xtol_rel = LMOptions().xtol_rel, xtol = CORE_LM_XTOL, verbose::Bool = false,
-                      trace = nothing, trace_meta = (;), iter_callback = nothing,
-                      height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
-    problem, idx = build_problem_grid(s; patch, fixed, height_degree, smoothness, inplane)
-    callback = _final_iteration_callback(_lm_callback(s, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), s, maxiters)
+function _lm_tiles!(s::CalibrationState; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH,
+                    fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), iter_callback = nothing,
+                    height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
+    problem, idx = build_problem_grid(s; damping, patch, fixed, height_degree, smoothness, inplane)
+    callback = _final_iteration_callback(_lm_callback(s, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), s, stops.max_iter)
     _reset_scrubbed!(s.run)
     result = try                                                 # (Core's stall postcondition runs inside, the tiles still batched)
-        _with_registered(() -> VgtkCore.lmsolve_chart!(problem, _lm_stops(s, maxiters, maxtime, reldcost, xtol_rel, xtol); callback), s, problem, idx)
+        _with_registered(() -> VgtkCore.lmsolve_chart!(problem, _lm_stops(s, stops); callback), s, problem, idx)
     finally
         s.run.final_iteration = false
-        _report_scrubbed(s.run, "run_lm_grid!")
+        _report_scrubbed(s.run, "_lm_tiles!")
     end
     read_back!(s, problem, idx, extract_variables_grid)
     return result
@@ -520,7 +518,7 @@ function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::VgtkCore.LeftR
 end
 
 """The per-tile `computeresjac` as host arrays: ONE implementation on every backend (the pixel functors of device/jacobian_kernels.jl on the state's
-backend, Float64 on the CPU; the view's batch when the grid problem is registered, `run_lm_grid!`) — the residual of the flux kernel
+backend, Float64 on the CPU; the view's batch when the grid problem is registered, `_lm_tiles!`) — the residual of the flux kernel
 (bitwise `computeresidual`'s) and the tile's Jacobian in the problem's coordinates (`_tile_jacobian_at`, `_host_jacobian`), for the
 tests, the stall postcondition and the grid smoothness's weight selection; the LM's iterations take the Gauss–Newton blocks on the device
 (`computecostgradhess`)."""
@@ -540,7 +538,7 @@ end
 # tile runs the same kernels over its own pixels (`_tile_batch`); partial varflags (fixed blocks) are batched too (2026-10-24).
 # ---------------------------------------------------------------------------
 
-"""Enable batched per-view evaluation for a grid problem (call before optimizing; see run_lm_grid!). `next[k]`: a tile of the view
+"""Enable batched per-view evaluation for a grid problem (call before optimizing; see _lm_tiles!). `next[k]`: a tile of the view
 whose tiles follow view `k`'s in the cost order (`nothing` after the last), the one the next view's batch is prefetched for;
 `pending[k]`: view `k`'s batch in flight, `(; key, need_jac, fut)` (`_batch_future!`); `lock`: held while they change."""
 _register_grid_problem!(s::CalibrationState, p::VgtkCore.LmProblem, idx) = _register_grid_problem!(s, p.problem, idx)
@@ -812,13 +810,13 @@ end
 
 # The final LM iteration's speculative linearization. NLLSsolver's LM computes the Jacobian at each iteration's first trial point
 # (it becomes the next linearization when the step is accepted), so a run of n iterations evaluates n + 1 Jacobians and the last
-# one is never used. `run_lm_grid!` marks its state (`s.run.final_iteration`, the state's run record) once the iteration cap's last
+# one is never used. `_lm_tiles!` marks its state (`s.run.final_iteration`, the state's run record) once the iteration cap's last
 # iteration begins (`_final_iteration_callback`);
 # its tiles then return their cost alone (zero blocks: the loop stops after that iteration whatever its outcome, and nothing reads
 # that linear system). The mark is set only when the iterator already holds the next linearization (`trialready`: the previous
 # trial was accepted), so the linearization the last iteration starts from is never one of them. A stop by another criterion
 # (cost or step tolerance, time) cannot be foreseen and keeps the extra Jacobian.
-"""`cb`, and after iteration `maxiters - 1` the state marked (`s.run.final_iteration`, unmarked by `run_lm_grid!` on exit)."""
+"""`cb`, and after iteration `maxiters - 1` the state marked (`s.run.final_iteration`, unmarked by `_lm_tiles!` on exit)."""
 function _final_iteration_callback(cb, s, maxiters::Integer)
     return function (cost, problem, data, iterdata)
         out = cb(cost, problem, data, iterdata)

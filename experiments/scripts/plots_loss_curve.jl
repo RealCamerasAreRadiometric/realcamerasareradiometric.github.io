@@ -5,7 +5,7 @@
 """Scale-free residual series of a trace: rel-RMS = √(2 cost / Σϕ²) per LM iteration."""
 rel_rms_series(trace) = [sqrt(2 * t.cost / t.ϕ²) for t in trace]
 
-"""rel-RMS over the LM iterations of `run_lm_grid!` (log scale)."""
+"""rel-RMS over the LM iterations of `_lm_tiles!` (log scale)."""
 function loss_curve_figure(trace)
     fig = Figure(size = (800, 340))
     ax = Axis(fig[1, 1]; xlabel = "LM iteration", ylabel = "rel-RMS residual", yscale = log10, title = "radiometric grid refinement")

@@ -22,7 +22,7 @@
     @test RC.cost(sw)[1] ≈ sum(sum(abs2, wts[k] .* RC.photometric_residuals(su)[k]) for k in 1:2) / 2 rtol = 1e-14
     @test RC.data_norm2(sw) ≈ sum(sum(abs2, wts[k] .* su.ϕ[k]) for k in 1:2) rtol = 1e-14
     # the per-view route: the host residual and the row kernel's Jacobian, each row times its weight
-    pu, _ = RC.build_problem(su); pw, _ = RC.build_problem(sw)
+    pu, _ = RC.build_problem(su; damping = RC.VgtkCore.LevenbergDamping()); pw, _ = RC.build_problem(sw; damping = RC.VgtkCore.LevenbergDamping())
     cu = get(pu.problem.costs, RC.PerViewResidual{9}); cw = get(pw.problem.costs, RC.PerViewResidual{9})
     for k in 1:2
         vu = NL.getvars(cu[k], pu.variables); vw = NL.getvars(cw[k], pw.variables)
@@ -50,7 +50,7 @@
     sq = state(; quanta = q); swq = state(; weights = wts, quanta = q)
     @test RC.lm_abstol(sq)^2 ≈ sum(length, q) / 15871^2 / 12 rtol = 1e-13
     @test RC.lm_abstol(swq)^2 ≈ sum(sum(abs2, wts[k] .* q[k]) for k in 1:2) / 12 rtol = 1e-14
-    @test RC._lm_stops(swq, 10, 60.0, 1e-10, 1e-12).residual_resolution == RC.lm_abstol(swq)
+    @test RC._lm_stops(swq, RC._calibration_stops(; max_iter = 10, max_time = 60.0, ftol = 1e-10, xtol_rel = 1e-12)).residual_resolution == RC.lm_abstol(swq)
     @test_throws DimensionMismatch state(; quanta = [q[1][1:3], q[2]])
     @test_throws DimensionMismatch state(; weights = [wts[1]])
     # the views' device weights are formed once under the cache lock (the views' Jacobians run concurrently: `_windowed`)
@@ -66,7 +66,7 @@ end
     su = RC.CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
     sw = RC.CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, weights = wts)
-    pu, _ = build_problem_grid(su; patch = (5, 5)); pw, _ = build_problem_grid(sw; patch = (5, 5))
+    pu, _ = build_problem_grid(su; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); pw, _ = build_problem_grid(sw; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     for (tu, tw) in zip(RC.tile_costs(pu), RC.tile_costs(pw))
         w3 = [wts[tw.k][3 * (i - 1) + c] for i in tw.pix for c in 1:3]               # a colour state: three rows per pixel, the view's
         vu = NL.getvars(tu, pu.variables); vw = NL.getvars(tw, pw.variables)
@@ -133,7 +133,7 @@ end
         S = NEScene.SCENE
         state(be) = RC.CalibrationState(S.sc, S.st, RC.with_vignetting(S.camera, su.camera.vignetting), copy(S.poses), su.mat, su.light, S.targets; S.masks, weights = wts, backend = be)
         sc = state(RC.KernelAbstractions.CPU()); sg = state(CUDA.CUDABackend())
-        pc, _ = RC.build_problem(sc); pg, _ = RC.build_problem(sg)
+        pc, _ = RC.build_problem(sc; damping = RC.VgtkCore.LevenbergDamping()); pg, _ = RC.build_problem(sg; damping = RC.VgtkCore.LevenbergDamping())
         for k in 1:2
             rc = get(pc.problem.costs, RC.PerViewResidual{9})[k]; rg = get(pg.problem.costs, RC.PerViewResidual{9})[k]
             r1, J1 = NL.computeresjac(RC.static(1023), rc, NL.getvars(rc, pc.variables)...)

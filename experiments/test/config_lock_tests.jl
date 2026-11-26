@@ -48,8 +48,8 @@ end
         haskey(doc, "pipeline") && push!(runs, ("pipeline", doc["pipeline"], ""))
         for (header, p, kind) in runs
             ncases += 1
-            o = RC.pipeline_options(p)                                              # resolves (a refusal is a failure of the lock)
-            resolved = Dict(leaves(RC.config_dict(o)))
+            alg, stops = RC.read_calibration(p); o = alg.options                    # resolves (a refusal is a failure of the lock)
+            resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(alg, stops)))   # keyed as the file's version names them
             for (k, v) in lock
                 haskey(resolved, k) || continue                                     # a key the run cannot use (INAPPLICABLE_KEYS): not written
                 # the in-plane start acts only with inplane = "aspect_skew": a heights-only case (inplane = "none", its commented override;
@@ -66,6 +66,26 @@ end
                 @test commented(lines, header, "grid.lattice") === true             # stated, with its derivation
             end
             @test !haskey(get(p, "grid", Dict()), "lattice_spacing") && !haskey(get(p, "grid", Dict()), "size")
+            # the configuration converter (RadiometricCamera's RC_CONFIG_VERSIONS, 0.4.0): a config of record stays version 1 on disk, its
+            # [lm] read whole as the current [optimizer]; its start and refinement settings split as written, the keys of version 1 —
+            # the split of record (before 0.4.0), so its products keep their keys
+            @test !haskey(p, RC.VgtkCore.CONFIG_VERSION_KEY)
+            let m = RC.VgtkCore.migrate_config(p, RC.RC_CONFIG_VERSIONS), old = "sensor_characteris" * "ation"   # (split: the banned spelling)
+                @test get(m, "optimizer", nothing) == get(p, "lm", nothing)
+                @test get(get(m, "camera", Dict()), "sensor_characterization", nothing) ==
+                      get(get(p, "camera", Dict()), "sensor_characterization", get(get(p, "camera", Dict()), old, nothing))
+            end
+            let refine_of_record = Dict{String, Any}()
+                for k in ("lm.max_iter", "lm.max_time", "lm.ftol", "lm.xtol_rel", "io.checkpoint_each", "sweep.iterations", "sweep.lm_chunk",
+                          "resume.iteration_offset", "resume.sweep")
+                    tb, key = split(k, '.')
+                    haskey(get(p, tb, Dict()), key) && (get!(refine_of_record, tb, Dict{String, Any}())[key] = p[tb][key])
+                end
+                start, refine = RC.split_refine_only(p)
+                @test refine == refine_of_record
+                @test start == Dict{String, Any}(k => (v isa AbstractDict && haskey(refine, k) ? Dict{String, Any}(kk => vv for (kk, vv) in v if !haskey(refine[k], kk)) : v)
+                                                 for (k, v) in p if !(haskey(refine, k) && length(refine[k]) == length(v)))
+            end
             # every other grid start (a parametric or any non-Schöps source) lays its lattice over the image region at a stated,
             # commented node count — the case's bound on its present nodes (owner 2026-11-15, 23:18)
             if get(get(p, "frontend", Dict()), "type", "") != "schoeps" && RC.start_is_grid(o)

@@ -164,13 +164,13 @@ end
         end
         # spot checks: the real-data budget of the runs of record (the 03.11 settings)
         rc = load_radiometric_refinement_config(experiment_config("radiometric_refinement"))
-        o = RadiometricCamera.pipeline_options(rc["cases"]["si30_bc5_warped"]["pipeline"])
-        @test o.io.channel == "G" && o.masks.samples_per_view == 8192 && o.lm.max_iter == 25 && o.rendering.N == 16 && o.rendering.hammersley
+        alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = alg.options
+        @test o.io.channel == "G" && o.masks.samples_per_view == 8192 && stops.max_iter == 25 && o.rendering.N == 16 && o.rendering.hammersley
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)
         isfisheye(n) = occursin(r"^(ag10fe_|si27fe_|si30fe_)|fisheye", n)   # si30fe: the fisheye 30 cm set (2026-11-16)
         for x in ("radiometric_refinement", "radiometric_refinement_vignetting"), (n, t) in load_radiometric_refinement_config(experiment_config(x))["cases"]
-            @test RadiometricCamera.pipeline_options(t["pipeline"]).lm.max_iter == (isfisheye(n) ? 50 : 25)
+            @test last(RadiometricCamera.read_calibration(t["pipeline"])).max_iter == (isfisheye(n) ? 50 : 25)
         end
         # the non-central spline is out of the paper (owner, 2026-11-11): no case, no chrome evaluation, no table row and no input of it
         # among the configs of record (the package's non-central model and its golden case are removed too, 2026-11-14)
@@ -310,10 +310,12 @@ end
         ki(cfg) = start_product(cfg, c).key; kc(cfg) = refinement_product(cfg, c).key
         c2 = deepcopy(db); c2["cases"][c]["pipeline"]["lm"]["max_iter"] = 3      # a refinement setting: the start is the same product
         @test ki(c2) == ki(db) && kc(c2) != kc(db)
+        resolved = RadiometricCamera.config_dict(RadiometricCamera.read_calibration(db["cases"][c]["pipeline"])...)
         for k in RadiometricCamera.REFINE_ONLY_KEYS                              # every refine-only key, RadiometricCamera's declaration
-            tb, key = split(k, '.')
+            ctb, ckey = split(k, '.'); v = resolved[ctb][ckey]                   # its resolved value (the current key)
+            v isa AbstractString && continue                                     # optimizer.type: one optimizer, no other value to set
+            tb, key = split(RadiometricCamera.config_key(db["cases"][c]["pipeline"], k), '.')   # the key as the case's version names it
             c2 = deepcopy(db); t = get!(c2["cases"][c]["pipeline"], tb, Dict{String, Any}())
-            v = getfield(getfield(RadiometricCamera.pipeline_options(db["cases"][c]["pipeline"]), Symbol(tb)), Symbol(key))
             t[key] = v isa Bool ? !v : v + 7                                     # another value than the case's
             @test ki(c2) == ki(db) && kc(c2) != kc(db)
         end

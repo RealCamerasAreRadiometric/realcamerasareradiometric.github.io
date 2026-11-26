@@ -2,12 +2,12 @@
 # The options of the calibration pipeline: ONE value, `PipelineOptions`, read from TOML.
 #
 # A run is configured by a TOML file of tables (`[io]`, `[frontend]`, `[camera]`, `[grid]`, `[focus]`, `[masks]`, `[rendering]`,
-# `[lighting]`, `[material]`, `[vignetting]`, `[warping]`, `[edge]`, `[lm]`, `[sweep]`, `[resume]`, `[selfcheck]`, `[compute]`), one struct per
+# `[lighting]`, `[material]`, `[vignetting]`, `[warping]`, `[edge]`, `[optimizer]` (version 1: `[lm]`), `[sweep]`, `[resume]`, `[selfcheck]`, `[compute]`), one struct per
 # table. The defaults are stated ONCE, in configs/default.toml (every field's keyword default reads it, tables.jl); a key absent from a config takes it. An unknown table or
 # key is refused (`ArgumentError` naming it and the allowed keys), never ignored. An enumerated choice is a tag of a `TagRegistry`
 # (VisualGeometryToolkitCore's one tag → type map): `FRONTEND_TAGS`, `VIGNETTING_TAGS`, `BACKEND_TAGS`.
 #
-#   pipeline_options(path_or_dict; set = ["lm.max_iter=2", …]) -> PipelineOptions     the reader (`set`: dotted-key overrides)
+#   pipeline_options(path_or_dict; set = ["optimizer.max_iter=2", …]) -> PipelineOptions     the reader (`set`: dotted-key overrides)
 #   config_dict(opts) -> Dict{String, Any}                                              the writer (the run record; reads back equal)
 #   PIPELINE_PATH_KEYS, PIPELINE_OUTPUT_KEYS                                            the keys that name an input / an output path
 #
@@ -35,8 +35,8 @@ string, except `camera.lens_coverage = "sensor"` (`SENSOR_LENS_COVERAGE`: the wh
 """
 names_input_path(key::AbstractString, v) =
     key in PIPELINE_PATH_KEYS && v isa AbstractString && !isempty(v) && !(key == "camera.lens_coverage" && v == SENSOR_LENS_COVERAGE)
-"""The keys whose values name an OUTPUT: the run's directory `io.out`, the LM's log `lm.log`."""
-const PIPELINE_OUTPUT_KEYS = ("io.out", "lm.log")
+"""The keys whose values name an OUTPUT: the run's directory `io.out`, the optimizer's log `optimizer.log` (version 1: `lm.log`)."""
+const PIPELINE_OUTPUT_KEYS = ("io.out", "optimizer.log")
 # the string options that are no path (a tag-like choice)
 const _NOT_PATH_KEYS = ("io.channel", "warping.inplane", "camera.sensor_model")
 
@@ -130,6 +130,7 @@ _vignetting_model(::Type{M}, key) where {M} =
     throw(ArgumentError("`$key` = $(repr(tag_of(VIGNETTING_TAGS, M))): a refinement fits $(repr(tag_of(VIGNETTING_TAGS, RadialVignetting))) alone, the radial profile " *
                         "about the principal point (the tensor-product surface is no option of the pipeline since 2026-11-14)"))
 _option_from_toml(::Type{ComputeOptions}, ::Val{:backend}, v, key) = BACKEND_TAGS[convert_field(String, v, key)]
+_option_from_toml(::Type{OptimizerTable}, ::Val{:type}, v, key) = OPTIMIZER_TAGS[convert_field(String, v, key)]
 # a penalty weight: a number β ≥ 0, or the string "gcv" (selected by generalized cross-validation)
 function _penalty_weight_from_toml(v, key)
     v isa AbstractString && (v == "gcv" ? (return :gcv) : throw(ArgumentError("`$key` = $(repr(v)) is not a weight β ≥ 0 or \"gcv\"")))
@@ -205,6 +206,7 @@ _field_toml(x) = VgtkCore.toml_value(x)
 toml_field(c::FrontendOptions, ::Val{:type}) = tag_of(FRONTEND_TAGS, c.type)
 toml_field(c::VignettingOptions, ::Val{:model}) = tag_of(VIGNETTING_TAGS, c.model)
 toml_field(c::ComputeOptions, ::Val{:backend}) = tag_of(BACKEND_TAGS, c.backend)
+toml_field(c::OptimizerTable, ::Val{:type}) = tag_of(OPTIMIZER_TAGS, c.type)
 toml_field(c::GridOptions, ::Val{:lattice}) = switch_spelling(c.lattice, LATTICE_TAGS)
 toml_field(c::GridOptions, ::Val{:start_perturbation}) = c.start_perturbation === nothing ? nothing : toml_table(c.start_perturbation)
 toml_field(c::Union{GridOptions, VignettingOptions, FocusOptions}, ::Val{:smoothness}) = smoothness_table(c.smoothness)
@@ -360,22 +362,23 @@ end
 The options of a refinement from a TOML file (or its parsed table). Every table and key is optional and takes its struct default when
 absent; an unknown table or key, a value of the wrong type or length, an unknown or retired tag and an unknown `fixed` block are
 refused with an `ArgumentError` that names them. `set` holds `key.path=value` overrides applied before reading (the `--set` of
-bin/refine.jl): `pipeline_options("run.toml"; set = ["lm.max_iter=2", "io.out=/tmp/x"])`.
+bin/refine.jl): `pipeline_options("run.toml"; set = ["optimizer.max_iter=2", "io.out=/tmp/x"])` (of a version-2 config). The
+`[optimizer]` table is checked here and read by [`read_calibration`](@ref).
 """
-function pipeline_options(path::AbstractString; set = ())
+pipeline_options(path::AbstractString; set = ()) = _read_config_file(pipeline_options, path, set)
+# a reader of a parsed config, `read(dict; set)`, of the file `path`: its refusals name the file and the overrides
+function _read_config_file(read, path::AbstractString, set)
     try
-        return pipeline_options(TOML.parsefile(path); set)
+        return read(TOML.parsefile(path); set)
     catch err
         err isa ArgumentError || rethrow()
         throw(ArgumentError("$path$(isempty(set) ? "" : " (with the overrides $(collect(set)))"): $(err.msg)"))
     end
 end
 function pipeline_options(d::AbstractDict; set = ())
-    d = _with_overrides(d, set)
-    for ((table, key), migration) in RETIRED_KEYS
-        t = get(d, table, nothing)
-        t isa AbstractDict && haskey(t, key) && throw(ArgumentError("`$table.$key` is retired: $migration"))
-    end
+    d = _current_config(d, set)
+    _read_table(OptimizerTable, get(d, "optimizer", Dict{String, Any}()), "optimizer")   # the algorithm's table, checked here, read by read_calibration
+    delete!(d, "optimizer")
     unknown = setdiff(collect(String, keys(d)), allowed_keys(PipelineOptions))
     isempty(unknown) || throw(ArgumentError("unknown table(s) $(sort(unknown)); allowed tables: $(sort(allowed_keys(PipelineOptions)))"))
     kw = [f => (f === :fixed ? _read_fixed(get(d, "fixed", toml_default(_TOML_DEFAULTS, "", "fixed"))) :
@@ -384,17 +387,57 @@ function pipeline_options(d::AbstractDict; set = ())
     return _refuse_inapplicable(d, _check_options(PipelineOptions(; kw...)))
 end
 
+# A config at the current version: the `set` overrides applied, the retired keys refused (by their own version's names), then
+# migrated (RC_CONFIG_VERSIONS: a version-1 `[lm]` is the `[optimizer]` table) and its version key dropped.
+function _current_config(d::AbstractDict, set)
+    d = _with_overrides(d, set)
+    for ((table, key), migration) in RETIRED_KEYS
+        t = get(d, table, nothing)
+        t isa AbstractDict && haskey(t, key) && throw(ArgumentError("`$table.$key` is retired: $migration"))
+    end
+    d = VgtkCore.migrate_config(d, RC_CONFIG_VERSIONS)
+    delete!(d, VgtkCore.CONFIG_VERSION_KEY)
+    return d
+end
+
+"""
+    config_key(table, key) -> String
+
+The dotted key `key` of the current configuration ([`RC_CONFIG_VERSIONS`](@ref)) as the configuration `table`'s version names it
+(its `config_version`, 1 when absent): the converter's table renames undone from the current version back to the table's, so
+`config_key(table, "optimizer.max_iter")` is `"lm.max_iter"` in a version-1 table. THE one map of a current key into a table as it is
+written, read where a key is looked up in a stored table without reading it as options (`split_refine_only`; a driver's output keys);
+a table read as options is migrated whole (`migrate_config`).
+"""
+function config_key(table::AbstractDict, key::AbstractString)
+    # a TABLE's renames only (a top-level path): a key renamed inside its table (`camera.sensor_characterization`) was already
+    # spelled so by version-1 files written after the rename, so its current name is the one a stored table states
+    ver = get(table, VgtkCore.CONFIG_VERSION_KEY, 1)
+    cur = VgtkCore.current_config_version(RC_CONFIG_VERSIONS)
+    ver isa Integer && 1 <= ver <= cur ||
+        throw(ArgumentError("config_key: `$(VgtkCore.CONFIG_VERSION_KEY)` = $(repr(ver)) is not a version of RadiometricCamera's configuration (1–$cur)"))
+    k = String(key)
+    for v in (cur - 1):-1:ver, (old, new) in RC_CONFIG_VERSIONS.migrations[v].renames
+        occursin('.', new) && continue
+        (k == new || startswith(k, new * ".")) && (k = old * k[(ncodeunits(new) + 1):end])
+    end
+    return k
+end
+
 """
     config_dict(opts::PipelineOptions) -> Dict{String, Any}
+    config_dict(algorithm::RadiometricCalibration, stops) -> Dict{String, Any}   (calibration/calibrate.jl)
 
 The options as a TOML document, one table per field (tags as their tag strings): what a run writes as its record. An absent
 optional table (`grid.start_perturbation = nothing`) is not written, nor a key the run cannot use (`INAPPLICABLE_KEYS`).
 `pipeline_options(config_dict(opts)) == opts` for options a config can state.
 """
 config_dict(opts::PipelineOptions) =
-    Dict{String, Any}(String(f) => (f === :fixed ? copy(opts.fixed) :
-                                    filter(kv -> kv[2] !== nothing && inapplicable_reason(opts, String(f), kv[1]) === nothing, toml_table(getfield(opts, f))))
-                      for f in fieldnames(PipelineOptions))
+    Dict{String, Any}(VgtkCore.CONFIG_VERSION_KEY => VgtkCore.current_config_version(RC_CONFIG_VERSIONS),
+                      (String(f) => (f === :fixed ? copy(opts.fixed) :
+                                     filter(kv -> kv[2] !== nothing && inapplicable_reason(opts, String(f), kv[1]) === nothing, toml_table(getfield(opts, f))))
+                       for f in fieldnames(PipelineOptions))...)
+
 """The top-level `fixed` of a config: a list of block names (strings)."""
 _read_fixed(v) = v isa AbstractVector && all(x -> x isa AbstractString, v) ? String.(v) :
                  throw(ArgumentError("`fixed` is a list of block names ($(collect(FIXABLE_BLOCKS))), got $(repr(v))"))
@@ -404,14 +447,16 @@ const PIPELINE_CONFIG_FILE = "pipeline_config.toml"
 
 """
     write_pipeline_config(dir, opts; header = "") -> path
+    write_pipeline_config(dir, algorithm, stops; header = "") -> path
 
-The options `opts` of a run as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
+The options `opts` of a run (or its whole calibration, the `[optimizer]` table with them) as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
 ABSOLUTE path (resolved against the writer's working directory, the one the run resolved it against): what bin/refine.jl and
 experiments/scripts/material_grid.jl write, so a record's regeneration hint can tell its own writer's options from another run's in a shared
 directory.
 """
-function write_pipeline_config(dir::AbstractString, opts::PipelineOptions; header::AbstractString = "")
-    d = config_dict(opts)
+write_pipeline_config(dir::AbstractString, opts::PipelineOptions; header::AbstractString = "") =
+    _write_pipeline_config(dir, config_dict(opts), opts; header)
+function _write_pipeline_config(dir, d, opts::PipelineOptions; header)
     isempty(opts.io.out) || (d["io"]["out"] = abspath(opts.io.out))
     path = joinpath(dir, PIPELINE_CONFIG_FILE)
     VgtkCore.write_toml(path, d; header)

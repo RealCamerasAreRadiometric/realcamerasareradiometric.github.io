@@ -69,10 +69,10 @@ One linearization of a block (a view; in the grid route a view's batch, then its
 | rows `_jacobian_row!` | F64 | assembles the block's J (columns × rows) and r on the device: scatter, focus chain, patch fan-out, parts through the gauge basis, heights through their basis, whitening | all of the above |
 | products | F64 | `J r`, `J Jᵀ` on the backend; `ncol` and `ncol²` values to the host; the column map T (charts, ties, held nodes) applied there | J, r |
 
-- **Per-view route** (`run_lm!`, `build_problem`): one `PerViewResidual` per photograph, 7 variable blocks. The views
+- **Per-view route** (`_lm_views!`, `build_problem`): one `PerViewResidual` per photograph, 7 variable blocks. The views
   of an iteration run ahead of NLLSsolver's requests on pooled device workers (`_windowed`; width from the kernel's
   occupancy and the free memory).
-- **Per-tile route** (`run_lm_grid!`, `build_problem_grid`): the lens is a spline grid, its parameters 5 × 5 patches of
+- **Per-tile route** (`_lm_tiles!`, `build_problem_grid`): the lens is a spline grid, its parameters 5 × 5 patches of
   nodes; one `PerTileResidual` per image tile (10 blocks: pose, 4 patches, focus, r, material, V, light). A view's
   kernels run once for the whole view (`_view_batch!`, memoized by the variables' identity); each tile then runs the row
   kernel on its pixels and its own products.

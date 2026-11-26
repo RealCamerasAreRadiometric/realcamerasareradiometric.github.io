@@ -8,7 +8,8 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
 - **Breaking: American in identifiers (owner decision 11).** Core's `SensorCharacterisation` is `SensorCharacterization` and its
   `ModelReason` `NoCharacterisation` is `NoCharacterization`; RC follows, with no alias:
   - the camera option `camera.sensor_characterisation` → `camera.sensor_characterization` (`CameraOptions.sensor_characterization`);
-    the old key is refused by name with its new one (`RETIRED_KEYS`), the value unchanged;
+    a configuration of version 1 (no `config_version`) that spells the old key reads through the converter (`RC_CONFIG_VERSIONS`'
+    v1 → v2 step), the value unchanged; a version-2 file is refused it, naming the new key;
   - `photo_set(…; characterisation)` → `photo_set(…; characterization)`, and `prediction_observation`'s third argument;
     `NO_SENSOR_CHARACTERISATION` → `NO_SENSOR_CHARACTERIZATION`; the retired stub `sensor_characterisation(…)` (an earlier
     release's, refused by name) is deleted: Core's retired-name list now names the spelling;
@@ -31,10 +32,29 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   - `refine_calibration!(state; options)` → `solve!(cache)`, or `solve(EstimationProblem(CalibrationEstimate, state),
     RadiometricCalibration(options))` of a started state (`load_calibration_start`'s);
   - `calibrate` (a task verb) is that `solve` in one call, unchanged.
+- **Breaking: the optimizer is the algorithm's, the stops the solve's (the stack's `solve(problem, alg; stops)`).**
+  `RadiometricCalibration(options; optimizer = LevenbergMarquardt(; damping = LevenbergDamping()), log = "")`: the refinement's
+  optimizer (VisualGeometryToolkitCore's `LevenbergMarquardt`, its damping Levenberg's λ·I, the former `LM_DAMPING`, now the
+  algorithm's default and no constant) and the LM's per-iteration log; the stop settings are Core's `LmStops`, the solve's
+  keyword (`solve(problem, alg; stops)`, `init`'s, `calibrate`'s), configs/default.toml's by default. `calibrate(geometry,
+  photographs, algorithm; stops, device)` takes the algorithm.
+  - `LMOptions` and `PipelineOptions.lm` are removed: the TOML's `[lm]` table is **`[optimizer]`** (`type = "levenberg_marquardt"`,
+    `OPTIMIZER_TAGS`; `max_iter`, `max_time`, `ftol`, `xtol_rel`, `log`), read by **`read_calibration(path_or_dict; set) ->
+    (algorithm, stops)`**; `config_dict(algorithm, stops)` and `write_pipeline_config(dir, algorithm, stops)` write it.
+    `pipeline_options` still reads (and checks) a whole run's file. `REFINE_ONLY_KEYS` and `PIPELINE_OUTPUT_KEYS` name
+    `optimizer.*`.
+  - **Configuration versions** (VisualGeometryToolkitCore's `ConfigVersions`): `RC_CONFIG_VERSIONS`, configs/default.toml
+    `config_version = 2`. A file without `config_version` is version 1 (RC ≤ 0.3, every config of record) and is read through the
+    converter: `[lm]` is the `[optimizer]` table, its keys kept. The configs of record stay version 1 on disk; their start and
+    refinement settings are split as written (`split_refine_only` through **`config_key(table, key)`**, a current key as a
+    table's version names it), so no product key moves (tested on every experiments config of record).
+  - `run_lm!`, `run_lm_grid!` and `radiometry_lmsolve!` are internal (`_lm_views!`, `_lm_tiles!`, `_lm_radiometry!`, each
+    taking `stops` and `damping`): the calibration is reached through `solve` / `init` / `solve!`. `build_problem`,
+    `build_problem_grid` and `update_radiometry!(…; joint = true)` take the LM's `damping`.
 - **Breaking: the closed-form block updates are named `update_<block>!`** (check_naming R19: no identifier begins `solve_`):
   `solve_Θ_l!` → `update_lighting!`, `solve_Θ_v!` → `update_vignetting!`, `solve_μ!` → `update_diffuse_weight!`,
   `solve_linear_blocks!` → `update_radiometry!` (the composite block: its parts' updates per sweep, or the joint LM); the joint LM
-  `solve_radiometry_gn!` → `radiometry_lmsolve!` (a step named by its mechanism, as Core's `lmsolve_chart!`). Same arguments.
+  `solve_radiometry_gn!` → `radiometry_lmsolve!` (a step named by its mechanism, as Core's `lmsolve_chart!`; internal since: the optimizer entry above). Same arguments.
 - **Breaking:** `fit_channels(s)` → `residual_channels(s)` (R15); the public constant `PRINT_PLANE` is removed (R20: a `const`
   naming one concrete stack type) — the print blur's plane is `VisualGeometryToolkitCore.TargetPlaneFrame{:board}`, spelled.
 - **Changed: Estimation's estimators through `solve`.** The SplineLens starts (`grid_model`, `region_start`, `exact_start`) fit by
