@@ -94,9 +94,9 @@ end
     N = lay.N
     x = SVector{N, Float64}(ntuple(i -> 1e-3 * sin(i), Val(N)))
     args = (lm.parts, lm.ϕ, lm.w, lm.chs, lm.vig, lm.a, lm.μ, lm.Z, lm.lay, x)
-    VgtkCore._launch_rows!(RC._radiometry_cost_row!, lm.partials, size(lm.partials, 2), args...)
+    RC._launch_row_job!(RC._radiometry_cost_row!, lm.partials, size(lm.partials, 2), args...)
     c0 = VgtkCore.reduce_cost(lm.partials)
-    VgtkCore._launch_rows!(RC._radiometry_normal_row!, lm.partials, size(lm.partials, 2), args...)
+    RC._launch_row_job!(RC._radiometry_normal_row!, lm.partials, size(lm.partials, 2), args...)
     n0 = VgtkCore.reduce_normal_equations(lm.partials, Val(N))
     @test VgtkCore.residual_cost!(nothing, lm, x) === c0
     n1 = VgtkCore.residual_normal_equations!(nothing, nothing, lm, x)

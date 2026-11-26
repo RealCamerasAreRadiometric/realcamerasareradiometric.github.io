@@ -58,6 +58,9 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   written into the state; `metadata.cost`, `metadata.gcv`). `RadiometricCalibration` takes `radiometry` (one of the two; `[sweep]
   joint`, `iterations`) and `lm_chunk` (`[sweep] lm_chunk`): `[sweep]` is the algorithm's table (`SweepOptions` and
   `PipelineOptions.sweep` removed), read by `read_calibration`, its keys unchanged. Same arithmetic, same numbers.
+- **Breaking:** `calibrate(camera, poses, observations, photographs, algorithm; target, names)` is removed (keywords are configuration
+  only): the geometric calibration is data, `calibrate(StartGeometry(camera, poses, observations, target; names), photographs,
+  algorithm; stops, device)`.
 - **Public:** `PIPELINE_OUTPUT_KEYS`, `START_RECORD_FILE`, `START_MASKS_DIR`, `load_refinement_start`, `masked_observations` and
   `Unweighted` (read by the paper project).
 - **Changed:** the start's per-view pose refit (`_refined_pose`) returns its `FitResult`; a start pose whose refine did not succeed

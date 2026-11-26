@@ -110,7 +110,7 @@ end
     _jacobian_row!(J, i, r, ids, bufidx, gidx, H, S, flux, ϕ, ω, chs, klay, parts, pdims, heights, hB, G, ::Val{N}, sensor, lensw,
                    bases, P0, pxy, light_scale, Z)
 
-THE row kernel of the LM's Jacobian, both routes (Core's `_launch_rows_on!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
+THE row kernel of the LM's Jacobian, both routes (`_launch_row_job!` over a block's pixels, `_pixel_rows_exec`): pixel `i` of the block (buffer pixel
 `bufidx[i]` of the kernels' outputs, its id in `ids`) writes the residual `r` and the Jacobian rows (`J`, columns × rows) of its
 measured channels `chs`, in the layout's full columns (`klay`, `_kernel_layout`): the AD scatter from the slots `S` (`_slot_rows`), the
 focus chain through the nodal weights `G[:, ks, gidx[i]]` (`_focus_chain!`), a tile's patch fan-out on its window lens `lensw` with
@@ -457,10 +457,10 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::VgtkCore.LeftRigi
     chs = residual_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
     KA.synchronize(be)
-    VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
+    _launch_row_job!(_jacobian_row!, Jd, npx, rd, dc.px[r.k], dc.idx[r.k], gidx, Int32(_image_height(s)), S, flux, _view_phi(s, r.k), _view_weights_device(s, r.k), chs,
                            _cached_layout(_view_layouts(s), be, lay), ph, (J, NV), hh,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N), s.settings.sensor, nothing, nothing, (0, 0),
-                           nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing)
+                           nothing, lt.scale, need_v ? _device_copy(s, vg.basis) : nothing; exec = _pixel_rows_exec(be))
     _note_block_bytes!(s, _device_bytes(rays, hrays === rays ? nothing : hrays, S, hh, ph, flux, Jd, rd) +
                        sum(sizeof, hs; init = 0))
     return (; J = Jd, res = rd, flux, lay, T = _column_map(lay, s.channel, ap, m))

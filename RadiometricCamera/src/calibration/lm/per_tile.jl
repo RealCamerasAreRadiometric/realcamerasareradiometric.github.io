@@ -784,13 +784,13 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::VgtkCore.LeftRigi
     Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
     chs = residual_channels(s)
     Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
-    VgtkCore._launch_rows_on!(_pixel_rows_exec(be), _jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
+    _launch_row_job!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
                            _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
                            need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N),
                            s.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,
                            need_g ? adapt(be, _window_bases(lens64, PX, PY)) : nothing, r.P0, need_g ? (Val(PX), Val(PY)) : nothing,
                            lt.scale,
-                           need_v ? _device_copy(s, vg.basis) : nothing)
+                           need_v ? _device_copy(s, vg.basis) : nothing; exec = _pixel_rows_exec(be))
     _note_block_bytes!(s, _device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1))   # its share of the view batch
     return (; J = Jd, res = rd, T = _column_map(lay, s.channel, ap, m), lay)
 end

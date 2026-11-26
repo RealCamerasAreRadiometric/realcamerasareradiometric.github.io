@@ -206,22 +206,17 @@ write_pipeline_config(dir::AbstractString, algorithm::RadiometricCalibration, st
 """
     calibrate(geometry::StartGeometry, photographs, algorithm::RadiometricCalibration; stops, device = default_backend())
         -> FitResult{CalibrationEstimate, CalibrationMetadata}
-    calibrate(camera, poses, observations, photographs, algorithm; target, stops, device = default_backend(), names = basename.(photographs))
 
 A radiometric calibration in one call (a task verb): `solve(EstimationProblem(CalibrationEstimate, (geometry, photographs),
 (; device)), algorithm; stops)` — the start, then the refinement of that state ([`RadiometricCalibration`](@ref); `stops` its solve's,
 configs/default.toml's `[optimizer]` by default).
-The second form takes the geometric calibration as data (`StartGeometry(camera, poses, observations, target; names)`). The state
+The geometric calibration is data: a [`StartGeometry`](@ref)`(camera, poses, observations, target; names)`. The state
 refined is the one a start record rebuilds (`save_calibration_start` → `load_calibration_start`, bin/refine.jl's path): the start
 reads no refinement-only key (`REFINE_ONLY_KEYS`), and a record carries the start's values bit for bit.
 """
 calibrate(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}, algorithm::RadiometricCalibration;
           stops::VgtkCore.LmStops = _calibration_stops(), device = default_backend()) =
     VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, (geometry, photographs), (; device)), algorithm; stops)
-calibrate(camera::VgtkCore.BoundedCamera, poses::AbstractVector, observations::AbstractVector, photographs::AbstractVector{<:AbstractString},
-          algorithm::RadiometricCalibration; target::TexturedTarget, stops::VgtkCore.LmStops = _calibration_stops(),
-          device = default_backend(), names = basename.(photographs)) =
-    calibrate(StartGeometry(camera, poses, observations, target; names), photographs, algorithm; stops, device)
 """The start's options of the run `options` (`start_options`: the refinement-only keys at their defaults), written to the run's `io.out`."""
 _start_run_options(options::PipelineOptions) =
     (d = config_dict(start_options(options)); pipeline_options(merge(d, Dict{String, Any}("io" => merge(d["io"], Dict{String, Any}("out" => options.io.out))))))

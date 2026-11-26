@@ -36,7 +36,7 @@
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
         start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
                                                                       (; device = RC.KernelAbstractions.CPU())), alg; stops).cache.state
-        fit = RC.calibrate(glens, poses, obs, photos, alg; target = board, stops, device = RC.KernelAbstractions.CPU())
+        fit = RC.calibrate(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos, alg; stops, device = RC.KernelAbstractions.CPU())
         return (; fit, out, photos)
     end
     export run_board

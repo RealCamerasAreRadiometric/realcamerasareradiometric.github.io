@@ -10,7 +10,7 @@
 #
 # Every per-pixel step runs on the state's backend (KernelAbstractions; the CPU backend is the same kernels, the test oracle): the
 # parts (`all_parts`, Core's `pointwise!` of `_PixelPartsAt`), the design rows of the QR solves (`_design_row!`) and the reductions
-# of the cost and the normal equations (`_radiometry_cost_row!`, `_radiometry_normal_row!`, Core's `_launch_rows!`, the precedent
+# of the cost and the normal equations (`_radiometry_cost_row!`, `_radiometry_normal_row!`, launched by Core's reductions, the precedent
 # of VisualGeometryToolkitEstimation's camera-regression refine). Only the solves' small systems are the host's.
 # ---------------------------------------------------------------------------
 
@@ -369,7 +369,7 @@ function _design_matrix(s::CalibrationState, parts::RadiometryParts, blk::Val)
     a = SMatrix{3, sh_count(max_degree(s.light)), Float64}(coefficients(s.light))
     n = blk === Val(:light) ? size(a, 2) : n_control_points(vig)
     A = VgtkCore.device_zeros(Float64, s.backend, length(chs) * length(parts), n)
-    VgtkCore._launch_rows!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(s.mat.diffuse_weight), blk)
+    _launch_row_job!(_design_row!, A, length(parts), parts.parts, chs, vig, a, Float64(s.mat.diffuse_weight), blk)
     return Array(A)
 end
 

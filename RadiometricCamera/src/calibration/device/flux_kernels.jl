@@ -31,8 +31,33 @@ does not depend on its group).
 """
 _pixel_workgroup(be, requested) = be isa KA.CPU ? 16 : requested
 """The launch policy of a per-pixel kernel on the backend `be` (Core's `OnBackend` on `_pixel_workgroup`; `requested` the device's
-group, `nothing` its own choice): `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`, Core's `_launch_rows_on!`)."""
+group, `nothing` its own choice): `_launch_rows`' functors and the Jacobian's row kernel (`_jacobian_row!`, `_launch_row_job!`)."""
 _pixel_rows_exec(be, requested = nothing) = VgtkCore.OnBackend(be; workgroupsize = _pixel_workgroup(be, requested))
+
+"""A row job (`_launch_row_job!`): `row!(out, i, args...)` writes row `i` of `out`. A per-index functor of Core's `pointwise!`: the
+row function a singleton, `out` and the tuple `args` adapted to the backend as its fields (one kernel argument each); its value
+the `UInt8` 0 (`pointwise!`'s output, nothing read)."""
+struct _RowJob{R, O, A}
+    row!::R
+    out::O
+    args::A
+end
+Adapt.adapt_structure(to, j::_RowJob) = _RowJob(j.row!, adapt(to, j.out), adapt(to, j.args))
+Base.@propagate_inbounds (j::_RowJob)(i) = (j.row!(j.out, i, j.args...); 0x00)
+
+"""
+    _launch_row_job!(row!, out, n, args...; exec = OnBackend(get_backend(out))) -> out
+
+`row!(out, i, args...)` for `i in 1:n` as ONE launch of Core's public `pointwise!` (a `_RowJob` over the indices `1:n`, on the backend
+and workgroup of `exec`), then a synchronize: the row kernels of the Jacobian, the closed-form design rows and the closed-form cost and
+normal-equation rows. `n = 0` launches nothing. A row's bits do not depend on the launch.
+"""
+function _launch_row_job!(row!::F, out, n::Integer, args::Vararg{Any, N}; exec::VgtkCore.OnBackend = VgtkCore.OnBackend(KA.get_backend(out))) where {F, N}
+    n > 0 || return out
+    VgtkCore.pointwise!(_RowJob(row!, out, args), KA.allocate(exec.backend, UInt8, Int(n)), Base.OneTo(Int(n)); exec)
+    KA.synchronize(exec.backend)
+    return out
+end
 
 """The flux `Φ_pixel` of a masked pixel id of view `k` (image height `H`)."""
 struct _FluxAt{V, G, M, L, S, T}
