@@ -164,7 +164,7 @@ end
         end
         # spot checks: the real-data budget of the runs of record (the 03.11 settings)
         rc = load_radiometric_refinement_config(experiment_config("radiometric_refinement"))
-        alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = alg.options
+        alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = alg.refinement.options
         @test o.io.channel == "G" && o.masks.samples_per_view == 8192 && stops.max_iter == 25 && o.rendering.N == 16 && o.rendering.hammersley
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)

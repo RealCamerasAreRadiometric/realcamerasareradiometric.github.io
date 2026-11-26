@@ -136,13 +136,13 @@ end
         save_state(joinpath(dir, "state.json"), (; camera, target = warped, poses, names, light, settings, observation = dec, page_flip = nothing))
         sst = load_state(joinpath(dir, "state.json"))
         mat0 = Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
-        state_on(board) = CalibrationState(board, settings, camera, poses, mat0, light, [zeros(H, W, 3) for _ in 1:2])
+        state_on(board) = calibration_problem(board, settings, camera, poses, mat0, light, [zeros(H, W, 3) for _ in 1:2])
         s = state_on(tall)
-        @test_throws "learned on a page of aspect" RC.load_state_into!(s, sst, names)
-        @test s.mat == mat0 && iszero(board_surface(s).h)
+        @test_throws "learned on a page of aspect" RC.load_state_into!(s.f, s.u0, sst, names)
+        @test s.u0.mat == mat0 && iszero(board_surface(s.u0).h)
         s1 = state_on(square)
-        RC.load_state_into!(s1, sst, names)
-        @test board_surface(s1).h == sst.target.warping && radiometric_target(s1).aspect === 1.0
+        RC.load_state_into!(s1.f, s1.u0, sst, names)
+        @test board_surface(s1.u0).h == sst.target.warping && radiometric_target(s1.f, s1.u0).aspect === 1.0
     end
 end
 

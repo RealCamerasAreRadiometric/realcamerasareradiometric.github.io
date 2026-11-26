@@ -60,22 +60,23 @@ function start_geometry(options::PipelineOptions; record = nothing, load_state =
 end
 
 """
-    save_calibration_start(dir, state; options) -> dir
+    save_calibration_start(dir, f, θ; options) -> dir
 
-The start `state` (the `init` of a [`RadiometricCalibration`](@ref) of the run `options`, its cache's `state`) as the start record `dir`: every value a
-refinement takes from its start (start/start_record.jl), so [`load_calibration_start`](@ref) rebuilds the start's state from the
-photographs and this record without computing it again.
+The start — data `f` and parameters `θ` (the `init` of a [`RadiometricCalibration`](@ref) of the run `options`: its cache's `f` and
+`u`) — as the start record `dir`: every value a refinement takes from its start (start/start_record.jl), so
+[`load_calibration_start`](@ref) rebuilds the start from the photographs and this record without computing it again.
 """
-save_calibration_start(dir::AbstractString, state::CalibrationState; options::PipelineOptions) =
-    (save_start(dir, state, state.start, start_options(options)); dir)   # the record keys by the start options alone (no output: io.out, optimizer.log)
+save_calibration_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters; options::PipelineOptions) =
+    (save_start(dir, f, θ, f.start, start_options(options)); dir)   # the record keys by the start options alone (no output: io.out, optimizer.log)
 
 """
-    load_calibration_start(dir; options, device = default_backend(), observations = nothing, photographs) -> CalibrationState
+    load_calibration_start(dir; options, device = default_backend(), observations = nothing, photographs) -> RefineProblem
 
-The refinement's state from the start record `dir` ([`save_calibration_start`](@ref); refused when its start options are not
+The refinement's problem from the start record `dir`, `RefineProblem(f, u0)` of the data `f` ([`CalibrationData`](@ref)) and the
+start's parameters `u0` ([`CalibrationParameters`](@ref)), which [`RadiometricRefinement`](@ref) solves ([`save_calibration_start`](@ref); refused when its start options are not
 `start_options(options)`): the front end's target and observations, the record's camera, region and poses, the photographs streamed
 at the record's masks (or the start's own streamed `observations`, handed over in the process that computed it: no photograph read
-again), and the closed-form start's state, costs and GCV weights loaded — nothing of the start computed again. `photographs`: the
+again), and the closed-form start's parameters, costs and GCV weights loaded — nothing of the start computed again. `photographs`: the
 files of the record's views, by default the run's (`io.images`, [`start_photographs`](@ref)).
 """
 function load_calibration_start(dir::AbstractString; options::PipelineOptions, device = default_backend(), observations = nothing,
@@ -84,7 +85,8 @@ function load_calibration_start(dir::AbstractString; options::PipelineOptions, d
     check_start_options(record, options)
     g = start_geometry(options; record, load_state)
     files = photographs === nothing ? start_photographs(options, g.names) : photographs
-    return _start_state(g, files, options, record; backend = device, observations, damping = nothing, radiometry = nothing)   # a record's start: no closed-form solve, no LM
+    f, θ = _start_state(g, files, options, record; backend = device, observations, damping = nothing, radiometry = nothing)   # a record's start: no closed-form solve, no LM
+    return VgtkCore.RefineProblem(f, θ)
 end
 
 """The photographs of the views `names` of the run `options` (`io.images`; a RAW file by its stem, `photo_file`)."""

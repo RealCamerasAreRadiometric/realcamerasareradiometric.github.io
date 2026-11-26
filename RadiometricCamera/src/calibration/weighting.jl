@@ -84,16 +84,16 @@ _stacked_weights(::Unweighted) = Unweighted()
 _stacked_weights(w::AbstractVector{<:AbstractVector}) = reduce(vcat, w; init = Float64[])
 
 """
-    data_norm2(s) -> Float64
+    data_norm2(f) -> Float64
 
 The squared norm of the measured values in the cost's units, `Σ ‖w ∘ ϕ‖²` over every view (`Σ ϕ²` unweighted): the data scale the
 penalties' weights are relative to (Core's `penalty_scale`: the grid, focus and vignetting smoothness) and the
 relative RMS's denominator (`cost`).
 """
-data_norm2(s) = sum(k -> sum(abs2, _whiten(_view_weights(s.weights, k), s.ϕ[k])), eachindex(s.ϕ); init = 0.0)
+data_norm2(f) = sum(k -> sum(abs2, _whiten(_view_weights(f.weights, k), f.ϕ[k])), eachindex(f.ϕ); init = 0.0)
 
 """
-    lm_abstol(s) -> Float64
+    lm_abstol(f) -> Float64
 
 The absolute residual-norm tolerance (SciML's `abstol`) in the cost's units, which Core's `LmStops(; residual_resolution)` reads (the
 meaning of `StaticLmStops`'): the RAW quantisation the data resolve, never the noise level (owner ruling 2026-11-14). A row's resolution is its code step `q` (`_quanta`, one
@@ -101,7 +101,7 @@ RAW code in the row's units) over √12, so the resolution's square is `Σᵢ (q
 as measured — through the one weighting (`_whiten`); `0` for views without a code (decoded images: Core's own resolution alone). A fit
 at the noise level (χ² ≈ m) is then far above it: no exact fit (Core's stop rules decide its termination).
 """
-lm_abstol(s) = sqrt(sum(k -> _resolution2(_view_weights(s.weights, k), s.quanta[k]), eachindex(s.ϕ); init = 0.0))
+lm_abstol(f) = sqrt(sum(k -> _resolution2(_view_weights(f.weights, k), f.quanta[k]), eachindex(f.ϕ); init = 0.0))
 # a view's Σ (q·w)² / 12 (`_whiten`: whitened rows or as measured); a view without code steps (a decoded image) resolves exactly
 _resolution2(w, ::Nothing) = 0.0
 _resolution2(w, q::AbstractVector) = sum(abs2, _whiten(w, q)) / 12

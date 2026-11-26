@@ -56,7 +56,7 @@ which the package pins separately (`[compat] VisualGeometryCore = "0.6"`, the pa
 - the board plane: `Plane3D` intersection equals `intersect_board`, the plane rebuilds from its coefficients;
 - `DoubleSphere` parity with VGC's own SoA kernel (its argument order is version-specific);
 - ray-tracing smoke on the CPU with every lens type (`DoubleSphere`, the pixel camera (Division), `GridLens`, `VGCLens`): `compute_mask`,
-  `render_view`, `CalibrationState`, `cost` at the generating state (residual 0) and after a 10 mrad pose move (residual > 0);
+  `render_view`, `calibration_problem`, `cost` at the generating parameters (residual 0) and after a 10 mrad pose move (residual > 0);
 - **hand-computed fixed values** (round trips cannot catch a convention that flips in both directions at once): the
   pinhole, unified-camera (ξ = 0.5) and division-model (k₁ = −0.1) back-projections of the normalized point (0.3, 0.2) to 1e-6, the
   adapter's pinhole; a pixel through a pose rotated 90° about z with centre (0.1, 0.2, 0) hitting the board at (0.35, 0.7, 2)

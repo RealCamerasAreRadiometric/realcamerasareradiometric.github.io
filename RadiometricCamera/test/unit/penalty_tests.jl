@@ -27,44 +27,44 @@
     masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     rng = Xoshiro(11)
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) .* (1 .+ 0.02 .* randn(rng, H, W, 3)) for k in 1:2]   # noisy photographs
-    state() = CalibrationState(board, st, camera_0, poses, mat_t, light_t, targets; masks)
-    s0 = state(); parts = all_parts(s0)
-    RC._update_vignetting!(s0, parts)
-    s1 = state(); RC._update_vignetting!(s1, parts; smoothness_weight = 0.0)
-    @test s1.camera.vignetting.P == s0.camera.vignetting.P                                           # weight 0: the unpenalized solve, bit for bit
+    state() = calibration_problem(board, st, camera_0, poses, mat_t, light_t, targets; masks)
+    s0 = state(); parts = all_parts(s0.f, s0.u0)
+    RC._update_vignetting!(s0.f, s0.u0, parts)
+    s1 = state(); RC._update_vignetting!(s1.f, s1.u0, parts; smoothness_weight = 0.0)
+    @test s1.u0.camera.vignetting.P == s0.u0.camera.vignetting.P                                           # weight 0: the unpenalized solve, bit for bit
     # a dominating weight: the field's nodes become Δ³-free (quadratic along each axis); the data fit worsens
-    D, m̄ = RC.vignetting_smoothness(s1)
+    D, m̄ = RC.vignetting_smoothness(s1.f, s1.u0)
     @test size(D) == (2 * 6 * 3, 36) && m̄ > 0
-    s2 = state(); RC._update_vignetting!(s2, parts; smoothness_weight = 1e6)
-    @test norm(D * vec(Matrix(s2.camera.vignetting.P))) < 1e-4 * norm(D * vec(Matrix(s0.camera.vignetting.P)))
-    @test RC.parts_cost(s2, parts) > RC.parts_cost(s0, parts)
-    @test s2.camera.vignetting(center(s2.camera.vignetting)) ≈ 1 atol = 1e-12           # the hard pin holds under the penalty
+    s2 = state(); RC._update_vignetting!(s2.f, s2.u0, parts; smoothness_weight = 1e6)
+    @test norm(D * vec(Matrix(s2.u0.camera.vignetting.P))) < 1e-4 * norm(D * vec(Matrix(s0.u0.camera.vignetting.P)))
+    @test RC.parts_cost(s2.f, s2.u0, parts) > RC.parts_cost(s0.f, s0.u0, parts)
+    @test s2.u0.camera.vignetting(center(s2.u0.camera.vignetting)) ≈ 1 atol = 1e-12           # the hard pin holds under the penalty
     # by GCV: β inside the bracket, recorded with the curve's minimum; the solve is the fixed-weight solve at that β
     rec = NamedTuple[]
-    s3 = state(); RC._update_vignetting!(s3, parts; smoothness_weight = :gcv, gcv_record = rec)
+    s3 = state(); RC._update_vignetting!(s3.f, s3.u0, parts; smoothness_weight = :gcv, gcv_record = rec)
     @test length(rec) == 1 && isfinite(rec[1].gcv) && 0 < rec[1].dof <= rec[1].n_free && rec[1].rows == 36
     @test rec[1].log10_β_bracket == [-8.0, 4.0] && 1e-8 <= rec[1].β <= 1e4 && !rec[1].at_bracket_end      # Estimation's gcv_select
-    s4 = state(); RC._update_vignetting!(s4, parts; smoothness_weight = rec[1].β)
-    @test s4.camera.vignetting.P ≈ s3.camera.vignetting.P rtol = 1e-10
+    s4 = state(); RC._update_vignetting!(s4.f, s4.u0, parts; smoothness_weight = rec[1].β)
+    @test s4.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P rtol = 1e-10
     # through the block sweep; the joint solve has no penalty
-    s5 = state(); r5 = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s5, parts), (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = :gcv))
+    s5 = state(); r5 = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s5.f, s5.u0, parts), (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = :gcv))
     rec2 = r5.metadata.gcv
-    @test length(rec2) == 1 && s5.camera.vignetting.P ≈ s3.camera.vignetting.P && VgtkCore.successful_retcode(r5) && r5.u.vignetting === s5.camera.vignetting
+    @test length(rec2) == 1 && s5.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P && VgtkCore.successful_retcode(r5) && r5.u.vignetting === s5.u0.camera.vignetting
     @test_throws ArgumentError RC._with_schedule(RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping()); vignetting_smoothness = 0.1)
     @test_throws ArgumentError RC._update_vignetting!(state(), parts; smoothness_weight = -1.0)
     @test_throws ArgumentError RC._update_vignetting!(state(), parts; smoothness_weight = :aic)
     # the boundary order: 2 is the natural rule (Δ²c = 0), 3 the curvature-preserving Δ³c = 0 — Core's BoundaryRule(m, region; order)
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
-    sr = CalibrationState(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 2)
-    @test sr.vig_rule.interior == VgtkCore.BoundaryRule(sr.camera.vignetting,reg).interior
-    @test RC.smoothness_nodes(sr.camera.vignetting,sr.vig_rule) == sr.vig_rule.interior
-    s3r = CalibrationState(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 3)
-    r3 = VgtkCore.BoundaryRule(s3r.camera.vignetting,reg; order = 3)
-    @test s3r.vig_rule.order == 3 && s3r.vig_rule.interior == r3.interior == sr.vig_rule.interior
-    @test s3r.vig_rule.dependent == r3.dependent && s3r.vig_rule.terms == r3.terms && s3r.vig_rule.terms != sr.vig_rule.terms
+    sr = calibration_problem(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 2)
+    @test sr.f.vig_rule.interior == VgtkCore.BoundaryRule(sr.u0.camera.vignetting,reg).interior
+    @test RC.smoothness_nodes(sr.u0.camera.vignetting,sr.f.vig_rule) == sr.f.vig_rule.interior
+    s3r = calibration_problem(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 3)
+    r3 = VgtkCore.BoundaryRule(s3r.u0.camera.vignetting,reg; order = 3)
+    @test s3r.f.vig_rule.order == 3 && s3r.f.vig_rule.interior == r3.interior == sr.f.vig_rule.interior
+    @test s3r.f.vig_rule.dependent == r3.dependent && s3r.f.vig_rule.terms == r3.terms && s3r.f.vig_rule.terms != sr.f.vig_rule.terms
     # order 3 extends a quadratic correction exactly where its rule has an axis or a diagonal to read (its coefficients sum to one)
-    @test all(tm -> sum(last, tm) ≈ 1, s3r.vig_rule.terms)
-    @test_throws ArgumentError RC.vignetting_rule(sr.camera.vignetting,reg; order = 4)    # Core's BoundaryRule refuses the order
+    @test all(tm -> sum(last, tm) ≈ 1, s3r.f.vig_rule.terms)
+    @test_throws ArgumentError RC.vignetting_rule(sr.u0.camera.vignetting,reg; order = 4)    # Core's BoundaryRule refuses the order
 end
 
 @testitem "penalties: the grid smoothness pspline and its weight by GCV on the linearization" setup = [RCFixtures, GridTilesScene] begin
@@ -82,16 +82,16 @@ end
     @test RC.grid_smoothness_cost(pr, glens_t) == 0.0
     @test length(RC.grid_smoothness(RC.PSplineSmoothness(3, 0.5), glens_t, 7.0, all10).rows) == 2 * 10 * 7
     # in a problem: rows on the present nodes only, zero at the start
-    prob_p, _ = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
+    prob_p, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
     @test sum(c -> length(c.terms), [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]) == length(pr.rows)
     # the weight by GCV on the linearization at a perturbed start: the smoothness of that weight, the selection recorded
-    sp = CalibrationState(board, st, camera_p, poses_p, mat_t, light_t, targets; masks)
+    sp = calibration_problem(board, st, camera_p, poses_p, mat_t, light_t, targets; masks)
     held_p = RC.interior_nodes(RC.grid_present(glens_p))
-    smooth, sel = RC.select_grid_smoothness_weight(sp, RC.PSplineSmoothness(3, :gcv), held_p; damping = VgtkCore.LevenbergDamping())
+    smooth, sel = RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, :gcv), held_p; damping = VgtkCore.LevenbergDamping())
     @test smooth.type === :pspline && smooth.β == sel.β && sel.kind === :pspline && isfinite(sel.gcv) && sel.n_columns == 4 * 50
-    @test sel.n_observations == 3 * sum(length, sp.px) && 0 < sel.dof <= sel.n_columns
+    @test sel.n_observations == 3 * sum(length, sp.f.px) && 0 < sel.dof <= sel.n_columns
     @test 1e-8 <= sel.β <= 1e4
-    @test RC.select_grid_smoothness_weight(sp, RC.NoSmoothness(), held_p; damping = VgtkCore.LevenbergDamping()) == (nothing, nothing)
+    @test RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.NoSmoothness(), held_p; damping = VgtkCore.LevenbergDamping()) == (nothing, nothing)
     # the nodes held: Core's footprint rule; :all every node the lens holds
     @test RC.grid_present(glens_t) == VgtkCore.node_mask(VgtkCore.model(glens_t), VgtkCore.imaged_region(glens_t))
     @test RC.grid_present(glens_t; nodes = :all) == trues(10, 10)

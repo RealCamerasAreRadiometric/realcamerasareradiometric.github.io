@@ -109,9 +109,9 @@ end
     rs = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks = [compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
-    s = CalibrationState(board, rs, camera, copy(poses), mat, light, targets; masks)
-    prob, idx = build_problem_grid(s; damping = VgtkCore.LevenbergDamping())                                      # the patch default: GRID_PATCH, which divides the padded lattice
+    s = calibration_problem(board, rs, camera, copy(poses), mat, light, targets; masks)
+    prob, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping())                                      # the patch default: GRID_PATCH, which divides the padded lattice
     @test GRID_PATCH == (5, 5) && size(idx.patches) == (4, 4)
-    out = _lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting))
+    out = _lm_tiles!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting))
     @test out.iterations >= 1 && isfinite(out.cost)
 end

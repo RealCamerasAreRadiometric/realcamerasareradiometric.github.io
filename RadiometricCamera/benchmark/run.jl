@@ -89,7 +89,7 @@ function benchmark_board()
     photos = [RC.render_view(k, camera, poses[k], mat, light, board, settings, masks[k]; backend = cpu) for k in 1:VIEWS]   # the CPU's photographs on every device
     start_light = EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH)
     # the timed states: a perturbed start on the benchmark's device
-    state(lens_ = lens) = RC.CalibrationState(board, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
+    state(lens_ = lens) = RC.calibration_problem(board, settings, RC.RadiometricCameraModel(lens_, camera.focus, camera.aperture_radius, flat), poses,
                                               RC.Material(; diffuse_weight = 0.7), start_light, photos; masks, backend = BE)
     return (; board, settings, poses, light, mat, camera, masks, photos, state, lens)
 end
@@ -155,50 +155,50 @@ function stages(c)
     add("render", () -> () -> on_backend ? render(; backend = BE) : render())      # (before render_view took a backend: the CPU's)
     add("pixel", () -> () -> (s = zero(SVector{3, Float64});
                               for i in 1:1000; s += RC.Φ_pixel(u, v, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings); end; s))
-    add("flux", () -> (s = c.state(); () -> RC._flux_device(s, k, RC.view_of(s, k), s.camera.vignetting, s.mat, s.light)))
-    add("cost", () -> (s = c.state(); () -> cost(s)[1]))
+    add("flux", () -> (s = c.state(); () -> RC._flux_device(s.f, s.u0, k, RC.view_of(s.u0, k), s.u0.camera.vignetting, s.u0.mat, s.u0.light)))
+    add("cost", () -> (s = c.state(); () -> cost(s.f, s.u0)[1]))
     # closed form
-    add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s))))
-    add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s); () -> RC.radiometry_normal_equations(s, parts)))
-    radiometry(s, alg) = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s, RC.all_parts(s))), alg)
-    add("linear_blocks", () -> () -> (s = c.state(); radiometry(s, RC.RadiometryBlockDescent()); cost(s)[1]))
-    add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); cost(s)[1]))
+    add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s.f, s.u0))))
+    add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s.f, s.u0); () -> RC.radiometry_normal_equations(s.f, s.u0, parts)))
+    radiometry(s, alg) = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s.f, s.u0, RC.all_parts(s.f, s.u0))), alg)
+    add("linear_blocks", () -> () -> (s = c.state(); radiometry(s, RC.RadiometryBlockDescent()); cost(s.f, s.u0)[1]))
+    add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); cost(s.f, s.u0)[1]))
     # per view
     function view_setup()
-        s = c.state(); problem, _ = RC.build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         r, vars, flags = first_block(problem, view_blocks(problem))
         return s, r, vars, flags
     end
     add("view_jacobian", () -> ((s, r, vars, flags) = view_setup(); () -> (j = RC._view_jacobian(flags, r, vars...); KA.synchronize(BE); sum(abs, j.res))))
     add("view_products", () -> ((s, r, vars, flags) = view_setup(); j = RC._view_jacobian(flags, r, vars...);
-                                () -> RC._gauss_newton_blocks(j.J, j.res, j.T, j.lay, s.run)))
+                                () -> RC._gauss_newton_blocks(j.J, j.res, j.T, j.lay, s.f.run)))
     add("view_normal_equations", () -> ((s, r, vars, flags) = view_setup(); () -> RC._block_normal_equations(flags, r, vars)))
-    add("lm1_view", () -> () -> (s = c.state(); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
-    add("lm3_view", () -> () -> (s = c.state(); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm1_view", () -> () -> (s = c.state(); RC._lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
+    add("lm3_view", () -> () -> (s = c.state(); RC._lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
     # per tile
     grid = Ref{Any}(nothing)
     grid_state() = (grid[] === nothing && (grid[] = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, c.lens), RC.GridStart(; lattice = RC.ImageLattice(GRID...))).u); c.state(grid[]))
     add("tile_normal_equations", () -> begin
-        s = grid_state(); problem, idx = RC.build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
-        () -> RC._with_registered(s, problem, idx) do
+        () -> RC._with_registered(s.f, s.u0, problem, idx) do
             sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
         end
     end)
     add("tile_rows_products", () -> begin           # the same tiles again within one registration: the view's batch is its memoized one
-        s = grid_state(); problem, idx = RC.build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
-        () -> RC._with_registered(s, problem, idx) do
+        () -> RC._with_registered(s.f, s.u0, problem, idx) do
             sweep()
             t0 = time_ns(); x = sweep(); Span(x + length(tiles), (time_ns() - t0) / 1e9)   # (not `v`: that rebound the pixel's v, boxed it in every stage, 4.4 kB a Φ_pixel call)
         end
     end)
-    add("lm1_grid", () -> () -> (s = grid_state(); RC._lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("lm1_grid", () -> () -> (s = grid_state(); RC._lm_tiles!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); RC._lm_views!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s)[1]))
+    add("calibration", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); RC._lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
     return list
 end
 

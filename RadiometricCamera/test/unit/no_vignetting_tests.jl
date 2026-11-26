@@ -67,10 +67,10 @@ end
     @test G ≈ Gf rtol = 1e-13
     # the calibration estimates V (Θ_v under the gauge V(𝐜) = 1): a camera without vignetting is refused by name, with the start to give
     targets = [img_flat]
-    @test_throws "the camera has no vignetting (`NoVignetting`" CalibrationState(a.board, a.st, a.none, [a.pose], a.mat, a.light, targets; masks = [a.mask])
-    @test_throws "flat_vignetting(geometric(camera))" CalibrationState(a.board, a.st, a.none, [a.pose], a.mat, a.light, targets; masks = [a.mask])
-    s = CalibrationState(a.board, a.st, RC.with_vignetting(a.none, flat_vignetting(RC.geometric(a.none))), [a.pose], a.mat, a.light, targets; masks = [a.mask])
-    @test s.camera.vignetting isa VrtkCore.TensorProductVignetting
+    @test_throws "the camera has no vignetting (`NoVignetting`" calibration_problem(a.board, a.st, a.none, [a.pose], a.mat, a.light, targets; masks = [a.mask])
+    @test_throws "flat_vignetting(geometric(camera))" calibration_problem(a.board, a.st, a.none, [a.pose], a.mat, a.light, targets; masks = [a.mask])
+    s = calibration_problem(a.board, a.st, RC.with_vignetting(a.none, flat_vignetting(RC.geometric(a.none))), [a.pose], a.mat, a.light, targets; masks = [a.mask])
+    @test s.u0.camera.vignetting isa VrtkCore.TensorProductVignetting
 end
 
 @testitem "NoVignetting on the device: the render is the unit field's, bit for bit" tags = [:gpu] setup = [RCFixtures, RCGPU, NoVignettingScene] begin

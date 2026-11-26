@@ -52,20 +52,20 @@ with_weight(s::BendingSmoothness, w) = BendingSmoothness(w)
 with_weight(s::NoSmoothness, w) = s
 
 """
-    focus_smoothness!(s, f::Focus, ϕ², sm::AbstractSmoothness) -> row_weight
+    focus_smoothness!(f::CalibrationData, focus::Focus, ϕ², sm::AbstractSmoothness) -> row_weight
 
-The bending smoothness rows of the run from `[focus.smoothness]` (its weight β), written into the state `s` (its `focus_smoothness`,
+The bending smoothness rows of the run from `[focus.smoothness]` (its weight β), written into the data `f` (its `focus_smoothness`,
 every focus block's smoothness residual reads it; none for β = 0): `√(β Σϕ²/N) L/√m̄`, `L` Core's `bending_rows` of the focus
 spline's system (one row per positive eigenvalue of the bending energy Q) and m̄ Core's `mean_positive_eigenvalue` of it:
 `‖L t̂‖²/m̄ = t̂ᵀQt̂/m̄`, the bending energy relative to its mean positive eigenvalue. Returns the row weight β Σϕ²/N (0 for none).
 """
-function focus_smoothness!(s, f::Focus, ϕ²::Real, sm::AbstractSmoothness)
+function focus_smoothness!(f::CalibrationData, fs::Focus, ϕ²::Real, sm::AbstractSmoothness)
     β = Float64(smoothness_weight(sm))
     β > 0 || return 0.0
-    N = length(f.t̂_i)
-    Lc = VgtkCore.bending_rows(FocusSpline(f).sys)
+    N = length(fs.t̂_i)
+    Lc = VgtkCore.bending_rows(FocusSpline(fs).sys)
     L = sqrt(β * ϕ² / N / VgtkCore.mean_positive_eigenvalue(Lc)) .* Lc
-    s.focus_smoothness = L
-    @printf("focus smoothness %s: row weight β Σϕ²/N %.4g, start smoothness cost %.4g\n", smoothness_line(sm), β * ϕ² / N, 0.5 * sum(abs2, L * collect(f.t̂_i))); flush(stdout)
+    f.focus_smoothness = L
+    @printf("focus smoothness %s: row weight β Σϕ²/N %.4g, start smoothness cost %.4g\n", smoothness_line(sm), β * ϕ² / N, 0.5 * sum(abs2, L * collect(fs.t̂_i))); flush(stdout)
     return β * ϕ² / N
 end

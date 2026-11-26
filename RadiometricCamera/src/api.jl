@@ -15,11 +15,11 @@
 # `RadiometricCameraModel`, which every verb here takes.
 # ---------------------------------------------------------------------------
 
-export calibrate, RadiometricCalibration, CalibrationCache, read_calibration, StartGeometry, start_geometry, load_calibration_start,
+export calibrate, RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_calibration, StartGeometry, start_geometry, load_calibration_start,
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
-       CalibrationState, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
+       calibration_problem, RadiometricCameraModel, RadiometricTarget, PipelineOptions, pipeline_options, CalibratedCamera
 
-public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
+public CalibrationData, CalibrationParameters, flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
        coverage_region, check_coverage, calibrated_folds, grid_angular_error,
        load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,
        save_lens, load_parametric_lens, load_lens, lens_type_name, TargetRadiometry, material, edge_parameters,
@@ -73,9 +73,6 @@ photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_mode
 _retired_view_form(name, replacement) =
     throw(ArgumentError("$name of a View (the camera's parts, the vignetting apart) is retired: a radiometric camera is one object. " *
                         "Give the camera and the pose: $replacement"))
-CalibrationState(::TexturedTarget, ::RenderSettings, ::AbstractVector{<:View}, ::AbstractVignetting, args...; kwargs...) =
-    _retired_view_form("CalibrationState", "`CalibrationState(board, settings, camera, poses, mat, light, targets; …)`, " *
-                       "`camera = RadiometricCameraModel(geometric, focus, aperture_radius, vignetting)`")
 render_view(::Integer, ::View, ::AbstractVignetting, args...) =
     _retired_view_form("render_view", "`render_view(k, camera, pose, mat, light, board, settings, mask)`")
 compute_mask(::View, ::TexturedTarget, ::RenderSettings; kwargs...) =
@@ -86,15 +83,11 @@ pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
     _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, board, settings)`")
 
 # ---- retired names (`lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
-# camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of a state, the replacer.
+# camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of calibration parameters, the replacer.
 # The old spellings are refused by name with their replacement (no alias, no forwarding).
 """Retired: VisualRadiometryToolkitCore's `with_geometric`."""
 with_lens(args...; kwargs...) = throw(ArgumentError("with_lens is retired: a radiometric camera's geometric camera is its `geometric` — " *
                                                     "use VisualRadiometryToolkitCore's `with_geometric(camera, geometric)`"))
-_retired_lens_accessor(what) =
-    throw(ArgumentError("lens($what) is retired: `lens` is VisualGeometryToolkitCore's lens model of a geometric camera. The geometric camera of " *
-                        "a radiometric camera or a calibration state is `VisualRadiometryToolkitCore.geometric($what)`; its lens model `lens(geometric($what))`"))
-VgtkCore.lens(::CalibrationState) = _retired_lens_accessor("state")
 
 # ---- moved names (the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
 # imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
@@ -148,7 +141,7 @@ BoardSurface(args...; kwargs...) = throw(ArgumentError(
 Scene(args...; kwargs...) = throw(ArgumentError(
     "Scene is retired: there is no scene type. The image size is the camera's (`extent(geometric(camera))`) and the board holds its own " *
     "state: give the board itself, a `TexturedTarget` (`with_state(board, state)` for a warped or printed-edge board) — " *
-    "`render_view(k, camera, pose, mat, light, board, settings, mask)`, `CalibrationState(board, settings, camera, poses, …)`"))
+    "`render_view(k, camera, pose, mat, light, board, settings, mask)`, `calibration_problem(board, settings, camera, poses, …)`"))
 """Retired: VisualRadiometryToolkitCore's `with_state`."""
 with_surface(args...; kwargs...) = throw(ArgumentError(
     "with_surface is retired: the surface parameters are the board's own state — VisualRadiometryToolkitCore's `with_state(board, state)`"))

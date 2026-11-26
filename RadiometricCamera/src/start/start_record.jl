@@ -77,24 +77,24 @@ _start_lens_file(parametric::Bool) = parametric ? "lens.json" : "grid.json"
 _mask_file(dir, k) = joinpath(dir, START_MASKS_DIR, "$(k).png")
 
 """
-    save_start(dir, s, meta, opts) -> dir
+    save_start(dir, f, θ, meta, opts) -> dir
 
 The start of a refinement (the start's state `s` and `meta`, of the options `opts`, its `start_options`) as the start record
 `dir` (the file header lists its files): every value a refinement takes from its start, so `load_calibration_start(dir; options)` rebuilds
 the start's state from the photographs and this record without recomputing it.
 """
-function save_start(dir::AbstractString, s::CalibrationState, meta, opts::PipelineOptions)
+function save_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters, meta, opts::PipelineOptions)
     mkpath(joinpath(dir, START_MASKS_DIR))
     names = meta.names
-    save_state(joinpath(dir, "state.json"), s, names; page_flip = meta.page_flip, provenance = (; stage = "start (closed-form sweep)"))
+    save_state(joinpath(dir, "state.json"), f, θ, names; page_flip = meta.page_flip, provenance = (; stage = "start (closed-form sweep)"))
     tag = _frontend_tag(opts)
-    route = lm_route(geometric(s))                         # the state's camera's route (a SplineLens camera per tile)
-    for (file, g, what) in ((joinpath(dir, "$(_camera_file(route)).json"), geometric(s), "start"),
+    route = lm_route(geometric(θ))                         # the state's camera's route (a SplineLens camera per tile)
+    for (file, g, what) in ((joinpath(dir, "$(_camera_file(route)).json"), geometric(θ), "start"),
                             (joinpath(dir, "frontend", "$(_camera_file(route)).json"), meta.lens_start, "frontend"))
         mkpath(dirname(file))
         _save_run_camera(route, file, g, meta.init_region; provenance = (; model = "$(what)_$(_model_label(route, g))_$tag", frontend = tag))
     end
-    for (k, m) in enumerate(s.masks)
+    for (k, m) in enumerate(f.masks)
         PNGFiles.save(_mask_file(dir, k), Gray{N0f8}.(Array(m)))
     end
     write_pipeline_config(dir, opts; header = "# the start options of this start record (start_options: the refinement-only keys at their defaults)")

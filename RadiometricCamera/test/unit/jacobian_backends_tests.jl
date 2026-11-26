@@ -13,9 +13,9 @@
     import VisualGeometryToolkitCore as VgtkCore
     using StaticArrays, LinearAlgebra, ForwardDiff
     h_w = SVector{HEIGHT_NC}([0.5 * VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
-    warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
+    warped(s) = (RC.set_surface!(s.u0, with_h(RC.board_surface(s.u0), h_w)); s)
     s_c = warped(edge_state(edge_s, targets_e))
-    prob, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+    prob, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
     tiles = RC.tile_costs(prob)
     r = tiles[argmax([length(t.pix) for t in tiles])]
     vars = collect(RC.NLLSsolver.getvars(r, prob.variables))
@@ -29,14 +29,14 @@
     D = ForwardDiff.Dual{Nothing, Float64, HEIGHT_NC}
     hd = SVector{HEIGHT_NC, D}(ntuple(i -> D(m.surface.h[i], ForwardDiff.Partials(ntuple(j -> Float64(i == j), Val(HEIGHT_NC)))), Val(HEIGHT_NC)))
     surf_d = RC.TargetState{D}(hd, SVector{RC.EDGE_NC, D}(m.surface.edge), SVector{RC.INPLANE_NC, D}(m.surface.inplane))
-    board_d = RadiometricCamera.with_state(s_c.board, surf_d)
+    board_d = RadiometricCamera.with_state(s_c.f.board, surf_d)
     # the kernels' own form (the tile's window lens — a bare model: the image's height from the state's camera — and the dual heights in
     # the board's state): the internal View and _Φ_pixel
-    view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.camera.geometric, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
+    view = RC.View(VgtkCore.model(vars[1]), RC._window_lens(s_c.u0.camera.geometric, r.P0, vars[2:5]...), VgtkCore.model(vars[6]), vars[7].r)
     Hd = zeros(3 * length(r.pix), HEIGHT_NC)
     for (i, iv) in enumerate(r.pix)
-        u, v = s_c.px[r.k][iv]
-        Φ = RC._Φ_pixel(u, v, r.k, RC._image_height(s_c), view, VgtkCore.model(vars[9]), m.mat, vars[10].light, board_d, s_c.settings)
+        u, v = s_c.f.px[r.k][iv]
+        Φ = RC._Φ_pixel(u, v, r.k, RC._image_height(s_c.u0), view, VgtkCore.model(vars[9]), m.mat, vars[10].light, board_d, s_c.f.settings)
         for c in 1:3, j in 1:HEIGHT_NC
             Hd[3 * (i - 1) + c, j] = ForwardDiff.partials(Φ[c], j)
         end
@@ -83,10 +83,10 @@ end
     require_gpu()
     if RC_GPU_TESTS
         h_w = SVector{HEIGHT_NC}([0.5 * VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
-        warped(s) = (RC.set_surface!(s, with_h(RC.board_surface(s), h_w)); s)
+        warped(s) = (RC.set_surface!(s.u0, with_h(RC.board_surface(s.u0), h_w)); s)
         pair(; kw...) = (warped(edge_state(edge_s, targets_e; kw...)), warped(edge_state(edge_s, targets_e; backend = CUDA.CUDABackend(), kw...)))
         tile_pair(sc, sg) = begin
-            pc, _ = build_problem_grid(sc; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1); pg, _ = build_problem_grid(sg; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+            pc, _ = build_problem_grid(sc.f, sc.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1); pg, _ = build_problem_grid(sg.f, sg.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
             tg = RC.tile_costs(pg); rg = tg[argmax([length(t.pix) for t in tg])]
             tc = RC.tile_costs(pc); rc = tc[findfirst(t -> t.k == rg.k && t.P0 == rg.P0, tc)]
             vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)

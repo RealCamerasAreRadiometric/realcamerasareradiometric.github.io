@@ -91,19 +91,19 @@ end
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), RC.𝔟(board), 2.5)
     mat = RC.Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    s = RC.CalibrationState(board, settings, camera, poses, mat, light, [zeros(H, W, 3)])       # decoded renders, no record
-    @test RC.observation_model(s) == RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB)
-    @test RC.calibrated_camera(s).observation == RC.observation_model(s)
+    s = RC.calibration_problem(board, settings, camera, poses, mat, light, [zeros(H, W, 3)])       # decoded renders, no record
+    @test RC.observation_model(s.f) == RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB)
+    @test RC.calibrated_camera(s.f, s.u0).observation == RC.observation_model(s.f)
     # a state estimated on RAW photosites under a record continues (or renders) no run of decoded photographs
     raw = RC.ObservationModel(RC.SensorRecord(repeat("ab", 32)), RC.Photosites(), :G)
-    sst = (; observation = raw, names = ["V01.png"], poses, camera, target = RC.radiometric_target(s), light)
-    err = try RC.load_state_into!(s, sst, ["V01.png"]); nothing catch e; e end
+    sst = (; observation = raw, names = ["V01.png"], poses, camera, target = RC.radiometric_target(s.f, s.u0), light)
+    err = try RC.load_state_into!(s.f, s.u0, sst, ["V01.png"]); nothing catch e; e end
     @test err isa ArgumentError && occursin(repeat("ab", 32), err.msg) && occursin("decoded images", err.msg)
-    @test s.camera == camera                                                     # nothing moved
+    @test s.u0.camera == camera                                                     # nothing moved
     # and a state's own observation model loads
-    RC.load_state_into!(s, merge(sst, (; observation = RC.observation_model(s))), ["V01.png"])
+    RC.load_state_into!(s.f, s.u0, merge(sst, (; observation = RC.observation_model(s.f))), ["V01.png"])
     # a RAW state's photosites are channel G (the state refuses another)
-    @test_throws "ONE observation each" RC.CalibrationState(board, settings, camera, poses, mat, light, [zeros(H, W, 3)];
+    @test_throws "ONE observation each" RC.calibration_problem(board, settings, camera, poses, mat, light, [zeros(H, W, 3)];
                                                            photo_kind = RC.Photosites(), channel = 0)
 end
 

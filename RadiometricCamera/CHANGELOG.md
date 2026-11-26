@@ -22,6 +22,28 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **Breaking: the refinement is a refine, `solve(RefineProblem(f, u0), RadiometricRefinement(…); stops)` (#18).**
+  `CalibrationState` (data and estimate in one mutable struct) is removed, with no alias and no property forwarding:
+  - `CalibrationData` (the problem's `f`: the board's design, the render settings, the masks and pixel lists, the photographs and
+    their observations ϕ, the weights, the vignetting rule, the backend and its device cache, the channel, the focus smoothness,
+    the μ interval, the code steps, the sensor models and observation model, the run record, the start) and
+    `CalibrationParameters` (the problem's `u0`, refined in place: `camera`, `poses`, `mat`, `light` and the board's `surface`,
+    the `TargetState` the board carried before; the kernels' board is the design with that surface, `_board(f, θ)`);
+  - `CalibrationState(board, settings, camera, poses, mat, light, targets; …)` → `calibration_problem(…)` (the same arguments: a
+    `RefineProblem` of `CalibrationData(board, settings, camera, poses, targets; …)` and `CalibrationParameters(f, camera, poses,
+    mat, light)`), each field read at its real path (`s.ϕ` → `f.ϕ`, `s.camera` → `u0.camera`, `s.board.state` → `u0.surface`);
+  - every function of a state takes the part(s) it reads: `cost(f, u0)`, `render_all(f, u0)`, `photometric_residuals(f, u0)`,
+    `all_parts(f, u0)`, `build_problem(f, u0; …)`, `build_problem_grid(f, u0; …)`, `save_state(path, f, u0, names)`,
+    `load_state_into!(f, u0, state, names)`, `set_radiometric_target!(f, u0, t)`; `n_views`, `geometric`, `focus`,
+    `aperture_radius`, `board_surface`, `set_surface!`, `set_vignetting!`, `set_pose!` of `u0` alone; `data_norm2`, `lm_abstol`,
+    `observation_model`, `residual_channels` of `f` alone; `RadiometryBlocks` on `EstimationProblem(RadiometryBlocks, (f, u0, parts))`;
+  - `RadiometricRefinement(options; optimizer, radiometry, lm_chunk, log)` (a `RefineKind`: the former `RadiometricCalibration`'s
+    fields) solves `RefineProblem(f, u0)`; `RadiometricCalibration(refinement)` (the `FitKind`: the start, then the refinement)
+    holds it, `read_calibration` returns `RadiometricCalibration(RadiometricRefinement(…))` (`alg.options` → `alg.refinement.options`);
+  - `CalibrationCache` holds `prob` (the started `RefineProblem`; was `state`); `load_calibration_start` returns the
+    `RefineProblem` (`solve(prob, alg.refinement; stops)`, was `solve(EstimationProblem(CalibrationEstimate, state), alg; stops)`);
+    `save_calibration_start(dir, f, u0; options)`; the retired View-form `CalibrationState` and `lens(::CalibrationState)` stubs are
+    gone with the type. No arithmetic moves: the same kernels on the same values.
 - **Experiments: `experiments/chrome_evaluation/v2.0`, the FitResult's names in the eval record (decision 11).** Each fit of
   `eval_<label>.json`'s `fit` (`in_sample`, `held_out.even` / `.odd`) records `successful_retcode` (was `converged`) and
   `stats.nsteps` (was `iterations`), and the fit's iteration cap is `fit.max_iter` (was `fit.iterations`, the `LmStops`' `max_iter`

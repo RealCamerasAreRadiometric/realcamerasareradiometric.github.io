@@ -12,7 +12,7 @@
 #   - no kernel writes them while they are shared: they are written only before that synchronization (an upload, or the radiance
 #     record's kernel), and every chunk's own output is a fresh array that keeps its tracking;
 #   - every reader finishes before they can be freed: `_each_chunk` returns only after each worker has waited for its own stream,
-#     and the long-lived ones (the state's device cache) are never written after their upload.
+#     and the long-lived ones (the calibration data's device cache) are never written after their upload.
 # Nothing in the stack changes (owner decision, Option A).
 # =============================================================================
 module RadiometricCameraCUDAExt

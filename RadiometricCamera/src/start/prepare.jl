@@ -225,21 +225,23 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     light0 = EnvironmentLight(SphericalHarmonicMap(1.0, opts.lighting.sh_order), b, r_SH)   # L ≡ 1 in every channel
     make_vig, vig_desc = _vignetting_spec(opts, W₀, H₀, coverage, vig_c)
     println("vignetting field: ", vig_desc, "; gauge V(𝐜) = 1 held ", "exactly (the centre's free direction eliminated)"); flush(stdout)
-    s = CalibrationState(board, st, RadiometricCameraModel(lens0, focus0, R0, make_vig()), [v.pose for v in views0], material0, light0, empty_targets;
+    camera0 = RadiometricCameraModel(lens0, focus0, R0, make_vig()); poses_start = [v.pose for v in views0]
+    f = CalibrationData(board, st, camera0, poses_start, empty_targets;
                          masks, ϕ, backend, region, channel = ch,
                          sensor_models = sensor, sensor = om.sensor, photo_kind = om.kind, weights = _run_weights(ω), quanta = qs,
                          support_min = opts.vignetting.support_min, boundary_order = opts.vignetting.boundary_order,
                          mu_bounds = opts.material.mu_bounds, jacobian_chunk = opts.compute.jacobian_chunk)
-    s.vig_rule isa RadialSupportRule && @printf("vignetting support: %d of %d nodes are parameters — the pole pair and those carrying ≥ %g of the mean data weight (relative weights %s); the others continue them with a zero Δ^%d across the border (Core's BoundaryRule, vignetting.boundary_order)\n",
-                                                count(s.vig_rule.supported), length(s.vig_rule.supported), opts.vignetting.support_min,
-                                                join([@sprintf("%.2g", x) for x in s.vig_rule.weight], " "), s.vig_rule.rule.order)
-    focus_row_weight = focus_smoothness!(s, focus0, data_norm2(s), opts.focus.smoothness)   # β Σϕ²/N: the run record's (`_run_parameters`)
+    θ = CalibrationParameters(f, camera0, poses_start, material0, light0)
+    f.vig_rule isa RadialSupportRule && @printf("vignetting support: %d of %d nodes are parameters — the pole pair and those carrying ≥ %g of the mean data weight (relative weights %s); the others continue them with a zero Δ^%d across the border (Core's BoundaryRule, vignetting.boundary_order)\n",
+                                                count(f.vig_rule.supported), length(f.vig_rule.supported), opts.vignetting.support_min,
+                                                join([@sprintf("%.2g", x) for x in f.vig_rule.weight], " "), f.vig_rule.rule.order)
+    focus_row_weight = focus_smoothness!(f, focus0, data_norm2(f), opts.focus.smoothness)   # β Σϕ²/N: the run record's (`_run_parameters`)
     # the grid's smoothness over the present nodes (per_tile_smoothness.jl): fixed at the start, its reference the start grid. A weight
     # chosen by GCV (`[grid.smoothness] weight = "gcv"`) is chosen after the closed-form start of the radiometry, on the linearization
     # there (`select_grid_smoothness_weight`)
     grid_int = grid_held === nothing ? nothing : interior_nodes(grid_held)
     grid_gcv = _grid_gcv(opts)
-    grid_sm = grid_held === nothing || grid_gcv ? nothing : grid_smoothness(opts.grid.smoothness, lens0, data_norm2(s), grid_int)
+    grid_sm = grid_held === nothing || grid_gcv ? nothing : grid_smoothness(opts.grid.smoothness, lens0, data_norm2(f), grid_int)
     grid_held === nothing || @printf("grid: %d of %d nodes present (the parameters; %d absent); smoothness %s%s\n", count(grid_int), length(grid_int),
                           length(grid_int) - count(grid_int), smoothness_line(opts.grid.smoothness),
                           grid_gcv ? ", by GCV after the closed-form start" :
@@ -247,21 +249,21 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     meta = (; focus_support, focus_row_weight, grid_int, grid_smoothness = grid_sm, grid_gcv = nothing, vignetting_gcv = NamedTuple[], region, coverage, init_region = g.init_region, resample = start === nothing ? g.resample : start.resample, names, views0, lens0, lens_start, fpx, in_support, features, features_for = g.features_for, W₀, H₀, be0, world = g.world, page_flip = g.page_flip,
             board_y_sign = g.board_y_sign, vig_c, make_vig, vig_desc, height0, inplane0, npx, samples, R0, d_c, f_m, t_start,
             sensor_model, observations = start === nothing ? (; masks = copy(masks), ϕ, ω, qs, sensor) : nothing)   # a start's streamed photographs (`load_calibration_start`)
-    start === nothing || return _from_start(s, meta, start, opts)   # a start record: its closed-form start and GCV weights loaded, not computed
+    start === nothing || return _from_start(f, θ, meta, start, opts)   # a start record: its closed-form start and GCV weights loaded, not computed
     # the radiometric start, on the LM's own pixels with the parts rendered once (decision 2026-10-31; before: a separate sparse subset,
     # `masks.linear_fraction`, and the sweep kept only if it lowered the cost on the LM's pixels — a test that a least-squares solve on
     # the same pixels cannot fail): the closed-form Θ_l solve sets the lighting's scale (no scalar light gain), then ONE closed-form
     # sweep of Θ_l, Θ_v, μ. Every solve is exact on these pixels, so the cost cannot rise.
-    parts = all_parts(s)
-    _update_radiometry!(s, RadiometryBlockDescent(), (; light = true, vignetting = false, mu = false); parts)
-    c0, rms0 = cost(s)
+    parts = all_parts(f, θ)
+    _update_radiometry!(f, θ, RadiometryBlockDescent(), (; light = true, vignetting = false, mu = false); parts)
+    c0, rms0 = cost(f, θ)
     @printf("lighting solve; init cost %.4e rel-RMS %.4f\n", c0, rms0); flush(stdout)
     t1 = time()
-    _update_radiometry!(s, _with_schedule(radiometry; sweeps = 1, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), verbose = false),
+    _update_radiometry!(f, θ, _with_schedule(radiometry; sweeps = 1, vignetting_smoothness = smoothness_weight(opts.vignetting.smoothness), verbose = false),
                         (; light = true, vignetting = true, mu = !("material" in opts.fixed)); parts, gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
-    c1, rms1 = cost(s); μ_lin = s.mat.diffuse_weight
-    @printf("linear sweep (%.0f s): cost %.4e rel-RMS %.4f; μ %.3f; V centre %.3f\n", time() - t1, c1, rms1, μ_lin, s.camera.vignetting(VgtkCore.center(s.camera.vignetting))); flush(stdout)
+    c1, rms1 = cost(f, θ); μ_lin = θ.mat.diffuse_weight
+    @printf("linear sweep (%.0f s): cost %.4e rel-RMS %.4f; μ %.3f; V centre %.3f\n", time() - t1, c1, rms1, μ_lin, θ.camera.vignetting(VgtkCore.center(θ.camera.vignetting))); flush(stdout)
     isempty(meta.vignetting_gcv) || (g = last(meta.vignetting_gcv);
         @printf("vignetting smoothness: β %.4g by GCV (minimum %.6g, %.1f effective parameters of %d%s)\n", g.β, g.gcv, g.dof, g.n_free,
                 g.at_bracket_end ? "; AT THE END of the bracket" : ""))
@@ -269,33 +271,33 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     if grid_gcv                                                 # the grid smoothness's weight by GCV, on the linearization at this start
         tg = time()
         lp = _refinement_lm(opts, route)                          # the refinement's problem (its blocks and holds, Θ_m's among them)
-        grid_sm, sel = select_grid_smoothness_weight(s, opts.grid.smoothness, grid_int; damping, lp.kw...)
+        grid_sm, sel = select_grid_smoothness_weight(f, θ, opts.grid.smoothness, grid_int; damping, lp.kw...)
         @printf("grid smoothness %s: weight %.4g by GCV (%.0f s; minimum %.6g, %.1f effective parameters of %d columns, %d observations%s)\n",
                 smoothness_line(with_weight(opts.grid.smoothness, sel.β)), sel.β, time() - tg, sel.gcv, sel.dof, sel.n_columns, sel.n_observations,
                 sel.at_bracket_end ? "; AT THE END of the bracket" : ""); flush(stdout)
         meta = (; meta..., grid_smoothness = grid_sm, grid_gcv = sel)
     end
-    s.start = meta
-    return s
+    f.start = meta
+    return f, θ
 end
 
 """The state `s` (its front end, masks and photographs read; `meta` its start's) of a start record `start`: the closed-form start's
 state loaded into it (`load_state_into!`), its costs, μ and GCV selections recorded, the grid smoothness at the recorded weight — nothing of
 the start computed again."""
-function _from_start(s::CalibrationState, meta, start, opts::PipelineOptions)
-    vig_ok, light_ok = load_state_into!(s, start.state, meta.names; sensor_model = sensor_model_mode(opts.camera.sensor_model))
+function _from_start(f::CalibrationData, θ::CalibrationParameters, meta, start, opts::PipelineOptions)
+    vig_ok, light_ok = load_state_into!(f, θ, start.state, meta.names; sensor_model = sensor_model_mode(opts.camera.sensor_model))
     vig_ok && light_ok || throw(ArgumentError("the start record $(start.dir): its $(vig_ok ? "lighting" : "vignetting field") is not the run's " *
                                               "(another size or geometry): a start of other code or options — produce its start again"))
     grid_sm, grid_gcv = meta.grid_smoothness, nothing
     if _grid_gcv(opts)                                          # the GCV's weight of the start (a grid start's: `_grid_gcv`), its smoothness rebuilt there
         grid_gcv = start.grid_gcv
         grid_gcv === nothing && throw(ArgumentError("the start record $(start.dir) records no grid-smoothness GCV, the run chooses its weight by GCV"))
-        grid_sm = grid_smoothness(opts.grid.smoothness, s.camera.geometric, data_norm2(s), meta.grid_int; weight = grid_gcv.β)
+        grid_sm = grid_smoothness(opts.grid.smoothness, θ.camera.geometric, data_norm2(f), meta.grid_int; weight = grid_gcv.β)
     end
     c1, rms1 = start.costs.linear
     @printf("start loaded from %s: closed-form start rel-RMS %.4f; μ %.3f%s\n", start.dir, rms1, start.μ_lin,
             grid_gcv === nothing ? "" : @sprintf("; grid smoothness weight %.4g (GCV of the start)", grid_gcv.β)); flush(stdout)
-    s.start = (; meta..., costs = start.costs, μ_lin = start.μ_lin, vignetting_gcv = NamedTuple[start.vignetting_gcv...],
+    f.start = (; meta..., costs = start.costs, μ_lin = start.μ_lin, vignetting_gcv = NamedTuple[start.vignetting_gcv...],
                grid_smoothness = grid_sm, grid_gcv)
-    return s
+    return f, θ
 end

@@ -80,8 +80,9 @@
     @test Int(RC.NLLSsolver.nvars(vv)) == size(Z, 2) == VgtkCore.tangent_size(vv) && !hasfield(typeof(vv), :bound)
     u = zeros(size(Z, 2)); u[3] = 0.01
     @test center(VgtkCore.model(RC.NLLSsolver.update(vv, u))) == c && VgtkCore.model(RC.NLLSsolver.update(vv, u))(c) == v16(c)
-    @test !any(m -> any(k -> k === :pin_center || k === :center_free, Base.kwarg_decl(m)), methods(RC.CalibrationState))
-    @test !hasfield(RC.CalibrationState, :pin_center) && !hasfield(RC.CalibrationState, :vig_center_free)
+    @test !any(m -> any(k -> k === :pin_center || k === :center_free, Base.kwarg_decl(m)),
+               [methods(RC.CalibrationData); methods(RC.CalibrationParameters); methods(RC.calibration_problem)])
+    @test !any(T -> hasfield(T, :pin_center) || hasfield(T, :vig_center_free), (RC.CalibrationData, RC.CalibrationParameters))
     @test RC.gauge_center_value(v16)(c) ≈ 1.0
 
     # 6. _same_field: the centre and the chart count

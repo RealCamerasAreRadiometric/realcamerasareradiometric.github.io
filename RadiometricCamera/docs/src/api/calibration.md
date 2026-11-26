@@ -15,7 +15,7 @@ Pages = ["image_formation/flux.jl"]
 Private = false
 ```
 
-## The state
+## The data and the parameters
 
 ```@autodocs
 Modules = [RadiometricCamera]

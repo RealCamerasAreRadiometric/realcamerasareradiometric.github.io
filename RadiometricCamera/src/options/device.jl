@@ -50,7 +50,7 @@ end
 """
     default_backend() -> KernelAbstractions.Backend
 
-The device of RC's entry points when the caller supplies none (the `backend` of [`CalibrationState`](@ref), [`render_view`](@ref)
+The device of RC's entry points when the caller supplies none (the `backend` of [`CalibrationData`](@ref), [`render_view`](@ref)
 and [`compute_mask`](@ref)): VisualGeometryToolkitCore's `default_device()`, a functional GPU when its vendor package is loaded
 (`using CUDA`), else the CPU, with a warning, once per session, that the run will be very slow. A caller that supplies
 `backend = CPU()` has chosen the CPU and is not warned. It does not load the vendor package, as a driver's [`rc_backend`](@ref) does:

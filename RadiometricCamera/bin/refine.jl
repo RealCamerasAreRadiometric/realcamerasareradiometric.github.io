@@ -62,7 +62,7 @@ function _cli(args)
 end
 config, set, plan, repeat, start_only, start_dir, start_out = _cli(ARGS)
 alg, stops = read_calibration(config; set)              # the calibration (its options and optimizer) and its solve's stops
-opts = alg.options
+opts = alg.refinement.options
 if plan
     TOML.print(stdout, RC.config_dict(alg, stops); sorted = true)
     exit(0)
@@ -93,49 +93,49 @@ if isempty(start_dir)
     start_dir = start_only ? opts.io.out : isempty(start_out) ? joinpath(opts.io.out, "start") : start_out
     ts = @timed begin
         g = RC.start_geometry(so)
-        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), alg; stops).cache.state
+        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(so, g.names)), (; device = backend)), alg; stops).cache.prob
     end
     s0 = ts.value
     if !isempty(so.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
-        RC.load_state_into!(s0, RC.load_state(so.io.render_state), s0.start.names)
-        RC.render_dump!(s0, s0.start.names, so.io.out, so.io.render_state)
+        RC.load_state_into!(s0.f, s0.u0, RC.load_state(so.io.render_state), s0.f.start.names)
+        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, so.io.out, so.io.render_state)
         exit(0)
     elseif so.io.render_init                                               # diagnostic: the start state rendered
-        RC.render_dump!(s0, s0.start.names, so.io.out, "init (linear sweep)")
+        RC.render_dump!(s0.f, s0.u0, s0.f.start.names, so.io.out, "init (linear sweep)")
         exit(0)
     end
-    save_calibration_start(start_dir, s0; options = so)
+    save_calibration_start(start_dir, s0.f, s0.u0; options = so)
     println("START written to ", start_dir, " in ", round(ts.time; digits = 1), " s"); flush(stdout)
     start_only && exit(0)
-    computed = s0.start.observations; s0 = nothing; ts = nothing; GC.gc()  # the start's state released before the refinement's is built
+    computed = s0.f.start.observations; s0 = nothing; ts = nothing; GC.gc()  # the start released before the refinement's is built
 end
 """
     _print_free_parameters(s, alg)
 
-A timing measurement's context (`--repeat`): the free parameters of the refinement's LM over the loaded state `s`, per block of THE
+A timing measurement's context (`--repeat`): the free parameters of the refinement's LM over the loaded start `s` (its `RefineProblem`), per block of THE
 problem the refinement builds (`_refinement_lm`, the per-tile route's `build_problem_grid`; the coordinates of its free variables), as
 one `PARAMETERS key=value …` line. The grid lens's are its present direction controls' 2 tangent coordinates each, less the 3 that hold
 the common rotation with the poses (`rotation_gauge_coordinates`); its patch blocks' solver coordinates (`lens_solver_coordinates`, which
 also carry the absent nodes of a partly present patch) beside them. A parametric (per-view) start prints its route alone.
 """
 function _print_free_parameters(s, alg)
-    opts = alg.options
-    meta = s.start
+    opts = alg.refinement.options
+    meta = s.f.start
     route = RC.lm_route(meta.lens0)
     if !(route isa RC.PerTileRoute)
         println("PARAMETERS route=$(nameof(typeof(route)))"); flush(stdout); return nothing
     end
     lp = RC._refinement_lm(opts, route; smoothness = meta.grid_smoothness)
-    problem, idx = RC.build_problem_grid(s; damping = alg.optimizer.damping, lp.kw...)
+    problem, idx = RC.build_problem_grid(s.f, s.u0; damping = alg.refinement.optimizer.damping, lp.kw...)
     vars = problem.problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)
-    present = count(VgtkCore.present_nodes(VgtkCore.model(s.camera.geometric)))
+    present = count(VgtkCore.present_nodes(VgtkCore.model(s.u0.camera.geometric)))
     gauge = lp.blocks.poses ? 3 : 0                                        # the rotation gauge: three direction coordinates held while the poses are free
     lensfree = lp.blocks.grid ? 2present - gauge : 0                       # a held lens ("camera" in fixed) has no free coordinate
     println("PARAMETERS route=PerTileRoute grid_nodes_present=$present lens=$lensfree lens_solver_coordinates=$(n(vec(idx.patches))) ",
             "focus=$(n(idx.focus:idx.focus)) aperture=$(n(idx.aperture:idx.aperture)) vignetting=$(n(idx.vignetting:idx.vignetting)) ",
             "poses=$(n(idx.poses)) views=$(length(idx.poses)) material=$(n(idx.material:idx.material)) lighting=$(n(idx.lighting:idx.lighting)) ",
-            "samples=$(sum(length, s.ϕ; init = 0))")
+            "samples=$(sum(length, s.f.ϕ; init = 0))")
     flush(stdout)
     return nothing
 end
@@ -146,9 +146,9 @@ for r in 1:repeat
     obs = computed; global computed = nothing                               # the start's streamed observations: handed to repeat 1 only, then released
     tp = @timed load_calibration_start(start_dir; options = opts, device = backend, observations = obs); obs = nothing
     global s = tp.value
-    tr = @timed VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, s), alg; stops)
+    tr = @timed VgtkCore.solve(s, alg.refinement; stops)
     global result = tr.value
-    tw = @timed save_radiometric_calibration(s, result; options = opts)
+    tw = @timed save_radiometric_calibration(s.f, s.u0, result; options = opts)
     println("TIMING $r/$repeat refine_s=$(tr.time) save_s=$(tw.time) refine_gc_s=$(tr.gctime) refine_compile_s=$(tr.compile_time) ",
             "save_compile_s=$(tw.compile_time) iterations=$(result.stats.nsteps) lm_seconds=$(result.metadata.seconds)")
     println(join(("REPEAT $r/$repeat", "load_calibration_start $(round(tp.time; digits = 1)) s ($(round(tp.bytes / 2^30; digits = 2)) GiB allocated, gc $(round(tp.gctime; digits = 1)) s, compile $(round(tp.compile_time; digits = 1)) s)",

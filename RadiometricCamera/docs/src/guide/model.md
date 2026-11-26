@@ -79,7 +79,7 @@ src/target/                         board.jl (𝓑: VisualRadiometryToolkitCore'
                                     texture, printed edge, and its own state, the warping h — and the calibration's share: the light
                                     sphere, the warping's free parameters, the distance map's reader), target_radiometry.jl
 src/image_formation/                radiance.jl (L_c, the per-basis responses), flux.jl (RenderSettings, Φ_pixel, masks)
-src/calibration/                    state.jl (CalibrationState), weighting.jl (the rows' weights: whitened under the sensor
+src/calibration/                    state.jl (CalibrationData, CalibrationParameters), weighting.jl (the rows' weights: whitened under the sensor
                                     noise, or as measured), precision.jl, closed_form.jl (closed-form Θ_l, Θ_v, μ), smoothness.jl,
                                     problem_spec.jl (the problem from the options), lm/ (per_view.jl: variable blocks, PerViewResidual,
                                     the pathwise computeresjac; per_tile.jl, per_tile_smoothness.jl: the grid models' per-tile blocks),

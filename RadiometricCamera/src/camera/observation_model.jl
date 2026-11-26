@@ -222,8 +222,8 @@ end
 """
     calibrated_camera(state) -> CalibratedCamera
 
-The calibrated camera of a state: a [`load_state`](@ref) record's (its `camera`, `observation` and `settings`) or a
-`CalibrationState`'s (`observation_model(s)`).
+The calibrated camera of a state: a [`load_state`](@ref) record's (its `camera`, `observation` and `settings`); a calibration's
+is `calibrated_camera(f, θ)` (its parameters' camera, its data's `observation_model(f)`).
 """
 calibrated_camera(st::NamedTuple) = CalibratedCamera(st.camera, st.observation, st.settings)
 """One line of an observation model for a message or a log: its sensor statement, the photographs' kind and the channel."""

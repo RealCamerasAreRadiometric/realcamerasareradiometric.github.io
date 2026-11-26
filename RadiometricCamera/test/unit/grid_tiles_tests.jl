@@ -35,8 +35,8 @@
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
-    s = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
-    prob, idx = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    s = calibration_problem(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
+    prob, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     tiles = RC.tile_costs(prob)
     # LM smoke: perturb the grid (small direction rotations) + a pose nudge; joint LM must recover sharply
     G_p = copy(VgtkCore.directions(VgtkCore.model(glens_t)))   # Core's layout [gy, gx]
@@ -62,7 +62,7 @@ end
     @test grid_angular_error(glens_t, src_t) < 2e-2
     @test grid_angular_error(_image_start(src_t, (32, 32)).camera, src_t) < 5e-4
     @test idx.n_tiles >= 2 && size(idx.patches) == (2, 2)
-    @test sum(r -> length(r.pix), tiles) == sum(length, s.px)          # every masked pixel in exactly one tile
+    @test sum(r -> length(r.pix), tiles) == sum(length, s.f.px)          # every masked pixel in exactly one tile
     # residual at the truth vanishes, and the stacked tile residuals match the per-view residuals
     for r in tiles
         vars = RC.NLLSsolver.getvars(r, prob.variables)
@@ -99,21 +99,21 @@ end
         col = J[:, 6 + 200 + 9 + 1]
         @test norm(col - fd) / norm(fd) < 5e-3
     end
-    s2 = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)   # a copy: the LM writes its poses back into
+    s2 = calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)   # a copy: the LM writes its poses back into
                                                          # the state's vector, and the GPU recovery below must start from the perturbed poses_p
-    c0 = cost(s2)[1]
-    res = _lm_tiles!(s2; stops = RC._calibration_stops(; max_iter = 25), damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
-    @test cost(s2)[1] < 3e-3 * c0
+    c0 = cost(s2.f, s2.u0)[1]
+    res = _lm_tiles!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 25), damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    @test cost(s2.f, s2.u0)[1] < 3e-3 * c0
     # recovery vs the grid truth (not the DS source), modulo the common rotation the gauge holds at the start's (`rotation_gauge_coordinates`):
     # the rays compared after Core's Kabsch rotation between the two lenses' rays
     let probe = [SVector(x, y) for x in 2.0:4.0:22.0 for y in 2.0:4.0:22.0]
-        a = [normalize(RC.chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC.chief_ray(s2.camera.geometric, p)) for p in probe]
+        a = [normalize(RC.chief_ray(glens_t, p)) for p in probe]; b = [normalize(RC.chief_ray(s2.u0.camera.geometric, p)) for p in probe]
         R = SMatrix{3, 3, Float64}(VgtkCore.solve(VgtkCore.EstimationProblem(Rotations.RotMatrix{3}, [a[i] => b[i] for i in eachindex(a)]), VgtkCore.Kabsch()).u)
         @test maximum(VgtkCore.angle_between(R' * b[i], a[i]) for i in eachindex(a)) < 5e-4
     end
     # trace entries carry the standard fields
     trc = NamedTuple[]
-    _lm_tiles!(s2; stops = RC._calibration_stops(; max_iter = 2), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), trace = trc, trace_meta = (; stage = 1, factor = 1, ϕ² = sum(sum(abs2, p) for p in s2.ϕ)))
+    _lm_tiles!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 2), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), trace = trc, trace_meta = (; stage = 1, factor = 1, ϕ² = sum(sum(abs2, p) for p in s2.f.ϕ)))
     @test !isempty(trc) && all(t.phase == :lm for t in trc)
 end
 
@@ -152,17 +152,17 @@ end
     D(l) = VgtkCore.directions(VgtkCore.model(l))
     @test VgtkCore.present_nodes(VgtkCore.model(lens_m)) == held && all(v -> all(isnan, v), D(lens_m)[.!held])
     camera_m = RadiometricCameraModel(lens_m, focus_t, r_t, vig_t)
-    s_all = CalibrationState(board, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
-    @test_throws ArgumentError build_problem_grid(s_all; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    s_all = calibration_problem(board, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
+    @test_throws ArgumentError build_problem_grid(s_all.f, s_all.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     reads_held(u, v) = all(p -> all(isfinite, VgtkCore.backproject(lens_m, first(p))), RC.sensor_samples(st.sensor, u, v))
     masks_m = [BitMatrix([mk[v, u] && reads_held(u, v) for v in axes(mk, 1), u in axes(mk, 2)]) for mk in masks]
     @test all(k -> 0 < count(masks_m[k]) < count(masks[k]), 1:2)
     targets_m = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks_m[k]) for k in 1:2]
-    s = CalibrationState(board, st, camera_m, copy(poses), mat_t, light_t, targets_m; masks = masks_m)
+    s = calibration_problem(board, st, camera_m, copy(poses), mat_t, light_t, targets_m; masks = masks_m)
     # in a problem: zero cost at the start, the rows' Jacobian against central differences through the patch blocks' retraction,
     # no column for an absent node; a patch block with no present node is not a variable of the solve
     for pr in (pr2, prp)
-        prob_p, idx_p = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
+        prob_p, idx_p = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
         @test idx_p.dependent_patches == [idx_p.patches[1, 1]]
         costs = [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]
         @test sum(c -> length(c.terms), costs) == length(pr.rows)
@@ -193,7 +193,7 @@ end
         end
     end
     # the absent nodes have no tile column either, and every residual is finite (none reads a NaN slot)
-    prob_f, idx_f = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob_f, idx_f = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     for r in RC.tile_costs(prob_f)
         res, J = RC.NLLSsolver.computeresjac(RC.static(1023), r, RC.NLLSsolver.getvars(r, prob_f.variables)...)
         @test all(isfinite, res) && all(isfinite, J)
@@ -201,8 +201,8 @@ end
     end
     # the solved lens: its present nodes moved, its absent ones still absent (no value: NaN)
     moved = [v isa RC._Patch ? RC.NLLSsolver.update(v, 1e-3 .* cos.(1:50)) : v for v in prob_f.variables]
-    lens = RC.extract_variables_grid(s, moved, idx_f)[1].geometric     # (camera, poses, …): the camera's lens
-    l0 = s.camera.geometric
+    lens = RC.extract_variables_grid(s.f, s.u0, moved, idx_f)[1].geometric     # (camera, poses, …): the camera's lens
+    l0 = s.u0.camera.geometric
     @test VgtkCore.present_nodes(VgtkCore.model(lens)) == held
     @test D(lens)[held] != D(l0)[held] && all(v -> all(isnan, v), D(lens)[.!held])
 end
@@ -218,8 +218,8 @@ end
     # --- device (GPU) per-tile path: bitwise residual, column parity, LM smoke ---
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_g = CalibrationState(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        s_g = calibration_problem(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         rc = tiles[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles)]
@@ -239,7 +239,7 @@ end
         end
         # --- batched per-view memoization: parity with the unbatched path (bitwise; `device_parity`), and cache hits ---
         # (r0g / rjg / Jg above were computed UNBATCHED; registering the problem enables batching)
-        RC._register_grid_problem!(s_g, prob_g, idx_g)
+        RC._register_grid_problem!(s_g.f, s_g.u0, prob_g, idx_g)
         r0g_b = RC.NLLSsolver.computeresidual(rg, varsg...)
         rjg_b, Jg_b = RC.NLLSsolver.computeresjac(RC.static(1023), rg, varsg...)
         @test r0g_b == r0g                                     # bitwise: same kernels, per-pixel independent
@@ -250,36 +250,36 @@ end
         #     the kept columns are the full Jacobian's without the r column
         vf_p = RC.static(1023 - 64)
         rj_p, Jg_p = RC.NLLSsolver.computeresjac(vf_p, rg, varsg...)             # batched (registered)
-        RC._unregister_grid_problem!(s_g)
+        RC._unregister_grid_problem!(s_g.f)
         rj_pu, Jg_pu = RC.NLLSsolver.computeresjac(vf_p, rg, varsg...)           # unbatched
-        RC._register_grid_problem!(s_g, prob_g, idx_g)
+        RC._register_grid_problem!(s_g.f, s_g.u0, prob_g, idx_g)
         @test rj_p == rjg
         @test rj_p == rj_pu
         @test device_parity(Jg_p, Jg_pu)
-        lay_full = RC._tile_layout(RC.static(1023), length(VgtkCore.model(varsg[6]).nodes), length(s_g.settings.sensor), 25, VgtkCore.tangent_size(varsg[9]),
+        lay_full = RC._tile_layout(RC.static(1023), length(VgtkCore.model(varsg[6]).nodes), length(s_g.f.settings.sensor), 25, VgtkCore.tangent_size(varsg[9]),
                                    Int(VrtkCore.n_control_points(VgtkCore.model(varsg[9]))), Int(sh_count(max_degree(varsg[10].light))))
         @test size(Jg_p, 2) == lay_full.ncol - 1
         @test device_parity(Jg_p, Jg[:, setdiff(1:lay_full.ncol, lay_full.col_r)])
         # (the 24 × 24 fixture has one tile per view, so the cache-hit check re-evaluates the same tile)
         RC.NLLSsolver.computeresidual(rg, varsg...)            # primes the view cache for this variable state
-        calls0 = s_g.run.device_calls[:flux]
+        calls0 = s_g.f.run.device_calls[:flux]
         @test RC.NLLSsolver.computeresidual(rg, varsg...) == r0g
-        @test s_g.run.device_calls[:flux] == calls0                 # same trial state: served from the cache
+        @test s_g.f.run.device_calls[:flux] == calls0                 # same trial state: served from the cache
         r2 = tiles_g[findfirst(t -> t !== rg, tiles_g)]        # cross-tile parity (another view)
         vars2 = RC.NLLSsolver.getvars(r2, prob_g.variables)
-        r0u2 = let; RC._unregister_grid_problem!(s_g); RC.NLLSsolver.computeresidual(r2, vars2...); end
-        RC._register_grid_problem!(s_g, prob_g, idx_g)
+        r0u2 = let; RC._unregister_grid_problem!(s_g.f); RC.NLLSsolver.computeresidual(r2, vars2...); end
+        RC._register_grid_problem!(s_g.f, s_g.u0, prob_g, idx_g)
         r0b2 = RC.NLLSsolver.computeresidual(r2, vars2...)
         @test r0b2 == r0u2
         # a *different* variable state must invalidate the cache (fresh objects → new key)
         vars2n = ntuple(i -> i == 1 ? RC.NLLSsolver.update(vars2[1], zeros(6)) : vars2[i], 10)
         RC.NLLSsolver.computeresidual(r2, vars2n...)
-        @test s_g.run.device_calls[:flux] > calls0
-        RC._unregister_grid_problem!(s_g)
-        s2g = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
-        c0g = cost(s2g)[1]
-        _lm_tiles!(s2g; stops = RC._calibration_stops(; max_iter = 15), damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
-        @test cost(s2g)[1] < 0.05 * c0g
-        @test grid_angular_error(s2g.camera.geometric, glens_t) < 2e-3
+        @test s_g.f.run.device_calls[:flux] > calls0
+        RC._unregister_grid_problem!(s_g.f)
+        s2g = calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
+        c0g = cost(s2g.f, s2g.u0)[1]
+        _lm_tiles!(s2g.f, s2g.u0; stops = RC._calibration_stops(; max_iter = 15), damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        @test cost(s2g.f, s2g.u0)[1] < 0.05 * c0g
+        @test grid_angular_error(s2g.u0.camera.geometric, glens_t) < 2e-3
     end
 end

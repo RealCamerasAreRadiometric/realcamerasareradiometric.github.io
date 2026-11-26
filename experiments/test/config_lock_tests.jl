@@ -48,7 +48,7 @@ end
         haskey(doc, "pipeline") && push!(runs, ("pipeline", doc["pipeline"], ""))
         for (header, p, kind) in runs
             ncases += 1
-            alg, stops = RC.read_calibration(p); o = alg.options                    # resolves (a refusal is a failure of the lock)
+            alg, stops = RC.read_calibration(p); o = alg.refinement.options                    # resolves (a refusal is a failure of the lock)
             resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(alg, stops)))   # keyed as the file's version names them
             for (k, v) in lock
                 haskey(resolved, k) || continue                                     # a key the run cannot use (INAPPLICABLE_KEYS): not written

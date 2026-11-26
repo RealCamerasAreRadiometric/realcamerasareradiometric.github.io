@@ -42,7 +42,7 @@ function _cli(args)
 end
 config, initpath, out, set, αs, ηs, limit = _cli(ARGS)
 alg, stops = RC.read_calibration(config; set)                           # the calibration (its options and optimizer), its solve's stops
-opts = alg.options
+opts = alg.refinement.options
 mkpath(out)
 RC.write_pipeline_config(out, alg, stops;
                          header = "# the options of this material grid (experiments/scripts/material_grid.jl --config=$config$(isempty(set) ? "" : " --set " * join(set, " --set ")))")
@@ -54,47 +54,48 @@ sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
     g = RC.start_geometry(opts)                                          # (the start reads its own options: `init`'s, the record's)
-    RC.save_calibration_start(joinpath(out, "start"), VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(opts, g.names)), (; device = RC.KernelAbstractions.CPU())),
-                                                                alg; stops).cache.state; options = opts)
+    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(opts, g.names)), (; device = RC.KernelAbstractions.CPU())),
+                          alg; stops).cache.prob
+    RC.save_calibration_start(joinpath(out, "start"), start.f, start.u0; options = opts)
 end
-s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.start
-RC.load_state_into!(s, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
-let v = s.camera.vignetting                                              # V flat: the grid scores the material and the lighting alone
-    set_vignetting!(s, VrtkCore.with_control_points(v, ones(size(VrtkCore.control_points(v)))))
+s = RC.load_calibration_start(sdir; options = opts, device = RC.KernelAbstractions.CPU()); meta = s.f.start
+RC.load_state_into!(s.f, s.u0, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
+let v = s.u0.camera.vignetting                                              # V flat: the grid scores the material and the lighting alone
+    set_vignetting!(s.u0, VrtkCore.with_control_points(v, ones(size(VrtkCore.control_points(v)))))
 end
 cands = vec([(ai, an, ei, en) for ai in αs, an in αs, ei in ηs, en in ηs])
 cands = cands[1:min(length(cands), limit)]
-ϕ² = sum(sum(abs2, p) for p in s.ϕ)
+ϕ² = sum(sum(abs2, p) for p in s.f.ϕ)
 relrms(c) = sqrt(2c / ϕ²)
 @printf("material grid: %d candidates (α %s; η %s) on %d pixels of %d views, V flat\n", length(cands), join(αs, "/"), join(ηs, "/"),
-        sum(length.(s.px)), length(s.px)); flush(stdout)
+        sum(length.(s.f.px)), length(s.f.px)); flush(stdout)
 
 """μ scanned over 0:0.1:1 with the closed-form lighting at each value (RadiometricCamera's closed-form blocks, the lighting alone),
 then the lighting and μ by block descent from the best μ (up to 100 sweeps, to a relative cost change of 1e-7); returns the cost."""
 function fit_light_mu!(s, parts)
-    lighting(s) = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts), (; vignetting = false, mu = false)), RadiometryBlockDescent())
+    lighting(s) = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false, mu = false)), RadiometryBlockDescent())
     best = (Inf, 0.5)
     for μ in 0.0:0.1:1.0
-        s.mat = with_μ(s.mat, μ); c = lighting(s).metadata.cost
+        s.u0.mat = with_μ(s.u0.mat, μ); c = lighting(s).metadata.cost
         c < best[1] && (best = (c, μ))
     end
-    s.mat = with_μ(s.mat, best[2]); c = lighting(s).metadata.cost
-    r = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts), (; vignetting = false)), RadiometryBlockDescent(; sweeps = 100, reltol = 1e-7))
+    s.u0.mat = with_μ(s.u0.mat, best[2]); c = lighting(s).metadata.cost
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false)), RadiometryBlockDescent(; sweeps = 100, reltol = 1e-7))
     return min(c, r.metadata.cost)
 end
 
-best = (; c = Inf, mat = s.mat, light = s.light)
+best = (; c = Inf, mat = s.u0.mat, light = s.u0.light)
 open(joinpath(out, "grid.tsv"), "w") do io
     println(io, "α_ink\tα_noink\tη_ink\tη_noink\tμ\trel_RMS\tseconds"); flush(io)
     for (i, (ai, an, ei, en)) in enumerate(cands)
         t = time()
-        s.mat = Material(; roughness_ink = ai, roughness_paper = an, refractive_index_ink = ei, refractive_index_paper = en, diffuse_weight = 0.5)
-        parts = all_parts(s)
+        s.u0.mat = Material(; roughness_ink = ai, roughness_paper = an, refractive_index_ink = ei, refractive_index_paper = en, diffuse_weight = 0.5)
+        parts = all_parts(s.f, s.u0)
         c = fit_light_mu!(s, parts); parts = nothing
         dt = time() - t
-        @printf(io, "%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.6f\t%.1f\n", ai, an, ei, en, s.mat.diffuse_weight, relrms(c), dt); flush(io)
-        c < best.c && (global best = (; c, mat = s.mat, light = s.light))
-        @printf("%4d/%d  α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f  (%.0f s)%s\n", i, length(cands), ai, an, ei, en, s.mat.diffuse_weight, relrms(c), dt,
+        @printf(io, "%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.6f\t%.1f\n", ai, an, ei, en, s.u0.mat.diffuse_weight, relrms(c), dt); flush(io)
+        c < best.c && (global best = (; c, mat = s.u0.mat, light = s.u0.light))
+        @printf("%4d/%d  α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f  (%.0f s)%s\n", i, length(cands), ai, an, ei, en, s.u0.mat.diffuse_weight, relrms(c), dt,
                 c == best.c ? "  *" : ""); flush(stdout)
         i % 16 == 0 && GC.gc()
     end
@@ -103,7 +104,7 @@ end
 r0 = init.target.radiometry
 RC.save_state(joinpath(out, "state.json"),
               (; init..., target = RC.RadiometricTarget(init.target.target, init.target.warping, init.target.aspect, RC.TargetRadiometry(best.mat, r0.ink_spread, r0.print_blur)),
-                 light = best.light, camera = s.camera);
+                 light = best.light, camera = s.u0.camera);
               provenance = (; iteration = 0, material_grid = (; alphas = αs, etas = ηs, candidates = length(cands), rel_rms = relrms(best.c))))
 @printf("best: α %.3f/%.3f  η %.2f/%.2f  μ %.3f  rel-RMS %.5f → %s\n", best.mat.roughness_ink, best.mat.roughness_paper, η₂(best.mat.refractive_index_ink), η₂(best.mat.refractive_index_paper),
         best.mat.diffuse_weight, relrms(best.c), joinpath(out, "state.json"))

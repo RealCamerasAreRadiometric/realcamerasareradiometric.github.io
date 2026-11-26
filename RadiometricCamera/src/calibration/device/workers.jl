@@ -125,9 +125,9 @@ function _each_chunk(f, be, c0s)
     for (ok, x) in outs; ok || throw(x); end
     return [x for (_, x) in outs]
 end
-"""Count a device evaluation `k` (`:flux`, `:jac`) of the state `s` (`s.run.device_calls`: instrumentation the batched-path tests read;
+"""Count a device evaluation `k` (`:flux`, `:jac`) of the state `s` (`f.run.device_calls`: instrumentation the batched-path tests read;
 a prefetch counts beside the caller's evaluation)."""
-_count_device_call!(s, k::Symbol) = lock(() -> (s.run.device_calls[k] += 1; nothing), s.run.lock)
+_count_device_call!(f::CalibrationData, k::Symbol) = lock(() -> (f.run.device_calls[k] += 1; nothing), f.run.lock)
 
 @inline function _decode_px(id::UInt32, H::Int32)
     z = Int32(id) - Int32(1)

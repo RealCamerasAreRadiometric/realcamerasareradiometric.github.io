@@ -29,8 +29,8 @@
     @testset "per-tile block (grid lens, warping free)" begin
         glens = _image_start(cam(RCg.VgtkCore.Lens(RCg.VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H), (10, 10)).camera
         s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
-        prob, _ = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
-        held, idx = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1, fixed = (:material,))
+        prob, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+        held, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]                                                         # the block stays variable
         t = largest_tile(prob); vars = NL.getvars(t, prob.variables)
         th = largest_tile(held); varsh = NL.getvars(th, held.variables)
@@ -49,13 +49,13 @@
         kb = cam(RCg.VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0), 41.216, (16.32, 15.36), W, H)
         board, m = gold_board(W, H; h = gold_h())
         s = gold_state(board, m, kb)
-        prob, _ = build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = 1)
-        held, idx = build_problem(s; damping = VgtkCore.LevenbergDamping(), height_degree = 1, fixed = (:material,))
+        prob, _ = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1)
+        held, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1, fixed = (:material,))
         @test idx.free[idx.material]
         r = get(prob.problem.costs, PerViewResidual{9})[1]; rh = get(held.problem.costs, PerViewResidual{9})[1]
         frozen_columns_check((r, NL.getvars(r, prob.variables)), (rh, NL.getvars(rh, held.variables)), RCg.static(127))
         # nothing rides the block: "material" holds the whole block (no variable Θ_m to hold inside it)
-        whole, idxw = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed = (:material,))
+        whole, idxw = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed = (:material,))
         @test !idxw.free[idxw.material] && RCg.material_fixed(whole.variables[idxw.material]) == ()
     end
     end

@@ -35,7 +35,7 @@
     @testset "the case si30_bc5_warped: the 03.11 run's values" begin
         t = rc["cases"]["si30_bc5_warped"]
         @test t["kind"] == "lens"
-        alg, stops = RadiometricCamera.read_calibration(t["pipeline"]); o = alg.options
+        alg, stops = RadiometricCamera.read_calibration(t["pipeline"]); o = alg.refinement.options
         @test o.frontend.type === RadiometricCamera.SchoepsFrontend && o.frontend.page_mm == (1000.0, 1000.0)
         @test o.frontend.texture_features_size == (4000, 4000)
         @test o.camera.sensor_mm == 35.6 && o.camera.f_mm == 14.6776 && o.camera.fnumber == 22.0 && !("aperture" in o.fixed)

@@ -9,8 +9,8 @@
     # the near-gauge: one infinitesimal rotation ω of every node direction (its tangent coordinates t_k · (ω × d)) and of every
     # pose (left: the camera frame turns, ξ = (ω, 0)) leaves the tile residuals all but unchanged (only the aperture disc and the
     # focus, fixed in the camera frame, do not turn with it)
-    sp = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
-    prob0, idx0 = build_problem_grid(sp; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), rotation_gauge = false)
+    sp = calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
+    prob0, idx0 = build_problem_grid(sp.f, sp.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), rotation_gauge = false)
     pin = RC.rotation_gauge_coordinates(glens_p, nothing)
     @test length(pin) == 3 && pin[1][1:2] == pin[2][1:2] && pin[1][3] == 1 && pin[2][3] == 2 && pin[3][1:2] != pin[1][1:2]
     # transversal: the three held coordinates of the rotation's field are a nonsingular map of ω (a slice of the gauge orbit)
@@ -19,7 +19,7 @@
     M = [held_coord(SVector{3}(I[1:3, j]), p) for p in pin, j in 1:3]
     @test cond(M) < 1e3
     # with the gauge held: every tile's and the smoothness's columns of the held coordinates are exactly zero
-    prob1, idx1 = build_problem_grid(sp; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
+    prob1, idx1 = build_problem_grid(sp.f, sp.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
     # its kept NLLSsolver cache is built for the solve's damping (the optimizer's, λ·I), so it is reused, never rebuilt per solve (RC 0.9.0 review, finding 1)
     @test same_cache_type(prob1, VgtkCore.LevenbergDamping()) && !same_cache_type(prob1, VgtkCore.MarquardtDamping())
     G_x = size(D, 2)
@@ -48,11 +48,11 @@
     # and the joint LM moves none of them (a zero column's step is zero), the poses and the grid both free: every accepted step leaves
     # the chief node where it is and moves the roll node along its free tangent only, in that step's chart (the chart turns with the
     # node, so the held coordinate is zero per step, not in the start's chart once the node has turned)
-    sl = CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
+    sl = calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     (gx1, gy1, _) = pin[1]; (gx3, gy3, c3) = pin[3]
     node(lens, gx, gy) = normalize(SVector{3, Float64}(VgtkCore.directions(VgtkCore.model(lens))[gy, gx]))
-    roll = [node(sl.camera.geometric, gx3, gy3)]; chief = [node(sl.camera.geometric, gx1, gy1)]
-    _lm_tiles!(sl; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:focus, :aperture, :vignetting, :lighting), iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
+    roll = [node(sl.u0.camera.geometric, gx3, gy3)]; chief = [node(sl.u0.camera.geometric, gx1, gy1)]
+    _lm_tiles!(sl.f, sl.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:focus, :aperture, :vignetting, :lighting), iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
     @test length(roll) == 4 && all(d -> norm(d - chief[1]) < 1e-14, chief)                       # the chief node: both coordinates held
     moves = [roll[k + 1] - roll[k] for k in 1:3]
     @test norm(roll[end] - roll[1]) > 0

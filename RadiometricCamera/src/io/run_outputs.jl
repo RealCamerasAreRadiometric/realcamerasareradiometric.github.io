@@ -44,7 +44,7 @@ that did not iterate, at the final state. `nothing` (the LM did not run): `(Retu
 lm_termination(res) = res === nothing ? (VgtkCore.ReturnCode.Default, VgtkCore.NoRule) : (res.code, res.rule)
 
 """
-    save_radiometric_calibration(state, result; options)
+    save_radiometric_calibration(f, θ, result; options)
 
 The records of a radiometric calibration (a [`RadiometricCalibration`](@ref) solve's `result` of the state `state`, the run `options`) in the run's
 directory `io.out`, each through VisualGeometryToolkitIO:
@@ -52,30 +52,30 @@ directory `io.out`, each through VisualGeometryToolkitIO:
 `grid.json` / `lens.json` (+ `grid_init.json` / `lens_init.json`; the model spec of the evaluation scripts is `grid:<file>` | `lens:<file>`),
 `state.json`, `radiometric_camera.json`, `radiometric_target.json`, `poses_{init,refined}.json` and `parameters.json` in `io.out`.
 """
-function save_radiometric_calibration(state::CalibrationState, result::VgtkCore.FitResult{<:CalibrationEstimate, <:CalibrationMetadata}; options::PipelineOptions)
+function save_radiometric_calibration(f::CalibrationData, θ::CalibrationParameters, result::VgtkCore.FitResult{<:CalibrationEstimate, <:CalibrationMetadata}; options::PipelineOptions)
     m = result.metadata
     costs = (; linear = (m.linear_cost, m.linear_rms), final = (m.final_cost, m.final_rms), seconds = m.seconds,
                termination = (result.retcode, result.stop_rule), m.folds)
-    return _write_calibration(state, state.start, options, m.solver, m.trace, costs)
+    return _write_calibration(f, θ, f.start, options, m.solver, m.trace, costs)
 end
-function _write_calibration(s::CalibrationState, meta, opts::PipelineOptions, res, trace, costs)
+function _write_calibration(f::CalibrationData, θ::CalibrationParameters, meta, opts::PipelineOptions, res, trace, costs)
     names = meta.names; K = length(names); W₀ = meta.W₀; H₀ = meta.H₀; lens0 = meta.lens0; views0 = meta.views0; route = lm_route(lens0)
-    rcam = s.camera; gfin = rcam.geometric
+    rcam = θ.camera; gfin = rcam.geometric
     (c0, rms0) = meta.costs.init; (c1, rms1) = costs.linear; (c2, rms2) = costs.final
     _write_run_cameras(route, opts, meta, gfin, lens0, trace, costs, (rms0, rms1, rms2))
-    save_state(joinpath(opts.io.out, "state.json"), s, names; page_flip = meta.page_flip,
+    save_state(joinpath(opts.io.out, "state.json"), f, θ, names; page_flip = meta.page_flip,
                provenance = (; iterations = length(trace), μ_lin = meta.μ_lin, cost = (; init = (c0, rms0), linear = (c1, rms1), final = (c2, rms2))))
-    save_radiometric_camera(joinpath(opts.io.out, "radiometric_camera.json"), calibrated_camera(s); provenance = (; views = names))
-    save_radiometric_target(joinpath(opts.io.out, "radiometric_target.json"), radiometric_target(s))
+    save_radiometric_camera(joinpath(opts.io.out, "radiometric_camera.json"), calibrated_camera(f, θ); provenance = (; views = names))
+    save_radiometric_target(joinpath(opts.io.out, "radiometric_target.json"), radiometric_target(f, θ))
     save_poses(joinpath(opts.io.out, "poses_init.json"), [v.pose for v in views0], names; world = meta.world)
-    save_poses(joinpath(opts.io.out, "poses_refined.json"), s.poses, names; world = meta.world)
-    surf = board_surface(s)
+    save_poses(joinpath(opts.io.out, "poses_refined.json"), θ.poses, names; world = meta.world)
+    surf = board_surface(θ)
     feats1 = _board_features(meta, surf, meta.features)
-    be1 = detection_bearings(gfin, s.poses, feats1, meta.fpx)
-    moved_m = [norm(s.poses[k].t - views0[k].pose.t) for k in 1:K]; moved = _mm.(moved_m)
-    save_run_parameters(joinpath(opts.io.out, "parameters.json"), _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, route, costs, trace, res,
+    be1 = detection_bearings(gfin, θ.poses, feats1, meta.fpx)
+    moved_m = [norm(θ.poses[k].t - views0[k].pose.t) for k in 1:K]; moved = _mm.(moved_m)
+    save_run_parameters(joinpath(opts.io.out, "parameters.json"), _run_parameters(opts, meta, f, θ, lens0, gfin, rcam, surf, be1, moved_m, route, costs, trace, res,
                                                                                     (c0, rms0), (c1, rms1), (c2, rms2));
-                        provenance = (; window_width = something(_device_entry(s, :window_width), 0)))   # an execution setting (`_window_width`)
+                        provenance = (; window_width = something(_device_entry(f, :window_width), 0)))   # an execution setting (`_window_width`)
     @printf("bearing error of the detections: init %.3f px → refined model + refined poses %.3f px; camera centres moved %.1f–%.1f mm\n",
             _med(meta.be0), _med(be1), minimum(moved), maximum(moved))
     println("written to ", opts.io.out, "; REFINE ", uppercase(_camera_file(route)), " DONE"); flush(stdout)
@@ -95,14 +95,14 @@ _count_reasons(models) = (d = Dict{Any, Int}(); foreach(m -> (r = VgtkCore.compo
 
 # ---- the run's parameters (rc/run_parameters/v1) -----------------------------------------------------------------------------------
 """
-    _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, route, costs, trace, res, cost0, cost1, cost2) -> NamedTuple
+    _run_parameters(opts, meta, f, θ, lens0, gfin, rcam, surf, be1, moved_m, route, costs, trace, res, cost0, cost1, cost2) -> NamedTuple
 
 The body of a refinement's `rc/run_parameters/v1` record ([`save_run_parameters`](@ref)): what the run was given and what it measured,
 never what its model records hold (the camera, the target, the poses, the light and the settings are radiometric_camera.json,
 radiometric_target.json, poses_*.json and state.json). ASCII snake_case keys, no unit in a key: every length a plain metre value here
 (the writer puts it in the file's `length_unit`), image quantities in the photographs' (COLMAP) pixels, the rest dimensionless.
 """
-function _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, route::LmRoute, costs, trace, res, cost0, cost1, cost2)
+function _run_parameters(opts, meta, f::CalibrationData, θ::CalibrationParameters, lens0, gfin, rcam, surf, be1, moved_m, route::LmRoute, costs, trace, res, cost0, cost1, cost2)
     m(x) = VgtkCore.ustrip(VgtkCore.m, x)                                     # a length quantity → plain metres
     sp = opts.grid.start_perturbation
     fv = _support_focus_values(rcam.focus, meta.in_support); fm = 1 / mean(fv)
@@ -124,7 +124,7 @@ function _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, r
         # [focus.smoothness] as the run applied it: its type and weight β, and the row weight β Σϕ²/N of its bending rows
         # (`focus_smoothness!`); nothing without a focus smoothness
         focus_options = meta.focus_row_weight > 0 ? (; smoothness = (; smoothness_record(opts.focus.smoothness)..., row_weight = meta.focus_row_weight)) : nothing,
-        resolution_used = [_image_width(s), _image_height(s)], samples = meta.samples, masked_pixels = meta.npx,
+        resolution_used = [_image_width(θ), _image_height(θ)], samples = meta.samples, masked_pixels = meta.npx,
         sensor_width = m(_sensor_width(opts)), focal_length = m(_focal_length(opts)), nominal_focal = meta.fpx,
         aperture_start = meta.R0, focus_distance_start = meta.d_c, linearize = opts.io.linearize, material_fixed = "material" in opts.fixed,
         material_mu_start = opts.material.mu, mu_linear = meta.μ_lin,
@@ -137,7 +137,7 @@ function _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, r
         inplane_print_error = _inplane_modelled(opts, surf) ? (; free = _surface_free(opts, :inplane), start = collect(Float64, meta.inplane0)) : nothing,
         focus_distance = isfinite(fm) ? fm : nothing, focus_support_nodes = length(fv),   # 1/mean t̂ over the support nodes (Inf: at infinity)
         bearing_error = isempty(meta.be0) ? nothing : (; init_median = _med(meta.be0), init_p90 = _q90(meta.be0), refined_median = _med(be1), refined_p90 = _q90(be1)),
-        sensor_characterization = opts.camera.sensor_characterization, sensor_models = sensor_record(meta.names, s.sensor_models),
+        sensor_characterization = opts.camera.sensor_characterization, sensor_models = sensor_record(meta.names, f.sensor_models),
         sensor_model = hasproperty(meta, :sensor_model) ? meta.sensor_model : nothing,   # mode, used, the record present (`sensor_model_record`): "off" + present = a record not used
         camera_moved = moved_m, iterations = length(trace), seconds = round(costs.seconds),
         stopped = res === nothing ? "no LM iteration" : string(res.rule),

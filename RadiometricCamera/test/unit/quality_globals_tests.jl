@@ -1,6 +1,6 @@
 # The no-global-state rule (owner, 2026-11-14: "These global constants should not exist"): no module-level mutable container configures
 # or records a run. A run's state — the LM's final-iteration mark, the scrubbed Jacobian entries, the device-call counts — lives on the
-# calibration state (`CalibrationState.run`), so two calibrations in one process never see each other's. The allow-list holds the
+# calibration's data (`CalibrationData.run`), so two calibrations in one process never see each other's. The allow-list holds the
 # process resources that are no run's state, each with its reason; it only ever shrinks.
 
 @testitem "quality: no module-level run state" begin
@@ -24,7 +24,7 @@ end
 @testitem "a state's run record: its own final-iteration mark, scrubbed counts and device calls" begin
     using Test, RadiometricCamera
     const RC = RadiometricCamera
-    @test fieldtype(CalibrationState, :run) === RC._LmRun
+    @test fieldtype(RC.CalibrationData, :run) === RC._LmRun
     a, b = RC._LmRun(), RC._LmRun()
     a.final_iteration = true; a.scrubbed[:pose] = 3; a.device_calls[:flux] += 1
     @test !b.final_iteration && isempty(b.scrubbed) && b.device_calls == Dict(:flux => 0, :jac => 0)   # never shared between states

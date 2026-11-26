@@ -10,19 +10,19 @@
     import VisualRadiometryToolkitCore as VrtkCore
     NL = RC.NLLSsolver
     S = NEScene.SCENE
-    state(; kw...) = RC.CalibrationState(S.sc, S.st, RC.with_vignetting(S.camera, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NEScene.W, NEScene.W); degree = 2)),
+    state(; kw...) = RC.calibration_problem(S.sc, S.st, RC.with_vignetting(S.camera, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NEScene.W, NEScene.W); degree = 2)),
                                          copy(S.poses), RC.with_μ(S.mat, 0.7), VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, kw...)
     su = state()
-    wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
+    wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.f.ϕ]
     sw = state(; weights = wts)
-    @test su.weights isa RC.Unweighted && sw.weights == wts
+    @test su.f.weights isa RC.Unweighted && sw.f.weights == wts
     # the cost's residuals: the photometric residuals times the weights; the relative RMS in the whitened norm
-    @test all(k -> RC.residuals(sw)[k] == wts[k] .* RC.photometric_residuals(sw)[k], 1:2)
-    @test RC.residuals(su) == RC.photometric_residuals(su)                           # Unweighted: the rows as measured, bit for bit
-    @test RC.cost(sw)[1] ≈ sum(sum(abs2, wts[k] .* RC.photometric_residuals(su)[k]) for k in 1:2) / 2 rtol = 1e-14
-    @test RC.data_norm2(sw) ≈ sum(sum(abs2, wts[k] .* su.ϕ[k]) for k in 1:2) rtol = 1e-14
+    @test all(k -> RC.residuals(sw.f, sw.u0)[k] == wts[k] .* RC.photometric_residuals(sw.f, sw.u0)[k], 1:2)
+    @test RC.residuals(su.f, su.u0) == RC.photometric_residuals(su.f, su.u0)                           # Unweighted: the rows as measured, bit for bit
+    @test RC.cost(sw.f, sw.u0)[1] ≈ sum(sum(abs2, wts[k] .* RC.photometric_residuals(su.f, su.u0)[k]) for k in 1:2) / 2 rtol = 1e-14
+    @test RC.data_norm2(sw.f) ≈ sum(sum(abs2, wts[k] .* su.f.ϕ[k]) for k in 1:2) rtol = 1e-14
     # the per-view route: the host residual and the row kernel's Jacobian, each row times its weight
-    pu, _ = RC.build_problem(su; damping = RC.VgtkCore.LevenbergDamping()); pw, _ = RC.build_problem(sw; damping = RC.VgtkCore.LevenbergDamping())
+    pu, _ = RC.build_problem(su.f, su.u0; damping = RC.VgtkCore.LevenbergDamping()); pw, _ = RC.build_problem(sw.f, sw.u0; damping = RC.VgtkCore.LevenbergDamping())
     cu = get(pu.problem.costs, RC.PerViewResidual{9}); cw = get(pw.problem.costs, RC.PerViewResidual{9})
     for k in 1:2
         vu = NL.getvars(cu[k], pu.variables); vw = NL.getvars(cw[k], pw.variables)
@@ -33,40 +33,40 @@
         @test Jw ≈ wts[k] .* Ju rtol = 1e-12
     end
     # the closed-form blocks: the QR systems and the reductions' cost, Jᵀr and JᵀJ, every row under its weight
-    ppu = RC.all_parts(su); ppw = RC.all_parts(sw)
+    ppu = RC.all_parts(su.f, su.u0); ppw = RC.all_parts(sw.f, sw.u0)
     W2 = reduce(vcat, wts)
-    A, b = RC._weighted_system(sw, ppw, Val(:vig)); A0, b0 = RC._weighted_system(su, ppu, Val(:vig))
+    A, b = RC._weighted_system(sw.f, sw.u0, ppw, Val(:vig)); A0, b0 = RC._weighted_system(su.f, su.u0, ppu, Val(:vig))
     @test A == W2 .* A0 && b == W2 .* b0
-    cu0, gu, Hu = RC.radiometry_normal_equations(su, ppu; mu = false)
+    cu0, gu, Hu = RC.radiometry_normal_equations(su.f, su.u0, ppu; mu = false)
     s3 = state(; weights = [fill(3.0, length(w)) for w in wts])
-    c3, g3, H3 = RC.radiometry_normal_equations(s3, RC.all_parts(s3); mu = false)
+    c3, g3, H3 = RC.radiometry_normal_equations(s3.f, s3.u0, RC.all_parts(s3.f, s3.u0); mu = false)
     @test isapprox(c3, 9cu0; rtol = 1e-12) && isapprox(Vector(g3), 9 .* Vector(gu); rtol = 1e-12) && isapprox(Matrix(H3), 9 .* Matrix(Hu); rtol = 1e-12)
-    cw0 = RC.radiometry_normal_equations(sw, ppw; mu = false)[1]
-    @test isapprox(cw0, RC.parts_cost(sw, ppw); rtol = 1e-14) && cw0 != cu0
+    cw0 = RC.radiometry_normal_equations(sw.f, sw.u0, ppw; mu = false)[1]
+    @test isapprox(cw0, RC.parts_cost(sw.f, sw.u0, ppw); rtol = 1e-14) && cw0 != cu0
     # the data's residual resolution (LmStops): the quantisation the data resolve, never the noise — each row's code step q over √12 in
     # the row's units (q·w whitened, q as measured); a decoded image has no code step: 0 (Core's own resolution alone)
-    @test RC.lm_abstol(su) == 0 && RC.lm_abstol(sw) == 0
-    q = [fill(1 / 15871, length(p)) for p in su.ϕ]
+    @test RC.lm_abstol(su.f) == 0 && RC.lm_abstol(sw.f) == 0
+    q = [fill(1 / 15871, length(p)) for p in su.f.ϕ]
     sq = state(; quanta = q); swq = state(; weights = wts, quanta = q)
-    @test RC.lm_abstol(sq)^2 ≈ sum(length, q) / 15871^2 / 12 rtol = 1e-13
-    @test RC.lm_abstol(swq)^2 ≈ sum(sum(abs2, wts[k] .* q[k]) for k in 1:2) / 12 rtol = 1e-14
-    @test RC._lm_stops(swq, RC._calibration_stops(; max_iter = 10, max_time = 60.0, ftol = 1e-10, xtol_rel = 1e-12)).residual_resolution == RC.lm_abstol(swq)
+    @test RC.lm_abstol(sq.f)^2 ≈ sum(length, q) / 15871^2 / 12 rtol = 1e-13
+    @test RC.lm_abstol(swq.f)^2 ≈ sum(sum(abs2, wts[k] .* q[k]) for k in 1:2) / 12 rtol = 1e-14
+    @test RC._lm_stops(swq.f, RC._calibration_stops(; max_iter = 10, max_time = 60.0, ftol = 1e-10, xtol_rel = 1e-12)).residual_resolution == RC.lm_abstol(swq.f)
     @test_throws DimensionMismatch state(; quanta = [q[1][1:3], q[2]])
     @test_throws DimensionMismatch state(; weights = [wts[1]])
     # the views' device weights are formed once under the cache lock (the views' Jacobians run concurrently: `_windowed`)
     sc = state(; weights = wts)
-    got = fetch.([Threads.@spawn RC._view_weights_device(sc, k) for _ in 1:16 for k in 1:2])
-    ws = sc.device_cache.weights
+    got = fetch.([Threads.@spawn RC._view_weights_device(sc.f, sc.u0, k) for _ in 1:16 for k in 1:2])
+    ws = sc.f.device_cache.weights
     @test all(i -> got[i] === ws[mod1(i, 2)], eachindex(got)) && ws[1] == wts[1] && ws[2] == wts[2]
 end
 
 @testitem "weighting: whitened rows in the per-tile route" setup = [RCFixtures, GridTilesScene] begin
     using RadiometricCamera: build_problem_grid
     NL = RC.NLLSsolver
-    su = RC.CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
-    wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
-    sw = RC.CalibrationState(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, weights = wts)
-    pu, _ = build_problem_grid(su; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); pw, _ = build_problem_grid(sw; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    su = RC.calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
+    wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.f.ϕ]
+    sw = RC.calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, weights = wts)
+    pu, _ = build_problem_grid(su.f, su.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); pw, _ = build_problem_grid(sw.f, sw.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     for (tu, tw) in zip(RC.tile_costs(pu), RC.tile_costs(pw))
         w3 = [wts[tw.k][3 * (i - 1) + c] for i in tw.pix for c in 1:3]               # a colour state: three rows per pixel, the view's
         vu = NL.getvars(tu, pu.variables); vw = NL.getvars(tw, pw.variables)
@@ -92,19 +92,19 @@ end
     pxs = [RC.masked_pixels(o[2]) for o in obs]
     ϕw = [RC.masked_observations(obs[k][1], pxs[k]; channel = 2) for k in 1:2]
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-    truth = CalibrationState(f.board, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
+    truth = calibration_problem(f.board, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
                              masks = [o[2] for o in obs], ϕ = first.(ϕw), weights = getindex.(ϕw, 2), channel = 2)
-    m = sum(length, truth.ϕ)
-    χ2 = 2cost(truth)[1] / m
+    m = sum(length, truth.f.ϕ)
+    χ2 = 2cost(truth.f, truth.u0)[1] / m
     # the render's own truth is the mean up to the 14-bit encoding of the mosaic (≪ σ): χ²/m is 1 within its spread √(2/m) (≈ 0.04 here)
     @test m > 500 && abs(χ2 - 1) < 0.15
     # each row's code step: one RAW code in the row's units, 1 / (white − black) of its photosite's channel (Core's linearisation)
     @test all(k -> ϕw[k][3] ≈ [1 / (mosaics[k].white - PhotositeScene.BLACK[VgtkCore.photosite_colors(mosaics[k])[v, u] + 1]) for (u, v) in pxs[k]], 1:2)
-    tq = CalibrationState(f.board, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
+    tq = calibration_problem(f.board, f.st, f.camera_t, copy(f.poses), f.mat_t, light_κ, [Array{Float64, 3}(undef, 0, 0, 0) for _ in 1:2];
                           masks = [o[2] for o in obs], ϕ = first.(ϕw), weights = getindex.(ϕw, 2), quanta = last.(ϕw), channel = 2)
     # a fit at the noise level is no exact fit: its cost (χ²/2 ≈ m/2) is far above the resolution's square (the quantisation, Σ (q/σ)²/12),
     # so Core's stationarity postcondition decides it (Success only when stationary)
-    @test 0 < RC.lm_abstol(tq)^2 < 1e-2 * cost(tq)[1]
+    @test 0 < RC.lm_abstol(tq.f)^2 < 1e-2 * cost(tq.f, tq.u0)[1]
     # the same photographs under the same black without a variance law (a ReadNoise alone: the gain dropped): plain values, the rows
     # as measured — the same values (each uncertain value's value) and mask
     rn = VgtkCore.sensor_fixture(; read_noise = (σr, σr, σr, σr), black = Tuple(PhotositeScene.BLACK)).model
@@ -129,18 +129,18 @@ end
     if RC_GPU_TESTS
         NL = RC.NLLSsolver
         su = ne_state()
-        wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.ϕ]
+        wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.f.ϕ]
         S = NEScene.SCENE
-        state(be) = RC.CalibrationState(S.sc, S.st, RC.with_vignetting(S.camera, su.camera.vignetting), copy(S.poses), su.mat, su.light, S.targets; S.masks, weights = wts, backend = be)
+        state(be) = RC.calibration_problem(S.sc, S.st, RC.with_vignetting(S.camera, su.u0.camera.vignetting), copy(S.poses), su.u0.mat, su.u0.light, S.targets; S.masks, weights = wts, backend = be)
         sc = state(RC.KernelAbstractions.CPU()); sg = state(CUDA.CUDABackend())
-        pc, _ = RC.build_problem(sc; damping = RC.VgtkCore.LevenbergDamping()); pg, _ = RC.build_problem(sg; damping = RC.VgtkCore.LevenbergDamping())
+        pc, _ = RC.build_problem(sc.f, sc.u0; damping = RC.VgtkCore.LevenbergDamping()); pg, _ = RC.build_problem(sg.f, sg.u0; damping = RC.VgtkCore.LevenbergDamping())
         for k in 1:2
             rc = get(pc.problem.costs, RC.PerViewResidual{9})[k]; rg = get(pg.problem.costs, RC.PerViewResidual{9})[k]
             r1, J1 = NL.computeresjac(RC.static(1023), rc, NL.getvars(rc, pc.variables)...)
             r2, J2 = NL.computeresjac(RC.static(1023), rg, NL.getvars(rg, pg.variables)...)
             @test maximum(abs, r1 .- r2) < 2e-3 * max(1.0, maximum(abs, r1)) && norm(J1 - J2) < 2e-3 * norm(J1)
         end
-        cc = RC.radiometry_normal_equations(sc, RC.all_parts(sc); mu = false); cg = RC.radiometry_normal_equations(sg, RC.all_parts(sg); mu = false)
+        cc = RC.radiometry_normal_equations(sc.f, sc.u0, RC.all_parts(sc.f, sc.u0); mu = false); cg = RC.radiometry_normal_equations(sg.f, sg.u0, RC.all_parts(sg.f, sg.u0); mu = false)
         @test isapprox(cg[1], cc[1]; rtol = 1e-3) && isapprox(Vector(cg[2]), Vector(cc[2]); rtol = 1e-3)
     end
 end

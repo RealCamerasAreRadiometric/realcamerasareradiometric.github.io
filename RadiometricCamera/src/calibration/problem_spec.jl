@@ -45,8 +45,8 @@ end
 _route_kw(::PerTileRoute, held, opts::PipelineOptions) =
     (; fixed = (held..., _lm_surface_holds(opts)...), _lm_structure(opts)...)
 """The route's LM (`lm_route`): `_lm_views!` per view, `_lm_tiles!` per tile."""
-_lm_route!(s::CalibrationState, ::PerViewRoute; kwargs...) = _lm_views!(s; kwargs...)
-_lm_route!(s::CalibrationState, ::PerTileRoute; kwargs...) = _lm_tiles!(s; kwargs...)
+_lm_route!(f::CalibrationData, θ::CalibrationParameters, ::PerViewRoute; kwargs...) = _lm_views!(f, θ; kwargs...)
+_lm_route!(f::CalibrationData, θ::CalibrationParameters, ::PerTileRoute; kwargs...) = _lm_tiles!(f, θ; kwargs...)
 """Whether the run models an in-plane print error on the surface `surf`: `warping.inplane` names one, or the surface carries one
 (`inplane_on`; a start or a resumed state's). Considered: `_surface_free(opts, :inplane)` (free, not modelled — a held print error is modelled)."""
 _inplane_modelled(opts::PipelineOptions, surf) = opts.warping.inplane != "none" || inplane_on(surf)

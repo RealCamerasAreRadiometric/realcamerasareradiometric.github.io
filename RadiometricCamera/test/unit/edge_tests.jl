@@ -54,9 +54,9 @@
     mat_e = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     # the print's edge parameters (δ, σ_print) are the scene's surface parameters
     board_edge(e) = RadiometricCamera.with_state(board_e, TargetState(edge = e))
-    edge_state(e, targets; kw...) = CalibrationState(board_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
+    edge_state(e, targets; kw...) = calibration_problem(board_edge(e), st_e, camera_e, poses_e, mat_e, light_e, targets; masks = masks_e, kw...)
     blank_e = [zeros(He, We, 3) for _ in 1:2]
-    targets_e = render_all(edge_state(edge_true, blank_e))
+    targets_e = let p = edge_state(edge_true, blank_e); render_all(p.f, p.u0) end
     edge_s = SVector(0.3, 3.0)
 end
 
@@ -94,20 +94,20 @@ end
     z = (0.4 - (12.5 - xg)) / σp
     @test ForwardDiff.partials(ρd[1], 1) ≈ -exp(-z^2 / 2) / sqrt(2π) / σp * 200 rtol = 1e-5   # (the approximation's derivative, ≈ φ to 1e-6)
 
-    r_thin = render_all(edge_state(SVector(1.6, 3.0), blank_e))
+    r_thin = let p = edge_state(SVector(1.6, 3.0), blank_e); render_all(p.f, p.u0) end
     @test all(isfinite, targets_e[1]) && sum(r_thin[1]) < sum(targets_e[1])        # more ink spread → darker
     @test maximum(abs, r_thin[1] .- targets_e[1]) > 0.02 * maximum(targets_e[1])
 
     # ---------------------------------------------------------------------------------------------------------------
     # 4. the tile problem on the distance-map board: the printed edge is no parameter of it (the material block: Θ_m and μ)
     s_e = edge_state(edge_s, targets_e)
-    prob_e, idx_e = build_problem_grid(s_e; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob_e, idx_e = build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     tiles_e = RC.tile_costs(prob_e)
     r_e = tiles_e[argmax([length(t.pix) for t in tiles_e])]
     vars_e = collect(RC.NLLSsolver.getvars(r_e, prob_e.variables))
     @test RC.NLLSsolver.nvars(vars_e[8]) == 9 && !any(n -> isdefined(RC, n), (:EDGE_NFREE, :n_fd, :n_edge, :EDGE_FD_H_MM))
-    @test_throws MethodError build_problem_grid(s_e; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), edge_block = true)   # no such keyword
-    @test_throws ArgumentError build_problem_grid(s_e; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:edge,))  # nothing of that name to hold
+    @test_throws MethodError build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), edge_block = true)   # no such keyword
+    @test_throws ArgumentError build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:edge,))  # nothing of that name to hold
     res_e, J_e = RC.NLLSsolver.computeresjac(RC.static(1023), r_e, vars_e...)
     @test size(J_e) == (3 * length(r_e.pix), 6 + 200 + 9 + 1 + 9 + 15 + 27)   # 15 vignetting columns (the hard pin)
     @test res_e ≈ RC.NLLSsolver.computeresidual(r_e, vars_e...) atol = 1e-10
@@ -135,9 +135,9 @@ end
     # ---------------------------------------------------------------------------------------------------------------
     # 5. a refinement leaves the printed edge where it is: the material free, two iterations, δ and σ_print as given
     s_r = edge_state(edge_s, targets_e)
-    c0e = cost(s_r)[1]
-    _lm_tiles!(s_r; stops = RC._calibration_stops(; max_iter = 2), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
-    @test cost(s_r)[1] <= c0e && board_surface(s_r).edge == edge_s
+    c0e = cost(s_r.f, s_r.u0)[1]
+    _lm_tiles!(s_r.f, s_r.u0; stops = RC._calibration_stops(; max_iter = 2), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:poses, :grid, :focus, :aperture, :vignetting, :lighting))
+    @test cost(s_r.f, s_r.u0)[1] <= c0e && board_surface(s_r.u0).edge == edge_s
 end
 
 @testitem "printed edge (distance map) (GPU)" tags = [:gpu] setup = [RCFixtures, RCGPU, EdgeScene] begin
@@ -151,11 +151,11 @@ end
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
         s_g = edge_state(edge_s, targets_e; backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         s_c = edge_state(edge_s, targets_e)
-        prob_c, _ = build_problem_grid(s_c; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
         varsg = RC.NLLSsolver.getvars(rg, prob_g.variables)
@@ -168,9 +168,9 @@ end
         for j in 1:6
             @test norm(Jc[:, j] .- Jg[:, j]) / norm(Jc[:, j]) < 2e-3
         end
-        RC._register_grid_problem!(s_g, prob_g, idx_g)
+        RC._register_grid_problem!(s_g.f, s_g.u0, prob_g, idx_g)
         rjg_b, Jg_b = RC.NLLSsolver.computeresjac(RC.static(1023), rg, varsg...)
         @test device_parity(rjg_b, rjg) && device_parity(Jg_b, Jg)
-        RC._unregister_grid_problem!(s_g)
+        RC._unregister_grid_problem!(s_g.f)
     end
 end

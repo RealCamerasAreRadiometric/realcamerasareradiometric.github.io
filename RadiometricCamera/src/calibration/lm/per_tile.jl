@@ -92,30 +92,31 @@ end
 """
     PerTileResidual{N}
 
-Cost block of one image tile of view `k`: `pix` indexes into `state.px[k]`, `ϕt` the matching
+Cost block of one image tile of view `k`: `pix` indexes into `f.px[k]`, `ϕt` the matching
 target rows and `ωt` their weights (weighting.jl: `Unweighted()`, or the view's 1/σ of those rows), `P0` the 0-based patch coordinates of the window origin. `idx` order:
 pose, patch(0,0), patch(1,0), patch(0,1), patch(1,1), focus, aperture, material, vignetting, lighting.
 `GP` is the patch block type (Core's `ControlPatchManifold`) and `AV` the aperture block type (`ApertureVar`).
 """
-struct PerTileResidual{N, S <: CalibrationState, GP <: VgtkCore.Manifold, AV <: ApertureVar} <: NLLSsolver.AbstractResidual
+struct PerTileResidual{N, D <: CalibrationData, U <: CalibrationParameters, GP <: VgtkCore.Manifold, AV <: ApertureVar} <: NLLSsolver.AbstractResidual
     k::Int
     pix::Vector{Int}
     ϕt::Vector{Float64}
     ωt::Union{Unweighted, Vector{Float64}}
     P0::Tuple{Int, Int}
     idx::SVector{10, Int}
-    state::S
+    f::D
+    θ::U
     dev::Base.RefValue{Any}                              # lazy device data (pixel-id list); nothing on CPU
     free::Union{Nothing, BitMatrix}                      # the present nodes (`[g_x, g_y]`, per_tile_smoothness.jl); an absent node has no column
     held_rotation_coordinates::NTuple{3, NTuple{3, Int}}              # the three direction coordinates (g_x, g_y, tangent) held (the rotation gauge); zeros: none
 end
 NLLSsolver.ndeps(::PerTileResidual) = static(10)
-NLLSsolver.nres(r::PerTileResidual) = n_channels(r.state) * length(r.pix)   # one residual per measured channel and pixel
+NLLSsolver.nres(r::PerTileResidual) = n_channels(r.f) * length(r.pix)   # one residual per measured channel and pixel
 NLLSsolver.varindices(r::PerTileResidual) = r.idx
 # Type-narrowed like PerViewResidual's getvars: without the asserts the downstream @unroll'd
 # accumulation is inferred over the whole variable-type union across all 10 slots — a compiler
 # memory explosion (the per-view path never hits this because its getvars asserts every slot).
-NLLSsolver.getvars(r::PerTileResidual{N, S, GP, AV}, vars::Vector) where {N, S, GP, AV} =
+NLLSsolver.getvars(r::PerTileResidual{N, D, U, GP, AV}, vars::Vector) where {N, D, U, GP, AV} =
     (vars[r.idx[1]]::VgtkCore.LeftRigidManifold6{Float64}, vars[r.idx[2]]::GP, vars[r.idx[3]]::GP,
      vars[r.idx[4]]::GP, vars[r.idx[5]]::GP, vars[r.idx[6]]::_FocusBlock,
      vars[r.idx[7]]::AV, vars[r.idx[8]]::MaterialVar{Float64},
@@ -205,14 +206,14 @@ function _block_residual(r::PerTileResidual, pose::VgtkCore.LeftRigidManifold6{F
                            p01::_Patch, p11::_Patch, foc::_FocusBlock, ap::ApertureVar,
                            m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar)
     is_valid(m) || return fill(NaN, NLLSsolver.nres(r))      # a step the material block could not represent: rejected
-    s = r.state
+    f, θ = r.f, r.θ
     # (the material block's finiteness is its `is_valid`, checked above)
     finite = all(isfinite, VgtkCore.model(pose).t) && all(isfinite, VgtkCore.model(pose).R) && all(isfinite, VgtkCore.model(foc).t̂_i) &&
              isfinite(ap.r) && all(isfinite, control_points(VgtkCore.model(vg))) && all(isfinite, coefficients(lt.light)) &&
              all(((p, q),) -> _patch_finite(p, r.free, r.P0[1] + q[1], r.P0[2] + q[2]), zip((p00, p10, p01, p11), ((0, 0), (1, 0), (0, 1), (1, 1))))
     finite || return fill(NaN, NLLSsolver.nres(r))
     vars = (pose, p00, p10, p01, p11, foc, ap, m, vg, lt)
-    ent = _view_batch!(s, r, vars, false)
+    ent = _view_batch!(f, θ, r, vars, false)
     ivs = ent === nothing ? (1:length(r.pix)) : r.pix
     ent === nothing && (ent = _tile_batch(r, vars, false))
     return _tile_residual(ent.flux, r, ivs)
@@ -282,10 +283,10 @@ _patch_var(lens0::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:S
 """The direction controls of the nodes `rows × cols` (1-based x, y) of a grid lens, laid `[g_x, g_y]`."""
 _patch_nodes(lens0, rows, cols) = [SVector{3, Float64}(_direction_node(lens0, gx - 1, gy - 1)) for gx in rows, gy in cols]
 """The aperture variable: the scalar radius of the state."""
-_aperture_var(::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, s::CalibrationState) = ApertureVar(aperture_radius(s))
+_aperture_var(::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, θ::CalibrationParameters) = ApertureVar(aperture_radius(θ))
 
 """
-    build_problem_grid(s; damping, patch = GRID_PATCH, fixed = (), height_degree = 0,
+    build_problem_grid(f, θ; damping, patch = GRID_PATCH, fixed = (), height_degree = 0,
                        smoothness = nothing, inplane = false) -> (problem::LmProblem, idx)
 
 The per-tile LM problem over the grid-lens state, VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`):
@@ -313,12 +314,12 @@ The parameters are the nodes the lens holds (Core's `present_nodes`; `with_prese
 an absent node is an `ArgumentError` (no residual reads an absent node), and a patch block with no present node is no variable.
 * `smoothness` (a `GridSmoothness`, `grid_smoothness`; `nothing` = none): its rows, one cost block per patch block or pair of them.
 """
-function build_problem_grid(s::CalibrationState{N}; damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
+function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
                             height_degree::Integer = 0,
                             smoothness = nothing, rotation_gauge::Bool = !(:poses in Symbol.(fixed)),
                             inplane::Bool = false) where {N}
     fixed = Tuple(Symbol(k) for k in fixed)                 # the holds by name, once (a config's strings): every test below reads these
-    lens0 = s.camera.geometric
+    lens0 = θ.camera.geometric
     is_grid_lens(lens0) || throw(ArgumentError("build_problem_grid needs grid-lens views (Core's SplineLens camera; loader lens = :grid)"))
     G_x, G_y = grid_dims(lens0)
     C_x, C_y = G_x - 3, G_y - 3
@@ -326,22 +327,22 @@ function build_problem_grid(s::CalibrationState{N}; damping::VgtkCore.LmDamping,
     (px_n >= 5 && py_n >= 5) || throw(ArgumentError("patch size must be ≥ 5 nodes (2×2-window coverage)"))
     (G_x % px_n == 0 && G_y % py_n == 0) || throw(ArgumentError("patch size must divide the grid ($G_x × $G_y)"))
     nPx = G_x ÷ px_n; nPy = G_y ÷ py_n
-    K = n_views(s)
-    vv = VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), vignetting_basis(s))   # Θ_v: Core's LinearSubspaceManifold
-    lv = LightingVar(s.light; s.channel)
+    K = n_views(θ)
+    vv = VgtkCore.restrict(VgtkCore.ParameterManifold(θ.camera.vignetting), vignetting_basis(f, θ))   # Θ_v: Core's LinearSubspaceManifold
+    lv = LightingVar(θ.light; f.channel)
     PatchT, AVT = _grid_block_types(lens0, px_n, py_n)
     NH = _surface_held(fixed, :height) ? 0 : height_nparams(height_degree)   # the surface's parameters: the model's, unless `fixed` holds them
     inplane = inplane && !_surface_held(fixed, :inplane)
     material_held, blocks_held = _hold_material(fixed, NH > 0 || inplane)   # Θ_m alone while a surface parameter rides
-    mv = MaterialVar(s.mat, s.board.state, s.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
-    TileT = PerTileResidual{N, typeof(s), PatchT, AVT}
+    mv = MaterialVar(θ.mat, θ.surface, _board(f, θ); height = NH, inplane, f.channel, fixed = material_held, f.mu_bounds)
+    TileT = PerTileResidual{N, typeof(f), typeof(θ), PatchT, AVT}
     variables = Any[]; blocks = Any[]
     held = VgtkCore.present_nodes(VgtkCore.model(lens0))
     free = all(held) ? nothing : interior_nodes(held)
     # the common rotation of the directions and the poses, held once by three direction coordinates (while the poses can turn with it)
     held_rotation_coordinates = rotation_gauge ? rotation_gauge_coordinates(lens0, free) : _NO_ROTATION_GAUGE
     for k in 1:K
-        push!(variables, VgtkCore.LeftRigidManifold6(s.poses[k]))
+        push!(variables, VgtkCore.LeftRigidManifold6(θ.poses[k]))
     end
     ip = Matrix{Int}(undef, nPx, nPy)
     L = px_n * py_n
@@ -350,13 +351,13 @@ function build_problem_grid(s::CalibrationState{N}; damping::VgtkCore.LmDamping,
         push!(variables, _patch_var(lens0, rows, cols)); ip[PI + 1, PJ + 1] = length(variables)
     end
     smoothness === nothing || _add_grid_smoothness!(blocks, smoothness, ip, (px_n, py_n), free === nothing ? trues(G_x, G_y) : free, PatchT; held_rotation_coordinates)
-    push!(variables, focus_block(focus(s)), _aperture_var(lens0, s), mv, vv, lv)
+    push!(variables, focus_block(focus(θ)), _aperture_var(lens0, θ), mv, vv, lv)
     i_f, i_r, i_m, i_v, i_l = (length(variables) - 4):length(variables)
-    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)
+    _add_focus_smoothness!(blocks, i_f, N, f.focus_smoothness)
     n_tiles = 0
     for k in 1:K
         groups = Dict{Tuple{Int, Int}, Vector{Int}}()
-        for (i, (u, v)) in enumerate(s.px[k])
+        for (i, (u, v)) in enumerate(f.px[k])
             𝐩 = 𝐩_of_pixel(u, v)
             cx, _, cy, _ = _grid_support(lens0, 𝐩)
             I = clamp(fld(cx - 1, px_n), 0, nPx - 2)
@@ -366,20 +367,20 @@ function build_problem_grid(s::CalibrationState{N}; damping::VgtkCore.LmDamping,
         for ((I, Jt), pix) in groups
             # the 2×2-window guarantee: every pixel's support (± 1 cell margin) inside patches {I, I+1} × {J, J+1}
             for i in pix
-                u, v = s.px[k][i]
-                free === nothing || _check_reads_present(lens0, s.settings.sensor, u, v, k)
+                u, v = f.px[k][i]
+                free === nothing || _check_reads_present(lens0, f.settings.sensor, u, v, k)
                 𝐩 = 𝐩_of_pixel(u, v)
                 cx, _, cy, _ = _grid_support(lens0, 𝐩)
                 ((max(cx - 1, 0) >= I * px_n) && (min(cx + 1, C_x - 1) + 3 <= (I + 2) * px_n - 1) &&
                  (max(cy - 1, 0) >= Jt * py_n) && (min(cy + 1, C_y - 1) + 3 <= (Jt + 2) * py_n - 1)) ||
                     throw(AssertionError("tile support escapes its 2×2 patch window — decrease the tile shift or increase patch"))
             end
-            nc = n_channels(s)                                  # the measured channels' entries of the tile's pixels
+            nc = n_channels(f)                                  # the measured channels' entries of the tile's pixels
             rows = [nc * (i - 1) + c for i in pix for c in 1:nc]   # the tile's rows of its view: its ϕt and their weights, one gather
-            ϕt = s.ϕ[k][rows]
+            ϕt = f.ϕ[k][rows]
             idx = SVector(k, ip[I + 1, Jt + 1], ip[I + 2, Jt + 1], ip[I + 1, Jt + 2], ip[I + 2, Jt + 2],
                           i_f, i_r, i_m, i_v, i_l)
-            push!(blocks, TileT(k, pix, ϕt, _select_rows(_view_weights(s.weights, k), rows), (I, Jt), idx, s, Ref{Any}(nothing), free, held_rotation_coordinates))
+            push!(blocks, TileT(k, pix, ϕt, _select_rows(_view_weights(f.weights, k), rows), (I, Jt), idx, f, θ, Ref{Any}(nothing), free, held_rotation_coordinates))
             n_tiles += 1
         end
     end
@@ -425,8 +426,8 @@ end
 
 """The camera (with the re-assembled grid lens), the poses, the material, the surface and the lighting from a grid-problem variable
 vector (as `extract_variables`)."""
-function extract_variables_grid(s::CalibrationState, vars::Vector, idx)
-    lens0 = s.camera.geometric::GridLike
+function extract_variables_grid(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
+    lens0 = θ.camera.geometric::GridLike
     ap = vars[idx.aperture]::ApertureVar
     lens_new = _assemble_lens(lens0, vars, idx.patches)
     mv = vars[idx.material]::MaterialVar
@@ -436,26 +437,26 @@ function extract_variables_grid(s::CalibrationState, vars::Vector, idx)
 end
 
 """
-    _lm_tiles!(s; stops, damping, patch = GRID_PATCH, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_tiles!(f, θ; stops, damping, patch = GRID_PATCH, kwargs...) -> (; code, rule, iterations, cost)
 
 Joint LM over the per-tile grid problem (all blocks; `fixed` as in `_lm_views!` with `:grid` for the patch blocks in place of
 `:distortion`). `height_degree` and `smoothness` as in `build_problem_grid`, the problem and its held blocks
 its; `iter_callback(it, cost, camera, poses, mat, surface, light)` sees the current best variables after every iteration, and `lm_log` as `_lm_views!`'s. The solve
 and its stopping tests and termination record as `_lm_views!`'s (VisualGeometryToolkitCore's `lmsolve_chart!` under `_lm_stops`).
 """
-function _lm_tiles!(s::CalibrationState; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH,
+function _lm_tiles!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH,
                     fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), iter_callback = nothing,
                     height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
-    problem, idx = build_problem_grid(s; damping, patch, fixed, height_degree, smoothness, inplane)
-    callback = _final_iteration_callback(_lm_callback(s, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), s, stops.max_iter)
-    _reset_scrubbed!(s.run)
+    problem, idx = build_problem_grid(f, θ; damping, patch, fixed, height_degree, smoothness, inplane)
+    callback = _final_iteration_callback(_lm_callback(f, θ, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), f, stops.max_iter)
+    _reset_scrubbed!(f.run)
     result = try                                                 # (Core's stall postcondition runs inside, the tiles still batched)
-        _with_registered(() -> VgtkCore.lmsolve_chart!(problem, _lm_stops(s, stops); callback), s, problem, idx)
+        _with_registered(() -> VgtkCore.lmsolve_chart!(problem, _lm_stops(f, stops); callback), f, θ, problem, idx)
     finally
-        s.run.final_iteration = false
-        _report_scrubbed(s.run, "_lm_tiles!")
+        f.run.final_iteration = false
+        _report_scrubbed(f.run, "_lm_tiles!")
     end
-    read_back!(s, problem, idx, extract_variables_grid)
+    read_back!(f, θ, problem, idx, extract_variables_grid)
     return result
 end
 
@@ -471,15 +472,15 @@ pixels `pix` (its rows among a view's batch) and its measured values `ϕ`."""
 function _tile_dev!(r::PerTileResidual)
     d = r.dev[]
     d === nothing || return d
-    s = r.state
+    f, θ = r.f, r.θ
     ids = Vector{UInt32}(undef, length(r.pix))
     for (j, i) in enumerate(r.pix)
-        u, v = s.px[r.k][i]
-        ids[j] = UInt32((u - 1) * _image_height(s) + v)
+        u, v = f.px[r.k][i]
+        ids[j] = UInt32((u - 1) * _image_height(θ) + v)
     end
-    sh(a) = _shared_read_only!(s.backend, a)                  # read on the window's queues too, written only here
-    d = (; px = sh(adapt(s.backend, ids)), idx = sh(_index_list(s.backend, length(ids))), pix = sh(adapt(s.backend, Int32.(r.pix))),
-          ϕ = sh(adapt(s.backend, r.ϕt)), ω = _device_weights(s.backend, r.ωt), layouts = Dict{Any, Any}())
+    sh(a) = _shared_read_only!(f.backend, a)                  # read on the window's queues too, written only here
+    d = (; px = sh(adapt(f.backend, ids)), idx = sh(_index_list(f.backend, length(ids))), pix = sh(adapt(f.backend, Int32.(r.pix))),
+          ϕ = sh(adapt(f.backend, r.ϕt)), ω = _device_weights(f.backend, r.ωt), layouts = Dict{Any, Any}())
     r.dev[] = d
     return d
 end
@@ -489,7 +490,7 @@ end
 problem not registered, `_register_grid_problem!`, or variables it cannot locate) — the same kernels as the view's batch, so the
 same values bit for bit."""
 _tile_batch(r::PerTileResidual, vars, need_jac::Bool) =
-    _await(_batch_launch(r.state, r.k, vars, _window_lens(r.state.camera.geometric, r.P0, vars[2], vars[3], vars[4], vars[5]), vars[2],
+    _await(_batch_launch(r.f, r.θ, r.k, vars, _window_lens(r.θ.camera.geometric, r.P0, vars[2], vars[3], vars[4], vars[5]), vars[2],
                          _tile_dev!(r).px, _tile_dev!(r).idx, nothing, need_jac))
 
 """
@@ -501,17 +502,17 @@ A tile's device Jacobian at its variables (`_tile_jacobian`) from its view's bat
 function _tile_jacobian_at(varflags, r::PerTileResidual{N}, pose::VgtkCore.LeftRigidManifold6{Float64}, p00::_Patch{PX, PY},
                            p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
                            ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar) where {N, PX, PY}
-    s = r.state
-    _count_device_call!(s, :jac)
+    f, θ = r.f, r.θ
+    _count_device_call!(f, :jac)
     NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
-    NS = length(s.settings.sensor)
+    NS = length(f.settings.sensor)
     lay = _tile_layout(varflags, N, NS, PX * PY, VgtkCore.tangent_size(vg), NV, J, n_height(m), n_inplane(m); r.free, r.held_rotation_coordinates,
                        fixed = material_fixed(m))
     # every varflags goes through the batched path (2026-10-24): `lay` already omits the fixed blocks' columns and the per-view
     # buffers hold every slot — formerly only the all-free case 1023 was batched, so a run with a fixed block (the paper's fixed
     # aperture) dropped every tile onto the far slower per-tile path
     vars = (pose, p00, p10, p01, p11, foc, ap, m, vg, lt)
-    ent = _view_batch!(s, r, vars, true)
+    ent = _view_batch!(f, θ, r, vars, true)
     ivs = ent === nothing ? (1:length(r.pix)) : r.pix
     ent === nothing && (ent = _tile_batch(r, vars, true))
     return (; _tile_jacobian(r, ent, lay, vars...; ivs)..., ent.flux, ivs)
@@ -524,7 +525,7 @@ tests, the stall postcondition and the grid smoothness's weight selection; the L
 (`computecostgradhess`)."""
 function _block_jacobian(varflags, r::PerTileResidual, vars...)
     t = _tile_jacobian_at(varflags, r, vars...)
-    return _tile_residual(t.flux, r, t.ivs), _host_jacobian(t.J, t.T, t.lay, r.state.run)
+    return _tile_residual(t.flux, r, t.ivs), _host_jacobian(t.J, t.T, t.lay, r.f.run)
 end
 # ---------------------------------------------------------------------------
 # Per-view batched device evaluation (memoized). A tile only receives its own 2 × 2 patch window,
@@ -541,23 +542,23 @@ end
 """Enable batched per-view evaluation for a grid problem (call before optimizing; see _lm_tiles!). `next[k]`: a tile of the view
 whose tiles follow view `k`'s in the cost order (`nothing` after the last), the one the next view's batch is prefetched for;
 `pending[k]`: view `k`'s batch in flight, `(; key, need_jac, fut)` (`_batch_future!`); `lock`: held while they change."""
-_register_grid_problem!(s::CalibrationState, p::VgtkCore.LmProblem, idx) = _register_grid_problem!(s, p.problem, idx)
-function _register_grid_problem!(s::CalibrationState, problem, idx)
-    dc = _ensure_device!(s)
-    _unregister_grid_problem!(s)
-    K = n_views(s)
+_register_grid_problem!(f::CalibrationData, θ::CalibrationParameters, p::VgtkCore.LmProblem, idx) = _register_grid_problem!(f, θ, p.problem, idx)
+function _register_grid_problem!(f::CalibrationData, θ::CalibrationParameters, problem, idx)
+    dc = _ensure_device!(f, θ)
+    _unregister_grid_problem!(f)
+    K = n_views(θ)
     next = Vector{Any}(nothing, K)
     tiles = tile_costs(problem)
     for i in 2:length(tiles)
         k = tiles[i - 1].k
         tiles[i].k != k && next[k] === nothing && (next[k] = tiles[i])
     end
-    s.device_cache = merge(s.device_cache, (; grid = (; problem, patches = idx.patches, lock = ReentrantLock(),
+    f.device_cache = merge(f.device_cache, (; grid = (; problem, patches = idx.patches, lock = ReentrantLock(),
                       cache = [Ref{Any}(nothing) for _ in 1:K], pending = Vector{Any}(nothing, K), next)))
     return nothing
 end
-function _unregister_grid_problem!(s::CalibrationState)
-    dc = s.device_cache
+function _unregister_grid_problem!(f::CalibrationData)
+    dc = f.device_cache
     dc === nothing && return nothing
     gb = get(dc, :grid, nothing)
     if gb !== nothing                                     # a batch still in flight: waited for (its worker back to the pool), dropped
@@ -567,10 +568,10 @@ function _unregister_grid_problem!(s::CalibrationState)
             gb.pending[k] = nothing
         end
     end
-    s.device_cache = Base.structdiff(s.device_cache, NamedTuple{(:grid,)})   # the board, the pixel ids (and the heights' board) kept
+    f.device_cache = Base.structdiff(f.device_cache, NamedTuple{(:grid,)})   # the board, the pixel ids (and the heights' board) kept
     return nothing
 end
-_grid_batch(s::CalibrationState) = _device_entry(s, :grid)
+_grid_batch(f::CalibrationData) = _device_entry(f, :grid)
 
 """The variable vector (variables or varnext) that holds exactly the objects given to the cost `r` (a tile's or a view's)."""
 function _locate_vars(problem, r, given)
@@ -608,13 +609,13 @@ Jacobian batch of view `k` also starts the next view's (`gb.next[k]`, at the sam
 `k`'s tiles are formed — the same kernels on the same inputs, so the same buffers bit for bit. A batch in flight whose key or need is
 not the request's is dropped (its future still completes); a failed batch's exception reaches every tile that waits for it.
 """
-function _view_batch!(s::CalibrationState, r::PerTileResidual{N}, vars, need_jac::Bool) where {N}
-    gb = _grid_batch(s)
+function _view_batch!(f::CalibrationData, θ::CalibrationParameters, r::PerTileResidual{N}, vars, need_jac::Bool) where {N}
+    gb = _grid_batch(f)
     gb === nothing && return nothing
     vec = _locate_vars(gb.problem, r, vars)
     vec === nothing && return nothing
     key = _view_key(gb, vec, vars)
-    fut = lock(() -> _batch_future!(s, gb, r.k, vars, vec, key, need_jac), gb.lock)
+    fut = lock(() -> _batch_future!(f, θ, gb, r.k, vars, vec, key, need_jac), gb.lock)
     ent = fut isa Task ? _fetch_batch(fut) : fut
     lock(gb.lock) do
         p = gb.pending[r.k]
@@ -622,24 +623,24 @@ function _view_batch!(s::CalibrationState, r::PerTileResidual{N}, vars, need_jac
             gb.pending[r.k] = nothing
             gb.cache[r.k][] = ent
         end
-        need_jac && _prefetch_next!(s, gb, r.k, vec)
+        need_jac && _prefetch_next!(f, θ, gb, r.k, vec)
     end
     return ent
 end
 """The batch of a shared future (`_batch_future!`), its job's exception rethrown as the job threw it."""
 _fetch_batch(fut::Task) = try fetch(fut) catch e; e isa TaskFailedException ? throw(e.task.exception) : rethrow() end
 """
-    _batch_future!(s, gb, k, vars, vec, key, need_jac) -> entry | Task
+    _batch_future!(f, θ, gb, k, vars, vec, key, need_jac) -> entry | Task
 
 Under the grid's lock: view `k`'s cached entry for `key` (`need_jac`: one with the Jacobian's buffers), else the future of its batch
 in flight for that key, else a new batch (`_view_batch_launch`) and its future, recorded as in flight (`gb.pending`).
 """
-function _batch_future!(s::CalibrationState, gb, k::Integer, vars, vec, key, need_jac::Bool)
+function _batch_future!(f::CalibrationData, θ::CalibrationParameters, gb, k::Integer, vars, vec, key, need_jac::Bool)
     ent = gb.cache[k][]
     ent !== nothing && ent.key == key && (!need_jac || ent.S !== nothing) && return ent
     p = gb.pending[k]
     p !== nothing && p.key == key && (!need_jac || p.need_jac) && return p.fut
-    job = _view_batch_launch(s, k, vars, vec, key, need_jac)
+    job = _view_batch_launch(f, θ, k, vars, vec, key, need_jac)
     fut = Threads.@spawn _await(job)                      # (a stale batch in flight is replaced; its future still completes)
     gb.pending[k] = (; key, need_jac, fut)
     return fut
@@ -647,12 +648,12 @@ end
 
 """Under the grid's lock: start the Jacobian batch of the view after `k` (`gb.next[k]`) at the trial vector `vec`, unless it is cached
 or in flight already (a residual sweep has no host assembly to overlap: none there)."""
-function _prefetch_next!(s::CalibrationState, gb, k::Integer, vec)
+function _prefetch_next!(f::CalibrationData, θ::CalibrationParameters, gb, k::Integer, vec)
     rn = gb.next[k]
     rn === nothing && return nothing
     length(vec) >= maximum(rn.idx) || return nothing
     varsn = ntuple(i -> vec[rn.idx[i]], 10)
-    _batch_future!(s, gb, rn.k, varsn, vec, _view_key(gb, vec, varsn), true)
+    _batch_future!(f, θ, gb, rn.k, varsn, vec, _view_key(gb, vec, varsn), true)
     return nothing
 end
 
@@ -661,10 +662,10 @@ the flux and, for `need_jac`, the radiance record, the Jacobian chunks, the part
 all queued on the worker's device queue before it waits once — `(; key, flux, flux_d, px, C, S, parts, heights)` (on the device but the host flux), the view
 cache's entry. One queue: the kernels share the board's buffers, and a buffer used on another queue waits for the queue that used it
 last, so separate queues bought little concurrency and made every launch wait for a kernel to end."""
-function _view_batch_launch(s::CalibrationState, k::Integer, vars, vec, key, need_jac::Bool)
-    gb = _grid_batch(s)
-    lensf = _assemble_lens(s.camera.geometric::GridLike, vec, gb.patches)
-    return _batch_launch(s, k, vars, lensf, vec[first(gb.patches)], s.device_cache.px[k], s.device_cache.idx[k], key, need_jac)
+function _view_batch_launch(f::CalibrationData, θ::CalibrationParameters, k::Integer, vars, vec, key, need_jac::Bool)
+    gb = _grid_batch(f)
+    lensf = _assemble_lens(θ.camera.geometric::GridLike, vec, gb.patches)
+    return _batch_launch(f, θ, k, vars, lensf, vec[first(gb.patches)], f.device_cache.px[k], f.device_cache.idx[k], key, need_jac)
 end
 """One chunk of a view batch's Jacobian (`_batch_launch`) in the float type `F`: the chunk's slots `c0 + 1 … c0 + C` seeded on the
 lens `lens` and the board `board` (its state replaced by the seeded one), both in `F` (Core's `kernel_float`, or
@@ -677,38 +678,38 @@ function _tile_chunk(::Val{F}, c0, C, lay, pose, foc, ap, m, lens, board, hi::Bo
 end
 
 """
-    _batch_launch(s, k, vars, lensf, p1, px, idx, key, need_jac) -> job
+    _batch_launch(f, θ, k, vars, lensf, p1, px, idx, key, need_jac) -> job
 
 THE evaluation of the per-tile blocks' kernels: the flux and, for `need_jac`, the radiance record, the Jacobian chunks, the parts, the
 height partials and the printed-edge differences of the pixel ids `px` (`idx` their index list, `_index_list`) of view `k` (all of the view's: `_view_batch_launch`; one
 tile's: `_tile_batch`) under the lens `lensf` (the view's assembled grid, or the tile's window) at the variables `vars`; `p1` one of
 its patch blocks (the slot layout's patch size).
 """
-function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, idx, key, need_jac::Bool) where {N}
+function _batch_launch(f::CalibrationData, θ::CalibrationParameters{N}, k::Integer, vars, lensf, p1, px, idx, key, need_jac::Bool) where {N}
     pose = vars[1]; foc = vars[6]::_FocusBlock; ap = vars[7]::ApertureVar
     m = vars[8]::MaterialVar; vg = vars[9]::VgtkCore.LinearSubspaceManifold; lt = vars[10]::LightingVar
-    dc = _ensure_device!(s)
-    be = s.backend
+    dc = _ensure_device!(f, θ)
+    be = f.backend
     F = VgtkCore.kernel_float(be)
     lens32 = _lens32(be, lensf)
     v32 = View{F, N, typeof(lens32)}(_pose_eltype(F, VgtkCore.model(pose)), lens32, VgtkCore.convert_eltype(F, VgtkCore.model(foc)),
                                      F(ap.r))
-    H = _image_height(s)
-    fluxf = _flux_functor(s, k, v32, VgtkCore.model(vg), m.mat, lt.light, m.surface)
+    H = _image_height(θ)
+    fluxf = _flux_functor(f, θ, k, v32, VgtkCore.model(vg), m.mat, lt.light, m.surface)
     recordf = nothing; hrecordf = nothing; jacf = Tuple{Int, Any}[]; heightf = nothing; partsf = nothing
     hk = nothing
-    C = s.jacobian_chunk
+    C = f.jacobian_chunk
     P = 0
     if need_jac
         Tag = JacTag
         NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
-        NS = length(s.settings.sensor)
+        NS = length(f.settings.sensor)
         # the same slot arithmetic as the per-tile Jacobian (all blocks free)
         lay = _tile_layout(1023, N, NS, length(_patch_dirs(p1)), VgtkCore.tangent_size(vg), NV, J, n_height(m), n_inplane(m);
                            fixed = material_fixed(m))
         P = lay.P
-        st32 = VgtkCore.convert_eltype(F, s.settings)
-        C = VgtkCore.dual_chunk(s.backend, P, s.jacobian_chunk)
+        st32 = VgtkCore.convert_eltype(F, f.settings)
+        C = VgtkCore.dual_chunk(f.backend, P, f.jacobian_chunk)
         # vignetting and lighting are not differentiated here (their columns are the parts kernel's): plain, not duals with
         # zero partials — the same values and partials, fewer registers
         vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
@@ -716,7 +717,7 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         board32 = with_state(dc.board, VgtkCore.convert_eltype(F, m.surface))
         recordf = (be, px, idx, k, H, v32, vig32j, m32, l32j, board32, st32)   # the estimator once per ray (`_launch_record`)
         if _needs_high(F, lay.NH > 0)                      # the nodal heights' kernel and its own record, in Float64 (`HIGH_FLOAT`)
-            hk = _height_inputs(s, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light, lensf)
+            hk = _height_inputs(f, θ, View(VgtkCore.model(pose), lensf, VgtkCore.model(foc), ap.r), VgtkCore.model(vg), m, lt.light, lensf)
             HIGH_FLOAT === F || (hrecordf = (be, px, idx, k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st))   # (CPU: the chunks' record)
             lay.NH > 0 && (heightf = (k, H, hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st, m.surface.h))
         end
@@ -727,8 +728,8 @@ function _batch_launch(s::CalibrationState{N}, k::Integer, vars, lensf, p1, px, 
         end
         partsf = (Int32(k), Int32(H), v32, vig32j, m32, l32j, board32, st32, (Val(J), Val(NV)))   # (`_PartsAt`, with the batch's record)
     end
-    _count_device_call!(s, :flux)
-    st32 = VgtkCore.convert_eltype(F, s.settings)
+    _count_device_call!(f, :flux)
+    st32 = VgtkCore.convert_eltype(F, f.settings)
     vig32j = VgtkCore.convert_eltype(F, VgtkCore.model(vg)); l32j = VgtkCore.convert_eltype(F, lt.light)
     return _on_worker() do
         fo = _launch_rows(fluxf, be, px)
@@ -769,8 +770,8 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::VgtkCore.LeftRigi
                         p10::_Patch, p01::_Patch, p11::_Patch, foc::_FocusBlock,
                         ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold,
                         lt::LightingVar; ivs = r.pix) where {N, PX, PY}
-    s = r.state
-    be = s.backend
+    f, θ = r.f, r.θ
+    be = f.backend
     NV = Int(n_control_points(VgtkCore.model(vg))); J = Int(sh_count(max_degree(lt.light)))
     npx = length(r.pix)
     need_v = !isempty(lay.vig_cols)
@@ -778,28 +779,28 @@ function _tile_jacobian(r::PerTileResidual{N}, ent, lay, pose::VgtkCore.LeftRigi
     need_f = !isempty(lay.focus_cols)
     need_g = any(q -> lay.patch_cols[q] > 0, 1:4)
     need_h = !isempty(lay.height_cols)
-    lens64 = _window_lens(s.camera.geometric, r.P0, p00, p10, p01, p11)
+    lens64 = _window_lens(θ.camera.geometric, r.P0, p00, p10, p01, p11)
     td = _tile_dev!(r)
     bufidx = ivs === r.pix ? td.pix : td.idx                # the tile's pixels among the buffer's: the view's (batched) or its own
-    Gw, gidx = need_f ? _focus_weights(s, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
-    chs = residual_channels(s)
-    Jd, rd = _jacobian_buffers(s, lay.ncol, length(chs) * npx)
-    _launch_row_job!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(s)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
+    Gw, gidx = need_f ? _focus_weights(f, θ, r.k, FocusSpline(VgtkCore.model(foc)), td.pix) : (nothing, nothing)
+    chs = residual_channels(f)
+    Jd, rd = _jacobian_buffers(f, lay.ncol, length(chs) * npx)
+    _launch_row_job!(_jacobian_row!, Jd, npx, rd, ent.px, bufidx, gidx, Int32(_image_height(θ)), ent.S, ent.flux_d, td.ϕ, td.ω, chs,
                            _cached_layout(td.layouts, be, lay), need_lin ? ent.parts : nothing, (J, NV), need_h ? ent.heights : nothing,
-                           need_h ? _device_copy(s, m.dense_basis) : nothing, Gw, Val(N),
-                           s.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,
+                           need_h ? _device_copy(f, m.dense_basis) : nothing, Gw, Val(N),
+                           f.settings.sensor, need_g ? _lens32(be, lens64, Float64) : nothing,
                            need_g ? adapt(be, _window_bases(lens64, PX, PY)) : nothing, r.P0, need_g ? (Val(PX), Val(PY)) : nothing,
                            lt.scale,
-                           need_v ? _device_copy(s, vg.basis) : nothing; exec = _pixel_rows_exec(be))
-    _note_block_bytes!(s, _device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1))   # its share of the view batch
-    return (; J = Jd, res = rd, T = _column_map(lay, s.channel, ap, m), lay)
+                           need_v ? _device_copy(f, vg.basis) : nothing; exec = _pixel_rows_exec(be))
+    _note_block_bytes!(f, _device_bytes(Jd, rd) + ent.bytes * npx ÷ max(length(ent.px), 1))   # its share of the view batch
+    return (; J = Jd, res = rd, T = _column_map(lay, f.channel, ap, m), lay)
 end
 
 """The residual of tile `r` from a view's flux `flux` (three channels per pixel, the kernels'; the tile's pixels at the view pixels
 `ivs`): the measured channels' entries (`residual_channels`) minus the tile's observed `ϕt`, one per measured channel and pixel, under
 the rows' weights `ωt` (`_whiten`; the row kernel's product)."""
 function _tile_residual(flux::AbstractVector, r::PerTileResidual, ivs)
-    chs = residual_channels(r.state); nc = length(chs)
+    chs = residual_channels(r.f); nc = length(chs)
     out = Vector{Float64}(undef, nc * length(r.pix))
     @inbounds for (i, iv) in enumerate(ivs), (j, c) in enumerate(chs)
         e = nc * (i - 1) + j
@@ -810,17 +811,17 @@ end
 
 # The final LM iteration's speculative linearization. NLLSsolver's LM computes the Jacobian at each iteration's first trial point
 # (it becomes the next linearization when the step is accepted), so a run of n iterations evaluates n + 1 Jacobians and the last
-# one is never used. `_lm_tiles!` marks its state (`s.run.final_iteration`, the state's run record) once the iteration cap's last
+# one is never used. `_lm_tiles!` marks its data (`f.run.final_iteration`, the data's run record) once the iteration cap's last
 # iteration begins (`_final_iteration_callback`);
 # its tiles then return their cost alone (zero blocks: the loop stops after that iteration whatever its outcome, and nothing reads
 # that linear system). The mark is set only when the iterator already holds the next linearization (`trialready`: the previous
 # trial was accepted), so the linearization the last iteration starts from is never one of them. A stop by another criterion
 # (cost or step tolerance, time) cannot be foreseen and keeps the extra Jacobian.
-"""`cb`, and after iteration `maxiters - 1` the state marked (`s.run.final_iteration`, unmarked by `_lm_tiles!` on exit)."""
-function _final_iteration_callback(cb, s, maxiters::Integer)
+"""`cb`, and after iteration `maxiters - 1` the data `f` marked (`f.run.final_iteration`, unmarked by `_lm_tiles!` on exit)."""
+function _final_iteration_callback(cb, f::CalibrationData, maxiters::Integer)
     return function (cost, problem, data, iterdata)
         out = cb(cost, problem, data, iterdata)
-        data.iternum + 1 >= maxiters && hasproperty(iterdata, :trialready) && iterdata.trialready && (s.run.final_iteration = true)
+        data.iternum + 1 >= maxiters && hasproperty(iterdata, :trialready) && iterdata.trialready && (f.run.final_iteration = true)
         return out
     end
 end
@@ -844,11 +845,11 @@ NLLSsolver.computeresjac(varflags, r::_DataBlock, vars...) =
     computecostgradhess(varflags, r, vars...) -> (cost, Jᵀr, JᵀJ)
 
 The LM's Gauss–Newton blocks of a view or a tile, formed on the state's backend (`_block_normal_equations`: `_gauss_newton_blocks`):
-the Jacobian never reaches the host. In a grid fit's final iteration (`s.run.final_iteration`) the cost alone. A robust kernel takes
+the Jacobian never reaches the host. In a grid fit's final iteration (`f.run.final_iteration`) the cost alone. A robust kernel takes
 NLLSsolver's default.
 """
 function NLLSsolver.computecostgradhess(varflags, r::_DataBlock, vars...)
-    if r.state.run.final_iteration                       # the final iteration's trial linearization is never used: the cost only
+    if r.f.run.final_iteration                       # the final iteration's trial linearization is never used: the cost only
         n = sum(i -> (Int(varflags) >> (i - 1)) & 1 == 1 ? Int(NLLSsolver.nvars(vars[i])) : 0, eachindex(vars))
         return NLLSsolver.computecost(r, vars...), zeros(n), zeros(n, n)
     end

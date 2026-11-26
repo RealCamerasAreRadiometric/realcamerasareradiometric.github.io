@@ -96,12 +96,12 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
             @test all(count(m) > 50 for m in masks)
             targets = [render_view(k, camera, poses[k], mat, light, board, st, masks[k]) for k in 1:2]
             @test all(t -> all(isfinite, t) && maximum(t) > 0, targets)
-            s = CalibrationState(board, st, camera, poses, mat, light, targets; masks)
-            c, rms = cost(s)
+            s = calibration_problem(board, st, camera, poses, mat, light, targets; masks)
+            c, rms = cost(s.f, s.u0)
             @test isfinite(c) && rms < 1e-6                                   # re-rendering the generating state: zero residual
             moved = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), SVector(0.01, 0.0, 0.0, 0.0, 0.0, 0.0)) for p in poses]
-            s2 = CalibrationState(board, st, camera, moved, mat, light, targets; masks)
-            c2, rms2 = cost(s2)
+            s2 = calibration_problem(board, st, camera, moved, mat, light, targets; masks)
+            c2, rms2 = cost(s2.f, s2.u0)
             @info "pipeline smoke" lens = nameof(typeof(lens)) rel_rms_at_truth = rms rel_rms_moved_10mrad = rms2
             @test rms2 > 1e-3                                                # the render responds to geometry
         end

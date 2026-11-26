@@ -29,20 +29,19 @@ end
 _LmRun() = _LmRun(false, Dict{Symbol, Int}(), Dict{Symbol, Int}(:flux => 0, :jac => 0), ReentrantLock())
 
 """
-    CalibrationState
+    CalibrationData
 
-Everything the calibration works on: the fixed data (the board, a `TexturedTarget`; the quadrature, masks, observed images ϕ; the image
-size is the camera's) and the current
-parameters Θ̄ — the camera every view shares (`camera`, a `RadiometricCameraModel`), one pose per view (`poses`, camera → world),
-the material and the lighting.
+The data of a radiometric calibration, the `f` of its `RefineProblem(f, u0)` ([`RadiometricRefinement`](@ref)): what the
+refinement holds fixed — the board's design (`board`, a `TexturedTarget`: its page, texture, print outline and warping basis; its
+`state` the start's surface, the estimate's is [`CalibrationParameters`](@ref)' `surface`: the kernels' board is
+`_board(f, θ)`), the render settings, the masks and their pixel lists, the photographs and their masked observations ϕ, the rows'
+weights, the vignetting's dependent-node rule, the compute backend and its device data, the measured channel, the focus's
+smoothness rows, the interval of μ, the RAW code steps, the photographs' sensor models and observation model, the record of its
+runs and the start it was lifted from (`start`, `_start_state`'s; `nothing` for bare data). The image size is the camera's.
 """
-mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, TC <: RadiometricCameraModel, TL <: EnvironmentLight, TP <: EuclideanMap}
-    board::SC
+mutable struct CalibrationData{SC <: TexturedTarget, ST <: RenderSettings}
+    board::SC                                 # the board's design; its state the start's surface (the estimate's: θ.surface)
     settings::ST
-    camera::TC                                # Θ_d, Θ_f, r and Θ_v, shared by every view
-    poses::Vector{TP}                         # Θ_e: camera → world per view
-    mat::Material{Float64}                    # Θ_m
-    light::TL                                 # Θ_l
     masks::Vector{BitMatrix}
     px::Vector{Vector{Tuple{Int, Int}}}       # masked pixel lists
     targets::Vector{Array{Float64, 3}}        # observed images
@@ -56,39 +55,62 @@ mutable struct CalibrationState{N, SC <: TexturedTarget, ST <: RenderSettings, T
     focus_smoothness::Matrix{Float64}         # the focus's bending smoothness rows (`focus_smoothness!`); 0 × 0 = none
     mu_bounds::NTuple{2, Float64}             # the interval (lo, hi) of μ (`material.mu_bounds`): the LM's chart, the closed-form solves' clamp
     quanta::Vector{Union{Nothing, Vector{Float64}}}   # per view, each row's RAW code step in its units (`_quanta`); nothing: a decoded image
-    sensor_models::Vector{VgtkCore.SensorModel}   # per view, the photograph's sensor model (Core's, resolved from the camera's characterisation by its EXIF: `photo_set`); the absent model for a decoded image
-    sensor::SensorStatement                   # the photographs' sensor statement (observation_model.jl): the characterisation they were read under, or none
-    photo_kind::PhotoKind                     # the photographs' kind: RAW photosites or decoded images (with `channel`, the state's `observation_model`)
-    run::_LmRun                               # the state's runs: the final-iteration mark, the scrubbed entries, the device calls (`_LmRun`)
-    start::Any                                # the start this state was lifted from (the start, `_start_state`: its geometry, views, costs, masks' record); nothing for a bare state
+    sensor_models::Vector{VgtkCore.SensorModel}   # per view, the photograph's sensor model (Core's, resolved from the camera's characterization by its EXIF: `photo_set`); the absent model for a decoded image
+    sensor::SensorStatement                   # the photographs' sensor statement (observation_model.jl): the characterization they were read under, or none
+    photo_kind::PhotoKind                     # the photographs' kind: RAW photosites or decoded images (with `channel`, the data's `observation_model`)
+    run::_LmRun                               # the runs on these data: the final-iteration mark, the scrubbed entries, the device calls (`_LmRun`)
+    start::Any                                # the start these data were lifted with (`_start_state`: its geometry, views, costs, masks' record); nothing for bare data
 end
 
 """
-    residual_channels(s) -> Tuple
+    CalibrationParameters
+
+The parameters Θ̄ of a radiometric calibration, the `u0` of its `RefineProblem(f, u0)` (refined in place by
+[`RadiometricRefinement`](@ref)): the camera every view shares (`camera`, a `RadiometricCameraModel`: Θ_d, Θ_f, r and Θ_v), one pose
+per view (`poses`, camera → world: Θ_e), the material (Θ_m), the lighting (Θ_l) and the board's surface (`surface`, its
+`TargetState`: the warping h, the print's edge parameters and the in-plane print error).
+"""
+mutable struct CalibrationParameters{N, TC <: RadiometricCameraModel, TL <: EnvironmentLight, TP <: EuclideanMap, TS <: TargetState}
+    camera::TC                                # Θ_d, Θ_f, r and Θ_v, shared by every view
+    poses::Vector{TP}                         # Θ_e: camera → world per view
+    mat::Material{Float64}                    # Θ_m
+    light::TL                                 # Θ_l
+    surface::TS                               # the board's surface (h, the print's edge, the in-plane print error)
+end
+
+"""The kernels' board of data `f` at the parameters `θ`: the board's design with the estimate's surface."""
+_board(f::CalibrationData, θ::CalibrationParameters) = with_state(f.board, θ.surface)
+
+"""
+    residual_channels(f) -> Tuple
 
 The channels a residual reads per pixel: `(1, 2, 3)` for a colour photograph (`channel = 0`), `(c,)` for a single-channel run
 (`io.channel` "R"/"G"/"B", the green photosites): ONE residual per measured pixel or photosite. The kernels evaluate the three
 channels of the flux (one kernel on every backend); a single-channel residual takes channel `c`'s rows, and the lighting and
 the refractive indices η of the other channels are not estimated (they follow channel `c`: `LightingVar`, `MaterialVar`).
 """
-residual_channels(s::CalibrationState) = _residual_channels(s.channel)
+residual_channels(f::CalibrationData) = _residual_channels(f.channel)
 """The observation model of a state's photographs (its `sensor`, `photo_kind` and `channel`): what its records state."""
-observation_model(s::CalibrationState) = ObservationModel(s.sensor, s.photo_kind, _channel_symbol(s.channel))
+observation_model(f::CalibrationData) = ObservationModel(f.sensor, f.photo_kind, _channel_symbol(f.channel))
 """The calibrated camera of a state: its camera, its photographs' observation model and its render settings."""
-calibrated_camera(s::CalibrationState) = CalibratedCamera(s.camera, observation_model(s), s.settings)
+calibrated_camera(f::CalibrationData, θ::CalibrationParameters) = CalibratedCamera(θ.camera, observation_model(f), f.settings)
 _residual_channels(c::Integer) = c == 0 ? (1, 2, 3) : (Int(c),)
-"""The residual rows per pixel (`length(residual_channels(s))`)."""
-n_channels(s::CalibrationState) = length(residual_channels(s))
+"""The residual rows per pixel (`length(residual_channels(f))`)."""
+n_channels(f::CalibrationData) = length(residual_channels(f))
 """The rows of the measured channels of a flux vector `x` laid out three channels per pixel (pixel-major): `x` itself for a colour
 photograph, every third entry from `c` for channel `c` alone."""
 _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
 
 """
-    CalibrationState(board, settings, camera, poses, mat, light, targets; masks = nothing, δ = 0.02,
-                     external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = default_backend(), ϕ = nothing,
-                     channel = 0, mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
-                     sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
-                     sensor = NoSensorRecord(), photo_kind = Decoded(false))
+    CalibrationData(board, settings, camera, poses, targets; masks = nothing, δ = 0.02,
+                    external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = default_backend(), ϕ = nothing,
+                    channel = 0, mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
+                    sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
+                    sensor = NoSensorRecord(), photo_kind = Decoded(false))
+
+The data of a calibration ([`CalibrationData`](@ref)); `camera` and `poses` the start's, which the masks are built from and
+whose vignetting field the dependent-node rule is of; the parameters are [`CalibrationParameters`](@ref)`(f, camera, poses, mat,
+light)`, both in one call [`calibration_problem`](@ref).
 
 `channel` (0: the three channels; 1–3: that channel alone, ONE residual per measured pixel, `residual_channels`): a
 single-channel state ties the other channels' lighting coefficients and refractive indices η to channel `channel`'s
@@ -99,15 +121,15 @@ clamp to it. `jacobian_chunk` (`compute.jacobian_chunk`): the dual partials per 
 the CPU backend takes every slot in one chunk) — 4, not 15: local memory grows ~1.9 KB per partial, and from about 8 partials the
 kernel is bound by spill traffic, so 14 re-traces at 4 beat 4 re-traces at 15 by 4.3× (25,564-px view, RTX 4090, 2026-11-04); 4
 also cuts the driver's local-memory reservation (bytes per thread × resident threads) ~5×. `sensor` and `photo_kind`: the photographs'
-[`ObservationModel`](@ref) with `channel` (`observation_model(s)`, what the state's records state; by default decoded images, no sensor
-record: a state of synthetic renders). `sensor_models`: per view, the photograph's Core `SensorModel` (`photo_set`; the
+[`ObservationModel`](@ref) with `channel` (`observation_model(f)`, what the records state; by default decoded images, no sensor
+record: data of synthetic renders). `sensor_models`: per view, the photograph's Core `SensorModel` (`photo_set`; the
 absent model, `SensorModel()`, by default: a decoded image, or a RAW photograph of a camera stated to have no characterisation). `weights`:
 the rows' weights (weighting.jl, `masked_observations`): `Unweighted()` (the default, rows as measured) or one 1/σ vector per view,
 each of its `ϕ`'s length (whitened rows: the residuals and the Jacobians divided by the measured values' σ). `quanta`: per view,
 each row's RAW code step in its units (`masked_observations`), or `nothing` (a decoded image): what the data resolve
 (`lm_abstol`).
 
-The state of the `RadiometricCameraModel` `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
+The data of photographs of the `RadiometricCameraModel` `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
 seen from `poses` (camera → world, one per photograph). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
 (`vignetting_rule`, extrapolated with a zero `boundary_order`-th difference), its parameters the interior ones; a radial profile's nodes with less than `support_min` of the mean data
 weight are dependent the same way, continuing the supported ones with that order (`RadialSupportRule`). Builds the masks from the initial views (∩ `external_masks`) unless `masks` is given. Float64 targets are
@@ -115,16 +137,16 @@ kept by reference (no copy). When the masked observation vectors `ϕ` are given 
 from `masked_vector`, e.g. for full-resolution photos that do not fit in memory together), `targets` may be
 empty placeholder arrays.
 """
-function CalibrationState(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel{<:Any, <:Focus{Float64, N}}, poses::AbstractVector{<:EuclideanMap},
-                          mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}};
-                          masks = nothing, δ::Real = 0.02, external_masks = nothing, support_min::Real = 0.0, region = nothing,
-                          boundary_order::Integer = 2, backend = default_backend(), ϕ = nothing, channel::Integer = 0,
-                          mu_bounds = (0.0, 1.0), jacobian_chunk::Integer = 4,
-                          sensor_models = fill(VgtkCore.SensorModel(), length(poses)),
-                          weights::Union{Unweighted, AbstractVector{<:AbstractVector{<:Real}}} = Unweighted(),
-                          quanta = fill(nothing, length(poses)), sensor::SensorStatement = NoSensorRecord(),
-                          photo_kind::PhotoKind = Decoded(false)) where {N}
-    0 <= channel <= 3 || throw(ArgumentError("CalibrationState: channel = $channel (0: the three channels, 1–3: that channel alone)"))
+function CalibrationData(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel{<:Any, <:Focus{Float64}}, poses::AbstractVector{<:EuclideanMap},
+                         targets::AbstractVector{<:AbstractArray{<:Real}};
+                         masks = nothing, δ::Real = 0.02, external_masks = nothing, support_min::Real = 0.0, region = nothing,
+                         boundary_order::Integer = 2, backend = default_backend(), ϕ = nothing, channel::Integer = 0,
+                         mu_bounds = (0.0, 1.0), jacobian_chunk::Integer = 4,
+                         sensor_models = fill(VgtkCore.SensorModel(), length(poses)),
+                         weights::Union{Unweighted, AbstractVector{<:AbstractVector{<:Real}}} = Unweighted(),
+                         quanta = fill(nothing, length(poses)), sensor::SensorStatement = NoSensorRecord(),
+                         photo_kind::PhotoKind = Decoded(false))
+    0 <= channel <= 3 || throw(ArgumentError("CalibrationData: channel = $channel (0: the three channels, 1–3: that channel alone)"))
     ObservationModel(sensor, photo_kind, _channel_symbol(channel))          # the three agree (a RAW photograph's photosites: one colour filter's, channel R, G or B)
     K = length(poses)
     length(targets) == K || throw(DimensionMismatch("$(K) views but $(length(targets)) targets"))
@@ -135,10 +157,10 @@ function CalibrationState(board::TexturedTarget, settings::RenderSettings, camer
     end
     W, H = _image_size(camera)                                              # the image is the camera's (its geometric camera's extent): stated once
     all(m -> size(m) == (H, W), masks) ||
-        throw(ArgumentError("CalibrationState: a mask is not of the camera's image, $H × $W (rows × columns): the image size is the camera's " *
+        throw(ArgumentError("CalibrationData: a mask is not of the camera's image, $H × $W (rows × columns): the image size is the camera's " *
                             "(`extent(geometric(camera))`), the masks and photographs are of it"))
     ϕ === nothing && !all(t -> (size(t, 1), size(t, 2)) == (H, W), targets) &&
-        throw(ArgumentError("CalibrationState: a photograph is not of the camera's image, $H × $W (rows × columns): the image size is the " *
+        throw(ArgumentError("CalibrationData: a photograph is not of the camera's image, $H × $W (rows × columns): the image size is the " *
                             "camera's (`extent(geometric(camera))`)"))
     px = [masked_pixels(m) for m in masks]
     ϕ === nothing && (ϕ = [masked_vector(targets[k], px[k]; channel) for k in 1:K])   # a plane target (H × W): one measured value per pixel
@@ -151,118 +173,149 @@ function CalibrationState(board::TexturedTarget, settings::RenderSettings, camer
     length(quanta) == K && all(k -> quanta[k] === nothing || length(quanta[k]) == length(ϕ[k]), 1:K) ||
         throw(DimensionMismatch("the code steps are one per measured value of each view (or nothing: a decoded image)"))
     camera.vignetting isa NoVignetting &&                                   # the method estimates V: Θ_v under the gauge V(𝐜) = 1, a block of every solve
-        throw(ArgumentError("CalibrationState: the camera has no vignetting (`NoVignetting`: V ≡ 1, no parameters), and the calibration " *
+        throw(ArgumentError("CalibrationData: the camera has no vignetting (`NoVignetting`: V ≡ 1, no parameters), and the calibration " *
                             "estimates V (Θ_v, under the gauge V(𝐜) = 1). Give the camera a field to estimate: " *
                             "`with_vignetting(camera, flat_vignetting(geometric(camera)))` (the flat 4 × 4 start) or a `RadialVignetting`. " *
                             "A camera without vignetting renders as it is (`render_view`, `Φ_pixel`)"))
-    camera = with_vignetting(camera, gauge_center_value(camera.vignetting))   # the gauge V(𝐜) = 1, held exactly: the start's, kept by every step (`gauge_basis`)
-    if channel > 0                                                          # the other channels' lighting and η follow channel `channel`
-        light = tie_channels(light, channel); mat = tie_channels(mat, channel)
-    end
-    rule = vignetting_rule(camera.vignetting, region, px; support_min, order = boundary_order)
-    return CalibrationState{N, typeof(board), typeof(settings), typeof(camera), typeof(light), eltype(poses)}(
-        board, settings, camera, poses, VgtkCore.convert_eltype(Float64, mat), light, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), zeros(0, 0),
+    rule = vignetting_rule(gauge_center_value(camera.vignetting), region, px; support_min, order = boundary_order)   # the gauged field's (CalibrationParameters')
+    return CalibrationData{typeof(board), typeof(settings)}(
+        board, settings, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), zeros(0, 0),
         Float64.(Tuple(mu_bounds)), Union{Nothing, Vector{Float64}}[q === nothing ? nothing : Vector{Float64}(q) for q in quanta],
         collect(VgtkCore.SensorModel, sensor_models), sensor, photo_kind, _LmRun(), nothing)
 end
+
 """
-    n_views(s::CalibrationState) -> Int
+    CalibrationParameters(f::CalibrationData, camera, poses, mat, light)
+
+The parameters Θ̄ of a calibration on the data `f` ([`CalibrationParameters`](@ref)): `camera` under the gauge `V(𝐜) = 1` held
+exactly (the start's, kept by every step: `gauge_basis`), the poses in host precision, the material, the lighting — on a
+single-channel `f` the other channels' lighting coefficients and refractive indices η tied to the measured channel's
+(`tie_channels`) — and the board's surface of `f`'s board (its start).
+"""
+function CalibrationParameters(f::CalibrationData, camera::RadiometricCameraModel{<:Any, <:Focus{Float64, N}}, poses::AbstractVector{<:EuclideanMap},
+                               mat::Material, light::EnvironmentLight) where {N}
+    length(poses) == length(f.ϕ) || throw(DimensionMismatch("$(length(poses)) poses but $(length(f.ϕ)) views"))
+    poses = [_pose_eltype(Float64, p) for p in poses]
+    camera = with_vignetting(camera, gauge_center_value(camera.vignetting))   # the gauge V(𝐜) = 1, held exactly: the start's, kept by every step (`gauge_basis`)
+    if f.channel > 0                                                        # the other channels' lighting and η follow channel `channel`
+        light = tie_channels(light, f.channel); mat = tie_channels(mat, f.channel)
+    end
+    surface = f.board.state
+    return CalibrationParameters{N, typeof(camera), typeof(light), eltype(poses), typeof(surface)}(
+        camera, poses, VgtkCore.convert_eltype(Float64, mat), light, surface)
+end
+
+"""
+    calibration_problem(board, settings, camera, poses, mat, light, targets; kwargs...) -> RefineProblem
+
+The refinement problem of a calibration of photographs `targets` of `board` seen by `camera` from `poses`, started at `mat` and
+`light`: VisualGeometryToolkitCore's `RefineProblem(f, u0)` of the data `f = `[`CalibrationData`](@ref)`(board, settings,
+camera, poses, targets; kwargs...)` and the parameters `u0 = `[`CalibrationParameters`](@ref)`(f, camera, poses, mat, light)`,
+which [`RadiometricRefinement`](@ref) refines in place.
+"""
+function calibration_problem(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel, poses::AbstractVector{<:EuclideanMap},
+                             mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}}; kwargs...)
+    f = CalibrationData(board, settings, camera, poses, targets; kwargs...)
+    return VgtkCore.RefineProblem(f, CalibrationParameters(f, camera, poses, mat, light))
+end
+"""
+    n_views(θ::CalibrationParameters) -> Int
 
 The number of views (photographs) of the calibration.
 """
-n_views(s::CalibrationState) = length(s.poses)
+n_views(θ::CalibrationParameters) = length(θ.poses)
 """
-    view_of(s::CalibrationState, k) -> View
+    view_of(θ::CalibrationParameters, k) -> View
 
-Internal: the kernels' view `k`, the state's camera at its pose `k` (`View(s.poses[k], s.camera)`).
+Internal: the kernels' view `k`, the state's camera at its pose `k` (`View(θ.poses[k], θ.camera)`).
 """
-view_of(s::CalibrationState, k::Integer) = View(s.poses[k], s.camera)
+view_of(θ::CalibrationParameters, k::Integer) = View(θ.poses[k], θ.camera)
 """
-    geometric(s::CalibrationState)
+    geometric(θ::CalibrationParameters)
 
 The geometric camera π⁻¹ (Θ_d) the views share: Core's pixel camera or a grid model.
 """
-geometric(s::CalibrationState) = geometric(s.camera)
+geometric(θ::CalibrationParameters) = geometric(θ.camera)
 """
-    focus(s::CalibrationState) -> Focus
+    focus(θ::CalibrationParameters) -> Focus
 
 The focus surface (Θ_f) the views share.
 """
-focus(s::CalibrationState) = focus(s.camera)
+focus(θ::CalibrationParameters) = focus(θ.camera)
 """
-    aperture_radius(s::CalibrationState)
+    aperture_radius(θ::CalibrationParameters)
 
 The aperture radius r the views share, in metres.
 """
-aperture_radius(s::CalibrationState) = aperture_radius(s.camera)
-_image_size(s::CalibrationState) = _image_size(s.camera)   # the image is the camera's
+aperture_radius(θ::CalibrationParameters) = aperture_radius(θ.camera)
+_image_size(θ::CalibrationParameters) = _image_size(θ.camera)   # the image is the camera's
 """The board's own state: its warping h, the print's edge parameters and the in-plane print error (VisualRadiometryToolkitCore's
 `TargetState`, the state of the state's `TexturedTarget`)."""
-board_surface(s::CalibrationState) = s.board.state
+board_surface(θ::CalibrationParameters) = θ.surface
 """Replace the board's state (host precision)."""
-function set_surface!(s::CalibrationState, surf::TargetState)
-    s.board = with_state(s.board, surf)
-    return s
+function set_surface!(θ::CalibrationParameters, surf::TargetState)
+    θ.surface = surf
+    return θ
 end
 """
-    target_radiometry(s::CalibrationState) -> TargetRadiometry
+    target_radiometry(f::CalibrationData, θ::CalibrationParameters) -> TargetRadiometry
 
 The target's radiometry of the state: its material and the print's edge parameters ([`TargetRadiometry`](@ref)).
 """
-target_radiometry(s::CalibrationState) = TargetRadiometry(s.mat, board_surface(s))
+target_radiometry(f::CalibrationData, θ::CalibrationParameters) = TargetRadiometry(θ.mat, board_surface(θ))
 """
-    radiometric_target(s::CalibrationState) -> RadiometricTarget
+    radiometric_target(f::CalibrationData, θ::CalibrationParameters) -> RadiometricTarget
 
 The state's calibration target: the board's geometric target (Core's target of its posed target; `nothing` on a board without one),
 the warping h with the aspect of the board's page and the target's radiometry ([`RadiometricTarget`](@ref)).
 """
-radiometric_target(s::CalibrationState) =
-    RadiometricTarget(_geometric_target(s.board.target), board_surface(s).h, warping_aspect(s.board), target_radiometry(s);
-                      inplane = board_surface(s).inplane)
+radiometric_target(f::CalibrationData, θ::CalibrationParameters) =
+    RadiometricTarget(_geometric_target(f.board.target), board_surface(θ).h, warping_aspect(_board(f, θ)), target_radiometry(f, θ);
+                      inplane = board_surface(θ).inplane)
 _geometric_target(::Nothing) = nothing
 _geometric_target(t::VgtkCore.PosedTarget) = VgtkCore.model(t)
 """
-    set_radiometric_target!(s::CalibrationState, t::RadiometricTarget) -> s
+    set_radiometric_target!(f::CalibrationData, θ::CalibrationParameters, t::RadiometricTarget) -> θ
 
 The state's material, board warping and the print's edge parameters from `t` (its geometric target is the run's board's). A warping
 learned on a page of another aspect than the run's board is an `ArgumentError` ([`board_surface`](@ref)).
 """
-function set_radiometric_target!(s::CalibrationState, t::RadiometricTarget)
-    surf = board_surface(s.board, t)
-    s.mat = VgtkCore.convert_eltype(Float64, material(t.radiometry))
-    return set_surface!(s, surf)
+function set_radiometric_target!(f::CalibrationData, θ::CalibrationParameters, t::RadiometricTarget)
+    surf = board_surface(_board(f, θ), t)
+    θ.mat = VgtkCore.convert_eltype(Float64, material(t.radiometry))
+    return set_surface!(θ, surf)
 end
 """Replace the camera's vignetting V (Θ_v)."""
-set_vignetting!(s::CalibrationState, v::AbstractVignetting) = (s.camera = with_vignetting(s.camera, v); s)
+set_vignetting!(θ::CalibrationParameters, v::AbstractVignetting) = (θ.camera = with_vignetting(θ.camera, v); θ)
 
 """
-    set_pose!(s::CalibrationState, k, pose::EuclideanMap) -> s
+    set_pose!(θ::CalibrationParameters, k, pose::EuclideanMap) -> θ
 
 Replace the pose Θ_e of photograph `k` (Core's `EuclideanMap`, camera → world, metres); the camera is kept.
 """
-function set_pose!(s::CalibrationState, k::Integer, pose::EuclideanMap)
-    s.poses[k] = _pose_eltype(Float64, pose)
-    return s
+function set_pose!(θ::CalibrationParameters, k::Integer, pose::EuclideanMap)
+    θ.poses[k] = _pose_eltype(Float64, pose)
+    return θ
 end
 
 """Render every view at the current parameters (`Vector` of `H × W × 3` images): the flux kernel on the state's backend."""
-render_all(s::CalibrationState) = [_render_view_device(s, k) for k in 1:n_views(s)]
+render_all(f::CalibrationData, θ::CalibrationParameters) = [_render_view_device(f, θ, k) for k in 1:n_views(θ)]
 
 """Residual vectors `𝔯_k = Φ_k − ϕ_k` in the measured values' units (unweighted). One view at a time, straight from the masked flux
 vector of the flux kernel on the state's backend (`_flux_device`, same pixel order as `masked_vector`): a full-size H × W × 3 image per
 view (290 MB each at 4256 × 2848) is what pushed the 16-view full-resolution runs over the container cap. The diagnostics' residuals
-(the model is `ϕ + 𝔯`); the cost's are `residuals(s)` (Core's `residuals`)."""
-photometric_residuals(s::CalibrationState) =
-    [_channel_rows(_flux_device(s, k, view_of(s, k), s.camera.vignetting, s.mat, s.light), s.channel) - s.ϕ[k] for k in 1:n_views(s)]
+(the model is `ϕ + 𝔯`); the cost's are `residuals(f, θ)` (Core's `residuals`)."""
+photometric_residuals(f::CalibrationData, θ::CalibrationParameters) =
+    [_channel_rows(_flux_device(f, θ, k, view_of(θ, k), θ.camera.vignetting, θ.mat, θ.light), f.channel) - f.ϕ[k] for k in 1:n_views(θ)]
 
 """The cost's residual vectors: [`photometric_residuals`](@ref) under the rows' weights (`_whiten`: whitened when the state's rows
 carry 1/σ, as measured otherwise)."""
-residuals(s::CalibrationState) = [_whiten(_view_weights(s.weights, k), r) for (k, r) in enumerate(photometric_residuals(s))]
+residuals(f::CalibrationData, θ::CalibrationParameters) = [_whiten(_view_weights(f.weights, k), r) for (k, r) in enumerate(photometric_residuals(f, θ))]
 
-"""Cost `½ Σ_k ‖𝔯_k‖²` of the cost's residual vectors (`residuals(s)`: whitened when the rows carry 1/σ) and the relative
-RMS residual `√(Σ_k ‖𝔯_k‖² / data_norm2(s))`, in the same norm."""
-function cost(s::CalibrationState)
-    r = residuals(s)
+"""Cost `½ Σ_k ‖𝔯_k‖²` of the cost's residual vectors (`residuals(f, θ)`: whitened when the rows carry 1/σ) and the relative
+RMS residual `√(Σ_k ‖𝔯_k‖² / data_norm2(f))`, in the same norm."""
+function cost(f::CalibrationData, θ::CalibrationParameters)
+    r = residuals(f, θ)
     sse = sum(sum(abs2, rk) for rk in r)
-    return sse / 2, sqrt(sse / data_norm2(s))
+    return sse / 2, sqrt(sse / data_norm2(f))
 end

@@ -431,18 +431,18 @@ _poses_trajectory(poses, names) = VgtkCore.Trajectory(VgtkCore.ViewFrame{:cam}, 
     images = Dict(k => String(names[k]) for k in eachindex(names)))
 
 """
-    save_state(path, s::CalibrationState, names; page_flip = nothing, provenance = (;))
+    save_state(path, f::CalibrationData, θ::CalibrationParameters, names; page_flip = nothing, provenance = (;))
     save_state(path, state::NamedTuple; length_unit = mm, provenance = (;))
 
 A refinement's state as an `rc/calibration_state/v3.1` record (VisualGeometryToolkitIO's file boundary; `records.jl`'s header): the
 radiometric camera, the radiometric target, the poses of the photographs (`names`, in order) as VisualGeometryToolkitIO's trajectory body, the light as VisualRadiometryToolkitIO's
-environment light body, the render settings, the photographs' observation model (`observation_model(s)`) and the page's ±y choice
+environment light body, the render settings, the photographs' observation model (`observation_model(f)`) and the page's ±y choice
 (`page_flip`, the Schöps front end's; omitted when `nothing`). `state` holds the fields [`load_state`](@ref) returns (`camera, target,
 poses, names, light, settings, observation, page_flip`). A run's labels (the iteration, the costs) go in `provenance`.
 """
-save_state(path::AbstractString, s::CalibrationState, names; page_flip = nothing, provenance::NamedTuple = (;)) =
-    save_state(path, (; camera = s.camera, target = radiometric_target(s), poses = s.poses, names, light = s.light, settings = s.settings,
-                        observation = observation_model(s), page_flip); provenance)
+save_state(path::AbstractString, f::CalibrationData, θ::CalibrationParameters, names; page_flip = nothing, provenance::NamedTuple = (;)) =
+    save_state(path, (; camera = θ.camera, target = radiometric_target(f, θ), poses = θ.poses, names, light = θ.light, settings = f.settings,
+                        observation = observation_model(f), page_flip); provenance)
 function save_state(path::AbstractString, st::NamedTuple; length_unit = VgtkCore.mm, provenance::NamedTuple = (;))
     s = _style(length_unit)
     body = merge((schema = RECORD_SCHEMAS.calibration_state,),

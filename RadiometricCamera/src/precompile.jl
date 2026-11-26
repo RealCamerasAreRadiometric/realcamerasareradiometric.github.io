@@ -36,48 +36,48 @@
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)
         mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-        # a state of the scene seen through `lens`, its targets rendered at the truth
-        function state(lens, board_ = board, st_ = st; kw...)
+        # the refinement problem of the scene seen through `lens`, its targets rendered at the truth
+        function problem(lens, board_ = board, st_ = st; kw...)
             camera = RadiometricCameraModel(lens, focus_t, 0.0386, vignetting())
-            cpu = KernelAbstractions.CPU()                                       # the workload's CPU states, chosen (no default's warning)
+            cpu = KernelAbstractions.CPU()                                       # the workload's CPU data, chosen (no default's warning)
             masks = [compute_mask(camera, p, board_, st_; δ = 0.02, backend = cpu) for p in poses]
             targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
-            return CalibrationState(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
+            return calibration_problem(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
-        damping = RadiometricCalibration(PipelineOptions()).optimizer.damping   # the algorithm's default
-        per_view(s; kw...) = ((prob, _) = build_problem(s; damping, kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
-        per_tile(s; kw...) = ((prob, _) = build_problem_grid(s; damping, patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
+        damping = RadiometricRefinement(PipelineOptions()).optimizer.damping   # the algorithm's default
+        per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; damping, kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
+        per_tile(p; kw...) = ((prob, _) = build_problem_grid(p.f, p.u0; damping, patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
 
         # the closed-form radiometry and the parametric (per-view) blocks on Core's lenses: the double sphere (a free board
         # warping), Kannala–Brandt, OpenCV's 14 coefficients, the division lens and a fixed lens
         ds = pixel_camera(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)))
-        s = state(ds)
-        parts = all_parts(s)
-        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts)), RadiometryBlockDescent())
-        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, parts)), JointRadiometry(; damping))
-        cost(s); render_all(s)
-        per_view(s)
-        per_view(state(ds); height_degree = 1)
-        per_view(state(pixel_camera(VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0))))
-        per_view(state(pixel_camera(VgtkIO.opencv_lens(zeros(14)))))
-        per_view(state(pixel_camera(VgtkIO.opencv_lens(zeros(14)))); fixed = (:cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
-        per_view(state(pixel_camera(VgtkCore.Division(0.144, -0.293))))
-        per_view(state(pixel_camera(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0))); fixed = (:f, :aspect, :cx, :cy, :k))
+        p = problem(ds)
+        parts = all_parts(p.f, p.u0)
+        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (p.f, p.u0, parts)), RadiometryBlockDescent())
+        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (p.f, p.u0, parts)), JointRadiometry(; damping))
+        cost(p.f, p.u0); render_all(p.f, p.u0)
+        per_view(p)
+        per_view(problem(ds); height_degree = 1)
+        per_view(problem(pixel_camera(VgtkCore.KannalaBrandt(-0.03, 0.004, 0.0, 0.0))))
+        per_view(problem(pixel_camera(VgtkIO.opencv_lens(zeros(14)))))
+        per_view(problem(pixel_camera(VgtkIO.opencv_lens(zeros(14)))); fixed = (:cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
+        per_view(problem(pixel_camera(VgtkCore.Division(0.144, -0.293))))
+        per_view(problem(pixel_camera(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0))); fixed = (:f, :aspect, :cx, :cy, :k))
 
         # the grid lens (Core's central generic model): evaluate, project, back-project, and its per-tile blocks (with the warping)
         g = VgtkCore.solve(VgtkCore.EstimationProblem(SplineLens, ds), GridStart(; lattice = ImageLattice(10, 10))).u
         𝐩 = SVector(10.0, 13.0)
         d = chief_ray(g, 𝐩); project(g, d); backproject(g, 𝐩); in_domain(g, 𝐩)
         grid_angular_error(g, ds)
-        sg = state(g)
-        per_tile(sg)
-        per_tile(sg; height_degree = 2)
+        pg = problem(g)
+        per_tile(pg)
+        per_tile(pg; height_degree = 2)
 
         # the pipeline's options: the defaults, an override, the record's round trip through TOML
         alg, stops = read_calibration(Dict{String, Any}("config_version" => 2); set = ["optimizer.max_iter=2"])
         TOML.print(IOBuffer(), config_dict(alg, stops))
         read_calibration(config_dict(alg, stops))
-        pipeline_options(config_dict(alg.options))
+        pipeline_options(config_dict(alg.refinement.options))
         _drain_device_pool!()          # the evaluations' pooled workers: a package image cannot hold a task
     end
 end

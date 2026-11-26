@@ -37,14 +37,14 @@
     end
     "A start away from the truth (flat V, grey light, μ 0.7): every residual and every Jacobian column nonzero."
     ne_state(; backend = VgtkCore.KA.CPU(), channel = 0) = (S = SCENE;
-        CalibrationState(S.sc, S.st, with_vignetting(S.camera, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2)), copy(S.poses),
+        calibration_problem(S.sc, S.st, with_vignetting(S.camera, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2)), copy(S.poses),
                          with_μ(S.mat, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, backend, channel))
     """The normal equations of the lighting and vignetting blocks (μ held) assembled on the host from the design-row kernel's rows:
     J = [A_v Z | the lighting columns per measured channel], r = Φ − ϕ with Φ the lighting rows times the coefficients."""
     function ne_host(s, parts)
-        chs = RC.residual_channels(s); nc = length(chs)
-        Al = RC._design_matrix(s, parts, Val(:light)); Av = RC._design_matrix(s, parts, Val(:vig)); ϕ = Array(parts.ϕ)
-        Z = RC.vignetting_basis(s); a = Matrix(coefficients(s.light)); J9 = size(Al, 2)
+        chs = RC.residual_channels(s.f); nc = length(chs)
+        Al = RC._design_matrix(s.f, s.u0, parts, Val(:light)); Av = RC._design_matrix(s.f, s.u0, parts, Val(:vig)); ϕ = Array(parts.ϕ)
+        Z = RC.vignetting_basis(s.f, s.u0); a = Matrix(coefficients(s.u0.light)); J9 = size(Al, 2)
         Jl = zeros(size(Al, 1), nc * J9); Φ = zeros(size(Al, 1))
         for row in axes(Al, 1)
             jc = (row - 1) % nc + 1
@@ -61,14 +61,14 @@ end
     using RadiometricCamera: all_parts, chart, _update_diffuse_weight!
     using StaticArrays, LinearAlgebra
     for channel in (0, 2)                                   # the colour state and a single-channel one (its J coefficients)
-        s = ne_state(; channel); parts = all_parts(s)
-        c, g, H = RC.radiometry_normal_equations(s, parts; mu = false)
+        s = ne_state(; channel); parts = all_parts(s.f, s.u0)
+        c, g, H = RC.radiometry_normal_equations(s.f, s.u0, parts; mu = false)
         ch, gh, Hh = ne_host(s, parts)
         @test relerr(c, ch) < 1e-12 && relerr(Vector(g), gh) < 1e-12 && relerr(Matrix(H), Hh) < 1e-12
-        @test c ≈ RC.parts_cost(s, parts) rtol = 1e-14       # the cost kernel's cost at the chart origin
+        @test c ≈ RC.parts_cost(s.f, s.u0, parts) rtol = 1e-14       # the cost kernel's cost at the chart origin
         # the full layout (μ on its chart): the gradient is the cost kernel's central differences
-        c, g, H = RC.radiometry_normal_equations(s, parts)
-        lm = RC._radiometry_lm(s, parts, RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.residual_channels(s)); light = true, mu = true, chart = true, s.mu_bounds))
+        c, g, H = RC.radiometry_normal_equations(s.f, s.u0, parts)
+        lm = RC._radiometry_lm(s.f, s.u0, parts, RC._radiometry_layout(size(RC.vignetting_basis(s.f, s.u0), 2), 9, length(RC.residual_channels(s.f)); light = true, mu = true, chart = true, s.f.mu_bounds))
         N = length(g); h = 1e-6
         e(q) = SVector{N, Float64}(ntuple(i -> i == q ? h : 0.0, Val(N)))
         fd = [(RC.VgtkCore.residual_cost!(nothing, lm, e(q)) - RC.VgtkCore.residual_cost!(nothing, lm, -e(q))) / 2h for q in 1:N]
@@ -76,10 +76,10 @@ end
         @test issymmetric(Matrix(H)) && isposdef(Symmetric(Matrix(H)))
     end
     # μ alone (the additive chart): _update_diffuse_weight!'s one Gauss–Newton step is exact (Φ is affine in μ): the step's gradient vanishes
-    s = ne_state(); parts = all_parts(s)
-    _update_diffuse_weight!(s, parts)
-    _, g, H = RC.radiometry_normal_equations(s, parts; light = false, vignetting = false, chart = false)
-    @test abs(g[1]) < 1e-10 * sqrt(H[1, 1]) * sqrt(2 * RC.parts_cost(s, parts))
+    s = ne_state(); parts = all_parts(s.f, s.u0)
+    _update_diffuse_weight!(s.f, s.u0, parts)
+    _, g, H = RC.radiometry_normal_equations(s.f, s.u0, parts; light = false, vignetting = false, chart = false)
+    @test abs(g[1]) < 1e-10 * sqrt(H[1, 1]) * sqrt(2 * RC.parts_cost(s.f, s.u0, parts))
 end
 
 # The launch and the reduction through Core's one call (reduce_cost / reduce_normal_equations with the row functor, Core 0.9.7) are
@@ -88,9 +88,9 @@ end
     using RadiometricCamera: all_parts, chart
     using StaticArrays
     import VisualGeometryToolkitCore as VgtkCore
-    s = ne_state(); parts = all_parts(s)
-    lay = RC._radiometry_layout(size(RC.vignetting_basis(s), 2), 9, length(RC.residual_channels(s)); light = true, mu = true, chart = true, s.mu_bounds)
-    lm = RC._radiometry_lm(s, parts, lay)
+    s = ne_state(); parts = all_parts(s.f, s.u0)
+    lay = RC._radiometry_layout(size(RC.vignetting_basis(s.f, s.u0), 2), 9, length(RC.residual_channels(s.f)); light = true, mu = true, chart = true, s.f.mu_bounds)
+    lm = RC._radiometry_lm(s.f, s.u0, parts, lay)
     N = lay.N
     x = SVector{N, Float64}(ntuple(i -> 1e-3 * sin(i), Val(N)))
     args = (lm.parts, lm.ϕ, lm.w, lm.chs, lm.vig, lm.a, lm.μ, lm.Z, lm.lay, x)
@@ -111,15 +111,15 @@ end
     be = CUDABackend(; always_inline = true)
     for channel in (0, 2)
         sc = ne_state(; channel); sg = ne_state(; channel, backend = be)
-        pc = all_parts(sc); pg = all_parts(sg)
+        pc = all_parts(sc.f, sc.u0); pg = all_parts(sg.f, sg.u0)
         @test relerr(reinterpret(Float64, Array(pg.parts)), reinterpret(Float64, collect(pc.parts))) < 1e-12   # the parts: Float64 on every backend
-        nc_ = RC.radiometry_normal_equations(sc, pc); ng = RC.radiometry_normal_equations(sg, pg)
+        nc_ = RC.radiometry_normal_equations(sc.f, sc.u0, pc); ng = RC.radiometry_normal_equations(sg.f, sg.u0, pg)
         @test relerr(ng[1], nc_[1]) < 1e-10 && relerr(Vector(ng[2]), Vector(nc_[2])) < 1e-10 && relerr(Matrix(ng[3]), Matrix(nc_[3])) < 1e-10
         # the block sweep and the joint solve on the device land where the CPU's do
-        for (s_, p_) in ((sc, pc), (sg, pg)); RC.VgtkCore.solve(RC.VgtkCore.EstimationProblem(RadiometryBlocks, (s_, p_)), RadiometryBlockDescent(; sweeps = 2)); end
-        @test relerr(Matrix(coefficients(sg.light)), Matrix(coefficients(sc.light))) < 1e-10 && abs(sg.mat.diffuse_weight - sc.mat.diffuse_weight) < 1e-10
-        rc = _lm_radiometry!(sc, pc; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg, pg; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80))
+        for (s_, p_) in ((sc, pc), (sg, pg)); RC.VgtkCore.solve(RC.VgtkCore.EstimationProblem(RadiometryBlocks, (s_.f, s_.u0, p_)), RadiometryBlockDescent(; sweeps = 2)); end
+        @test relerr(Matrix(coefficients(sg.u0.light)), Matrix(coefficients(sc.u0.light))) < 1e-10 && abs(sg.u0.mat.diffuse_weight - sc.u0.mat.diffuse_weight) < 1e-10
+        rc = _lm_radiometry!(sc.f, sc.u0, pc; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg.f, sg.u0, pg; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80))
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success
-        @test relerr(vec(Matrix(control_points(sg.camera.vignetting))), vec(Matrix(control_points(sc.camera.vignetting)))) < 1e-8
+        @test relerr(vec(Matrix(control_points(sg.u0.camera.vignetting))), vec(Matrix(control_points(sc.u0.camera.vignetting)))) < 1e-8
     end
 end

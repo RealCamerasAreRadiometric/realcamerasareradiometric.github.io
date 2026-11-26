@@ -180,7 +180,7 @@ function _add_grid_smoothness!(blocks, smooth::GridSmoothness, ip::AbstractMatri
 end
 
 """
-    select_grid_smoothness_weight(s, sm, interior; patch = GRID_PATCH, build_kwargs...) -> (smoothness, selection)
+    select_grid_smoothness_weight(f, θ, sm, interior; patch = GRID_PATCH, build_kwargs...) -> (smoothness, selection)
 
 The grid smoothness `sm` (its type and order; its weight the one chosen here) over the `interior` nodes (`[g_x, g_y]`) with its weight β chosen by generalized cross-validation
 (Estimation's `gcv_curve` and `gcv_select`) on the LINEARIZATION of the grid problem at the state's current values (the run's start): the Gauss–Newton
@@ -188,18 +188,18 @@ system `JᵀJ`, `Jᵀr` of the per-tile data residuals over the columns of the g
 focus, aperture, material, vignetting, lighting) held where they are, so it is the criterion of the grid's own update — and the
 unit-weight smoothness's `DᵀD` over the same columns (its residual is zero at the start, its reference d̂₀ the start). `λ = w² =
 β Σϕ² / N / m̄` (the smoothness's row weight squared), so β is the same normalized weight `[grid.smoothness] weight` states. The problem is
-`build_problem_grid(s; patch, smoothness, build_kwargs...)`, the LM's own; one Jacobian evaluation of every tile and one
+`build_problem_grid(f, θ; patch, smoothness, build_kwargs...)`, the LM's own; one Jacobian evaluation of every tile and one
 dense generalized eigendecomposition of the free columns (O(n³) in their number: 2 per present node, up to 2·7875 for a 105 × 75
 grid). `(nothing, nothing)` for none. `selection` is `gcv_select`'s record plus the counts of the linearization.
 """
-function select_grid_smoothness_weight(s::CalibrationState, sm::AbstractSmoothness, interior::AbstractMatrix{Bool}; patch::Tuple{Int, Int} = GRID_PATCH,
+function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParameters, sm::AbstractSmoothness, interior::AbstractMatrix{Bool}; patch::Tuple{Int, Int} = GRID_PATCH,
                                        build_kwargs...)
-    lens = s.camera.geometric
-    ϕ² = data_norm2(s)
+    lens = θ.camera.geometric
+    ϕ² = data_norm2(f)
     unit = grid_smoothness(sm, lens, ϕ², interior; weight = 1.0)
     unit === nothing && return nothing, nothing
     p1 = GridSmoothness(unit.type, unit.rows, unit.d0, 1.0, unit.β, unit.m̄)       # row weight 1: its Gauss–Newton block is DᵀD
-    problem, idx = build_problem_grid(s; patch, smoothness = p1, build_kwargs...)
+    problem, idx = build_problem_grid(f, θ; patch, smoothness = p1, build_kwargs...)
     free_blocks = sort(setdiff(vec(idx.patches), idx.dependent_patches))
     off = Dict{Int, Int}(); ncol = 0
     for i in free_blocks
@@ -207,7 +207,7 @@ function select_grid_smoothness_weight(s::CalibrationState, sm::AbstractSmoothne
     end
     G = zeros(ncol, ncol); h = zeros(ncol); Q = zeros(ncol, ncol); q = zeros(ncol); rr = 0.0; n = 0
     # the tiles of a view are evaluated in one batch, as _lm_tiles! does (bitwise the per-tile path's values)
-    _with_registered(s, problem, idx; concurrent = false) do       # the tiles of a view in its batch; one at a time
+    _with_registered(f, θ, problem, idx; concurrent = false) do       # the tiles of a view in its batch; one at a time
         for T in keys(problem.problem.costs)
             data = T <: PerTileResidual
             (data || T <: GridSmoothnessResidual) || continue

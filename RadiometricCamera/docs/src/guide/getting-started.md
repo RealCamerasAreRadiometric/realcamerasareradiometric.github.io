@@ -79,30 +79,32 @@ size(photos[1])
 
 ## Calibrating the radiometry
 
-A [`CalibrationState`](@ref) holds one camera, the poses of its photographs, the lighting, the material and the photographs ϕ.
-Here the geometry is known: the state starts from the true camera with a flat vignetting (`with_vignetting`), a grey
+A calibration is a refinement problem, `RefineProblem(f, u0)` ([`calibration_problem`](@ref)): its data `f` (a
+[`CalibrationData`](@ref): the board, the photographs ϕ and their masks) and its parameters `u0` (a
+[`CalibrationParameters`](@ref): one camera, the poses of its photographs, the lighting and the material).
+Here the geometry is known: the parameters start from the true camera with a flat vignetting (`with_vignetting`), a grey
 lighting and the wrong weight μ = 0.7; Core's `cost` is ½ Σ‖Φ − ϕ‖² and the relative RMS residual.
 
 ```@example tutorial
 camera_start = with_vignetting(camera_true, TensorProductVignetting((4, 4), Rect(extent(geometric)); degree = 2))   # V ≡ 1
-s = CalibrationState(board, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
-                     masks)
-cost(s)
+(; f, u0) = calibration_problem(board, settings, camera_start, poses, Material(; diffuse_weight = 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), photos;
+                                masks)
+cost(f, u0)
 ```
 
 The flux is linear in the lighting `Θ_l` with the vignetting held, linear in the vignetting `Θ_v` with the lighting held
 (bilinear in the two together) and affine in μ, so each block alone has a closed-form solve. Block by block, the solves creep
 along the coupling of `Θ_l` and `Θ_v`; [`JointRadiometry`](@ref) solves the three together instead — VisualGeometryToolkitCore's
-`solve` of [`RadiometryBlocks`](@ref) on the state and its parts (the pixel quadratures run once, [`all_parts`](@ref): every
+`solve` of [`RadiometryBlocks`](@ref) on the data, the parameters and their parts (the pixel quadratures run once, [`all_parts`](@ref): every
 [`PixelParts`](@ref)), a Levenberg–Marquardt on those parts at the `damping` given (here Levenberg's λ·I, a
-[`RadiometricCalibration`](@ref)'s default). It writes the blocks into the state and reproduces the photographs exactly:
+[`RadiometricRefinement`](@ref)'s default). It writes the blocks into the parameters and reproduces the photographs exactly:
 
 ```@example tutorial
-r = solve(EstimationProblem(RadiometryBlocks, (s, all_parts(s))), JointRadiometry(; damping = VisualGeometryToolkitCore.LevenbergDamping()))
-successful_retcode(r), cost(s)[2] < 1e-4, isapprox(s.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
+r = solve(EstimationProblem(RadiometryBlocks, (f, u0, all_parts(f, u0))), JointRadiometry(; damping = VisualGeometryToolkitCore.LevenbergDamping()))
+successful_retcode(r), cost(f, u0)[2] < 1e-4, isapprox(u0.mat.diffuse_weight, 0.4; rtol = 1e-4)   # Float32's precision on a GPU (the CPU's Float64 reaches ~1e-12)
 ```
 
-The vignetting and the lighting come back up to their common gauge: the state pins V = 1 at the sensor's centre, and the
+The vignetting and the lighting come back up to their common gauge: the parameters pin V = 1 at the sensor's centre, and the
 lighting absorbs the true field's value there.
 
 ## Next

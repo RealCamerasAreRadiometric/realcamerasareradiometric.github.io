@@ -97,9 +97,9 @@ end
     targets = [p[1] for p in ph]
     masks = [f.masks[k] .& ph[k][2] for k in 1:2]                                       # the compute mask AND the valid green photosites
     light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)          # the encoding's scale is the lighting's
-    truth = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, targets; masks, channel = 2)
-    @test all(k -> length(truth.ϕ[k]) == count(masks[k]), 1:2)                         # ONE residual per green photosite
-    c_truth = cost(truth)[1]
+    truth = calibration_problem(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, targets; masks, channel = 2)
+    @test all(k -> length(truth.f.ϕ[k]) == count(masks[k]), 1:2)                         # ONE residual per green photosite
+    c_truth = cost(truth.f, truth.u0)[1]
     # R/B perturbed: the photograph differs at red and blue photosites only, the mask and every residual are the same
     col = [VgtkCore.photosite_colors(m) for m in mosaics]
     pert = map(1:2) do k
@@ -108,18 +108,18 @@ end
     end
     ph2 = [read_photosites(m) for m in pert]
     @test all(k -> ph2[k][2] == ph[k][2] && ph2[k][1] != ph[k][1], 1:2)
-    truth2 = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
-    @test cost(truth2)[1] == c_truth && truth2.ϕ == truth.ϕ
+    truth2 = calibration_problem(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph2]; masks, channel = 2)
+    @test cost(truth2.f, truth2.u0)[1] == c_truth && truth2.f.ϕ == truth.f.ϕ
     # a perturbed camera (poses, lens) recovered from the green photosites alone: the truth to the 14-bit encoding
     camera_0 = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 1.25 * f.W, (0.5 * f.W, 0.5 * f.H), f.W, f.H),
                                       Focus(f.tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9]), 0.0386, f.vig_t)
     poses_0 = [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in f.poses]
-    s = CalibrationState(f.board, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
-    c0 = cost(s)[1]
-    _lm_views!(s; stops = RC._calibration_stops(; max_iter = 100, ftol = 1e-12), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting, :material))
-    @test cost(s)[1] < 1e-3 * c0 && cost(s)[1] <= 1.01 * c_truth + 1e-12
-    @test all(rad2deg(rotation_angle(RotMatrix{3}(s.poses[k].R' * f.poses[k].R))) < 1e-3 for k in 1:2)
-    @test maximum(abs, pinhole_θ(RC.geometric(s))[3:4] .- pinhole_θ(f.lens_t)[3:4]) < 1e-3 * f.W
+    s = calibration_problem(f.board, f.st, camera_0, poses_0, f.mat_t, light_κ, targets; masks, channel = 2)
+    c0 = cost(s.f, s.u0)[1]
+    _lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 100, ftol = 1e-12), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting, :material))
+    @test cost(s.f, s.u0)[1] < 1e-3 * c0 && cost(s.f, s.u0)[1] <= 1.01 * c_truth + 1e-12
+    @test all(rad2deg(rotation_angle(RotMatrix{3}(s.u0.poses[k].R' * f.poses[k].R))) < 1e-3 for k in 1:2)
+    @test maximum(abs, pinhole_θ(RC.geometric(s.u0))[3:4] .- pinhole_θ(f.lens_t)[3:4]) < 1e-3 * f.W
 end
 
 @testitem "photosites: the device evaluates the same residual" tags = [:gpu] setup = [RCFixtures, RCGPU, PhotositeScene] begin
@@ -133,15 +133,15 @@ end
         ph = [read_photosites(mosaic_of(r, κ)) for r in f.renders]
         masks = [f.masks[k] .& ph[k][2] for k in 1:2]
         light_κ = EnvironmentLight(SphericalHarmonicMap(κ .* f.a_t, 2), f.b, f.r_SH)
-        s_cpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2, backend = RadiometricCamera.KernelAbstractions.CPU())
-        s_gpu = CalibrationState(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
+        s_cpu = calibration_problem(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2, backend = RadiometricCamera.KernelAbstractions.CPU())
+        s_gpu = calibration_problem(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
-        @test s_gpu.px == s_cpu.px                                                         # the same green photosites
-        prob_c, _ = build_problem(s_cpu; damping = VgtkCore.LevenbergDamping()); prob_g, _ = build_problem(s_gpu; damping = VgtkCore.LevenbergDamping())
+        @test s_gpu.f.px == s_cpu.f.px                                                         # the same green photosites
+        prob_c, _ = build_problem(s_cpu.f, s_cpu.u0; damping = VgtkCore.LevenbergDamping()); prob_g, _ = build_problem(s_gpu.f, s_gpu.u0; damping = VgtkCore.LevenbergDamping())
         rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]
         r_c = RC.NLLSsolver.computeresidual(rc, RC.NLLSsolver.getvars(rc, prob_c.variables)...)
         r_g = RC.NLLSsolver.computeresidual(rg, RC.NLLSsolver.getvars(rg, prob_g.variables)...)
-        @test length(r_c) == length(r_g) == length(s_cpu.px[1]) && maximum(abs, r_c .- r_g) < 2e-3 * max(1.0, maximum(abs, r_c))
+        @test length(r_c) == length(r_g) == length(s_cpu.f.px[1]) && maximum(abs, r_c .- r_g) < 2e-3 * max(1.0, maximum(abs, r_c))
     end
 end
 

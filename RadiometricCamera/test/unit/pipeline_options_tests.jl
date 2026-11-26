@@ -169,7 +169,7 @@ end
     @test count("_refinement_lm(opts, ", psrc) == 3                                                    # docstring; the GCV, refine!
     # the grid smoothness's GCV builds the refinement's problem from the same keywords (RC 0.9.0 review, finding 4: prepare_refinement
     # left a module-global hold set; there is none now)
-    @test count("select_grid_smoothness_weight(s, opts.grid.smoothness, grid_int; damping, lp.kw...)", psrc) == 1
+    @test count("select_grid_smoothness_weight(f, θ, opts.grid.smoothness, grid_int; damping, lp.kw...)", psrc) == 1
     # the grid smoothness's weight by GCV with the grid held: refused at load (finding 5: GCV linearized the held patches)
     m = thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => "gcv")), "fixed" => ["camera"])))
     @test occursin("`grid.smoothness.weight = \"gcv\"` with \"camera\" in `fixed`", m)
@@ -314,7 +314,7 @@ end
                                      set = ["optimizer.max_time=1e-10", "optimizer.max_iter=2", "io.out=/tmp/rc out", "frontend.type=schoeps",
                                             "io.views=[\"V01.png\", \"V02.png\"]", "camera.lens_coverage=/data/image_region.json",
                                             "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.support_min=0.25"])
-    o = alg.options
+    o = alg.refinement.options
     @test stops.max_time == 1e-10 && stops.max_iter == 2 && o.io.out == "/tmp/rc out" && o.frontend.type === RC.SchoepsFrontend
     @test o.io.views == ["V01.png", "V02.png"] && o.camera.lens_coverage == "/data/image_region.json"
     @test o.grid.smoothness == RC.BendingSmoothness(0.1) && o.focus.support_min == 0.25
@@ -342,12 +342,12 @@ end
     back = RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o)))))
     @test back == o
     # the calibration (its options, its optimizer) and its solve's stops round-trip too, the record a current version (`config_version`)
-    alg = RC.RadiometricCalibration(o; log = "lm.tsv"); stops = RC._calibration_stops(; max_iter = 2)
+    alg = RC.RadiometricCalibration(RC.RadiometricRefinement(o; log = "lm.tsv")); stops = RC._calibration_stops(; max_iter = 2)
     d = TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(alg, stops))))
     @test d["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS) && d["optimizer"]["max_iter"] == 2 &&
           d["optimizer"]["type"] == "levenberg_marquardt"
     alg2, stops2 = RC.read_calibration(d)
-    @test alg2.options == o && alg2.log == "lm.tsv" && alg2.optimizer == alg.optimizer && stops2 == stops
+    @test alg2.refinement.options == o && alg2.refinement.log == "lm.tsv" && alg2.refinement.optimizer == alg.refinement.optimizer && stops2 == stops
     @test RC.pipeline_options(RC.config_dict(RC.PipelineOptions())) == RC.PipelineOptions()
     # the camera's in-focus blur is removed: its two keys are retired (RC 0.11.0), refused by name whatever their value
     @test_throws "`rendering.psf_sigma` is retired" RC.pipeline_options(Dict{String, Any}("rendering" => Dict{String, Any}("psf_sigma" => 0.0)))
@@ -497,7 +497,7 @@ end
     none = Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none")))
     jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
     joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
-    @test jon.radiometry isa RC.JointRadiometry && jon.radiometry.damping == jon.optimizer.damping && joff.radiometry isa RC.RadiometryBlockDescent
+    @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.damping == jon.refinement.optimizer.damping && joff.refinement.radiometry isa RC.RadiometryBlockDescent
     @test RC.config_dict(jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(joff, joff_stops)["sweep"]["joint"] == "off"
     @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
     for (t, k) in switches
@@ -550,8 +550,8 @@ end
     # a version-1 file (no config_version): [lm] is the optimizer's table, the old key spelling the current key, values as stored
     v1 = Dict{String, Any}("lm" => Dict{String, Any}("max_iter" => 7, "log" => "x.tsv"), "camera" => Dict{String, Any}(old => "s.json"))
     alg, stops = RC.read_calibration(v1)
-    @test stops.max_iter == 7 && alg.log == "x.tsv" && alg.options.camera.sensor_characterization == "s.json"
-    @test RC.pipeline_options(v1) == alg.options
+    @test stops.max_iter == 7 && alg.refinement.log == "x.tsv" && alg.refinement.options.camera.sensor_characterization == "s.json"
+    @test RC.pipeline_options(v1) == alg.refinement.options
     # a version-2 file names them as version 2 does: a version-1 name in it is refused, naming the current one
     @test occursin("optimizer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "lm" => Dict{String, Any}()))))
     @test occursin("sensor_characterization",
@@ -559,7 +559,7 @@ end
     @test occursin("newer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 3))))
     # the writer states the current version, and its record reads back
     d = RC.config_dict(alg, stops)
-    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && first(RC.read_calibration(d)).options == alg.options
+    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && first(RC.read_calibration(d)).refinement.options == alg.refinement.options
     # a current key as a stored table names it: a table's rename undone, a key renamed inside its table kept
     @test RC.config_key(v1, "optimizer.max_iter") == "lm.max_iter" && RC.config_key(d, "optimizer.max_iter") == "optimizer.max_iter"
     @test RC.config_key(v1, "optimizer") == "lm" && RC.config_key(v1, "io.out") == "io.out"

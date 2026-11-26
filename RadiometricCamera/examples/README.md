@@ -17,7 +17,7 @@
    the geometric camera (`geometric`) and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at
    a pose), the light `EnvironmentLight` (a `SphericalHarmonicMap` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` —
    and what each symbol is in the paper.
-3. **State, masks, start prediction** — `CalibrationState`, `compute_mask`, `render_all`, `cost`.
+3. **Problem, masks, start prediction** — `calibration_problem` (`CalibrationData`, `CalibrationParameters`), `compute_mask`, `render_all`, `cost`.
 4. **Calibration** — the closed-form linear sweep (`RadiometryBlockDescent`: Θ_l, Θ_v, μ), the joint LM over all blocks on the GPU
    (`_lm_tiles!`), the loss curve, `save_grid`.
 5. **Validation** — night stars (the paper project's star evaluation), difference images.

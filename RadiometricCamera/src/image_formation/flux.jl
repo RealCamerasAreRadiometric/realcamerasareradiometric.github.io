@@ -413,7 +413,7 @@ end
     tie_channels(light::EnvironmentLight, c) -> EnvironmentLight
     tie_channels(mat::Material, c) -> Material
 
-A single-channel state's parameters (`CalibrationState`'s `channel = c`): every channel's lighting coefficients, and every
+A single-channel calibration's parameters (`CalibrationData`'s `channel = c`): every channel's lighting coefficients, and every
 channel's refractive indices `η_ink`, `η_¬ink`, are channel `c`'s. No residual reads the other channels, so they are no parameters
 of the fit (`LightingVar`, `MaterialVar`): they follow channel `c`, so a render or a record of the state shows the measured
 channel's values in all three.

@@ -68,11 +68,12 @@ the model's identity ([`sensor_record`](@ref RadiometricCamera.sensor_record)). 
 refused.
 
 Its stages are the API: [`read_calibration`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
-calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into a radiometric state (the masks, the
+calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into the refinement's problem (the masks, the
 photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, (geometry, photographs)),
-algorithm; stops)`, a [`CalibrationCache`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
-(`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's state from one (`--start=<dir>`),
-`solve!` of the cache — or `solve(EstimationProblem(CalibrationEstimate, state), algorithm; stops)` of a loaded state —
+algorithm; stops)`, a [`CalibrationCache`](@ref) of `RefineProblem(f, u0)`: the data [`CalibrationData`](@ref), the parameters
+[`CalibrationParameters`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
+(`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's problem from one (`--start=<dir>`),
+`solve!` of the cache — or `solve(problem, algorithm.refinement; stops)` of a loaded problem ([`RadiometricRefinement`](@ref)) —
 runs the sweeps and the LM (a `FitResult` of a [`CalibrationEstimate`](@ref), [`RadiometricCalibration`](@ref)), and
 [`save_radiometric_calibration`](@ref) writes the records; [`calibrate`](@ref) is the start and the refinement in one call. A run
 with neither flag computes its start, writes it (into `io.out/start/`, or `--start-out=<dir>`) and refines from it in the same
@@ -87,6 +88,6 @@ generalized cross-validation at the start), `[vignetting.smoothness] type = "psp
 ## The walkthrough
 
 `examples/radiometric_calibration.jl` is the commented walkthrough (and the source of the notebook beside it): a geometric
-central model three ways in, the radiometric model around it, the state and its masks, the calibration on the GPU, and the
+central model three ways in, the radiometric model around it, the refinement's problem and its masks, the calibration on the GPU, and the
 night-stars validation. It reads the paper project's published data (`VGTK_DATA_ROOT`, the tier `rc_calibration`);
 `examples/README.md` says how to run it.

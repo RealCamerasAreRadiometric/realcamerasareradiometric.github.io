@@ -64,18 +64,18 @@
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks = [compute_mask(camera_k, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_k, poses[k], mat_k, light_k, board, st, masks[k]) for k in 1:2]
-    s = CalibrationState(board, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
+    s = calibration_problem(board, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
     fixed = VgtkCore.parameter_names(VgtkCore.model(lk))   # every parameter held
-    prob, idx = build_problem(s; damping = VgtkCore.LevenbergDamping(), fixed)
+    prob, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed)
     res = get(prob.problem.costs, PerViewResidual{9})[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0, J = RC.NLLSsolver.computeresjac(RC.static(125), res, vars...)                 # the LM's flags: every block but the fixed lens
     @test maximum(abs, r0) < 1e-12 && size(J, 2) == 6 + 0 + 9 + 1 + 9 + 15 + 27        # the fixed lens has no columns; 15 vignetting columns (the hard pin)
     @test norm(J[:, 1]) > 0 && norm(J[:, 6 + 9 + 1]) > 0                               # pose and aperture columns are live
-    s2 = CalibrationState(board, st, camera_k, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.004), SVector(0.003, -0.003, 0.004))) for p in poses],
+    s2 = calibration_problem(board, st, camera_k, [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.004, -0.003, 0.004), SVector(0.003, -0.003, 0.004))) for p in poses],
                           mat_k, light_k, targets; masks)
-    c0 = cost(s2)[1]
-    _lm_views!(s2; stops = RC._calibration_stops(; max_iter = 8), damping = VgtkCore.LevenbergDamping(), fixed)
-    @test cost(s2)[1] < 1e-3 * c0
-    @test pinhole_θ(RC.geometric(s2)) ≈ pinhole_θ(lk) && VgtkCore.lens(RC.geometric(s2)) == VgtkCore.lens(lk)   # untouched by the LM
+    c0 = cost(s2.f, s2.u0)[1]
+    _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 8), damping = VgtkCore.LevenbergDamping(), fixed)
+    @test cost(s2.f, s2.u0)[1] < 1e-3 * c0
+    @test pinhole_θ(RC.geometric(s2.u0)) ≈ pinhole_θ(lk) && VgtkCore.lens(RC.geometric(s2.u0)) == VgtkCore.lens(lk)   # untouched by the LM
 end

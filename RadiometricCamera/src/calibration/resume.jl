@@ -10,30 +10,30 @@ function _state_page_flip(opts::PipelineOptions, load_state)
 end
 """Load a state ([`load_state`](@ref)) into `s` (the poses of the views by name; the camera's lens, focus and aperture; the target's
 material, warping and printed edge; the vignetting and the lighting when their sizes match). Returns `(vig_ok, light_ok)`. The state's
-observation model must be the run's (`observation_model(s)`: the same sensor record, photograph kind and channel): a state continues,
+observation model must be the run's (`observation_model(f)`: the same sensor record, photograph kind and channel): a state continues,
 or predicts, only photographs read as it was estimated on — another is refused naming both. Under `sensor_model =`
 [`OffSensorModel`](@ref)`()` (`camera.sensor_model = "off"`) a state estimated under a sensor record continues a run that reads the
 same photographs without it (the run's resolution warned, `observation_model`'s `stated`)."""
-function load_state_into!(s::CalibrationState, sst, names; sensor_model::SensorModelMode = AutoSensorModel())
-    _continues(sensor_model, sst.observation, observation_model(s)) ||
+function load_state_into!(f::CalibrationData, θ::CalibrationParameters, sst, names; sensor_model::SensorModelMode = AutoSensorModel())
+    _continues(sensor_model, sst.observation, observation_model(f)) ||
         throw(ArgumentError("state: estimated under the observation model $(observation_line(sst.observation)), the run reads its photographs " *
-                            "under $(observation_line(observation_model(s))): a state continues or predicts only photographs read as it was estimated on"))
+                            "under $(observation_line(observation_model(f))): a state continues or predicts only photographs read as it was estimated on"))
     idx = [findfirst(==(n), sst.names) for n in names]
     any(isnothing, idx) && error("state: views not in the state: $(names[isnothing.(idx)])")
-    set_radiometric_target!(s, sst.target)                          # the material, the board warping h and the print's edge (first: a warping of another page is refused before anything moves)
+    set_radiometric_target!(f, θ, sst.target)                          # the material, the board warping h and the print's edge (first: a warping of another page is refused before anything moves)
     for k in eachindex(names)
-        set_pose!(s, k, sst.poses[idx[k]])
+        set_pose!(θ, k, sst.poses[idx[k]])
     end
     c = sst.camera
     lens = c.geometric
-    if !(typeof(lens) === typeof(s.camera.geometric))
-        lens = _with_run_region(lens, s.camera.geometric)
+    if !(typeof(lens) === typeof(θ.camera.geometric))
+        lens = _with_run_region(lens, θ.camera.geometric)
         println("state: written under another imaged region — its grid lens takes the run's region")
     end
-    light_ok = size(coefficients(sst.light)) == size(coefficients(s.light))
-    light_ok && (s.light = sst.light)
-    vig_ok = _same_field(c.vignetting, s.camera.vignetting) && light_ok
-    s.camera = RadiometricCameraModel(lens, c.focus, c.aperture_radius, vig_ok ? c.vignetting : s.camera.vignetting)
+    light_ok = size(coefficients(sst.light)) == size(coefficients(θ.light))
+    light_ok && (θ.light = sst.light)
+    vig_ok = _same_field(c.vignetting, θ.camera.vignetting) && light_ok
+    θ.camera = RadiometricCameraModel(lens, c.focus, c.aperture_radius, vig_ok ? c.vignetting : θ.camera.vignetting)
     return vig_ok, light_ok
 end
 

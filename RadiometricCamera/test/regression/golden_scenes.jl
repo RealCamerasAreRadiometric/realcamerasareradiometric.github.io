@@ -74,13 +74,13 @@ function gold_state(board, m, lens)
     if OLD_STACK
         views = [View(p, lens, gold_focus(), 0.0386) for p in poses]
         masks = [compute_mask(v, board, GOLD_ST; δ = 0.03, backend = dev) for v in views]
-        tg = render_all(CalibrationState(board, GOLD_ST, copy(views), gold_vig(), m, light, zero_targets; masks))
-        return CalibrationState(board, GOLD_ST, copy(views), vig_start, with_μ(m, 0.55), light_start, tg; masks)
+        tg = let p = calibration_problem(board, GOLD_ST, copy(views), gold_vig(), m, light, zero_targets; masks); render_all(p.f, p.u0) end
+        return calibration_problem(board, GOLD_ST, copy(views), vig_start, with_μ(m, 0.55), light_start, tg; masks)
     end
     camera = gold_camera(lens)
     masks = [compute_mask(camera, p, board, GOLD_ST; δ = 0.03, backend = dev) for p in poses]
-    tg = render_all(CalibrationState(board, GOLD_ST, camera, poses, m, light, zero_targets; masks))
-    return CalibrationState(board, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_μ(m, 0.55), light_start, tg; masks)
+    tg = let p = calibration_problem(board, GOLD_ST, camera, poses, m, light, zero_targets; masks); render_all(p.f, p.u0) end
+    return calibration_problem(board, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_μ(m, 0.55), light_start, tg; masks)
 end
 """
 The height columns of a tile Jacobian in a form that does not depend on the warping's basis. The columns are `J_h = HS · B`
@@ -93,7 +93,7 @@ compares their Gram matrix with the one the recorded summary gives, since `(HS B
 complement `B₀`.
 """
 function height_projection(J, t, vars, s)
-    lay = RCg._tile_layout(RCg.static(1023), length(VgtkCore.model(vars[6]).nodes), length(s.settings.sensor), 25, VgtkCore.tangent_size(vars[9]),
+    lay = RCg._tile_layout(RCg.static(1023), length(VgtkCore.model(vars[6]).nodes), length(s.f.settings.sensor), 25, VgtkCore.tangent_size(vars[9]),
                            Int(RCg.n_control_points(VgtkCore.model(vars[9]))), Int(sh_count(max_degree(vars[10].light))),
                            RCg.n_height(vars[8]); t.free)
     hc = collect(lay.height_cols)
@@ -131,19 +131,19 @@ function gold_outputs()
     # 2. per-view problem (KB on the warped board): residual + Jacobian, closed-form joint radiometry, 3 LM iterations
     board, m = gold_board(W, H; h = gold_h())
     s = gold_state(board, m, kb)
-    prob, _ = build_problem(s; damping = VgtkCore.LevenbergDamping())
+    prob, _ = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
     r = get(prob.problem.costs, PerViewResidual{9})[1]
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
     out["perview_residual"] = res; out["perview_jacobian"] = jac_summary(J)
-    s2 = deepcopy(s); parts = all_parts(s2); _lm_radiometry!(s2, parts; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 20)); c = RCg.parts_cost(s2, parts)
-    out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.camera.vignetting))), a = vec(Matrix(coefficients(s2.light))), μ = s2.mat.diffuse_weight)
+    s2 = deepcopy(s); parts = all_parts(s2.f, s2.u0); _lm_radiometry!(s2.f, s2.u0, parts; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 20)); c = RCg.parts_cost(s2.f, s2.u0, parts)
+    out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.u0.camera.vignetting))), a = vec(Matrix(coefficients(s2.u0.light))), μ = s2.u0.mat.diffuse_weight)
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
-    s3 = deepcopy(s); cost0 = cost(s3)[1]; _lm_views!(s3; stops = RCg._calibration_stops(; max_iter = 3, ftol = 1e-12, xtol = 1e-14), damping = VgtkCore.LevenbergDamping())
-    out["lm3"] = (; cost = cost(s3)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3)))), t̂ = collect(focus(s3).t̂_i), r = aperture_radius(s3),
-                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.poses], mat = collect(RCg.Θ_m_nonlinear(s3.mat)), μ = s3.mat.diffuse_weight)
+    s3 = deepcopy(s); cost0 = cost(s3.f, s3.u0)[1]; _lm_views!(s3.f, s3.u0; stops = RCg._calibration_stops(; max_iter = 3, ftol = 1e-12, xtol = 1e-14), damping = VgtkCore.LevenbergDamping())
+    out["lm3"] = (; cost = cost(s3.f, s3.u0)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3.u0)))), t̂ = collect(focus(s3.u0).t̂_i), r = aperture_radius(s3.u0),
+                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.u0.poses], mat = collect(RCg.Θ_m_nonlinear(s3.u0.mat)), μ = s3.u0.mat.diffuse_weight)
     # 3. per-tile problem (grid model, warping free): the largest tile
     s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
-    prob, _ = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+    prob, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
     t = largest_tile(prob)
     vars = RCg.NLLSsolver.getvars(t, prob.variables)
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(1023), t, vars...)
@@ -165,7 +165,7 @@ function gold_outputs()
     # the print's edge (δ, σ_print) on the surface (σ_print 3 mm, about one pixel on the board: before 2026-11-14 the edge's width was the
     # camera's in-focus blur, σ_cam 0.9 px, with σ_print 0.3 mm)
     s = gold_state(gold_board(W, H; edge = SVector(0.3, 3.0), sdf)..., glens)
-    prob, _ = build_problem_grid(s; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
     t = largest_tile(prob)
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(1023), t, RCg.NLLSsolver.getvars(t, prob.variables)...)
     out["tile_edge_residual"] = res; out["tile_edge_jacobian"] = jac_summary(J)

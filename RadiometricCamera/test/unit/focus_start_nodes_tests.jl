@@ -56,7 +56,7 @@ end
     @test fold_termination(ok..., (; folded = [1])) == validity_gate(ok..., true)       # the fold check: the same one gate
     # the refinement folds it into its termination record after the fold check, on the run's fixed support
     src = read(joinpath(pkgdir(RadiometricCamera), "src", "calibration", "calibrate.jl"), String)
-    @test occursin("runaway = focus_runaway(f, state.start.in_support, state.start.views0[1].focus)", src)
+    @test occursin("runaway = focus_runaway(fs, f.start.in_support, f.start.views0[1].focus)", src)
     @test occursin("code, rule = validity_gate(fold_termination(costs.termination..., folds)..., !isempty(runaway))", src)
 end
 

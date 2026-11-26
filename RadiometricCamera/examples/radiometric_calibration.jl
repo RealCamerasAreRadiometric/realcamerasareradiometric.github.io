@@ -21,7 +21,7 @@ using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
 using RadiometricCamera: grid_angular_error, grid_dims, GridStart, ImageLattice, DerivedLattice, load_camera, load_session, render_all, RenderSettings, _lm_tiles!,
                          save_grid, all_parts, RadiometryBlocks, RadiometryBlockDescent, sphere_radius
 using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
-using VisualGeometryToolkitCore: cost                                        # a state's ½ Σ (Φ − ϕ)² and its relative RMS
+using VisualGeometryToolkitCore: cost                                        # a calibration's ½ Σ (Φ − ϕ)² and its relative RMS
 import CUDA, KernelAbstractions
 import VisualRadiometryToolkitCore as VrtkCore
 import VisualGeometryToolkitCore as VgtkCore
@@ -95,22 +95,23 @@ mat0 = Material(; roughness_ink = 0.15, roughness_paper = 0.4, refractive_index_
 st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)
 @printf("f %.2f mm, d_s %.3f mm, r %.2f mm, light sphere r_SH %.2f m around 𝔟 = (%.2f, %.2f, %.2f) m\n", 1e3f_m, 1e3d_s, 1e3r0, r_SH, b...)
 
-# ## 3. The state, masks and the start prediction
+# ## 3. The problem, masks and the start prediction
 #
-# `CalibrationState` holds the board, every block of `Θ̄`, the photographs ϕ and the masks (pixels whose whole circle of confusion lands
-# on the board, `compute_mask`). Four views keep the walkthrough short. The one thing the start cannot know is the absolute scale of
+# `calibration_problem` builds the refinement's `RefineProblem(f, u0)`: its data `f` (a `CalibrationData`: the board, the photographs ϕ
+# and the masks — pixels whose whole circle of confusion lands on the board, `compute_mask`) and its parameters `u0` (a
+# `CalibrationParameters`: every block of `Θ̄`, refined in place). Four views keep the walkthrough short. The one thing the start cannot know is the absolute scale of
 # the light (the photographs' units): the closed-form Θ_l solve below sets it. `render_all` renders Φ for every masked pixel; `cost`
 # returns `(½ Σ (Φ − ϕ)², rel-RMS = √(Σ(Φ − ϕ)² / Σ ϕ²))`.
 
 K = 4; sel = round.(Int, range(1, length(ds.poses); length = K))
-s = CalibrationState(ds.board, st, camera0, ds.poses[sel], mat0, light0, ds.targets[sel]; δ = 0.01, backend)
-VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, all_parts(s)), (; light = true, vignetting = false, mu = false)), RadiometryBlockDescent()); c0, rms0 = cost(s)
-@printf("%d views, %d masked pixels; start (flat V, closed-form lighting): rel-RMS %.4f\n", K, sum(length, s.px), rms0)
-Φ0 = render_all(s);                                                          # H × W × 3 per view, zero outside the mask
+prob = calibration_problem(ds.board, st, camera0, ds.poses[sel], mat0, light0, ds.targets[sel]; δ = 0.01, backend)
+VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (prob.f, prob.u0, all_parts(prob.f, prob.u0)), (; light = true, vignetting = false, mu = false)), RadiometryBlockDescent()); c0, rms0 = cost(prob.f, prob.u0)
+@printf("%d views, %d masked pixels; start (flat V, closed-form lighting): rel-RMS %.4f\n", K, sum(length, prob.f.px), rms0)
+Φ0 = render_all(prob.f, prob.u0);                                                          # H × W × 3 per view, zero outside the mask
 
 # A first look at model vs photo (view 1, green channel): the start prediction is the geometric model's rendering of the board.
 
-let img = ds.targets[sel[1]], m = s.masks[1]
+let img = ds.targets[sel[1]], m = prob.f.masks[1]
     @printf("view %s: photo mean %.4f, model mean %.4f on the %d masked pixels\n", ds.names[sel[1]], mean(img[:, :, 2][m]), mean(Φ0[1][:, :, 2][m]), count(m))
 end
 
@@ -121,24 +122,24 @@ end
 # directions (per-tile cost blocks, `_lm_tiles!`), focus `Θ_f`, aperture r, material `Θ_m`, vignetting `Θ_v`, lighting `Θ_l`; the
 # vignetting gauge V(𝐜) = 1 is exact (the centre's free direction eliminated, `gauge_basis`), no geometric prior.
 
-VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s, all_parts(s))), RadiometryBlockDescent()); c1, rms1 = cost(s)
-@printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, s.mat.diffuse_weight, s.camera.vignetting(VgtkCore.center(s.camera.vignetting) + SVector(0.4W, 0.0)))
+VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (prob.f, prob.u0, all_parts(prob.f, prob.u0))), RadiometryBlockDescent()); c1, rms1 = cost(prob.f, prob.u0)
+@printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, prob.u0.mat.diffuse_weight, prob.u0.camera.vignetting(VgtkCore.center(prob.u0.camera.vignetting) + SVector(0.4W, 0.0)))
 trace = NamedTuple[]
 monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", it, cst,
                                                                1e3 * camera.aperture_radius, mat.diffuse_weight, mat.roughness_paper, mat.roughness_ink)
-res = _lm_tiles!(s; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, iter_callback = monitor, verbose = false)
-c2, rms2 = cost(s)
+res = _lm_tiles!(prob.f, prob.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, iter_callback = monitor, verbose = false)
+c2, rms2 = cost(prob.f, prob.u0)
 @printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.rule)
 
 # The loss curve and the refined lens. `save_grid` stores the grid as VisualGeometryToolkitIO's camera record for the
 # evaluation scripts (`grid:<file>` model spec).
 
-ϕ² = sum(sum(abs2, p) for p in s.ϕ)
+ϕ² = sum(sum(abs2, p) for p in prob.f.ϕ)
 println("rel-RMS per LM iteration: ", join([@sprintf("%.4f", sqrt(2t.cost / ϕ²)) for t in trace], " → "))
-save_grid(joinpath(OUT, "grid_refined.json"), geometric(s); provenance = (; model = "example_refined"))
+save_grid(joinpath(OUT, "grid_refined.json"), geometric(prob.u0); provenance = (; model = "example_refined"))
 save_grid(joinpath(OUT, "grid_start.json"), lens0; provenance = (; model = "example_start"))
-drift = [1e3 * acos(clamp(dot(normalize(geometric(s).grid[i]), normalize(lens0.grid[i])), -1, 1)) for i in eachindex(lens0.grid)]
-@printf("grid moved: median %.3f mrad, max %.3f mrad; aperture r %.3f mm; focus 1/t̂ mean %.2f m\n", median(drift), maximum(drift), 1e3 * aperture_radius(s), 1 / mean(focus(s).t̂_i))
+drift = [1e3 * acos(clamp(dot(normalize(geometric(prob.u0).grid[i]), normalize(lens0.grid[i])), -1, 1)) for i in eachindex(lens0.grid)]
+@printf("grid moved: median %.3f mrad, max %.3f mrad; aperture r %.3f mm; focus 1/t̂ mean %.2f m\n", median(drift), maximum(drift), 1e3 * aperture_radius(prob.u0), 1 / mean(focus(prob.u0).t̂_i))
 
 # ## 5. Validation
 #
@@ -150,9 +151,9 @@ drift = [1e3 * acos(clamp(dot(normalize(geometric(s).grid[i]), normalize(lens0.g
 # 2. **Difference images**: model − photo per view, before and after. Here as numbers; `bin/refine.jl` with `[io] render_state` dumps the
 #    photo / model planes of a state for the difference pages.
 
-Φ1 = render_all(s)
+Φ1 = render_all(prob.f, prob.u0)
 for k in 1:K
-    m = s.masks[k]; ϕk = ds.targets[sel[k]]
+    m = prob.f.masks[k]; ϕk = ds.targets[sel[k]]
     d0 = sqrt(mean(abs2, (Φ0[k] .- ϕk)[m, :][:])) / sqrt(mean(abs2, ϕk[m, :][:])); d1 = sqrt(mean(abs2, (Φ1[k] .- ϕk)[m, :][:])) / sqrt(mean(abs2, ϕk[m, :][:]))
     @printf("  %-14s rel-RMS start %.4f → refined %.4f\n", ds.names[sel[k]], d0, d1)
 end

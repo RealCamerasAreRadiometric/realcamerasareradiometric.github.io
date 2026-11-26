@@ -35,7 +35,7 @@
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
         start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
-                                                                      (; device = RC.KernelAbstractions.CPU())), alg; stops).cache.state
+                                                                      (; device = RC.KernelAbstractions.CPU())), alg; stops).cache.prob
         fit = RC.calibrate(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos, alg; stops, device = RC.KernelAbstractions.CPU())
         return (; fit, out, photos)
     end
@@ -97,8 +97,8 @@ end
     mktempdir() do dir
         s = run_board(dir, Dict("max_iter" => 1), fixture_board(), cam; checkpoint = "off", start_only = true,
                       tables = Dict("focus" => Dict("support_min" => 0.9)))
-        sup = s.start.focus_support
-        f = s.start.views0[1].focus
+        sup = s.f.start.focus_support
+        f = s.f.start.views0[1].focus
         @test sup.dropped > 0                                                  # the rule dropped nodes (else this test says nothing)
         @test length(sup.weight) == length(sup.supported) == length(f.t̂_i)
         @test sup.support_min == 0.9

@@ -272,7 +272,7 @@ end
 # an NLLSsolver variable through Core's adapter. The gauge `V(𝐜) = 1` is held exactly, always: the centre's direction is absent from
 # `Z` (`gauge_basis`), and the start has V(𝐜) = 1 (`gauge_center_value`).
 """The free directions `Z` of the state's vignetting: `vignetting_basis` under its rule without the centre's direction (`gauge_basis`)."""
-vignetting_basis(s::CalibrationState) = gauge_basis(s.camera.vignetting, vignetting_basis(s.camera.vignetting, s.vig_rule))
+vignetting_basis(f::CalibrationData, θ::CalibrationParameters) = gauge_basis(θ.camera.vignetting, vignetting_basis(θ.camera.vignetting, f.vig_rule))
 
 """
     LightingVar(light; channel = 0)
@@ -310,11 +310,12 @@ Cost block of view `k`: residual `Φ_c(𝐮; Θ̄) − ϕ_c(𝐮)` over the mask
 struct PerViewResidual{N} <: NLLSsolver.AbstractResidual
     k::Int
     idx::SVector{7, Int}
-    state::CalibrationState{N}
+    f::CalibrationData
+    θ::CalibrationParameters{N}
 end
 Base.eltype(::PerViewResidual) = Float64
 NLLSsolver.ndeps(::PerViewResidual) = static(7)
-NLLSsolver.nres(r::PerViewResidual) = n_channels(r.state) * length(r.state.px[r.k])   # one residual per measured channel and pixel
+NLLSsolver.nres(r::PerViewResidual) = n_channels(r.f) * length(r.f.px[r.k])   # one residual per measured channel and pixel
 NLLSsolver.varindices(r::PerViewResidual) = r.idx
 NLLSsolver.getvars(r::PerViewResidual{N}, vars::Vector) where {N} =
     (vars[r.idx[1]]::VgtkCore.LeftRigidManifold6{Float64}, vars[r.idx[2]]::_LensBlock, vars[r.idx[3]]::_FocusBlock,
@@ -322,7 +323,7 @@ NLLSsolver.getvars(r::PerViewResidual{N}, vars::Vector) where {N} =
 
 """View of the residual's variables (element type generic)."""
 @inline function _view_of(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{Float64}, dist::_LensBlock, foc::_FocusBlock, ap::ApertureVar)
-    c = r.state.camera
+    c = r.θ.camera
     return View(VgtkCore.model(pose), VgtkCore.with_model(c.geometric, VgtkCore.model(dist)), VgtkCore.model(foc), ap.r)
 end
 
@@ -331,7 +332,7 @@ minus the observed vector."""
 function _block_residual(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{Float64}, dist::_LensBlock, foc::_FocusBlock,
                         ap::ApertureVar, m::MaterialVar, vg::VgtkCore.LinearSubspaceManifold, lt::LightingVar)
     is_valid(m) || return fill(NaN, NLLSsolver.nres(r))      # a step the material block could not represent: rejected
-    s = r.state
+    f, θ = r.f, r.θ
     view = _view_of(r, pose, dist, foc, ap)
     # a non-finite trial state must yield a NaN cost (the device kernels would silently render zero flux
     # for NaN rays, which leaves NLLSsolver's damping loop without an exit condition); the material block's finiteness is its
@@ -339,8 +340,8 @@ function _block_residual(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{F
     finite = all(isfinite, view.pose.t) && all(isfinite, view.pose.R) && all(isfinite, VgtkCore.parameter_vector(view.geometric.camera)) &&
              all(isfinite, view.focus.t̂_i) && isfinite(view.r) && all(isfinite, control_points(VgtkCore.model(vg))) && all(isfinite, coefficients(lt.light))
     finite || return fill(NaN, NLLSsolver.nres(r))
-    fluxv = _flux_device(s, r.k, view, VgtkCore.model(vg), m.mat, lt.light, m.surface)
-    return _whiten(_view_weights(s.weights, r.k), _channel_rows(fluxv, s.channel) .- s.ϕ[r.k])   # the rows' weights (weighting.jl)
+    fluxv = _flux_device(f, θ, r.k, view, VgtkCore.model(vg), m.mat, lt.light, m.surface)
+    return _whiten(_view_weights(f.weights, r.k), _channel_rows(fluxv, f.channel) .- f.ϕ[r.k])   # the rows' weights (weighting.jl)
 end
 
 @inline _bit(flags, i) = (Int(flags) >> (i - 1)) & 1 == 1
@@ -434,7 +435,7 @@ per_tile.jl), formed on the state's backend (`_block_jacobian`, `_gauss_newton_b
 cost is `computecost`'s, ½‖r‖² of the block's cost rows (`_cost_rows`)."""
 function _block_normal_equations(varflags, r, vars)
     b = _block_jacobian(varflags, r, vars)
-    g, H = _gauss_newton_blocks(b.J, b.res, b.T, b.lay, r.state.run)
+    g, H = _gauss_newton_blocks(b.J, b.res, b.T, b.lay, r.f.run)
     return 0.5 * Float64(NLLSsolver.sqnorm(_cost_rows(b, r))), g, H
 end
 """A view's Jacobian block (`_view_jacobian`) and its cost rows: the same residual, read back (`nres` values)."""
@@ -450,7 +451,7 @@ _cost_rows(v, ::PerViewResidual) = Array(v.res)
 # same values bit for bit, W + 1 blocks' kernels on the device at once (`_windowed`).
 
 """
-    _window_width(s, list) -> W
+    _window_width(f, θ, list) -> W
 
 The blocks a request starts ahead (`_windowed`), derived at run time from the device and the problem (owner ruling 2026-11-13: no
 constant, no config key — an execution setting that changes no value):
@@ -464,10 +465,10 @@ constant, no config key — an execution setting that changes no value):
 - clamped to `1 … length(list)`.
 Every value is the same at any W (`_windowed`); the W of a run is recorded in its provenance (`window_width`).
 """
-function _window_width(s::CalibrationState, list)
+function _window_width(f::CalibrationData, θ::CalibrationParameters, list)
     n = length(list)
     n == 0 && return 1
-    be = s.backend
+    be = f.backend
     KA.isgpu(be) || return clamp(VgtkCore.device_resident_threads(be), 1, n)   # the host: its threads (Core's)
     cap = lock(() -> get(_CAPACITY, typeof(be), nothing), _DEVICE_CACHE_LOCK)
     if cap === nothing
@@ -476,17 +477,17 @@ function _window_width(s::CalibrationState, list)
     end
     px = sum(_block_pixels, list) / n
     occ = ceil(Int, cap / max(px, 1.0))
-    w = _device_entry(s, :window)
+    w = _device_entry(f, :window)
     bytes = w === nothing ? 0 : w.block_bytes[]
     mem = floor(Int, VgtkCore.device_free_bytes(be) / (WINDOW_MEMORY_FOOTPRINT * max(bytes, 1)))
     return clamp(min(occ, mem), 1, n)
 end
-_block_pixels(r::PerViewResidual) = length(r.state.px[r.k])
+_block_pixels(r::PerViewResidual) = length(r.f.px[r.k])
 _block_pixels(r) = length(r.pix)
 """Note the device bytes `b` of a block's job of the state's registered problem (its window's `block_bytes`, atomic: the blocks run on
 concurrent workers), the window's memory bound (`_window_width`); without a registered problem, nothing."""
-function _note_block_bytes!(s::CalibrationState, b::Integer)
-    w = _device_entry(s, :window)
+function _note_block_bytes!(f::CalibrationData, b::Integer)
+    w = _device_entry(f, :window)
     w === nothing || (w.block_bytes[] = Int(b))
     return nothing
 end
@@ -498,51 +499,51 @@ others run, so the estimate is an upper bound."""
 const WINDOW_MEMORY_FOOTPRINT = 0.4
 
 """
-    _register_window!(s, problem, select; width = nothing)
+    _register_window!(f, θ, problem, select; width = nothing)
 
 Enable the concurrent evaluation (`_windowed`) of the residual blocks of `problem` whose type `select` accepts (in the problem's order,
 as NLLSsolver visits them): `width` blocks ahead of each request, or (`nothing`) `_window_width`'s, derived after the first block.
 `_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall postcondition register their problem and unregister it on exit
 (`_unregister_window!`).
 """
-_register_window!(s::CalibrationState, p::VgtkCore.LmProblem, select; width::Union{Nothing, Integer} = nothing) =
-    _register_window!(s, p.problem, select; width)                           # an LM problem: its NLLSsolver problem's blocks
-function _register_window!(s::CalibrationState, problem, select; width::Union{Nothing, Integer} = nothing)
-    _unregister_window!(s)
-    _ensure_device!(s); _height_board(s); _view_phi(s, 1)        # the device cache's lazy entries, built before workers read it
+_register_window!(f::CalibrationData, θ::CalibrationParameters, p::VgtkCore.LmProblem, select; width::Union{Nothing, Integer} = nothing) =
+    _register_window!(f, θ, p.problem, select; width)                           # an LM problem: its NLLSsolver problem's blocks
+function _register_window!(f::CalibrationData, θ::CalibrationParameters, problem, select; width::Union{Nothing, Integer} = nothing)
+    _unregister_window!(f)
+    _ensure_device!(f, θ); _height_board(f, θ); _view_phi(f, θ, 1)        # the device cache's lazy entries, built before workers read it
     list = [c for T in keys(problem.costs) if select(T) for c in get(problem.costs, T)]
     pos = IdDict{Any, Int}(c => i for (i, c) in enumerate(list))
-    s.device_cache = merge(s.device_cache, (; window = (; problem, list, pos, width = Ref(width === nothing ? 0 : Int(width)),
+    f.device_cache = merge(f.device_cache, (; window = (; problem, list, pos, width = Ref(width === nothing ? 0 : Int(width)),
                                                          pending = Vector{Any}(nothing, length(list)), block_bytes = Threads.Atomic{Int}(0),
                                                          buffers = IdDict{Task, Any}(), buffers_lock = ReentrantLock())))
     return nothing
 end
 """The views of a per-view problem concurrently (`_register_window!`)."""
-_register_view_problem!(s::CalibrationState, problem; width = nothing) = _register_window!(s, problem, T -> T <: PerViewResidual; width)
+_register_view_problem!(f::CalibrationData, θ::CalibrationParameters, problem; width = nothing) = _register_window!(f, θ, problem, T -> T <: PerViewResidual; width)
 
 """
-    _with_registered(f, s, problem, idx = nothing; concurrent = true) -> f()
+    _with_registered(work, f, θ, problem, idx = nothing; concurrent = true) -> work()
 
-`f()` with the LM problem `problem` registered on the state `s`, and unregistered on exit whatever `f` does — the one teardown of
+`work()` with the LM problem `problem` registered on the data `f` (at the parameters `θ`), and unregistered on exit whatever `work` does — the one teardown of
 `_lm_views!`, `_lm_tiles!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view
 batches (`_register_grid_problem!`); with `concurrent` its blocks in the window (`_register_window!`: the views of a per-view
 problem, the tiles of a grid problem).
 """
-function _with_registered(f, s::CalibrationState, problem, idx = nothing; concurrent::Bool = true)
+function _with_registered(work, f::CalibrationData, θ::CalibrationParameters, problem, idx = nothing; concurrent::Bool = true)
     grid = idx !== nothing && hasproperty(idx, :patches)
-    grid && _register_grid_problem!(s, problem, idx)
+    grid && _register_grid_problem!(f, θ, problem, idx)
     try
-        concurrent && _register_window!(s, problem, grid ? (T -> T <: PerTileResidual) : (T -> T <: PerViewResidual))
-        return f()
+        concurrent && _register_window!(f, θ, problem, grid ? (T -> T <: PerTileResidual) : (T -> T <: PerViewResidual))
+        return work()
     finally
-        concurrent && _unregister_window!(s)            # (its jobs read the grid batch: first)
-        grid && _unregister_grid_problem!(s)
+        concurrent && _unregister_window!(f)            # (its jobs read the grid batch: first)
+        grid && _unregister_grid_problem!(f)
     end
 end
 """Disable the concurrent blocks (`_register_window!`): every job in flight collected and dropped. The width the window ran at stays
 in the device cache (`window_width`, the run's provenance)."""
-function _unregister_window!(s::CalibrationState)
-    w = _device_entry(s, :window)
+function _unregister_window!(f::CalibrationData)
+    w = _device_entry(f, :window)
     w === nothing && return nothing
     for i in eachindex(w.pending)
         job = w.pending[i]
@@ -550,11 +551,11 @@ function _unregister_window!(s::CalibrationState)
         w.pending[i] = nothing
     end
     lock(() -> empty!(w.buffers), w.buffers_lock)            # the solve's Jacobian buffers (`_jacobian_buffers`): released with it
-    s.device_cache = merge(Base.structdiff(s.device_cache, NamedTuple{(:window,)}), (; window_width = w.width[]))
+    f.device_cache = merge(Base.structdiff(f.device_cache, NamedTuple{(:window,)}), (; window_width = w.width[]))
     return nothing
 end
 """The entry `key` of the state's device cache (a registered problem's: `:grid`, `:window`), `nothing` without one."""
-_device_entry(s::CalibrationState, key::Symbol) = (dc = s.device_cache; dc === nothing ? nothing : get(dc, key, nothing))
+_device_entry(f::CalibrationData, key::Symbol) = (dc = f.device_cache; dc === nothing ? nothing : get(dc, key, nothing))
 
 """
     _windowed(f, r, vars, what) -> f(r, vars)
@@ -566,7 +567,7 @@ evaluated here; and, when the state has a registered problem (`_register_window!
 block). A job that failed or whose key differs is dropped (the request evaluates, and reports a failure itself).
 """
 function _windowed(f, r, vars, what)
-    w = _device_entry(r.state, :window)
+    w = _device_entry(r.f, :window)
     w === nothing && return f(r, vars)
     i = get(w.pos, r, 0)
     i == 0 && return f(r, vars)
@@ -577,7 +578,7 @@ function _windowed(f, r, vars, what)
     out = job === nothing ? nothing : (x = try _await(job) catch; nothing end; x !== nothing && x[1] == key ? Some(x[2]) : nothing)
     if w.width[] == 0                                     # the width, after the first block (its kernels' occupancy and bytes)
         out === nothing && (out = Some(f(r, vars)))
-        w.width[] = _window_width(r.state, w.list)
+        w.width[] = _window_width(r.f, r.θ, w.list)
     end
     for j in (i + 1):min(i + w.width[], length(w.list))
         w.pending[j] === nothing || continue
@@ -689,7 +690,7 @@ _hold_material(blocks_held, rides::Bool) =
     :material in blocks_held && rides ? ((:material,), Tuple(k for k in blocks_held if k !== :material)) : ((), Tuple(blocks_held))
 
 """
-    build_problem(s::CalibrationState; damping, fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
+    build_problem(f::CalibrationData, θ::CalibrationParameters; damping, fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
 
 The per-view LM problem at the state `s`: VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`) with one pose
 variable (`VgtkCore.LeftRigidManifold6{Float64}`) per view, the shared distortion / focus / aperture / material / vignetting / lighting variables and one
@@ -701,42 +702,42 @@ held at their start, and its other entries hold the lens model's parameters by
 Core's names in the lens block (`lens_free`; `(:cx, :cy, :k3)`, `:aspect` the aspect f_y/f_x); an entry that is none of these is an
 `ArgumentError`. A lens with no free parameter is held. The model's structure (as the grid route's `build_problem_grid`): with
 `height_degree > 0` the material block carries the board warping's `HEIGHT_NC` nodal heights (`MaterialVar{Float64, HEIGHT_NC}`:
-HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(s.board)`); with `inplane` the in-plane print error `(a, u)` of
+HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(f.board)`); with `inplane` the in-plane print error `(a, u)` of
 the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it. `damping` the LM's (its optimizer's,
 VisualGeometryToolkitCore's `LmDamping`: the `LmProblem`'s).
 """
-function build_problem(s::CalibrationState{N}; damping::VgtkCore.LmDamping, fixed = (), height_degree::Integer = 0,
+function build_problem(f::CalibrationData, θ::CalibrationParameters{N}; damping::VgtkCore.LmDamping, fixed = (), height_degree::Integer = 0,
                        inplane::Bool = false) where {N}
-    K = n_views(s)
-    vv = VgtkCore.restrict(VgtkCore.ParameterManifold(s.camera.vignetting), vignetting_basis(s))   # Θ_v: Core's LinearSubspaceManifold
-    lv = LightingVar(s.light; s.channel)
+    K = n_views(θ)
+    vv = VgtkCore.restrict(VgtkCore.ParameterManifold(θ.camera.vignetting), vignetting_basis(f, θ))   # Θ_v: Core's LinearSubspaceManifold
+    lv = LightingVar(θ.light; f.channel)
     blocks_held, lens_held = _split_fixed(fixed)           # the blocks `fixed` names, and the lens model's parameters
-    lv_d = lens_manifold(geometric(s); fixed = lens_held)
+    lv_d = lens_manifold(geometric(θ); fixed = lens_held)
     NH = _surface_held(fixed, :height) ? 0 : height_nparams(height_degree)   # a free board warping: the nodal heights ride in the material block (as in the grid route)
     inplane = inplane && !_surface_held(fixed, :inplane)
     material_held, blocks_held = _hold_material(blocks_held, NH > 0 || inplane)
-    mv = MaterialVar(s.mat, s.board.state, s.board; height = NH, inplane, s.channel, fixed = material_held, s.mu_bounds)
-    variables = Any[VgtkCore.LeftRigidManifold6(s.poses[k]) for k in 1:K]
-    push!(variables, lv_d, focus_block(focus(s)),
-          ApertureVar(aperture_radius(s)), mv, vv, lv)
+    mv = MaterialVar(θ.mat, θ.surface, _board(f, θ); height = NH, inplane, f.channel, fixed = material_held, f.mu_bounds)
+    variables = Any[VgtkCore.LeftRigidManifold6(θ.poses[k]) for k in 1:K]
+    push!(variables, lv_d, focus_block(focus(θ)),
+          ApertureVar(aperture_radius(θ)), mv, vv, lv)
     i_d, i_f, i_r, i_m, i_v, i_l = (K + 1):(K + 6)
-    blocks = Any[PerViewResidual{N}(k, SVector(k, i_d, i_f, i_r, i_m, i_v, i_l), s) for k in 1:K]
-    _add_focus_smoothness!(blocks, i_f, N, s.focus_smoothness)
+    blocks = Any[PerViewResidual{N}(k, SVector(k, i_d, i_f, i_r, i_m, i_v, i_l), f, θ) for k in 1:K]
+    _add_focus_smoothness!(blocks, i_f, N, f.focus_smoothness)
     idx = (; poses = 1:K, distortion = i_d, focus = i_f, aperture = i_r, material = i_m, vignetting = i_v, lighting = i_l)
     free = trues(length(variables))
-    last(lens_free(geometric(s); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
+    last(lens_free(geometric(θ); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
     _free_mask!(free, idx, blocks_held; lens_key = :distortion, lens_idx = i_d)
     return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free), damping), (; idx..., free)
 end
 
 """
-    extract_variables(s, vars, idx) -> (camera, poses, mat, surface, light)
+    extract_variables(f, θ, vars, idx) -> (camera, poses, mat, surface, light)
 
 The camera, the poses, the material, the surface and the lighting encoded in a variable vector (non-mutating; used by `read_back!`
 and tracing).
 """
-function extract_variables(s::CalibrationState, vars::Vector, idx)
-    lens_new = VgtkCore.with_model(geometric(s), VgtkCore.model(vars[idx.distortion]::_LensBlock))
+function extract_variables(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
+    lens_new = VgtkCore.with_model(geometric(θ), VgtkCore.model(vars[idx.distortion]::_LensBlock))
     mv = vars[idx.material]::MaterialVar
     camera = RadiometricCameraModel(lens_new, VgtkCore.model(vars[idx.focus]::_FocusBlock), (vars[idx.aperture]::ApertureVar).r,
                                     VgtkCore.model(vars[idx.vignetting]::VgtkCore.LinearSubspaceManifold))
@@ -744,22 +745,22 @@ function extract_variables(s::CalibrationState, vars::Vector, idx)
     return camera, poses, mv.mat, mv.surface, (vars[idx.lighting]::LightingVar).light
 end
 
-"""`read_back!(s, problem, idx, extract = extract_variables)`: write the optimised variables of `problem` back into the state, read
+"""`read_back!(f, θ, problem, idx, extract = extract_variables)`: write the optimised variables of `problem` back into the state, read
 through the route's `extract` (`extract_variables` per view, `extract_variables_grid` per tile): the one read-back of both LMs."""
-function read_back!(s::CalibrationState, problem, idx, extract = extract_variables)
-    camera, poses, mat, surface, light = extract(s, problem.variables, idx)
-    s.camera = camera; s.poses .= poses
-    s.mat = mat; s.light = light
-    set_surface!(s, surface)
-    return s
+function read_back!(f::CalibrationData, θ::CalibrationParameters, problem, idx, extract = extract_variables)
+    camera, poses, mat, surface, light = extract(f, θ, problem.variables, idx)
+    θ.camera = camera; θ.poses .= poses
+    θ.mat = mat; θ.light = light
+    set_surface!(θ, surface)
+    return θ
 end
 
 """
-    Θ̄_snapshot(s; camera = s.camera, poses = s.poses, mat = s.mat, surface = board_surface(s), light = s.light) -> NamedTuple
+    Θ̄_snapshot(f, θ; camera = θ.camera, poses = θ.poses, mat = θ.mat, surface = board_surface(θ), light = θ.light) -> NamedTuple
 
 Everything needed to re-render the state later (`camera, poses, mat, surface, light`).
 """
-Θ̄_snapshot(s::CalibrationState; camera = s.camera, poses = s.poses, mat = s.mat, surface = s.board.state, light = s.light) =
+Θ̄_snapshot(f::CalibrationData, θ::CalibrationParameters; camera = θ.camera, poses = θ.poses, mat = θ.mat, surface = θ.surface, light = θ.light) =
     (; camera, poses = copy(poses), mat, surface, light)
 
 
@@ -786,7 +787,7 @@ function _free_mask!(free::AbstractVector{Bool}, idx, fixed; lens_key::Symbol, l
 end
 
 """
-    _lm_callback(s, idx, extract; trace, trace_meta, iter_callback, verbose, lm_log) -> callback
+    _lm_callback(f, θ, idx, extract; trace, trace_meta, iter_callback, verbose, lm_log) -> callback
 
 The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one): with a `trace` or an `iter_callback`, after
 every iteration the current best variables (`varnext` once allocated, else `variables`) read through `extract(s, vars, idx)` (the
@@ -794,16 +795,16 @@ route's `extract_variables` / `extract_variables_grid`) into `(camera, poses, ma
 (`trace_meta` merged, `phase = :lm`) and `iter_callback(it, cost, camera, poses, mat, surface, light)` called; else NLLSsolver's
 print-out (`verbose`) or null callback. Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none).
 """
-function _lm_callback(s::CalibrationState, idx, extract; trace = nothing, trace_meta = (;), iter_callback = nothing, verbose::Bool = false,
+function _lm_callback(f::CalibrationData, θ::CalibrationParameters, idx, extract; trace = nothing, trace_meta = (;), iter_callback = nothing, verbose::Bool = false,
                       lm_log::AbstractString = "")
     cb = if trace !== nothing || iter_callback !== nothing
         it = Ref(0)
         function (cost, problem_, data, iterdata)
             vars = length(problem_.varnext) == length(problem_.variables) ? problem_.varnext : problem_.variables
-            camera, poses, mat, surface, light = extract(s, vars, idx)
+            camera, poses, mat, surface, light = extract(f, θ, vars, idx)
             it[] += 1
             trace !== nothing && push!(trace, (; trace_meta..., phase = :lm, cost = Float64(cost), time = time(),
-                                               snap = Θ̄_snapshot(s; camera, poses, mat, surface, light)))
+                                               snap = Θ̄_snapshot(f, θ; camera, poses, mat, surface, light)))
             iter_callback !== nothing && iter_callback(it[], Float64(cost), camera, poses, mat, surface, light)
             return cost, 0
         end
@@ -814,7 +815,7 @@ function _lm_callback(s::CalibrationState, idx, extract; trace = nothing, trace_
 end
 
 """
-    _lm_views!(s; stops, damping, fixed = (), height_degree = 0, inplane = false, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_views!(f, θ; stops, damping, fixed = (), height_degree = 0, inplane = false, kwargs...) -> (; code, rule, iterations, cost)
 
 Levenberg–Marquardt over all parameter blocks but those `fixed` names (of `(:poses, :distortion, :focus, :aperture, :material,
 :vignetting, :lighting)`), the surface parameters it names (`:height`, `:inplane`) and the lens block's parameters `fixed` names by
@@ -828,31 +829,31 @@ are whitened (a two-view 32 × 32 fixture starts at ≈ 2e-4), so an absolute th
 along a flat direction. Returns VisualGeometryToolkitCore's termination record (`code`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
 — or at a stationary point after the rejection cap; `rule`, a `StopRule`; `iterations`; `cost`, ‖r‖² at the solution).
 """
-function _lm_views!(s::CalibrationState; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, fixed = (), verbose::Bool = false,
+function _lm_views!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, fixed = (), verbose::Bool = false,
                     trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
                     lm_log::AbstractString = "")
-    problem, idx = build_problem(s; damping, fixed, height_degree, inplane)
-    callback = _lm_callback(s, idx, extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
-    _reset_scrubbed!(s.run)
+    problem, idx = build_problem(f, θ; damping, fixed, height_degree, inplane)
+    callback = _lm_callback(f, θ, idx, extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
+    _reset_scrubbed!(f.run)
     result = try                                           # (Core's stall postcondition runs inside, the views still concurrent)
-        _with_registered(s, problem) do
-            VgtkCore.lmsolve_chart!(problem, _lm_stops(s, stops); callback)
+        _with_registered(f, θ, problem) do
+            VgtkCore.lmsolve_chart!(problem, _lm_stops(f, stops); callback)
         end
     finally
-        _report_scrubbed(s.run, "_lm_views!")
+        _report_scrubbed(f.run, "_lm_views!")
     end
-    read_back!(s, problem, idx)
+    read_back!(f, θ, problem, idx)
     return result
 end
 
 """The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[optimizer]` key."""
 const CORE_LM_XTOL = VgtkCore.LmStops().xtol
-"""The solve's stop settings `stops` (VisualGeometryToolkitCore's `LmStops`) of the calibration LM of the state `s`: as given, their
+"""The solve's stop settings `stops` (VisualGeometryToolkitCore's `LmStops`) of the calibration LM on the data `f`: as given, their
 residual resolution the norm the data resolve — the photographs' RAW quantisation in the cost's norm, never the noise level
-(`lm_abstol`), a fact of the state."""
-_lm_stops(s, stops::VgtkCore.LmStops) =
+(`lm_abstol`), a fact of the data."""
+_lm_stops(f::CalibrationData, stops::VgtkCore.LmStops) =
     VgtkCore.LmStops(; stops.max_iter, stops.ftol, stops.xtol, stops.xtol_rel, stops.stationarity_tol, stops.max_time,
-                     residual_resolution = lm_abstol(s))
+                     residual_resolution = lm_abstol(f))
 """The stops of one LM chunk of a refinement: `stops` with its iteration cap `n` and its wall-clock cap `max_time` (s), the others kept."""
 _chunk_stops(stops::VgtkCore.LmStops, n::Integer, max_time::Real) =
     VgtkCore.LmStops(; max_iter = n, stops.ftol, stops.xtol, stops.xtol_rel, stops.stationarity_tol, max_time = Float64(max_time),
