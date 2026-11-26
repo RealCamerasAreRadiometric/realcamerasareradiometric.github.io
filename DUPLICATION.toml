@@ -50,13 +50,6 @@ file = "RadiometricCamera/benchmark/run.jl"
 function = "device_name"
 reason = "the benchmark report's device label (the CPU's model and threads, a device's name), not a computation; removed with the others when Core's device_names entry of the CPU is forward-ported"
 
-# ---- the sensor characterisation's producer (owner ruling D12) ---------------------------------------------------------------
-
-[[pattern]]
-use = "sensor_component"
-file = "experiments/src/sensor_characterization.jl"
-reason = "the record's producer composes Core's measured components (MasterDark, defect_onsets, PhotonTransfer) into a SensorCharacterization; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: removed when VisualGeometryToolkitCore gains the public builder of a characterisation (from its darks and flats), the producer calling it"
-
 # ---- awaiting their owner (TEMPORARY: each entry goes when its item lands) ----------------------------------------------------
 
 [[similar]]

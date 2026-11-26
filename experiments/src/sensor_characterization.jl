@@ -80,9 +80,10 @@ bursts(root::AbstractString) =
 
 THE computation of the experiment (this file's header): the E1 burst `dark_root/<dark>`'s master dark, every E1_E2 burst's master
 dark (its Dark, defect mask and read noise; the black slot a `Darks` of them all, the E1 dark's channel black shared; `black` that
-channel black), the E4 series' photon transfer, into ONE `SensorCharacterization` of the frames' body at their ISO. Each burst
-is read once (Features' `load_raw_mosaic`), keyed by its EXIF exposure (its headers read first, `exposure_index`: two bursts of one
-tree at one exposure are refused). `fit` is Core's PhotonTransfer FitResult (its metadata: the
+channel black), the E4 series' photon transfer, into ONE `SensorCharacterization` of the frames' body at their ISO, by Core's builder
+`DarksAndFlats` (its `MasterDark` at `false_defects`, the E1 burst the reference). Each burst is read once (Features'
+`load_raw_mosaic`), keyed by its EXIF exposure (its headers read first, `exposure_index`: two bursts of one tree at one exposure are
+refused); every burst is held at once (the builder's data). `fit` is the series' PhotonTransfer FitResult (its metadata: the
 range, the Birge ratio).
 """
 function characterize_sensor(dark_root::AbstractString, ptc_root::AbstractString; dark::AbstractString, false_defects::Real)
@@ -90,46 +91,18 @@ function characterize_sensor(dark_root::AbstractString, ptc_root::AbstractString
     dark_bursts = bursts(dark_root); ptc_bursts = bursts(ptc_root)
     exposure_index([d => burst_exposure(dir) for (d, dir) in dark_bursts], "the dark tree $dark_root")    # one burst per exposure, or refused
     exposure_index([d => burst_exposure(dir) for (d, dir) in ptc_bursts], "the photon-transfer tree $ptc_root")
-    e1 = load(joinpath(dark_root, dark))
-    t1 = burst_exposure(e1)
-    md = _master_dark(e1, t1, false_defects)
-    body = VgtkFeatures.body_identity(first(e1)); iso = VgtkFeatures.exposure_settings(first(e1)).iso
-    e1 = nothing; GC.gc()
-    masks = Pair[]; darks = Dict{Any, Any}(); dark_maps = VgtkCore.Dark[]
-    for (d, dir) in dark_bursts
-        if d == dark
-            push!(masks, t1 => md.defects); darks[t1] = md.read_noise; push!(dark_maps, md.dark)
-            continue
-        end
-        fr = load(dir); t = burst_exposure(fr)
-        m = _master_dark(fr, t, false_defects)
-        push!(masks, t => m.defects); darks[t] = m.read_noise; push!(dark_maps, m.dark)
-        fr = nothing; GC.gc()
-    end
-    black = VgtkCore.Darks(md.dark.black, dark_maps; source = VgtkCore.SensorSource.measured)   # one Dark per exposure band
-    defects = VgtkCore.defect_onsets(identity.(masks))
-    groups = Dict{Any, Any}()
-    for (_, dir) in ptc_bursts
-        fr = load(dir); groups[burst_exposure(fr)] = fr
-    end
-    # the estimator's input: the E1 dark subtracted and its defects left out (PhotonTransfer reads the black and defect slots only)
-    model = VgtkCore.SensorModel(md.dark, VgtkCore.NoNoise(), VgtkCore.defect_onsets([t1 => md.defects]))
-    fit = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.PoissonGaussian, Dict(k => v for (k, v) in groups),
-                                                    (; darks = Dict(k => v for (k, v) in darks), sensor_model = model)),   # concrete key and value types
-                         VgtkCore.PhotonTransfer())
-    K = fit.u
-    noise = VgtkCore.PoissonGaussian(K.gain, md.read_noise.σ, (gain = K.std_error.gain, σ = md.read_noise.std_error);
-                                     source = VgtkCore.SensorSource.measured)
-    c = VgtkCore.SensorCharacterization(body; entries = [iso => (; black, noise, defects)])
-    return (; characterization = c, fit, black = md.dark.black, read_noise = md.read_noise, defects,
-            exposures = sort!(collect(keys(darks)); by = t -> VgtkCore.ustrip(VgtkCore.parse_unit("s"), t)))
-end
-
-"""The master dark of one burst `frames` at its exposure `t` (Core's `MasterDark` on `EstimationProblem(Dark, frames, (; exposure_band =
-(t, t)))`): its `dark`, `read_noise` and `defects`."""
-function _master_dark(frames, t, false_defects)
-    r = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.Dark, frames, (; exposure_band = (t, t))), VgtkCore.MasterDark(; false_defects))
-    return (; dark = r.u, r.metadata.read_noise, r.metadata.defects)
+    t1 = burst_exposure(joinpath(dark_root, dark))                                      # the reference: the E1 burst's exposure (its headers)
+    darks = Dict(burst_exposure(fr) => fr for fr in (load(dir) for (_, dir) in dark_bursts))
+    flats = Dict(burst_exposure(fr) => fr for fr in (load(dir) for (_, dir) in ptc_bursts))
+    first_frame = first(darks[t1])
+    body = VgtkFeatures.body_identity(first_frame); iso = VgtkFeatures.exposure_settings(first_frame).iso
+    # Core's builder of a characterization from its darks and flats: every burst's MasterDark, their defect onsets, the series'
+    # PhotonTransfer, the reference burst (the E1 dark) the shared black, the read noise and the series' linearisation
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SensorCharacterization, (darks, flats), (; body, iso, reference = t1)),
+                       VgtkCore.DarksAndFlats(; dark = VgtkCore.MasterDark(; false_defects)))
+    c = r.u; fit = r.metadata.series; md = r.metadata.darks[t1]
+    return (; characterization = c, fit, black = md.u.black, read_noise = md.metadata.read_noise, defects = c.entries[Float64(iso)].defects,
+            exposures = sort!(collect(keys(r.metadata.darks)); by = t -> VgtkCore.ustrip(VgtkCore.parse_unit("s"), t)))
 end
 
 """The SHA-256 of a set's rows of the tier's MANIFEST.tsv (`<tier>/<set>/…` rows, in the file's order, newline-joined): the record's
