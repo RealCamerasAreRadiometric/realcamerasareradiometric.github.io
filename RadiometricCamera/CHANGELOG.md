@@ -22,6 +22,18 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **Breaking: a smoothness weight chosen by GCV is Estimation's `GeneralizedCrossValidation()` (spec §9 G-j).** Estimation retired
+  `gcv_select` and the weight `:gcv`; RC follows, with no alias:
+  - `PSplineSmoothness(order, :gcv)` / `BendingSmoothness(:gcv)` → `PSplineSmoothness(order, GeneralizedCrossValidation())` (a weight is a
+    `Float64` or the algorithm value); `RadiometryBlockDescent(; vignetting_smoothness = GeneralizedCrossValidation())`, and
+    `_update_vignetting!`'s `smoothness_weight`; a Symbol weight is refused (`check_penalty_weight`'s `ArgumentError`);
+  - the selection is `solve(EstimationProblem(Hyperparameter, curve, (; scale)), GeneralizedCrossValidation())` in both GCV solves
+    (the vignetting's closed form, the grid's linearization: `select_grid_smoothness_weight` takes the weight's algorithm from its
+    smoothness); the records keep their shape, `(; β = r.u, r.metadata...)` = gcv_select's `(; β, λ, gcv, rss, dof, log10_β_bracket,
+    at_bracket_end)`;
+  - the TOML does not change: `weight = "gcv"` reads as `GeneralizedCrossValidation()` at its defaults, and writes back as `"gcv"`
+    (`weight_record`; a non-default bracket or scan is no option spelling and is refused by the writer, never written as the default).
+  No number moves: the same scan and Brent search on the same curves.
 - **Core's public `matvec!` and `toml_leaves`** (VisualGeometryToolkitCore 0.14, Phase 1A): the device Jacobian's `Jᵀr` and the
   boolean-switch scan called the internal `_matvec!` and `_toml_leaves` (R22); they read the public functions, the same code, bit for bit.
 - **Breaking: the refinement is a refine, `solve(RefineProblem(f, u0), RadiometricRefinement(…); stops)` (#18).**

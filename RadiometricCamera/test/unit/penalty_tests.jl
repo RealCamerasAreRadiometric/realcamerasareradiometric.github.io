@@ -10,6 +10,7 @@
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
+    using VisualGeometryToolkitEstimation: GeneralizedCrossValidation
     tex = fixture_board()
     board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
     W = H = 24
@@ -41,18 +42,24 @@
     @test s2.u0.camera.vignetting(center(s2.u0.camera.vignetting)) ≈ 1 atol = 1e-12           # the hard pin holds under the penalty
     # by GCV: β inside the bracket, recorded with the curve's minimum; the solve is the fixed-weight solve at that β
     rec = NamedTuple[]
-    s3 = state(); RC._update_vignetting!(s3.f, s3.u0, parts; smoothness_weight = :gcv, gcv_record = rec)
+    s3 = state(); RC._update_vignetting!(s3.f, s3.u0, parts; smoothness_weight = GeneralizedCrossValidation(), gcv_record = rec)
     @test length(rec) == 1 && isfinite(rec[1].gcv) && 0 < rec[1].dof <= rec[1].n_free && rec[1].rows == 36
-    @test rec[1].log10_β_bracket == [-8.0, 4.0] && 1e-8 <= rec[1].β <= 1e4 && !rec[1].at_bracket_end      # Estimation's gcv_select
+    @test rec[1].log10_β_bracket == [-8.0, 4.0] && 1e-8 <= rec[1].β <= 1e4 && !rec[1].at_bracket_end      # Estimation's GeneralizedCrossValidation
     s4 = state(); RC._update_vignetting!(s4.f, s4.u0, parts; smoothness_weight = rec[1].β)
     @test s4.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P rtol = 1e-10
     # through the block sweep; the joint solve has no penalty
-    s5 = state(); r5 = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s5.f, s5.u0, parts), (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = :gcv))
+    s5 = state(); r5 = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s5.f, s5.u0, parts), (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = GeneralizedCrossValidation()))
     rec2 = r5.metadata.gcv
     @test length(rec2) == 1 && s5.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P && VgtkCore.successful_retcode(r5) && r5.u.vignetting === s5.u0.camera.vignetting
     @test_throws ArgumentError RC._with_schedule(RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping()); vignetting_smoothness = 0.1)
-    @test_throws ArgumentError RC._update_vignetting!(state(), parts; smoothness_weight = -1.0)
-    @test_throws ArgumentError RC._update_vignetting!(state(), parts; smoothness_weight = :aic)
+    s6 = state()
+    @test_throws ArgumentError RC._update_vignetting!(s6.f, s6.u0, parts; smoothness_weight = -1.0)
+    @test_throws ArgumentError RC._update_vignetting!(s6.f, s6.u0, parts; smoothness_weight = :aic)
+    @test_throws ArgumentError RC._update_vignetting!(s6.f, s6.u0, parts; smoothness_weight = :gcv)                # the algorithm value, no Symbol
+    @test_throws ArgumentError RC.RadiometryBlockDescent(; vignetting_smoothness = :gcv)
+    # a non-default GCV is no option spelling: refused by the writer, never written as "gcv"
+    @test RC.weight_record(GeneralizedCrossValidation()) == "gcv" && RC.weight_record(0.5) == 0.5
+    @test_throws ArgumentError RC.weight_record(GeneralizedCrossValidation(; points = 9))
     # the boundary order: 2 is the natural rule (Δ²c = 0), 3 the curvature-preserving Δ³c = 0 — Core's BoundaryRule(m, region; order)
     reg = VgtkCore.Rect(0, 0, W, H) ∩ VgtkCore.Ellipse(VgtkCore.Point2(12.0, 12.0), 7.0, 7.0, 0.0)
     sr = calibration_problem(board, st, camera_0, poses, mat_t, light_t, targets; masks, region = reg, boundary_order = 2)
@@ -70,6 +77,7 @@ end
 @testitem "penalties: the grid smoothness pspline and its weight by GCV on the linearization" setup = [RCFixtures, GridTilesScene] begin
     using RadiometricCamera: build_problem_grid
     using LinearAlgebra
+    using VisualGeometryToolkitEstimation: GeneralizedCrossValidation
     all10 = trues(10, 10)
     free = trues(10, 10); free[1:5, 1:5] .= false; free[7, 8] = false
     pr = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.5), glens_t, 7.0, free)
@@ -87,7 +95,7 @@ end
     # the weight by GCV on the linearization at a perturbed start: the smoothness of that weight, the selection recorded
     sp = calibration_problem(board, st, camera_p, poses_p, mat_t, light_t, targets; masks)
     held_p = RC.interior_nodes(RC.grid_present(glens_p))
-    smooth, sel = RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, :gcv), held_p; damping = VgtkCore.LevenbergDamping())
+    smooth, sel = RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, GeneralizedCrossValidation()), held_p; damping = VgtkCore.LevenbergDamping())
     @test smooth.type === :pspline && smooth.β == sel.β && sel.kind === :pspline && isfinite(sel.gcv) && sel.n_columns == 4 * 50
     @test sel.n_observations == 3 * sum(length, sp.f.px) && 0 < sel.dof <= sel.n_columns
     @test 1e-8 <= sel.β <= 1e4
@@ -100,12 +108,13 @@ end
 
 @testitem "penalties: the options' new keys" setup = [RCFixtures] begin
     using TOML
+    using VisualGeometryToolkitEstimation: GeneralizedCrossValidation
     ps(w) = Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => w))
     o = RC.pipeline_options(Dict("grid" => ps("gcv"), "vignetting" => merge(ps("gcv"), Dict("boundary_order" => 3))))
-    @test o.grid.smoothness == RC.PSplineSmoothness(3, :gcv) && o.vignetting.smoothness == RC.PSplineSmoothness(3, :gcv) && o.vignetting.boundary_order == 3
+    @test o.grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && o.vignetting.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation()) && o.vignetting.boundary_order == 3
     @test RC.pipeline_options(TOML.parse(sprint(TOML.print, RC.config_dict(o)))) == o      # the writer's "gcv" reads back
     @test RC.pipeline_options(Dict("vignetting" => ps(2))).vignetting.smoothness == RC.PSplineSmoothness(3, 2.0)
-    @test RC.pipeline_options(Dict{String, Any}(); set = ["grid.smoothness={type = \"pspline\", order = 3, weight = \"gcv\"}"]).grid.smoothness == RC.PSplineSmoothness(3, :gcv)
+    @test RC.pipeline_options(Dict{String, Any}(); set = ["grid.smoothness={type = \"pspline\", order = 3, weight = \"gcv\"}"]).grid.smoothness == RC.PSplineSmoothness(3, GeneralizedCrossValidation())
     # today's values are the defaults: no penalty on V, order 2, the grid smoothness's weight a number
     d = RC.PipelineOptions()
     @test d.vignetting.smoothness == RC.PSplineSmoothness(3, 0.0) && d.vignetting.boundary_order == 2 && d.grid.smoothness == RC.PSplineSmoothness(3, 0.1)

@@ -131,9 +131,9 @@ _vignetting_model(::Type{M}, key) where {M} =
                         "about the principal point (the tensor-product surface is no option of the pipeline since 2026-11-14)"))
 _option_from_toml(::Type{ComputeOptions}, ::Val{:backend}, v, key) = BACKEND_TAGS[convert_field(String, v, key)]
 _option_from_toml(::Type{OptimizerTable}, ::Val{:type}, v, key) = OPTIMIZER_TAGS[convert_field(String, v, key)]
-# a penalty weight: a number β ≥ 0, or the string "gcv" (selected by generalized cross-validation)
+# a penalty weight: a number β ≥ 0, or the string "gcv" (selected by Estimation's GeneralizedCrossValidation() at its defaults)
 function _penalty_weight_from_toml(v, key)
-    v isa AbstractString && (v == "gcv" ? (return :gcv) : throw(ArgumentError("`$key` = $(repr(v)) is not a weight β ≥ 0 or \"gcv\"")))
+    v isa AbstractString && (v == "gcv" ? (return VgtkEstimation.GeneralizedCrossValidation()) : throw(ArgumentError("`$key` = $(repr(v)) is not a weight β ≥ 0 or \"gcv\"")))
     return VgtkEstimation.check_penalty_weight(convert_field(Float64, v, key), "`$key`")
 end
 # `[<component>.smoothness]`: a table dispatched by its `type` (`SMOOTHNESS_TYPES`), its keys the type's — `order` and `weight` of a
@@ -169,8 +169,8 @@ end
 _option_from_toml(::Type{<:Union{GridOptions, VignettingOptions, FocusOptions}}, ::Val{:smoothness}, v, key) = _smoothness_from_toml(v, key)
 _option_from_toml(::Type{MaskOptions}, ::Val{:edge_detector}, v, key) = edge_detector_from_toml(v, key)
 "The `[<component>.smoothness]` table of a smoothness (the reader's inverse)."
-smoothness_table(s::PSplineSmoothness) = Dict{String, Any}("type" => "pspline", "order" => s.order, "weight" => s.weight === :gcv ? "gcv" : s.weight)
-smoothness_table(s::BendingSmoothness) = Dict{String, Any}("type" => "bending", "weight" => s.weight === :gcv ? "gcv" : s.weight)
+smoothness_table(s::PSplineSmoothness) = Dict{String, Any}("type" => "pspline", "order" => s.order, "weight" => weight_record(s.weight))
+smoothness_table(s::BendingSmoothness) = Dict{String, Any}("type" => "bending", "weight" => weight_record(s.weight))
 smoothness_table(::NoSmoothness) = Dict{String, Any}("type" => "none")
 _option_from_toml(::Type{GridOptions}, ::Val{:lattice}, v, key) = read_switch(v, key, LATTICE_TAGS)   # parsed once into its rule (dispatch)
 _option_from_toml(::Type{GridOptions}, ::Val{:node_count}, v, key) = convert_field(Int, v, key)
@@ -222,14 +222,14 @@ end
 _field(::Val{F}) where {F} = F
 
 # Whether the run chooses its grid smoothness's weight by GCV: a grid route (`start_is_grid`) with a smoothness of weight "gcv".
-_grid_gcv(opts::PipelineOptions) = smoothness_weight(opts.grid.smoothness) === :gcv && start_is_grid(opts)
+_grid_gcv(opts::PipelineOptions) = smoothness_weight(opts.grid.smoothness) isa VgtkEstimation.GeneralizedCrossValidation && start_is_grid(opts)
 # A component's smoothness: of a type it takes, a pspline of the difference order it implements, its weight ≥ 0 (or "gcv" where taken).
 function _check_smoothness(sm::AbstractSmoothness, key; types = (PSplineSmoothness, BendingSmoothness, NoSmoothness), order = nothing, gcv = true)
     any(T -> sm isa T, types) || throw(ArgumentError("`$key.type` = $(repr(String(smoothness_type(sm)))): the component takes $(join([repr(String(smoothness_type(T))) for T in types], ", "))"))
     sm isa NoSmoothness && return nothing
     order === nothing || sm.order == order || throw(ArgumentError("`$key.order` = $(sm.order): the component's penalty is its order-$order differences"))
     w = smoothness_weight(sm)
-    w === :gcv && !gcv && throw(ArgumentError("`$key.weight` = \"gcv\": the component's weight is a number β ≥ 0"))
+    w isa VgtkEstimation.GeneralizedCrossValidation && !gcv && throw(ArgumentError("`$key.weight` = \"gcv\": the component's weight is a number β ≥ 0"))
     VgtkEstimation.check_penalty_weight(w, "`$key.weight`")
     return nothing
 end

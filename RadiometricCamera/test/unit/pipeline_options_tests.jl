@@ -458,12 +458,13 @@ end
 @testitem "pipeline options (TOML): one smoothness vocabulary for the spline components" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: focus
     using TOML
+    using VisualGeometryToolkitEstimation: GeneralizedCrossValidation   # a weight chosen by GCV: the algorithm value (the TOML's "gcv")
     # the defaults: the grid's P-spline of its Δ³ at 0.1, the vignetting's Δ³ at 0, the focus's bending at 0 (RC 0.11.0's tables)
     d = RC.PipelineOptions()
     @test d.grid.smoothness == RC.PSplineSmoothness(3, 0.1) && d.vignetting.smoothness == RC.PSplineSmoothness(3, 0.0) && d.focus.smoothness == RC.BendingSmoothness(0.0)
     # each table round-trips through TOML, dispatched by its type (no flag)
-    for (comp, sm) in (("grid", RC.PSplineSmoothness(3, :gcv)), ("grid", RC.BendingSmoothness(0.5)), ("grid", RC.NoSmoothness()),
-                       ("vignetting", RC.PSplineSmoothness(3, :gcv)), ("vignetting", RC.NoSmoothness()), ("focus", RC.BendingSmoothness(0.25)))
+    for (comp, sm) in (("grid", RC.PSplineSmoothness(3, GeneralizedCrossValidation())), ("grid", RC.BendingSmoothness(0.5)), ("grid", RC.NoSmoothness()),
+                       ("vignetting", RC.PSplineSmoothness(3, GeneralizedCrossValidation())), ("vignetting", RC.NoSmoothness()), ("focus", RC.BendingSmoothness(0.25)))
         o = RC.pipeline_options(Dict(comp => Dict("smoothness" => RC.smoothness_table(sm))))
         @test getfield(o, Symbol(comp)).smoothness == sm
         @test RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o))))) == o

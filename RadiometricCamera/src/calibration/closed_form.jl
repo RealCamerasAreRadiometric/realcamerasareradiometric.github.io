@@ -423,12 +423,12 @@ together (the pole tie, V′(0) = 0).
 
 `smoothness_weight` β > 0 adds the P-spline penalty `λ ‖D vec(P)‖²` over the free nodes (`vignetting_smoothness`:
 third differences along the lattice axes, so a field quadratic along each axis costs nothing) with `λ = β Σϕ² / N / m̄` (`N` the
-free directions, `m̄` the mean positive eigenvalue of `DᵀD`: Core's `penalty_scale`), so β means what the grid smoothness's does. `:gcv`
-selects β by Estimation's generalized cross-validation (`gcv_curve`, `gcv_select`) on this solve's own linear system, and
+free directions, `m̄` the mean positive eigenvalue of `DᵀD`: Core's `penalty_scale`), so β means what the grid smoothness's does. A
+`GeneralizedCrossValidation` selects β by Estimation's generalized cross-validation (`gcv_curve`, `_gcv_selection`) on this solve's own linear system, and
 pushes the selection to `gcv_record` (a vector; `nothing`: not recorded). `0` is the unpenalized solve, unchanged; without a window
 of 4 free nodes along either axis there is no row and the solve is the unpenalized one.
 """
-function _update_vignetting!(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts = all_parts(f, θ); smoothness_weight::Union{Real, Symbol} = 0.0, gcv_record = nothing)
+function _update_vignetting!(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts = all_parts(f, θ); smoothness_weight = 0.0, gcv_record = nothing)
     VgtkEstimation.check_penalty_weight(smoothness_weight, "_update_vignetting!: smoothness_weight")
     n_cp = n_control_points(θ.camera.vignetting)
     A, b = _weighted_system(f, θ, parts, Val(:vig))
@@ -442,17 +442,24 @@ function _update_vignetting!(f::CalibrationData, θ::CalibrationParameters, part
         AZ = A * Z; r = b - A * P0
         DZ = D * Z; c = -D * P0
         scale = VgtkCore.penalty_scale(data_norm2(f), size(Z, 2), m̄)       # λ = β Σϕ² / N / m̄
-        sel = if smoothness_weight === :gcv
-            VgtkEstimation.gcv_select(VgtkEstimation.gcv_curve(AZ' * AZ, AZ' * r, dot(r, r), DZ' * DZ, DZ' * c, size(AZ, 1)), scale)
+        sel = if smoothness_weight isa VgtkEstimation.GeneralizedCrossValidation
+            _gcv_selection(VgtkEstimation.gcv_curve(AZ' * AZ, AZ' * r, dot(r, r), DZ' * DZ, DZ' * c, size(AZ, 1)), scale, smoothness_weight)
         else
             (; β = Float64(smoothness_weight), λ = smoothness_weight * scale)
         end
         sλ = sqrt(sel.λ)
         y = qr!(vcat(AZ, sλ .* DZ), ColumnNorm()) \ vcat(r, sλ .* c)
-        smoothness_weight === :gcv && gcv_record !== nothing && push!(gcv_record, (; sel..., m̄, rows = size(D, 1), n_free = size(Z, 2)))
+        smoothness_weight isa VgtkEstimation.GeneralizedCrossValidation && gcv_record !== nothing && push!(gcv_record, (; sel..., m̄, rows = size(D, 1), n_free = size(Z, 2)))
     end
     set_vignetting!(θ, with_control_points(θ.camera.vignetting, P0 + Z * y))
     return θ
+end
+
+"""The penalty weight GCV selects on the curve `score` at the weight scale `scale` (`solve(EstimationProblem(Hyperparameter, score, (; scale)),
+alg)`, Estimation's), as the start records and run records store it: `(; β, λ, gcv, rss, dof, log10_β_bracket, at_bracket_end)`."""
+function _gcv_selection(score, scale::Real, alg::VgtkEstimation.GeneralizedCrossValidation)
+    r = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkEstimation.Hyperparameter, score, (; scale)), alg)
+    return (; β = r.u, r.metadata...)
 end
 
 """
@@ -539,18 +546,18 @@ RadiometryBlocks(θ::CalibrationParameters) = RadiometryBlocks(θ.light, θ.came
 Block coordinate descent over the closed-form blocks ([`RadiometryBlocks`](@ref)), a fit: per sweep the lighting `Θ_l` (linear least
 squares per measured channel, all views stacked; a single-channel state's other channels following the measured one), the
 vignetting `Θ_v` (linear least squares over the free directions of `vignetting_basis`, the gauge `V(𝐜) = 1` held exactly; with a
-`vignetting_smoothness` β > 0 the P-spline penalty of its third differences, λ = β Σϕ²/N/m̄, Core's `penalty_scale`; `:gcv`: β by
+`vignetting_smoothness` β > 0 the P-spline penalty of its third differences, λ = β Σϕ²/N/m̄, Core's `penalty_scale`; a `GeneralizedCrossValidation`: β by
 Estimation's generalized cross-validation on the solve's own system) and μ (one exact Gauss–Newton step of the affine μ, clamped to the
 state's `mu_bounds`), each block when free. The blocks are coupled (the flux is bilinear in V and Θ_l), hence `sweeps` > 1 until the
 parts cost falls by less than `reltol` of its value (0 sweeps: the blocks as they are). `verbose` prints the parts cost per sweep.
 """
-struct RadiometryBlockDescent{W <: Union{Real, Symbol}} <: VgtkCore.AbstractEstimationAlgorithm
+struct RadiometryBlockDescent{W <: Union{Real, VgtkEstimation.GeneralizedCrossValidation}} <: VgtkCore.AbstractEstimationAlgorithm
     sweeps::Int
     reltol::Float64
     vignetting_smoothness::W
     verbose::Bool
 end
-function RadiometryBlockDescent(; sweeps::Integer = 1, reltol::Real = 1e-4, vignetting_smoothness::Union{Real, Symbol} = 0.0, verbose::Bool = false)
+function RadiometryBlockDescent(; sweeps::Integer = 1, reltol::Real = 1e-4, vignetting_smoothness = 0.0, verbose::Bool = false)
     sweeps >= 0 || throw(ArgumentError("RadiometryBlockDescent: sweeps ≥ 0; got $sweeps"))
     VgtkEstimation.check_penalty_weight(vignetting_smoothness, "RadiometryBlockDescent: vignetting_smoothness")
     return RadiometryBlockDescent(Int(sweeps), Float64(reltol), vignetting_smoothness, verbose)

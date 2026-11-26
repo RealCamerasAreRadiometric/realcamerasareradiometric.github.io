@@ -115,7 +115,7 @@ function _run_parameters(opts, meta, f::CalibrationData, θ::CalibrationParamete
                                          # (a number or "gcv"), its cost at the start and the end, the weight GCV chose and its selection
                                          smoothness = (; smoothness_record(opts.grid.smoothness)...,
                                                          cost = (; init = grid_smoothness_cost(meta.grid_smoothness, lens0), final = grid_smoothness_cost(meta.grid_smoothness, gfin)),
-                                                         beta = smoothness_weight(opts.grid.smoothness) === :gcv && meta.grid_smoothness !== nothing ? meta.grid_smoothness.β : nothing,
+                                                         beta = smoothness_weight(opts.grid.smoothness) isa VgtkEstimation.GeneralizedCrossValidation && meta.grid_smoothness !== nothing ? meta.grid_smoothness.β : nothing,
                                                          selection = meta.grid_gcv),
                                          start_perturbation = sp === nothing ? nothing : (; sigma = sp.sigma_px, seed = sp.seed)),
         vignetting_options = !smoothing(opts.vignetting.smoothness) && opts.vignetting.boundary_order == 2 ? nothing :

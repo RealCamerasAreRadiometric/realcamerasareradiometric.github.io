@@ -3,7 +3,7 @@
 # nodal values — one vocabulary for the three (the owner, 2026-11-14), in the options and in the code: a `[<component>.smoothness]`
 # table dispatched by its `type` (the stack's `{type, …}` convention), no flag.
 #
-#   [grid.smoothness]       type = "pspline", order = 3, weight = 0.1    (weight may be "gcv")
+#   [grid.smoothness]       type = "pspline", order = 3, weight = 0.1    (weight may be "gcv": Estimation's GeneralizedCrossValidation())
 #   [vignetting.smoothness] type = "pspline", order = 3, weight = 0.0    (weight may be "gcv")
 #   [focus.smoothness]      type = "bending", weight = 0.0
 #
@@ -14,14 +14,16 @@
 
 """The smoothness of a spline component (`[<component>.smoothness]`): `PSplineSmoothness`, `BendingSmoothness`, `NoSmoothness`."""
 abstract type AbstractSmoothness end
-"""`type = "pspline"`: the `order`-th differences of the component over its lattice, weight `weight` (β ≥ 0, or `:gcv`)."""
+"""`type = "pspline"`: the `order`-th differences of the component over its lattice, weight `weight` (β ≥ 0, or a
+`GeneralizedCrossValidation()`: β chosen by Estimation's GCV)."""
 struct PSplineSmoothness <: AbstractSmoothness
     order::Int
-    weight::Union{Float64, Symbol}
+    weight::Union{Float64, VgtkEstimation.GeneralizedCrossValidation}
 end
-"""`type = "bending"`: the analytic bending energy ∫∫ f_xx² + 2 f_xy² + f_yy² of the component, weight `weight` (β ≥ 0, or `:gcv`)."""
+"""`type = "bending"`: the analytic bending energy ∫∫ f_xx² + 2 f_xy² + f_yy² of the component, weight `weight` (β ≥ 0,
+or a `GeneralizedCrossValidation()`)."""
 struct BendingSmoothness <: AbstractSmoothness
-    weight::Union{Float64, Symbol}
+    weight::Union{Float64, VgtkEstimation.GeneralizedCrossValidation}
 end
 """`type = "none"`: no smoothness."""
 struct NoSmoothness <: AbstractSmoothness end
@@ -33,19 +35,24 @@ smoothness_type(::Type{PSplineSmoothness}) = :pspline
 smoothness_type(::Type{BendingSmoothness}) = :bending
 smoothness_type(::Type{NoSmoothness}) = :none
 smoothness_type(s::AbstractSmoothness) = smoothness_type(typeof(s))
-"""The weight β of a smoothness (0 for none; `:gcv` when chosen by GCV)."""
+"""The weight β of a smoothness (0 for none; a `GeneralizedCrossValidation` when chosen by GCV)."""
 smoothness_weight(s::Union{PSplineSmoothness, BendingSmoothness}) = s.weight
 smoothness_weight(::NoSmoothness) = 0.0
 """Whether a smoothness penalizes anything: a type other than none, of a weight other than 0."""
 smoothing(s::AbstractSmoothness) = !(s isa NoSmoothness) && smoothness_weight(s) != 0
 """The smoothness's log line: `pspline order 3, weight 0.1`, `bending, weight 0`, `none`."""
-smoothness_line(s::PSplineSmoothness) = "pspline order $(s.order), weight $(s.weight === :gcv ? "gcv" : s.weight)"
-smoothness_line(s::BendingSmoothness) = "bending, weight $(s.weight === :gcv ? "gcv" : s.weight)"
+smoothness_line(s::PSplineSmoothness) = "pspline order $(s.order), weight $(weight_record(s.weight))"
+smoothness_line(s::BendingSmoothness) = "bending, weight $(weight_record(s.weight))"
 smoothness_line(::NoSmoothness) = "none"
 """A smoothness as a record's fields (`type`, `order` — a pspline's, else `nothing` — and `weight`, a number or `"gcv"`): what the
 run records write, the `[<component>.smoothness]` table's keys."""
 smoothness_record(s::AbstractSmoothness) = (; type = String(smoothness_type(s)), order = s isa PSplineSmoothness ? s.order : nothing,
-                                             weight = (w = smoothness_weight(s); w === :gcv ? "gcv" : w))
+                                             weight = weight_record(smoothness_weight(s)))
+"""A penalty weight as its options and records spell it: β, or `"gcv"` for Estimation's `GeneralizedCrossValidation()` at its defaults (the
+TOML states no other: a non-default bracket or scan is an `ArgumentError`, never written as the default)."""
+weight_record(w::Real) = w
+weight_record(w::VgtkEstimation.GeneralizedCrossValidation) = w == VgtkEstimation.GeneralizedCrossValidation() ? "gcv" :
+    throw(ArgumentError("a smoothness weight $(repr(w)): the options spell only GeneralizedCrossValidation() at its defaults (\"gcv\")"))
 """The same smoothness of another weight (the one GCV chose)."""
 with_weight(s::PSplineSmoothness, w) = PSplineSmoothness(s.order, w)
 with_weight(s::BendingSmoothness, w) = BendingSmoothness(w)

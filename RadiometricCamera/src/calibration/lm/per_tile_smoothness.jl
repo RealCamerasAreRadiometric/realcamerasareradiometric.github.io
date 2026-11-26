@@ -24,7 +24,7 @@
 #   The grid A/B on the synthetic Siemens case (experiments/grid_prior/) measured them; the defaults are its winner.
 #   weight       `[grid.smoothness] weight` β, or "gcv": β minimizing generalized cross-validation on the LINEARIZATION of the grid problem at
 #                the start (the data's Gauss–Newton system over the grid's interior nodes, the other blocks held at the start; the
-#                start's smoothness residual is zero; Estimation's `gcv_curve` and `gcv_select`) — `select_grid_smoothness_weight`, after the
+#                start's smoothness residual is zero; Estimation's `gcv_curve` and `GeneralizedCrossValidation`) — `select_grid_smoothness_weight`, after the
 #                closed-form start of the radiometry.
 # ---------------------------------------------------------------------------
 
@@ -183,14 +183,14 @@ end
     select_grid_smoothness_weight(f, θ, sm, interior; patch = GRID_PATCH, build_kwargs...) -> (smoothness, selection)
 
 The grid smoothness `sm` (its type and order; its weight the one chosen here) over the `interior` nodes (`[g_x, g_y]`) with its weight β chosen by generalized cross-validation
-(Estimation's `gcv_curve` and `gcv_select`) on the LINEARIZATION of the grid problem at the state's current values (the run's start): the Gauss–Newton
+(Estimation's `gcv_curve` and `GeneralizedCrossValidation`, `sm`'s weight) on the LINEARIZATION of the grid problem at the state's current values (the run's start): the Gauss–Newton
 system `JᵀJ`, `Jᵀr` of the per-tile data residuals over the columns of the grid's free patch blocks — the other blocks (poses,
 focus, aperture, material, vignetting, lighting) held where they are, so it is the criterion of the grid's own update — and the
 unit-weight smoothness's `DᵀD` over the same columns (its residual is zero at the start, its reference d̂₀ the start). `λ = w² =
 β Σϕ² / N / m̄` (the smoothness's row weight squared), so β is the same normalized weight `[grid.smoothness] weight` states. The problem is
 `build_problem_grid(f, θ; patch, smoothness, build_kwargs...)`, the LM's own; one Jacobian evaluation of every tile and one
 dense generalized eigendecomposition of the free columns (O(n³) in their number: 2 per present node, up to 2·7875 for a 105 × 75
-grid). `(nothing, nothing)` for none. `selection` is `gcv_select`'s record plus the counts of the linearization.
+grid). `(nothing, nothing)` for none. `selection` is `_gcv_selection`'s record plus the counts of the linearization.
 """
 function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParameters, sm::AbstractSmoothness, interior::AbstractMatrix{Bool}; patch::Tuple{Int, Int} = GRID_PATCH,
                                        build_kwargs...)
@@ -230,7 +230,7 @@ function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParame
             end
         end
     end
-    sel = VgtkEstimation.gcv_select(VgtkEstimation.gcv_curve(G, h, rr, Q, q, n), VgtkCore.penalty_scale(ϕ², count(interior), unit.m̄))
+    sel = _gcv_selection(VgtkEstimation.gcv_curve(G, h, rr, Q, q, n), VgtkCore.penalty_scale(ϕ², count(interior), unit.m̄), smoothness_weight(sm))
     smooth = grid_smoothness(sm, lens, ϕ², interior; weight = sel.β)
     return smooth, (; sel..., kind = smoothness_type(sm), n_observations = n, n_columns = ncol,
                    linearization = "the grid's free patch blocks at the start (Gauss-Newton of the per-tile data; other blocks held)")

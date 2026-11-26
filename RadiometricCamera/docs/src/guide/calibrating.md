@@ -81,7 +81,7 @@ process, the photographs read once (the start's streamed observations handed to 
 
 Every spline component's smoothness is one table, dispatched by its `type`: `[grid.smoothness] type = "pspline", order = 3,
 weight = 0.1` (the third differences of the grid's correction; `"bending"` or `"none"`; `weight = "gcv"` chooses β by
-generalized cross-validation at the start), `[vignetting.smoothness] type = "pspline", order = 3, weight = 0.0` and
+generalized cross-validation at the start: the weight is then VisualGeometryToolkitEstimation's `GeneralizedCrossValidation()`), `[vignetting.smoothness] type = "pspline", order = 3, weight = 0.0` and
 `[focus.smoothness] type = "bending", weight = 0.0`. `grid.prior`, `grid.prior_weight`, `vignetting.smoothness_weight` and
 `focus.prior` are retired and refused by name.
 
