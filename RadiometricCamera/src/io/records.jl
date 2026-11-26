@@ -5,7 +5,7 @@
 #
 #   rc/radiometric_camera/v3.1   a CalibratedCamera         {<VisualGeometryToolkitIO's envelope>, <camera body>, "observation_model", "settings"}
 #   rc/radiometric_target/v2.0   a RadiometricTarget        {<VisualGeometryToolkitIO's envelope>, <target body>}
-#   rc/run_parameters/v3.0       a refinement's run         {<VisualGeometryToolkitIO's envelope; units.length "m">, <what the run was given and measured>}
+#   rc/run_parameters/v4.0       a refinement's run         {<VisualGeometryToolkitIO's envelope; units.length "m">, <what the run was given and measured>}
 #   rc/initialization_region/v1.0  the grids' start region  {<VisualGeometryToolkitIO's envelope>, "initialization_region" VisualGeometryToolkitIO's region body} (initialization_region.json)
 #   rc/calibration_state/v3.1    a refinement's state       {<VisualGeometryToolkitIO's envelope>, "camera", "target", "poses", "light", "settings", "observation_model"[, "page_flip"]}
 #
@@ -45,7 +45,7 @@
 """The schema of each RadiometricCamera kind, by its name: the version this package writes and reads (VisualGeometryToolkitIO's envelope). An
 earlier version (an earlier release's, on an earlier envelope) is refused by name: regenerate it."""
 const RECORD_SCHEMAS = (radiometric_camera = "rc/radiometric_camera/v3.1", radiometric_target = "rc/radiometric_target/v2.0",
-                        calibration_state = "rc/calibration_state/v3.1", run_parameters = "rc/run_parameters/v3.0",
+                        calibration_state = "rc/calibration_state/v3.1", run_parameters = "rc/run_parameters/v4.0",
                         # the initialization region of the grid cameras in a directory (initialization_region.json): their start's region
                         initialization_region = "rc/initialization_region/v1.0",
                         # the run's reports (VisualGeometryToolkitIO's `write_record` states every file's schema): the self-check's summary and per-view
@@ -274,7 +274,7 @@ load_radiometric_target(path::AbstractString) = ((r, s) = _read_kind(path, :radi
 """
     save_run_parameters(path, body; provenance = (;))
 
-A refinement's run as an `rc/run_parameters/v3.0` record (VisualGeometryToolkitIO's `write_record`): `body` (the pipeline's
+A refinement's run as an `rc/run_parameters/v4.0` record (VisualGeometryToolkitIO's `write_record`): `body` (the pipeline's
 `_run_parameters`: ASCII snake_case keys, no unit in a key, never a value the model records hold) under VisualGeometryToolkitIO's envelope — its
 lengths are plain metres, the `units` object's `length` "m"; its image quantities COLMAP pixels, the `units` object's `pixel`; the
 rest dimensionless. [`load_run_parameters`](@ref) reads it back.
@@ -287,8 +287,8 @@ end
 """
     load_run_parameters(path) -> record
 
-The `rc/run_parameters/v3.0` record of a refinement ([`save_run_parameters`](@ref)) as VisualGeometryToolkitIO's `read_record` reads it (a v2.0 record
-through its version step, `_run_parameters_v3`); another schema is an `ArgumentError`.
+The `rc/run_parameters/v4.0` record of a refinement ([`save_run_parameters`](@ref)) as VisualGeometryToolkitIO's `read_record` reads it (a v2.0
+or v3.0 record through its version steps, `_run_parameters_v3` and `_run_parameters_v4`); another schema is an `ArgumentError`.
 """
 load_run_parameters(path::AbstractString) = first(_read_kind(path, :run_parameters))
 
@@ -300,7 +300,7 @@ load_run_parameters(path::AbstractString) = first(_read_kind(path, :run_paramete
 # stored.
 _order_v3(type) = type == "pspline" ? 3 : nothing
 function _run_parameters_v3(t::AbstractDict)
-    t = Dict{String, Any}(t); t["schema"] = RECORD_SCHEMAS.run_parameters
+    t = Dict{String, Any}(t); t["schema"] = "rc/run_parameters/v3.0"   # v3.0, not the current version: the v4.0 step runs after it
     g = get(t, "grid", nothing)
     if g isa AbstractDict && haskey(g, "prior")
         g = Dict{String, Any}(g)
@@ -320,6 +320,22 @@ function _run_parameters_v3(t::AbstractDict)
     return t
 end
 VgtkIO.migrate_schema(::Val{Symbol("rc/run_parameters/v2.0")}, t::AbstractDict) = _run_parameters_v3(t)
+
+# ---- the version step of the American identifiers (owner decision 11): rc/run_parameters v3.0 → v4.0 ----------------------
+# The camera option's key, the record's location as the run was given it, is spelled `sensor_characterization` (British before),
+# and a frame's sensor-model `reason` of no record given, VisualGeometryToolkitCore's `ModelReason`, is `NoCharacterization` (the
+# value an earlier Core spelled British). Every other value as stored.
+function _run_parameters_v4(t::AbstractDict)
+    t = Dict{String, Any}(t); t["schema"] = RECORD_SCHEMAS.run_parameters
+    haskey(t, "sensor_characterisation") && (t["sensor_characterization"] = pop!(t, "sensor_characterisation"))
+    models = get(t, "sensor_models", nothing)
+    if models isa AbstractVector
+        t["sensor_models"] = Any[m isa AbstractDict && get(m, "reason", nothing) == "NoCharacterisation" ?
+                                 merge(Dict{String, Any}(m), Dict{String, Any}("reason" => "NoCharacterization")) : m for m in models]
+    end
+    return t
+end
+VgtkIO.migrate_schema(::Val{Symbol("rc/run_parameters/v3.0")}, t::AbstractDict) = _run_parameters_v4(t)
 # The removed kind rc/focus_ab (the focus A/B experiment's report, focus_ab.json) is refused by name wherever a record is read
 # through its version step (`VgtkIO.read_record`): the experiment is decided and the report is no longer written or read.
 _refuse_focus_ab() = throw(ArgumentError(

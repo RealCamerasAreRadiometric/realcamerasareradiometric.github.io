@@ -1,5 +1,5 @@
 # The camera's sensor characterisation on the calibration state (owner order 2026-11-14; spec 2026-11-13-sensor-noise, rulings D1–D14):
-# `camera.sensor_characterisation` names an IO record (or none: empty), each RAW photograph's Core `SensorModel` is resolved from it
+# `camera.sensor_characterization` names an IO record (or none: empty), each RAW photograph's Core `SensorModel` is resolved from it
 # by its EXIF capture settings (Core's resolver, a lookup), and the run record states each photograph's reason. The photographs'
 # black is the model's and its defects are masked (Core's defect mask). Fixtures through Core's ONE builder, `sensor_fixture` (D13).
 
@@ -18,13 +18,13 @@
 end
 
 @testitem "sensor model: the characterisation key, its fallback and its refusals" setup = [RCFixtures, SensorFixtures] begin
-    o = RC.pipeline_options(Dict("camera" => Dict("sensor_characterisation" => "sensor/fx3.sensor_characterisation.json")))
-    @test o.camera.sensor_characterisation == "sensor/fx3.sensor_characterisation.json"
+    o = RC.pipeline_options(Dict("camera" => Dict("sensor_characterization" => "sensor/fx3.sensor_characterisation.json")))
+    @test o.camera.sensor_characterization == "sensor/fx3.sensor_characterisation.json"
     @test RC.pipeline_options(RC.config_dict(o)) == o
-    @test RC.PipelineOptions().camera.sensor_characterisation == ""                       # not stated
-    @test "camera.sensor_characterisation" in RC.PIPELINE_PATH_KEYS
-    @test RC.names_input_path("camera.sensor_characterisation", "sensor/fx3.json")
-    @test !RC.names_input_path("camera.sensor_characterisation", "")
+    @test RC.PipelineOptions().camera.sensor_characterization == ""                       # not stated
+    @test "camera.sensor_characterization" in RC.PIPELINE_PATH_KEYS
+    @test RC.names_input_path("camera.sensor_characterization", "sensor/fx3.json")
+    @test !RC.names_input_path("camera.sensor_characterization", "")
     @test_throws "sensor_model = \"off\"" RC.sensor_statement("none")                  # retired (RC 0.11.2)
     @test_throws "names no record" RC.sensor_statement("")
     # decoded images: no sensor record, the absent model each; a record named for them is refused
@@ -44,7 +44,6 @@ end
     # the retired names are refused by name with the entry point
     @test_throws "photo_set" RC.photo_sensor_models(files, "")
     @test_throws "photo_set" RC.photo_observations(nothing, nothing, "x")
-    @test_throws "sensor_statement" RC.sensor_characterisation("none")
 end
 
 @testitem "sensor model: the characterisation through IO, resolved per frame, recorded" setup = [RCFixtures, SensorFixtures] begin
@@ -55,9 +54,9 @@ end
                                 source = VgtkCore.SensorSource.measured)
     mktempdir() do dir
         p = joinpath(dir, "fx3.sensor_characterisation.json")
-        VgtkIO.save(p, f.characterisation)
-        c = VgtkIO.load(VgtkCore.SensorCharacterisation, p)                                # IO's reader, the one path
-        @test c == f.characterisation
+        VgtkIO.save(p, f.characterization)
+        c = VgtkIO.load(VgtkCore.SensorCharacterization, p)                                # IO's reader, the one path
+        @test c == f.characterization
         m = VgtkCore.sensor_model(c, f.capture, 1)
         @test m == f.model && VgtkCore.component_sources(m).reason == VgtkCore.Matched
         rec = only(RC.sensor_record(["IMG_1.ARW"], [m]))
@@ -65,7 +64,7 @@ end
               rec.defects == "measured" && rec.specified_override === false && rec.digest == VgtkCore.content_digest(m)
         @test rec.black_component == "ChannelBlack"
         rec0 = only(RC.sensor_record(["x.png"], [VgtkCore.SensorModel()]))
-        @test rec0.reason == "NoCharacterisation" && rec0.noise === nothing && rec0.black == "file" && rec0.black_component == "FileBlack"
+        @test rec0.reason == "NoCharacterization" && rec0.noise === nothing && rec0.black == "file" && rec0.black_component == "FileBlack"
     end
 end
 
@@ -95,7 +94,7 @@ end
         mktempdir() do dir
             p = joinpath(dir, "frame_1" * lowercase(last(splitext(f)))); symlink(f, p)
             ms = Base.invokelatest(RC.photo_set, RC.observation_model([p], ""), [p]).models
-            @test VgtkCore.component_sources(only(ms)).reason == VgtkCore.NoCharacterisation
+            @test VgtkCore.component_sources(only(ms)).reason == VgtkCore.NoCharacterization
         end
     end
 end

@@ -8,14 +8,14 @@
 @testsetup module DriverRuns
     using DrWatson
 
-    const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
+    const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterization",
                      "image_regions", "distance_maps", "timing")
     const DRIVER_STAGE_NAMES = Dict(
         "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
         "focus_surfaces" => ("figures",),
         "texture_recovery" => ("prepare", "detect", "sheet", "init", "refine", "folds", "evaluate", "fold_report", "compare", "report", "figures"),
         "frontends" => ("prepare", "detect", "init", "evaluate"),
-        "sensor_characterisation" => ("evaluate",),
+        "sensor_characterization" => ("evaluate",),
         "image_regions" => ("detect",),
         "distance_maps" => ("prepare",),
         "timing" => ("start", "time", "record"))
@@ -138,7 +138,7 @@ end
                          "chrome_evaluation_paper.toml",   # the chrome evaluation's paper stages: the sets, their tables and figures
                          "frontends.toml",
                          "chrome_index_grid.toml",   # the chrome index stage's comparison grid (a measurement: scripts/chrome_index_grid.jl)
-                         "sensor_characterisation.toml",   # the FX3's sensor characterisation (the refinements' sensor model record; D12)
+                         "sensor_characterization.toml",   # the FX3's sensor characterisation (the refinements' sensor model record; D12)
                          "image_regions.toml",   # the capture sets' image-region steps (scripts/image_regions.jl; 2026-11-15)
                          "distance_maps.toml",   # the printed boards' edge distance maps, read through [runs] (scripts/distance_maps.jl; 2026-11-16)
                          "convergence.toml",   # the bias of Schöps's method per LM iteration (scripts/convergence.jl; 2026-11-15)
@@ -546,8 +546,8 @@ end
     @test count("_bilinear_green(Float32, device, m, sensor_model)", feat) == 1        # detect_sfop(m::RawMosaic)'s image: the same call
     drv = read(srcdir("drivers.jl"), String); che = read(srcdir("chrome_evaluation.jl"), String); fe = read(srcdir("frontends.jl"), String)
     @test occursin("Base.invokelatest(RadiometricCamera.raw_green_image, Float32, m; sensor_model = models[i], device)", drv)   # the decode
-    @test occursin("raw_sensor_models(files, characterisation;", drv) && occursin("raw_sensor_models(files, spec;", che)   # one model resolution
-    @test occursin("mode = t[\"image\"]", fe) && occursin("characterisation = config_input(cfg, t[\"sensor_characterisation\"])", fe)
+    @test occursin("raw_sensor_models(files, characterization;", drv) && occursin("raw_sensor_models(files, spec;", che)   # one model resolution
+    @test occursin("mode = t[\"image\"]", fe) && occursin("characterization = config_input(cfg, t[\"sensor_characterization\"])", fe)
     @test RadiometricCamera.GEOMETRY_IMAGES == ("raw_green", "luma") && DETECT_IMAGES === RadiometricCamera.GEOMETRY_IMAGES   # one vocabulary
     @test "raw_green" in RAW_MODES && !("green" in RAW_MODES)
 
@@ -567,13 +567,13 @@ end
     # error naming the key, and another image (the decoded images' luma, the retired green cells) is refused
     path = projectdir("configs", "experiments", "frontends.toml")
     cfg = TOML.parsefile(path)
-    @test all(t -> t["image"] == "raw_green" && t["sensor_characterisation"] == "fx3_sensor_characterisation", values(cfg["cases"]))
+    @test all(t -> t["image"] == "raw_green" && t["sensor_characterization"] == "fx3_sensor_characterization", values(cfg["cases"]))
     @test frontend_decode_product(cfg, "zoom48_f10_siemens").record["frame_map"] == decoded_frame("raw_green").record
     edited(f) = (c = deepcopy(TOML.parsefile(path)); f(c["cases"]["zoom48_f10_siemens"]); p = joinpath(mktempdir(), "frontends.toml");
                  open(io -> TOML.print(io, c), p, "w"); p)
     @test occursin("image", thrown_message(() -> load_frontends_config(edited(t -> delete!(t, "image")))))
     @test occursin("retired", thrown_message(() -> load_frontends_config(edited(t -> t["image"] = "green_cells"))))
     @test occursin("raw_green", thrown_message(() -> load_frontends_config(edited(t -> t["image"] = "luma"))))
-    @test occursin("sensor_characterisation", thrown_message(() -> load_frontends_config(edited(t -> delete!(t, "sensor_characterisation")))))
+    @test occursin("sensor_characterization", thrown_message(() -> load_frontends_config(edited(t -> delete!(t, "sensor_characterization")))))
     @test frontend_decode_product(cfg, "zoom48_f10_siemens").record["cases"]["zoom48_f10_siemens"]["image"] == "raw_green"   # keyed by its image
 end

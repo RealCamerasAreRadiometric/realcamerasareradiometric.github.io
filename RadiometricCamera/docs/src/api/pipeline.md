@@ -38,10 +38,11 @@ RadiometricCamera's kinds, read and written through VisualGeometryToolkitIO (`wr
 VisualGeometryToolkitIO's records of the VisualGeometryToolkitCore values it holds, under VisualGeometryToolkitIO's envelope (one
 `units` and one `conventions` object): `rc/radiometric_camera/v3.1` (a `CalibratedCamera`: the model, its observation model and its
 render settings), `rc/radiometric_target/v2.0`, `rc/calibration_state/v3.1` (the state files `state.json`, `state_it<N>.json` and a
-start record's start state; with the photographs' observation model) and `rc/run_parameters/v3.0`. A record of an earlier version
+start record's start state; with the photographs' observation model) and `rc/run_parameters/v4.0`. A record of an earlier version
 is refused by name — a camera or a state of v3.0 too, which states no observation model (refused, never migrated, naming the
 refinement step that regenerates it) — but an `rc/run_parameters/v2.0` (its grid `prior*` keys renamed to the smoothness
-vocabulary), which reads through its version step. A camera's or a state's focus surface is the sensor-grid thin plate spline
+vocabulary) and a v3.0 (its sensor record's key and its frames' no-record reason, spelled British before v4.0 and American
+since: `sensor_characterization`, `NoCharacterization`), which read through their version steps. A camera's or a state's focus surface is the sensor-grid thin plate spline
 (`"type": "sensor_thin_plate_spline"`); a record of a removed focus surface (`direction_thin_plate_spline`,
 `direction_spherical_spline`) and a file of the removed kind `rc/focus_ab` (the focus A/B experiment's report) are refused by name.
 

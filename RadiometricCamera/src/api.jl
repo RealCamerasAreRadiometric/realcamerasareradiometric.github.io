@@ -39,7 +39,7 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
        save_state, load_state, save_radiometric_camera, load_radiometric_camera, save_radiometric_target,
        load_radiometric_target, initialization_region, in_initialization, selfcheck, settings_line, RAW_EXTENSIONS,
        photosite_mask, is_raw_file, is_png_file, photo_files, raw_file, raw_image_size, photo_file, load_photo,
-       sensor_record, NO_SENSOR_CHARACTERISATION, calibrated_camera, ObservationModel, photo_set, observe,
+       sensor_record, NO_SENSOR_CHARACTERIZATION, calibrated_camera, ObservationModel, photo_set, observe,
        SensorStatement, SensorRecord, NoSensorRecord, PhotoKind, SensorModelMode, AutoSensorModel, OnSensorModel,
        OffSensorModel, sensor_model_mode, warn_sensor_model_off, Photosites, Decoded, OBSERVATION_CHANNELS, PhotoSet,
        observation_model, sensor_statement, observation_line, names_input_path, load_distance_map,
@@ -59,15 +59,12 @@ public flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_
 project_pixel(args...; kwargs...) = throw(ArgumentError("project_pixel is retired: use VisualGeometryToolkitCore's `project(camera, X)`; " *
                                                         "a SplineLens camera's batched `project(model(camera), rays, seeds)`, the detections as the seeds"))
 # (ONE entry point for photographs, the calibrated camera's observation model — no second decode path)
-"""Retired in an earlier release: photographs are read through THE entry point, `photo_set(camera_or_observation_model, files; characterisation)` and `observe(set, k, mask)`."""
+"""Retired in an earlier release: photographs are read through THE entry point, `photo_set(camera_or_observation_model, files; characterization)` and `observe(set, k, mask)`."""
 photo_observations(args...; kwargs...) = throw(ArgumentError("photo_observations is retired: read photographs through the entry point, " *
-                                                             "`observe(photo_set(camera, files; characterisation), k, mask)` — the camera's observation model decides the decode"))
+                                                             "`observe(photo_set(camera, files; characterization), k, mask)` — the camera's observation model decides the decode"))
 """Retired in an earlier release: each photograph's sensor model is `photo_set(...).models`."""
-photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_models is retired: `photo_set(observation_model(files, spec), files; characterisation).models` " *
+photo_sensor_models(args...; kwargs...) = throw(ArgumentError("photo_sensor_models is retired: `photo_set(observation_model(files, spec), files; characterization).models` " *
                                                               "— the frames' models of the camera's own record"))
-"""Retired in an earlier release: a characterisation is stated by `sensor_statement(spec)` and read by `photo_set`."""
-sensor_characterisation(args...; kwargs...) = throw(ArgumentError("sensor_characterisation is retired: `sensor_statement(spec)` states the record " *
-                                                                  "(its sha256), `photo_set` reads it at the location given"))
 
 # ---- retired call forms (the camera-first API). A radiometric camera is ONE object, a `RadiometricCameraModel`
 # (geometric camera, focus surface, aperture radius, vignetting); a photograph is the camera at a pose. The forms that took a `View` assembled

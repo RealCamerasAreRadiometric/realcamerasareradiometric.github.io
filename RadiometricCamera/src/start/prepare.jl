@@ -154,19 +154,19 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     ϕ = Vector{Vector{Float64}}(undef, K); ω = Vector{Any}(undef, K); qs = Vector{Any}(undef, K)          # the measured values and their rows' weights (weighting.jl)
     ch = _io_channel(opts.io.channel)                                           # 0: RGB; c: channel c alone, one residual per pixel
     ch == 0 || @printf("photographs: the %s channel alone, one residual per measured pixel (io.channel)\n", opts.io.channel)
-    # the photographs' observation model (observation_model.jl: the sensor statement of `camera.sensor_characterisation`, RAW photosites
+    # the photographs' observation model (observation_model.jl: the sensor statement of `camera.sensor_characterization`, RAW photosites
     # or decoded images, the channel) and each photograph's sensor model through THE entry point (`photo_set`: Core's resolver by its
     # EXIF; the absent model for a decoded image): its black and defects, and its reason, recorded per photograph (`sensor_record`)
     # `camera.sensor_model` (parsed once): whether a record present — the named one, or the start record's statement — is used
     files = photographs
     smode = sensor_model_mode(opts.camera.sensor_model)
     stated = start === nothing ? NoSensorRecord() : start.state.observation.sensor
-    om = observation_model(files, opts.camera.sensor_characterisation; opts.io.linearize, channel = opts.io.channel, sensor_model = smode, stated)
-    sensor_model = sensor_model_record(smode, opts.camera.sensor_characterisation, stated, om)
-    pset = observations === nothing ? photo_set(om, files; characterisation = _characterisation_path(opts.camera.sensor_characterisation, om),
+    om = observation_model(files, opts.camera.sensor_characterization; opts.io.linearize, channel = opts.io.channel, sensor_model = smode, stated)
+    sensor_model = sensor_model_record(smode, opts.camera.sensor_characterization, stated, om)
+    pset = observations === nothing ? photo_set(om, files; characterization = _characterization_path(opts.camera.sensor_characterization, om),
                                                 lens = opts.io.lens_identity === nothing ? nothing : lens_identity(opts.io.lens_identity)) : nothing
     sensor = observations !== nothing ? observations.sensor : (pset::PhotoSet).models
-    any(is_raw_file, files) && println("sensor models (", om.sensor isa SensorRecord ? opts.camera.sensor_characterisation : "none used", "; sensor_model = ", sensor_model.mode, "): ",
+    any(is_raw_file, files) && println("sensor models (", om.sensor isa SensorRecord ? opts.camera.sensor_characterization : "none used", "; sensor_model = ", sensor_model.mode, "): ",
                                        join(["$(n) × $(r)" for (r, n) in sort!(collect(pairs(_count_reasons(sensor))); by = string ∘ first)], ", "))
     if observations !== nothing                                                 # the start's own streamed observations (`load_calibration_start`):
         observations.masks == masks || throw(ArgumentError("the start's observations are of other masks than its record's"))   # no photograph read again

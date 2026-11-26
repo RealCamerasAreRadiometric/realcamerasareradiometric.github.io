@@ -55,12 +55,12 @@ path = "distance_map.json"
 stage = "refine"
 provenance = "the AprilGrid's printed-edge distance map (8 px per mm), a vgio/raster record (edge.sdf): the step [maps.aprilgrid_8ppm] of distance_maps.toml (scripts/distance_maps.jl), keyed by the board generator's sdf.f32 + sdf.json (each pinned by its sha256), produced on demand when missing (owner 2026-11-16: a derived file is produced, never an input of record)"
 
-[inputs.fx3_sensor_characterisation]
+[inputs.fx3_sensor_characterization]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "refine"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterization experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw_14mm_siemens_central30cm]
 tier = "rc_raw_photos"
@@ -463,7 +463,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -524,7 +524,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -585,7 +585,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -645,7 +645,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -715,7 +715,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag30_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -776,7 +776,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag30_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -837,7 +837,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag30_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -897,7 +897,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag30_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -973,7 +973,7 @@ fnumber = 22.0
 # the set's own f/22 image circle (≈ 1315 px), not the f/4 one (≈ 1087 px): the refinement must cover every pixel the chrome
 # photographs use (the OpenCV-14 extrapolated wildly in the ring between them)
 lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag10fe_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1036,7 +1036,7 @@ fnumber = 22.0
 # the set's own f/22 image circle (≈ 1315 px), not the f/4 one (≈ 1087 px): the refinement must cover every pixel the chrome
 # photographs use (the OpenCV-14 extrapolated wildly in the ring between them)
 lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag10fe_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1099,7 +1099,7 @@ fnumber = 22.0
 # the set's own f/22 image circle (≈ 1315 px), not the f/4 one (≈ 1087 px): the refinement must cover every pixel the chrome
 # photographs use (the OpenCV-14 extrapolated wildly in the ring between them)
 lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag10fe_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1161,7 +1161,7 @@ fnumber = 22.0
 # the set's own f/22 image circle (≈ 1315 px), not the f/4 one (≈ 1087 px): the refinement must cover every pixel the chrome
 # photographs use (the OpenCV-14 extrapolated wildly in the ring between them)
 lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag10fe_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -1233,7 +1233,7 @@ fnumber = 22.0
 # the set's own f/22 image circle (≈ 1315 px), not the f/4 one (≈ 1087 px): the refinement must cover every pixel the chrome
 # photographs use (the OpenCV-14 extrapolated wildly in the ring between them)
 lens_coverage = "image_region:fx3_fisheye_aprilgrid_10cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag10fe_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1293,7 +1293,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 8.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sitla_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -1365,7 +1365,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 10598.75
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sitla_spline_pinhole_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -1434,7 +1434,7 @@ sensor_mm = 35.6
 f_mm = 48.0                       # the EXIF focal length (FocalLength 48 mm; the lens reports no calibrated one)
 fnumber = 10.0                    # the EXIF aperture, f/10
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sizl_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -1506,7 +1506,7 @@ sensor_mm = 35.6
 f_mm = 48.0
 fnumber = 24000.0                  # the plain pinhole: r₀ = f / 2N = 1.0 µm at f = 48 mm (as the Tamron pinhole case's 1.0 µm)
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sizl_spline_pinhole_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -1579,7 +1579,7 @@ sensor_mm = 35.6
 f_mm = 48.0                       # the EXIF focal length (FocalLength 48 mm; the lens reports no calibrated one)
 fnumber = 10.0                    # the EXIF aperture, f/10
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sizl_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1643,7 +1643,7 @@ sensor_mm = 35.6
 f_mm = 48.0
 fnumber = 24000.0                  # the plain pinhole: r₀ = f / 2N = 1.0 µm at f = 48 mm (as the Tamron pinhole case's 1.0 µm)
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.sizl_bc5_pinhole_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1704,7 +1704,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1765,7 +1765,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag30_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1828,7 +1828,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si17ta_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1889,7 +1889,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si17ta_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -1950,7 +1950,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si17ta_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2010,7 +2010,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si17ta_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -2080,7 +2080,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si17ta_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2141,7 +2141,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag08ta_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -2211,7 +2211,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag08ta_bc5_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2272,7 +2272,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag08ta_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2333,7 +2333,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag08ta_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2394,7 +2394,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 22.0
 lens_coverage = "sensor"       # the lens lights the whole sensor: its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.ag08ta_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2455,7 +2455,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 2.8
 lens_coverage = "sensor"       # at f/2.8 the 14 mm (no housing) has no image circle in the frame, a soft falloff (50 % at ≈ 1750 px, 20 % at ≈ 1980) the vignetting carries; detect_image_circle finds none
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.texcal_14mm_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -2525,7 +2525,7 @@ f_mm = 7.8057                     # the fisheye's nominal focal length of record
 fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30fe_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15)
 nodes = "interior"
@@ -2595,7 +2595,7 @@ f_mm = 7.8057                     # the fisheye's nominal focal length of record
 fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30fe_kb_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2658,7 +2658,7 @@ f_mm = 7.8057                     # the fisheye's nominal focal length of record
 fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30fe_ds_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
@@ -2719,7 +2719,7 @@ f_mm = 7.8057                     # the fisheye's nominal focal length of record
 fnumber = 32.0                    # the EXIF aperture: f/32 on all 301 photographs (read on the B200 server, 2026-11-16)
 # the set's own f/32 image circle: the refinement must cover every pixel the chrome photographs use (as the fisheye 10 cm cases)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.si30fe_ocv14_warped.pipeline.masks]
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1

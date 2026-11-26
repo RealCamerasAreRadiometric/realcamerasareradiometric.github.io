@@ -1,4 +1,4 @@
-# Config of record of the sensor characterisation (scripts/sensor_characterisation.jl; owner ruling D12: the experiment renamed,
+# Config of record of the sensor characterisation (scripts/sensor_characterization.jl; owner ruling D12: the experiment renamed,
 # its dark statistics replaced by Core's MasterDark / defect_onsets): the Sony ILME-FX3 at ISO 100, the campaign of
 # 2026-11-13 of David Nakath's protocol (raw_noise_experiments_outline.md, raw_noise_characterization.md and the notes
 # raw_noise_experiments_13_11_2026.md beside the sets in the tier), the Tamron 20 mm (EXIF LensModel "E 20mm F2.8 F050") at f/10,
@@ -8,10 +8,10 @@
 #                     every exposure, the photon transfer's intercepts) every burst
 #   E4/<exposure>     the photon transfer curve: the Expodisc diffuser on the lens in diffuse light, 5–7 frames at each of the 21
 #                     exposures (111 frames)
-# The record it writes is the one the configs of record read (input fx3_sensor_characterisation of radiometric_refinement*.toml and
+# The record it writes is the one the configs of record read (input fx3_sensor_characterization of radiometric_refinement*.toml and
 # the green chrome evaluations; the run's summary.toml says whether it equals it). E5 (PRNU) is out of the record (Phase 1).
 #
-#   julia --project=experiments experiments/scripts/sensor_characterisation.jl [--plan] [--stage=evaluate]
+#   julia --project=experiments experiments/scripts/sensor_characterization.jl [--plan] [--stage=evaluate]
 #
 # THE BODY: EXIF states no body serial (Sony's InternalSerialNumber is in the makernotes only, which Features does not read): the
 # record names the body by make and model, as every FX3 photograph's EXIF does. No sensor temperature is recorded.
@@ -20,9 +20,9 @@
 # its MANIFEST.tsv (sha256 per file), the record of record by its sha256.
 
 [experiment]
-name = "sensor_characterisation"
+name = "sensor_characterization"
 
-[characterise]
+[characterize]
 dark = "1_8000"                 # E1: the protocol's black-level and read-noise burst (50 frames at the shortest exposure, 1/8000 s: no dark
                                 # current), its folder of the E1_E2 tree; its exposure as its frames' EXIF state it
 false_defects = 0.01            # Core MasterDark's expected false defects over the whole sensor (its default, the record of record's): a
@@ -52,6 +52,6 @@ provenance = "the campaign's manifest: bytes, sha256 and md5 per file, paths rel
 [inputs.record_of_record]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
-sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # the configs of record's input fx3_sensor_characterisation
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # the configs of record's input fx3_sensor_characterization
 stage = "evaluate"
-provenance = "the FX3's characterisation of record (the refinements' input fx3_sensor_characterisation, made on the B200 server 2026-11-14 by the scratch recipe this driver codifies): the run compares the record it writes against it"
+provenance = "the FX3's characterisation of record (the refinements' input fx3_sensor_characterization, made on the B200 server 2026-11-14 by the scratch recipe this driver codifies): the run compares the record it writes against it"

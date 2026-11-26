@@ -297,7 +297,7 @@ The run record's sensor models, one per photograph (`names[k]`, `models[k]`): Co
 `nothing` when absent; the resolver's reason; whether a specified component overrode a measured one), the black component the
 photograph's values were linearised with (`black_component`: `Dark` — per photosite, the photograph's EXIF exposure inside the
 dark's band —, `ChannelBlack` — per colour, e.g. reason `DarkOutOfBand` —, or `FileBlack` — the RAW's own, e.g. reason
-`NoCharacterisation`) and the model's identity (Core's `content_digest`), as plain strings.
+`NoCharacterization`) and the model's identity (Core's `content_digest`), as plain strings.
 """
 sensor_record(names, models) = [begin
                                      c = VgtkCore.component_sources(m)
@@ -333,39 +333,39 @@ struct PhotoSet{O <: ObservationModel}
 end
 
 """
-    photo_set(camera::CalibratedCamera, files; characterisation = nothing, lens = nothing, sensor_model = AutoSensorModel()) -> PhotoSet
-    photo_set(observation::ObservationModel, files; characterisation = nothing, lens = nothing) -> PhotoSet
+    photo_set(camera::CalibratedCamera, files; characterization = nothing, lens = nothing, sensor_model = AutoSensorModel()) -> PhotoSet
+    photo_set(observation::ObservationModel, files; characterization = nothing, lens = nothing) -> PhotoSet
 
 THE entry point of photographs (owner 2026-11-15: "if a sensor was estimated with a model, then it must be used to predict the
 model"): the photographs `files` read exactly as the camera's — or the calibration's — observation model states, by dispatch on its
-types, never by a flag. `characterisation` is a LOCATION only (a path of the `vgio/sensor_characterisation` record); what it must be is
+types, never by a flag. `characterization` is a LOCATION only (a path of the `vgio/sensor_characterization` record); what it must be is
 the camera's statement. `lens`: the lens the config states (an adapted lens EXIF misnames; Features' `extract_capture_settings`).
 A camera's prediction reads them under `sensor_model` (`prediction_observation`: "off" reads RAW photosites without the
 record, with the loud warning).
 
-- [`SensorRecord`](@ref), [`Photosites`](@ref): RAW photographs only; `characterisation` required and its file's sha256 equal to the
-  record's — another file is refused naming both. Each photograph's model is Core's resolver `sensor_model(characterisation,
+- [`SensorRecord`](@ref), [`Photosites`](@ref): RAW photographs only; `characterization` required and its file's sha256 equal to the
+  record's — another file is refused naming both. Each photograph's model is Core's resolver `sensor_model(characterization,
   capture, k)` by its EXIF; a frame the record does not describe (another body, `OtherBody`; an ISO it holds no entry for,
   `UnmatchedISO`) is refused by name.
 - [`NoSensorRecord`](@ref), [`Photosites`](@ref): RAW photographs only, each under the file's black (Core's resolver without a
-  characterisation, reason `NoCharacterisation`); a `characterisation` is refused: the camera was calibrated without one.
+  characterisation, reason `NoCharacterization`); a `characterization` is refused: the camera was calibrated without one.
 - [`NoSensorRecord`](@ref), [`Decoded`](@ref): decoded images only, the absent model each; a RAW photograph is refused, so is a
-  `characterisation`.
+  `characterization`.
 """
 photo_set(cam::CalibratedCamera, files::AbstractVector{<:AbstractString}; sensor_model::SensorModelMode = AutoSensorModel(),
-          characterisation::Union{Nothing, AbstractString} = nothing, kwargs...) =
-    photo_set(prediction_observation(sensor_model, cam.observation, characterisation)..., files; kwargs...)
+          characterization::Union{Nothing, AbstractString} = nothing, kwargs...) =
+    photo_set(prediction_observation(sensor_model, cam.observation, characterization)..., files; kwargs...)
 """
-    prediction_observation(sensor_model, observation, characterisation) -> (observation, (; characterisation))
+    prediction_observation(sensor_model, observation, characterization) -> (observation, (; characterization))
 
 The observation model, and the record location, a prediction of a camera calibrated under `observation` reads its photographs with,
 by `sensor_model` ([`SensorModelMode`](@ref); `camera.sensor_model`): "auto" and "on" read them as the camera states (`photo_set`'s
 refusals: another record, another kind, a missing location) — "on" refuses a camera calibrated without a record; "off" reads RAW
-photosites WITHOUT a record present (the camera's, or the `characterisation` given, which must exist and, for a camera's record, be
+photosites WITHOUT a record present (the camera's, or the `characterization` given, which must exist and, for a camera's record, be
 that record), with [`warn_sensor_model_off`](@ref).
 """
-prediction_observation(::AutoSensorModel, om::ObservationModel, c) = (om, (; characterisation = c))
-prediction_observation(::OnSensorModel, om::ObservationModel, c) = (om, (; characterisation = c))
+prediction_observation(::AutoSensorModel, om::ObservationModel, c) = (om, (; characterization = c))
+prediction_observation(::OnSensorModel, om::ObservationModel, c) = (om, (; characterization = c))
 prediction_observation(::OnSensorModel, om::ObservationModel{NoSensorRecord}, c) =
     throw(ArgumentError("`camera.sensor_model = \"on\"`: the camera was calibrated without a sensor record ($(observation_line(om))): no sensor model to predict with"))
 function prediction_observation(::OffSensorModel, om::ObservationModel{SensorRecord, Photosites}, c)
@@ -374,24 +374,24 @@ function prediction_observation(::OffSensorModel, om::ObservationModel{SensorRec
         got == om.sensor || throw(ArgumentError("the camera was calibrated under the sensor characterisation sha256 $(om.sensor.sha256), given sha256 $(got.sha256) ($c)"))
     end
     warn_sensor_model_off(c === nothing ? _record_line(om.sensor) : _record_line(c, om.sensor))
-    return (ObservationModel(NoSensorRecord(), Photosites(), om.channel), (; characterisation = nothing))
+    return (ObservationModel(NoSensorRecord(), Photosites(), om.channel), (; characterization = nothing))
 end
 function prediction_observation(::OffSensorModel, om::ObservationModel{NoSensorRecord, Photosites}, c)
     c === nothing || warn_sensor_model_off(_record_line(c, sensor_statement(c)))   # a record present on disk, not used
-    return (om, (; characterisation = nothing))
+    return (om, (; characterization = nothing))
 end
-prediction_observation(::OffSensorModel, om::ObservationModel, c) = (om, (; characterisation = c))   # decoded images: photo_set's refusals
+prediction_observation(::OffSensorModel, om::ObservationModel, c) = (om, (; characterization = c))   # decoded images: photo_set's refusals
 photo_set(om::ObservationModel, ch::NamedTuple, files::AbstractVector{<:AbstractString}; kwargs...) = photo_set(om, files; ch..., kwargs...)
 function photo_set(om::ObservationModel{SensorRecord, Photosites}, files::AbstractVector{<:AbstractString};
-                   characterisation::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
+                   characterization::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
     _require_kind(om, files)
     want = om.sensor.sha256
-    characterisation === nothing &&
-        throw(ArgumentError("the camera was calibrated under the sensor characterisation sha256 $want: its photographs are read under that record (give its location: `characterisation`, the path)"))
-    got = open(VgtkCore.sha256_hex, characterisation)
-    got == want || throw(ArgumentError("the camera was calibrated under the sensor characterisation sha256 $want, given sha256 $got ($characterisation): " *
+    characterization === nothing &&
+        throw(ArgumentError("the camera was calibrated under the sensor characterisation sha256 $want: its photographs are read under that record (give its location: `characterization`, the path)"))
+    got = open(VgtkCore.sha256_hex, characterization)
+    got == want || throw(ArgumentError("the camera was calibrated under the sensor characterisation sha256 $want, given sha256 $got ($characterization): " *
                                        "a prediction reads its photographs under the camera's own record"))
-    c = VgtkIO.load(VgtkCore.SensorCharacterisation, characterisation)
+    c = VgtkIO.load(VgtkCore.SensorCharacterization, characterization)
     models = _resolved_models(c, files, lens)
     _require_described(want, files, models)
     return PhotoSet(om, String.(files), models)
@@ -405,19 +405,19 @@ function _require_described(sha256::AbstractString, files::AbstractVector{<:Abst
     return nothing
 end
 function photo_set(om::ObservationModel{NoSensorRecord, Photosites}, files::AbstractVector{<:AbstractString};
-                   characterisation::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
+                   characterization::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
     _require_kind(om, files)
-    _refuse_characterisation(characterisation)
+    _refuse_characterization(characterization)
     return PhotoSet(om, String.(files), _resolved_models(nothing, files, lens))
 end
 function photo_set(om::ObservationModel{NoSensorRecord, Decoded}, files::AbstractVector{<:AbstractString};
-                   characterisation::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
+                   characterization::Union{Nothing, AbstractString} = nothing, lens::Union{Nothing, VgtkCore.DeviceIdentity} = nothing)
     _require_kind(om, files)
-    _refuse_characterisation(characterisation)
+    _refuse_characterization(characterization)
     return PhotoSet(om, String.(files), VgtkCore.SensorModel[VgtkCore.SensorModel() for _ in files])
 end
-_refuse_characterisation(::Nothing) = nothing
-_refuse_characterisation(path::AbstractString) =
+_refuse_characterization(::Nothing) = nothing
+_refuse_characterization(path::AbstractString) =
     throw(ArgumentError("the camera was calibrated without a sensor characterisation: its photographs are read without one (given $path)"))
 _kind_name(::Photosites) = "RAW photographs (their photosites)"
 _kind_name(::Decoded) = "decoded images"

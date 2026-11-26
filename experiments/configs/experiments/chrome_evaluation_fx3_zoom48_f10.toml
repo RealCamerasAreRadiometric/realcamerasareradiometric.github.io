@@ -17,12 +17,12 @@ name = "chrome_evaluation"
 [upstream]
 radiometric_refinement = "configs/experiments/radiometric_refinement.toml"
 
-[inputs.fx3_sensor_characterisation]
+[inputs.fx3_sensor_characterization]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "detect"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterization experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw]
 tier = "rc_raw_photos"
@@ -49,7 +49,7 @@ raw = "raw"
 mode = "photosites"               # read, not decoded: the RAW photographs linked with their EXIF (Features' load_raw_metadata); detect reads each mosaic
 
 [detect]
-sensor_characterisation = "fx3_sensor_characterisation"   # the FX3's record of record (input fx3_sensor_characterisation): each RAW re-linearised under its frame's model, its Poisson–Gaussian noise propagated into the detections' covariances
+sensor_characterization = "fx3_sensor_characterization"   # the FX3's record of record (input fx3_sensor_characterization): each RAW re-linearised under its frame's model, its Poisson–Gaussian noise propagated into the detections' covariances
 photos = "fx3_zoom48_f10_chrome"
 image = "raw_green"               # the RAW mosaics behind prepare's set, Features' bilinear green on the raw grid under each frame's sensor model; raw pixels
 precision = "Float32"

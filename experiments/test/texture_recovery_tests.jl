@@ -291,10 +291,10 @@ end
     # the entry point refuses what the camera was not calibrated under: a characterisation for a camera of decoded images; a camera
     # calibrated on RAW photosites under a record given these decoded photographs
     @test_throws "calibrated without a sensor characterisation" sheet_scene(cc, target, sheet, joinpath(sheetdir, "texture.png"), imgdir, poses, W, H;
-                                                                          characterisation = joinpath(sheetdir, "texture.png"))
+                                                                          characterization = joinpath(sheetdir, "texture.png"))
     raw_cc = RC.CalibratedCamera(camera, RC.ObservationModel(RC.SensorRecord(repeat("ab", 32)), RC.Photosites(), :G), sett)
     @test_throws "calibrated on RAW photographs" sheet_scene(raw_cc, target, sheet, joinpath(sheetdir, "texture.png"), imgdir, poses, W, H;
-                                                             characterisation = joinpath(sheetdir, "texture.png"))
+                                                             characterization = joinpath(sheetdir, "texture.png"))
     # texture recovery reads its photographs through the entry point alone: no second decode path in its source
     src = read(srcdir("texture_recovery.jl"), String)
     @test !occursin("photo_observations(", src) && !occursin("load_photo(", src) && occursin("RC.observe(ctx.photos", src)

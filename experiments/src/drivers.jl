@@ -803,17 +803,17 @@ linearisation; the greens of Core's `photosite_colors`, 1 and 3)."""
 green_quantile(m::VgtkCore.RawMosaic) = (c = VgtkCore.photosite_colors(m); quantile(VgtkCore.linearview(m)[(c .== 1) .| (c .== 3)], 0.9999))
 
 """
-    raw_sensor_models(files, characterisation; what) -> Vector{SensorModel}
+    raw_sensor_models(files, characterization; what) -> Vector{SensorModel}
 
-Each RAW photograph's sensor model, resolved by its EXIF from the sensor characterisation `characterisation` (a record's path)
+Each RAW photograph's sensor model, resolved by its EXIF from the sensor characterisation `characterization` (a record's path)
 through RadiometricCamera's ONE entry point (`photo_set` under the observation model of RAW photosites under that record,
 `observation_model`: the resolution, and the refusals, of the calibration and of every prediction). The geometry image
 (`raw_green`) is read under it — the chrome detect's and the front ends' decode alike. Precision over recall: a frame the
 characterisation gives no noise law (another body, an unmatched ISO) is refused by name (`what`), never read at a guessed level.
 """
-function raw_sensor_models(files::AbstractVector{<:AbstractString}, characterisation::AbstractString; what::AbstractString)
-    om = RadiometricCamera.observation_model(files, characterisation)
-    models = RadiometricCamera.photo_set(om, files; characterisation).models
+function raw_sensor_models(files::AbstractVector{<:AbstractString}, characterization::AbstractString; what::AbstractString)
+    om = RadiometricCamera.observation_model(files, characterization)
+    models = RadiometricCamera.photo_set(om, files; characterization).models
     bad = [basename(f) for (f, m) in zip(files, models) if !(m.noise isa VgtkCore.PoissonGaussian)]
     isempty(bad) || throw(ArgumentError("$what: the sensor characterisation gives no noise law (gain) for $(length(bad)) photographs: $(join(bad, ", "))"))
     return models
@@ -830,7 +830,7 @@ raw_exif(md, f::AbstractString, root::AbstractString) =
                       "fnumber" => md.fnumber, "focal_mm" => md.focal_mm, "iso" => md.iso, "model" => md.model, "raw" => relpath(f, root))
 
 """
-    decode_raw(src, root, set; gain, mode, srgb, characterisation = nothing) -> String
+    decode_raw(src, root, set; gain, mode, srgb, characterization = nothing) -> String
 
 The raw photographs in `src` decoded in Julia by VisualGeometryToolkitFeatures' `load_raw` (LibRaw_jll), every mode of `RAW_MODES`:
 `root/<set>_linear/*.png` (16-bit linear, camera raw colour, white
@@ -846,9 +846,9 @@ positions): decoded under the file's black, no sensor model — exempt from the 
 calibrated camera is calibrated on or predicts goes through RadiometricCamera's `photo_set`).
 """
 function decode_raw(src::AbstractString, root::AbstractString, set::AbstractString; gain, mode::AbstractString, srgb::Bool,
-                    characterisation::Union{Nothing, AbstractString} = nothing)
+                    characterization::Union{Nothing, AbstractString} = nothing)
     check_raw_mode(mode, srgb, "decode_raw ($set)")
-    (mode == "raw_green") == (characterisation !== nothing) ||
+    (mode == "raw_green") == (characterization !== nothing) ||
         throw(ArgumentError("decode_raw ($set): $(mode == "raw_green" ? "mode \"raw_green\" reads each frame under its sensor model: name the characterisation" : "mode $(repr(mode)) reads no sensor characterisation")"))
     assert_not_input(root)
     files = raw_files(src)
@@ -861,7 +861,7 @@ function decode_raw(src::AbstractString, root::AbstractString, set::AbstractStri
     end
     g = gain == "auto" ? 0.9 / max(maximum(green_quantile, mosaics), 1e-6) : Float64(gain)
     gain == "auto" && println("auto gain $(round(g; digits = 3))")
-    models = mode == "raw_green" ? raw_sensor_models(files, characterisation; what = "decode_raw ($set)") : nothing
+    models = mode == "raw_green" ? raw_sensor_models(files, characterization; what = "decode_raw ($set)") : nothing
     device = mode == "raw_green" ? RadiometricCamera.rc_backend("gpu"; inline = false) : nothing   # GPU first (a loud fallback)
     dirs = (linear = joinpath(root, "$(set)_linear"), srgb = srgb ? joinpath(root, "$(set)_srgb") : nothing)
     foreach(d -> d === nothing || mkpath(d), dirs)
@@ -1168,15 +1168,15 @@ function refinement_product(cfg::AbstractDict, case::AbstractString)
 end
 
 """
-    case_characterisation(cfg, case) -> Union{Nothing, String}
+    case_characterization(cfg, case) -> Union{Nothing, String}
 
 The location of the sensor characterisation the refinement case `[cases.<case>]` read its photographs under — its `[pipeline.camera]
-sensor_characterisation`, the one input of `cfg` at that path, read through [`config_input`](@ref) (its sha256 checked) — or `nothing`
+sensor_characterization`, the one input of `cfg` at that path, read through [`config_input`](@ref) (its sha256 checked) — or `nothing`
 when it names none (empty: decoded images, or RAW photographs read without a record). What a consumer of the case's camera hands RadiometricCamera's `photo_set` as the
-`characterisation` (a location only: the camera's record states which file it must be).
+`characterization` (a location only: the camera's record states which file it must be).
 """
-function case_characterisation(cfg::AbstractDict, case::AbstractString)
-    spec = get(get(get(cfg["cases"][case], "pipeline", Dict{String, Any}()), "camera", Dict{String, Any}()), "sensor_characterisation", "")
+function case_characterization(cfg::AbstractDict, case::AbstractString)
+    spec = get(get(get(cfg["cases"][case], "pipeline", Dict{String, Any}()), "camera", Dict{String, Any}()), "sensor_characterization", "")
     isempty(spec) && return nothing
     ids = sort([id for (id, t) in cfg["inputs"] if t["path"] == spec])
     length(ids) == 1 || throw(ArgumentError("case $case: its sensor characterisation $spec is $(isempty(ids) ? "no input" : "the path of $(length(ids)) inputs ($(join(ids, ", ")))") of the config: one input states it"))

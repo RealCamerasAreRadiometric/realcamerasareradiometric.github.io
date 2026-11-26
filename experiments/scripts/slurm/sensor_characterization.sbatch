@@ -1,8 +1,8 @@
 #!/bin/bash
 # EXAMPLE SLURM launcher: the resources below are those of the machine the runs were made on (dgx01: one node of 224 CPUs,
 # 1900 GB and 8 GPUs in a partition named `gpu`). Adapt --partition, CPUs and memory to your site. Submit from the repository
-# root (`sbatch experiments/scripts/slurm/sensor_characterisation.sbatch`; or `bash experiments/scripts/reproduce/reproduce_results_vcai.sh
-# --only=sensor_characterisation`); logs go to ./logs/, which must exist before submission.
+# root (`sbatch experiments/scripts/slurm/sensor_characterization.sbatch`; or `bash experiments/scripts/reproduce/reproduce_results_vcai.sh
+# --only=sensor_characterization`); logs go to ./logs/, which must exist before submission.
 # Data paths come from the environment: VGTK_DATA_ROOT, VGTK_RESULTS_ROOT (common.sh) and VGTK_DATA_ROOT_UNPUBLISHED (the inputs of
 # tier "unpublished": the runner sets it from configs/reproduce.toml's site tiers).
 #SBATCH --partition=gpu
@@ -18,7 +18,7 @@ mkdir -p logs
 source experiments/scripts/slurm/common.sh
 
 # =============================================================================
-# sensor_characterisation.sbatch — scripts/sensor_characterisation.jl on its config of record: one task, the characterisation by
+# sensor_characterization.sbatch — scripts/sensor_characterization.jl on its config of record: one task, the characterisation by
 # Core's estimators (stage evaluate; their kernels run on the frames' device, the decoded mosaics' — the host today: no GPU requested,
 # none pinned). MEMORY: --mem-per-cpu=8480M is the
 # node ratio (1900 GB / 224 CPU); 8 CPUs hold 68 GB, the largest burst (50 frames, 1.2 GB of codes) and the E4 series (111 frames,
@@ -26,6 +26,6 @@ source experiments/scripts/slurm/common.sh
 # =============================================================================
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
-echo "[$(date +%T)] sensor_characterisation  threads=$JULIA_NUM_THREADS  data=$VGTK_DATA_ROOT  results=$VGTK_RESULTS_ROOT  commit=$(git rev-parse HEAD)"
-exec "$JULIA" --startup-file=no --project=experiments experiments/scripts/sensor_characterisation.jl \
-    --config=experiments/configs/experiments/sensor_characterisation.toml --stage=evaluate
+echo "[$(date +%T)] sensor_characterization  threads=$JULIA_NUM_THREADS  data=$VGTK_DATA_ROOT  results=$VGTK_RESULTS_ROOT  commit=$(git rev-parse HEAD)"
+exec "$JULIA" --startup-file=no --project=experiments experiments/scripts/sensor_characterization.jl \
+    --config=experiments/configs/experiments/sensor_characterization.toml --stage=evaluate

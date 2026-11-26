@@ -5,6 +5,22 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **Breaking: American in identifiers (owner decision 11).** Core's `SensorCharacterisation` is `SensorCharacterization` and its
+  `ModelReason` `NoCharacterisation` is `NoCharacterization`; RC follows, with no alias:
+  - the camera option `camera.sensor_characterisation` → `camera.sensor_characterization` (`CameraOptions.sensor_characterization`);
+    the old key is refused by name with its new one (`RETIRED_KEYS`), the value unchanged;
+  - `photo_set(…; characterisation)` → `photo_set(…; characterization)`, and `prediction_observation`'s third argument;
+    `NO_SENSOR_CHARACTERISATION` → `NO_SENSOR_CHARACTERIZATION`; the retired stub `sensor_characterisation(…)` (an earlier
+    release's, refused by name) is deleted: Core's retired-name list now names the spelling;
+  - **`rc/run_parameters/v4.0`**: the run record's key `sensor_characterization` and its frames' reason `NoCharacterization`; a v3.0
+    record (RC 0.3) reads through its version step (`_run_parameters_v4`), every other value as stored — tested on the
+    experiments' recorded golden run (`siemens_coarse_full/parameters.json`, unchanged);
+  - the experiments: the experiment and stage `sensor_characterization` (its driver, config, sbatch, source and test files
+    renamed), its table `[characterize]` and `characterize_sensor`, the input `fx3_sensor_characterization`, the drivers'
+    keyword `characterization`, `load_sensor_characterization_config`, `case_characterization`. The recorded data keep their
+    names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
+    `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
+    read through IO's steps). No number moves.
 - **Breaking: the calibration is an algorithm.** `start_calibration` and `refine_calibration!` are removed (check_naming R15: a
   `refine_` name is a kind, never a function), replaced by `RadiometricCalibration(options)` (a fit, `FitKind`) on
   `EstimationProblem(CalibrationEstimate, (geometry, photographs)[, (; device)])`:

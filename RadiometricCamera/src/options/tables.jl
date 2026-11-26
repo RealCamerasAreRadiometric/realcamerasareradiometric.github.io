@@ -98,17 +98,17 @@ Base.@kwdef struct CameraOptions <: AbstractOptionsTable
     lens_coverage::String = _option_default(CameraOptions, :lens_coverage)              # where light falls: "sensor" (the whole sensor, nothing
                                                      #   measured) or the path of the capture set's measured image region (an
                                                      #   rc/image_region/v1.0 record: `run_lens_coverage`)
-    sensor_characterisation::String = _option_default(CameraOptions, :sensor_characterisation)              # the body's sensor characterisation (an IO `vgio/sensor_characterisation` record, Core's
-                                                     #   `SensorCharacterisation`), each RAW photograph's `SensorModel` resolved from it by its
+    sensor_characterization::String = _option_default(CameraOptions, :sensor_characterization)              # the body's sensor characterisation (an IO `vgio/sensor_characterization` record, Core's
+                                                     #   `SensorCharacterization`), each RAW photograph's `SensorModel` resolved from it by its
                                                      #   EXIF capture settings (`photo_set`); empty = none named (a path that does not exist is
                                                      #   refused; "none" is retired: `sensor_model = "off"`)
     sensor_model::String = _option_default(CameraOptions, :sensor_model)              # whether the run uses the sensor model (SENSOR_MODEL_TAGS, parsed
                                                      #   once by `sensor_model_mode`): "auto" (a record present is used, none: the file's black),
                                                      #   "on" (a record required), "off" (a record present is NOT used: a loud warning)
 end
-"""The RETIRED value of `camera.sensor_characterisation` that stated there is none (an earlier release's): refused, naming
+"""The RETIRED value of `camera.sensor_characterization` that stated there is none (an earlier release's): refused, naming
 `camera.sensor_model = "off"` (a record present, not used) — a run that names no record leaves the key empty."""
-const NO_SENSOR_CHARACTERISATION = "none"
+const NO_SENSOR_CHARACTERIZATION = "none"
 """The `camera.lens_coverage` that states a lens lighting the whole sensor: the coverage is the sensor's rectangle (Core's default
 lens coverage), nothing is measured."""
 const SENSOR_LENS_COVERAGE = "sensor"

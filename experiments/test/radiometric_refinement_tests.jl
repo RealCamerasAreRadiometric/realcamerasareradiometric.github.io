@@ -47,7 +47,7 @@
         @test o.io.checkpoint_each && o.io.channel == "G" && o.compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)
         p = resolve_pipeline(rc, t; produce = false)                     # the paths alone: nothing produced (the run inputs are produced only by a run)
-        @test table_inputs(rc, p) == ["central30cm_14mm_central30cm_green_si_bc5_fit_json", "fx3_sensor_characterisation", "siemens_1m_board"]   # the FX3 record: keyed by its sha256
+        @test table_inputs(rc, p) == ["central30cm_14mm_central30cm_green_si_bc5_fit_json", "fx3_sensor_characterization", "siemens_1m_board"]   # the FX3 record: keyed by its sha256
         @test table_runs(t["pipeline"]) == ["fx3_14mm_central30cm_schoeps_green",   # its Schöps start: the front ends' run (frontends.toml), keyed by its key
                                             "siemens_1m_distance_map"]               # its edge.sdf: the board's distance map (distance_maps.toml), keyed by its key
         # the photographs are the RAW input (a photosites set: its prepare run links the RAW files): RC reads them as RAW by their files

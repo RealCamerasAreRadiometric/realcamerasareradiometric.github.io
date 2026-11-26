@@ -342,15 +342,15 @@ inputs_from = [
 default = false
 
 [[stage]]
-name = "sensor_characterisation"
+name = "sensor_characterization"
 what = "the FX3's sensor characterisation at ISO 100 by Core's estimators (MasterDark, defect_onsets, PhotonTransfer): the record the refinements read"
 cpus_per_task = 8       # CPU: one task decoding the campaign's 569 E1_E2 and E4 frames one burst at a time, at the project's thread count
 mem_per_cpu = "8480M"   # 68 GB: the largest burst (1.2 GB of codes) and the E4 series (2.7 GB) many times over
 after = ["setup"]
-sbatch = "experiments/scripts/slurm/sensor_characterisation.sbatch"
+sbatch = "experiments/scripts/slurm/sensor_characterization.sbatch"
 job_name = "rc-sensor-char"
-driver = "experiments/scripts/sensor_characterisation.jl"
-config = "experiments/configs/experiments/sensor_characterisation.toml"
+driver = "experiments/scripts/sensor_characterization.jl"
+config = "experiments/configs/experiments/sensor_characterization.toml"
 time = "00:05:00"       # 2× the measured 87 s (the B200 server 2026-11-14, 16 CPUs, warm depot: 569 frames decoded and the record written)
 default = false
 

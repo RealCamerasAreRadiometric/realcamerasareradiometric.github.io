@@ -45,10 +45,10 @@ const DETECT_LUMA_KEYS = ("noise_sigma",)
 const DETECT_POLARITIES = ("light", "dark", "none")
 "The keys of `[detect]`: the photographs (an input or a prepare set), how they become the detector's grey image, the precision and
 device (a tag of RadiometricCamera's `BACKEND_TAGS`), the keywords, the photographs detected (`photographs`), the excluded ones and
-the camera's sensor characterisation (`sensor_characterisation`: the input id of its vgio/sensor_characterisation record, or empty for decoded photographs;
+the camera's sensor characterisation (`sensor_characterization`: the input id of its vgio/sensor_characterization record, or empty for decoded photographs;
 RadiometricCamera's entry point `photo_set`), whose per-frame model a RAW photograph's mosaic is linearised and detected under."
 const CHROME_DETECT_KEYS = ("photos", "image", "precision", "device", DETECT_KEYWORDS..., "photographs", "excluded",
-                            "sensor_characterisation")
+                            "sensor_characterization")
 "The detector's grey images `[detect] image` names (this file's header)."
 const DETECT_IMAGES = RadiometricCamera.GEOMETRY_IMAGES   # the one vocabulary of the geometry images ("raw_green", "luma")
 "The element types `[detect] precision` names."
@@ -94,7 +94,7 @@ end
 input of stage detect or a `[prepare.<set>]`, `image` one of `DETECT_IMAGES` (`raw_green` exactly for a prepare set of mode
 "photosites"), a known precision, a device tag of RadiometricCamera's `BACKEND_TAGS` (`gpu`, the configs of record's, or `cpu`, the test oracle; resolved when the stage runs, RadiometricCamera's `rc_backend`), `photographs` a
 non-empty array of distinct file names, `excluded` a table of reasons disjoint from it. Returns
-`(; photos, prepared, image, T, device, sfop, window, sensor_characterisation, photographs, excluded)`: `prepared` whether `photos` is
+`(; photos, prepared, image, T, device, sfop, window, sensor_characterization, photographs, excluded)`: `prepared` whether `photos` is
 a prepare set, `sfop` detect_sfop's keywords and `window` the seeded detect_foerstner's (`DETECT_KEYWORDS`; its `f_tests` the
 configuration's one FoerstnerTests table, shared by every photograph's call), `photographs` sorted.
 """
@@ -148,17 +148,17 @@ function detect_settings(cfg::AbstractDict, path::AbstractString = "the chrome e
     # FoerstnerTests: on the host, per window half-width; recomputed per photograph they were most of the GPU detect's time)
     window = (; derivative = Symbol(t["derivative"]), derivative_sigma = Float64(t["derivative_sigma"]), significance_level = level,
               f_tests = VgtkFeatures.FoerstnerTests())
-    sc = t["sensor_characterisation"]
-    sc == RadiometricCamera.NO_SENSOR_CHARACTERISATION &&
-        throw(ArgumentError("$where sensor_characterisation: \"none\" is retired (RadiometricCamera 0.11.2): leave it empty — the photographs' kind decides (\"luma\": decoded, no sensor model)"))
+    sc = t["sensor_characterization"]
+    sc == RadiometricCamera.NO_SENSOR_CHARACTERIZATION &&
+        throw(ArgumentError("$where sensor_characterization: \"none\" is retired (RadiometricCamera 0.11.2): leave it empty — the photographs' kind decides (\"luma\": decoded, no sensor model)"))
     sc isa AbstractString && (isempty(sc) || haskey(cfg["inputs"], sc) && cfg["inputs"][sc]["stage"] == "detect") ||
-        throw(ArgumentError("$where sensor_characterisation: $(repr(sc)) is neither empty nor an input of stage detect (the record)"))
+        throw(ArgumentError("$where sensor_characterization: $(repr(sc)) is neither empty nor an input of stage detect (the record)"))
     image == "luma" && !isempty(sc) &&
-        throw(ArgumentError("$where sensor_characterisation: \"luma\" reads decoded photographs, which no sensor model describes: leave it empty"))
+        throw(ArgumentError("$where sensor_characterization: \"luma\" reads decoded photographs, which no sensor model describes: leave it empty"))
     image == "raw_green" && isempty(sc) &&
-        throw(ArgumentError("$where sensor_characterisation: \"raw_green\" reads RAW mosaics, detected under their frames' sensor model: name the characterisation"))
+        throw(ArgumentError("$where sensor_characterization: \"raw_green\" reads RAW mosaics, detected under their frames' sensor model: name the characterisation"))
     return (; photos, prepared, image, T = DETECT_PRECISIONS[t["precision"]], device = String(t["device"]), sfop, window,
-            sensor_characterisation = String(sc), photographs = sort(String.(ph)), excluded = ex)
+            sensor_characterization = String(sc), photographs = sort(String.(ph)), excluded = ex)
 end
 
 """
@@ -177,8 +177,8 @@ function detect_product(cfg::AbstractDict)
     else
         rec["inputs"] = inputs_record(cfg, [photos])
     end
-    sc = cfg["detect"]["sensor_characterisation"]   # the record the RAW mosaics are linearised under: its content keys the run
-    isempty(sc) || (rec["sensor_characterisation"] = inputs_record(cfg, [sc]))
+    sc = cfg["detect"]["sensor_characterization"]   # the record the RAW mosaics are linearised under: its content keys the run
+    isempty(sc) || (rec["sensor_characterization"] = inputs_record(cfg, [sc]))
     return driver_product("detect", rec; output = "summary.tsv", threads = nothing)   # one detection per photograph
 end
 
@@ -266,7 +266,7 @@ grey. A `raw_green` set's photographs are read as their RAW mosaics (`raw_photog
 detector_image(dir::AbstractString, name::AbstractString) = load_grey(joinpath(dir, name))
 
 """
-    raw_photographs(cfg, set, names, characterisation) -> (; files, models)
+    raw_photographs(cfg, set, names, characterization) -> (; files, models)
 
 The RAW photographs `names` of the photosites prepare set `set` (its folder of links, `photosite_images`; their EXIF in its
 photosites.json, `run_prepare`), each frame's sensor model resolved by its EXIF from the characterisation (`[detect]`'s: an input
@@ -275,8 +275,8 @@ model of RAW photosites under that record, `observation_model`: the same resolut
 every prediction's). `detect` reads each as its mosaic
 (Features' `load_raw_mosaic`) and detects it under its model ([`detect_photo`](@ref)).
 """
-function raw_photographs(cfg::AbstractDict, set::AbstractString, names::AbstractVector{<:AbstractString}, characterisation::AbstractString)
-    spec = config_input(cfg, characterisation)
+function raw_photographs(cfg::AbstractDict, set::AbstractString, names::AbstractVector{<:AbstractString}, characterization::AbstractString)
+    spec = config_input(cfg, characterization)
     root = photosite_images(cfg, set)
     files = [joinpath(root, n) for n in names]
     models = raw_sensor_models(files, spec; what = "raw_green ($set)")   # the one resolution (src/drivers.jl), the front ends' decode's too

@@ -99,7 +99,7 @@ end
                 "io.channel",                                                       # 2026-11-04: one colour channel alone (the option of 2026-11-02, migrated)
                 "warping.inplane", "warping.inplane_start",                         # 2026-11-10: the in-plane print error (Core's Aspect ∘ Skew) and its start
                 "vignetting.chart",                                                 # 2026-11-10: the radial profile's chart (its free centre retired 2026-11-11)
-                "camera.sensor_characterisation",                                   # 2026-11-14: the camera's sensor model (IO record; the weighting follows it)
+                "camera.sensor_characterization",                                   # 2026-11-14: the camera's sensor model (IO record; the weighting follows it)
                 "camera.sensor_model",                                              # 2026-11-15: whether the run uses it (auto | on | off; RC 0.11.2)
                 "masks.lens_coverage_scale",                                        # 2026-11-15: the photometric sampling's scale of the lens coverage
                 "grid.lattice",                                                     # 2026-11-15: the lattice's mode (derived | node_count; RC 0.11.4)
@@ -375,12 +375,13 @@ end
 @testitem "pipeline options (TOML): load_pipeline_metrics reads a run's metrics back" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: cost
     using TOML
-    dir = mktempdir()                                                          # a refinement: its rc/run_parameters/v3.0 record
+    using JSON: JSON
+    dir = mktempdir()                                                          # a refinement: its rc/run_parameters/v4.0 record
     RC.save_run_parameters(joinpath(dir, "parameters.json"),
         (; cost = (; init = (; cost = 2.0, rel_rms = 0.2), after_linear_solve = (; cost = 1.5, rel_rms = 0.15), after_refinement = (; cost = 1.0, rel_rms = 0.1)),
            bearing_error = (; init_median = 0.5, init_p90 = 0.9, refined_median = 0.3, refined_p90 = 0.6), camera_moved = [0.001, 0.002],
            iterations = 2, stopped = "ftol", retcode = "Success", stop_rule = "FunctionTolerance", grid = nothing))
-    @test VgtkIO.read_record(joinpath(dir, "parameters.json")).schema == "rc/run_parameters/v3.0"
+    @test VgtkIO.read_record(joinpath(dir, "parameters.json")).schema == "rc/run_parameters/v4.0"
     @test VgtkIO.read_record(joinpath(dir, "parameters.json")).units.length == "m"
     m = RC.load_pipeline_metrics(dir)
     @test sort(collect(keys(m))) == ["bearing_error", "camera_moved", "cost", "iterations", "retcode", "stop_rule", "stopped"]
@@ -396,7 +397,7 @@ end
     @test occursin("bin/refine.jl --config=$(joinpath(old_dir, "pipeline_config.toml"))", thrown_message(() -> RC.load_pipeline_metrics(old_dir)))
 
     old = joinpath(mktempdir(), "parameters.json"); write(old, "{\"frontend\": \"blob\", \"image_size\": [5208, 3476]}")
-    @test_throws "not a rc/run_parameters/v3.0 record" RC.load_run_parameters(old)                                  # a report before the record
+    @test_throws "not a rc/run_parameters/v4.0 record" RC.load_run_parameters(old)                                  # a report before the record
     # a v2.0 run record (RC ≤ 0.10: the grid's `prior*` keys) reads through its version step into the smoothness's keys, values as stored
     v2 = joinpath(mktempdir(), "parameters.json")
     VgtkIO.write_record(v2, (; schema = "rc/run_parameters/v2.0", frontend = "schoeps",
@@ -404,10 +405,21 @@ end
                                       prior_beta = 0.0123, prior_gcv = (; β = 0.0123, gcv = 2.0e-3, kind = "pspline"), start_perturbation = nothing),
                               vignetting_options = (; smoothness_weight = 0.5, boundary_order = 3, smoothness_gcv = nothing)); style = RC._style(VgtkCore.m))
     r3 = RC.load_run_parameters(v2)
-    @test r3.schema == "rc/run_parameters/v3.0" && !haskey(r3.grid, :prior) && !haskey(r3.grid, :prior_weight) && r3.grid.n_interior == 3
+    @test r3.schema == "rc/run_parameters/v4.0" && !haskey(r3.grid, :prior) && !haskey(r3.grid, :prior_weight) && r3.grid.n_interior == 3
     @test r3.grid.smoothness.type == "pspline" && r3.grid.smoothness.order == 3 && r3.grid.smoothness.weight == "gcv" && r3.grid.smoothness.beta == 0.0123
     @test r3.grid.smoothness.cost.final == 1.5e-4 && r3.grid.smoothness.selection.β == 0.0123
     @test r3.vignetting_options.smoothness.weight == 0.5 && r3.vignetting_options.smoothness.order == 3 && r3.vignetting_options.boundary_order == 3
+    # a v3.0 run record of record (the experiments' golden siemens_coarse_full run, RC 0.11): read through the v3 → v4 step (owner
+    # decision 11), its camera option's key `sensor_characterization` and its frames' reason `NoCharacterization`; every other value as stored
+    golden = joinpath(pkgdir(RadiometricCamera), "..", "experiments", "test", "pipeline", "golden", "siemens_coarse_full", "parameters.json")
+    if isfile(golden)
+        raw = JSON.parsefile(golden)
+        @test raw["schema"] == "rc/run_parameters/v3.0" && haskey(raw, "sensor_characterisation")   # the recorded file, unchanged
+        r4 = RC.load_run_parameters(golden)
+        @test r4.schema == "rc/run_parameters/v4.0" && r4.sensor_characterization == raw["sensor_characterisation"] && !haskey(r4, Symbol("sensor_characterisation"))
+        @test [m.reason for m in r4.sensor_models] == fill("NoCharacterization", length(raw["sensor_models"]))
+        @test [m.digest for m in r4.sensor_models] == [m["digest"] for m in raw["sensor_models"]] && r4.cost.after_refinement.cost == raw["cost"]["after_refinement"]["cost"]
+    end
     # the focus A/B experiment's report (rc/focus_ab, focus_ab.json) is a removed kind: a file of it, of either version, is refused by name
     @test !haskey(RC.RECORD_SCHEMAS, :focus_ab)
     for v in ("v1.0", "v2.0")

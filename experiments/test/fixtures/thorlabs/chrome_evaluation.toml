@@ -42,7 +42,7 @@ provenance = "the Sony DSC-HX400V at 4.3 mm (5184 x 3888, COLMAP pixels): K and 
 # The photograph is decoded by JpegTurbo (jpeg_decode, 8-bit sRGB as the camera wrote it) and read as grey, Gray.(·) (Rec. 601 luma of
 # the sRGB values; no linearisation). The detections are COLMAP pixel coordinates of the photograph.
 [detect]
-sensor_characterisation = ""   # the photographs are decoded inputs (no photosites): no sensor model (the photo kind decides); Förstner's documented a-posteriori covariance
+sensor_characterization = ""   # the photographs are decoded inputs (no photosites): no sensor model (the photo kind decides); Förstner's documented a-posteriori covariance
 photos = "photos"                 # the input whose files are the photographs
 image = "luma"                    # the detector's grey image: the JPEG as the camera wrote it, read as grey (no linearisation)
 precision = "Float32"             # detect_foerstner's element type T (Float32 | Float64; the reference computes in Float64)

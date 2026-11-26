@@ -25,12 +25,12 @@ path = "distance_map.json"
 stage = "refine"
 provenance = "the 1 m Siemens-star print's printed-edge distance map, a vgio/raster record (edge.sdf): the step [maps.siemens_1m] of distance_maps.toml (scripts/distance_maps.jl), keyed by the board generator's sdf.f32 + sdf.json (each pinned by its sha256), produced on demand when missing (owner 2026-11-16: a derived file is produced, never an input of record)"
 
-[inputs.fx3_sensor_characterisation]
+[inputs.fx3_sensor_characterization]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14)
 stage = "refine"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterisation experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0, VisualGeometryToolkitIO 0.10.2), made on the B200 server 2026-11-14 from the tier rc_sensor_characterisation_20261113 with Core 0.10.3's estimators (scratch e4_alldarks_one.jl + e4_record_alldarks.jl; the experiments' sensor_characterization experiment reproduces it): black = a Darks of 21 Darks, one per E1_E2 exposure (each burst's master dark, its exposure band the darks' EXIF exposure), their shared channel black the 50 E1 1/8000 s frames' (measured, 512.29/512.23/512.31/512.24 codes); noise = a measured Poisson–Gaussian law (gain K = 11.32987 ± 0.00433 e⁻/code from the photon transfer (Core's PhotonTransfer) on the E4 frames, σ_r per colour from E1), defects = 23,544 photosites by defect_onsets over every E1_E2 exposure (EXIF onsets); its 42 rasters fx3.sensor_characterisation.gain-exifband-alldarks.iso100.band<k>.dark_{offset,variance}.tiff beside it, verified by IO on load; supersedes fx3.sensor_characterisation.gain-exifband.json (owner 2026-11-14: a Dark per measured exposure); kept on the B200 server under the unpublished root and linked into the data root (next tier to pack: rc_sensor_models, data_artifacts.toml)"
 
 [inputs.raw_14mm_siemens_20261028]
 tier = "rc_raw_photos"
@@ -148,7 +148,7 @@ sensor_mm = 35.6
 f_mm = 14.6776
 fnumber = 4.0
 lens_coverage = "image_region:fx3_14mm_f4_20261028"   # the housing cuts the light inside the sensor: the session's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.f4_14mm_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -219,7 +219,7 @@ sensor_mm = 35.6
 f_mm = 7.8057
 fnumber = 4.0
 lens_coverage = "image_region:fx3_fisheye_siemens_20261028"   # the fisheye's image circle inside the frame: the set's measured image region ([image_regions])
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.f4_fisheye_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)
@@ -290,7 +290,7 @@ sensor_mm = 35.6
 f_mm = 21.1975
 fnumber = 2.8
 lens_coverage = "sensor"       # the Tamron 20 mm lights the whole sensor (owner ruling 2026-11-12): its rectangle, nothing measured
-sensor_characterisation = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterisation): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
+sensor_characterization = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"   # the FX3's record of record (input fx3_sensor_characterization): every frame of the set resolves at ISO 100 to the Dark of its exposure where the campaign measured it (Matched), else the shared measured channel black (DarkOutOfBand), with the Poisson–Gaussian noise and defects; its gain whitens the residuals (the weighting follows the model)
 [cases.f4_tamron_spline_warped.pipeline.grid]
 lattice = "derived"             # T. Schöps's own lattice extended over the lens coverage, never subdivided (m = 1; owner ruling 2026-11-15: his
                                 #   cell runs the 14 mm refinement at 88 s/it against ≈ 300 s at the 40 px subdivision, rel-RMS equal to 3 digits)

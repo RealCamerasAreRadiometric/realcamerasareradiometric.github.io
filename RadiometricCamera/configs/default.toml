@@ -43,7 +43,7 @@ fnumber = 8.0        # f-number N of the aperture start r₀ = f / (2N)
 lens_coverage = "sensor"   # where light falls on the sensor: "sensor" = the lens lights the whole sensor (its rectangle; nothing is
                            #   measured), else the path of the capture set's measured image region (an rc/image_region/v1.0 record:
                            #   its keyed step, Features' detect_image_circle on the set's own frames; owner ruling 2026-11-15)
-sensor_characterisation = ""   # the body's sensor characterisation (a vgio/sensor_characterisation record): each RAW photograph's sensor
+sensor_characterization = ""   # the body's sensor characterisation (a vgio/sensor_characterization record): each RAW photograph's sensor
                                #   model (black, noise, defects) resolved from it by its EXIF; empty = none named (a named path that
                                #   does not exist is refused); "none" is retired (RC 0.11.2): `sensor_model = "off"`
 sensor_model = "auto"          # whether the run uses the sensor model: "auto" (the owner's default, 2026-11-15: a record present —

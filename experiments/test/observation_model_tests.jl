@@ -10,7 +10,7 @@
     # (src/io/photographs.jl, not here); the front ends' geometric decode (decode_raw, green_quantile), the sensor characterisation's
     # producer (it reads the dark frames), and the chrome detector (its frames' models from photo_set) are the exemptions
     allowed = Dict("src/drivers.jl" => ("load_raw_mosaic(", "LinearRaw(", "linearview("),
-                   "src/sensor_characterisation.jl" => ("load_raw_mosaic(",),
+                   "src/sensor_characterization.jl" => ("load_raw_mosaic(",),
                    "scripts/chrome_evaluation.jl" => ("load_raw_mosaic(",))
     primitives = ("photo_observations(", "photo_sensor_models(", "load_photo(", "load_raw(", "load_raw_mosaic(", "LinearRaw(", "linearview(")
     bad = String[]
@@ -31,7 +31,7 @@
     @test occursin("RC.photo_set(cc,", src("src/texture_recovery.jl")) && occursin("RC.observe(ctx.photos", src("src/texture_recovery.jl"))
     @test occursin("RadiometricCamera.photo_set(om, files", src("src/drivers.jl"))                  # raw_sensor_models: the chrome detect's and the front ends' decode
     @test occursin("raw_sensor_models(files, spec;", src("src/chrome_evaluation.jl"))
-    @test occursin("characterisation = case_characterisation(REFINEMENT, CASE)", src("scripts/texture_recovery.jl"))
+    @test occursin("characterization = case_characterization(REFINEMENT, CASE)", src("scripts/texture_recovery.jl"))
 end
 
 @testitem "observation model: a case's characterisation is located by its input, sha256 checked" default_imports = false begin
@@ -39,10 +39,10 @@ end
     using DrWatson
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
-    cfg = Dict{String, Any}("cases" => Dict{String, Any}("a" => Dict{String, Any}("pipeline" => Dict{String, Any}("camera" => Dict{String, Any}("sensor_characterisation" => ""))),
+    cfg = Dict{String, Any}("cases" => Dict{String, Any}("a" => Dict{String, Any}("pipeline" => Dict{String, Any}("camera" => Dict{String, Any}("sensor_characterization" => ""))),
                                                          "b" => Dict{String, Any}("pipeline" => Dict{String, Any}()),
-                                                         "c" => Dict{String, Any}("pipeline" => Dict{String, Any}("camera" => Dict{String, Any}("sensor_characterisation" => "x/y.json")))),
+                                                         "c" => Dict{String, Any}("pipeline" => Dict{String, Any}("camera" => Dict{String, Any}("sensor_characterization" => "x/y.json")))),
                             "inputs" => Dict{String, Any}())
-    @test case_characterisation(cfg, "a") === nothing && case_characterisation(cfg, "b") === nothing
-    @test_throws "is no input of the config" case_characterisation(cfg, "c")
+    @test case_characterization(cfg, "a") === nothing && case_characterization(cfg, "b") === nothing
+    @test_throws "is no input of the config" case_characterization(cfg, "c")
 end

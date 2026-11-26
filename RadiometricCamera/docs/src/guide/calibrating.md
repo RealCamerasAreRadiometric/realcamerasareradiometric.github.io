@@ -58,8 +58,8 @@ state file after every iteration (the convergence monitors of the experiments re
 functional; `[compute] backend = "cpu"` forces the CPU (the default device of a [`RadiometricCalibration`](@ref)'s start and of [`load_calibration_start`](@ref)
 is [`default_backend`](@ref): the GPU when one is functional, else the CPU with a warning).
 
-A run on RAW photographs names the camera's sensor characterisation: `[camera] sensor_characterisation` is the path of the
-body's `vgio/sensor_characterisation` record (VisualGeometryToolkitCore's `SensorCharacterisation`, read by
+A run on RAW photographs names the camera's sensor characterisation: `[camera] sensor_characterization` is the path of the
+body's `vgio/sensor_characterization` record (VisualGeometryToolkitCore's `SensorCharacterization`, read by
 VisualGeometryToolkitIO); a named path that does not exist is refused. `[camera] sensor_model`
 ([`sensor_model_mode`](@ref RadiometricCamera.sensor_model_mode)) decides its use: `"auto"` (the default) uses a record present
 and reads the file's black without one; `"on"` requires one; `"off"` does not use a record present, with one loud warning

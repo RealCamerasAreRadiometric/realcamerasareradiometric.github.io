@@ -33,7 +33,7 @@
         "INPUT_PROVENANCE" => "a provenance text of calibrate.jl's records",
         "USAGE" => "a script's usage text",
         # ---- vocabulary: the spellings of legal or retired values ----
-        "NO_SENSOR_CHARACTERISATION" => "the retired value's spelling, refused by name",
+        "NO_SENSOR_CHARACTERIZATION" => "the retired value's spelling, refused by name",
         "SENSOR_LENS_COVERAGE" => "the spelling of `camera.lens_coverage`'s whole-sensor value (the TOML states it)",
         "RETIRED_IMAGE_CIRCLE_INPUTS" => "the retired input's path, refused by name",
         "BOUNDARY_ORDERS" => "the legal values of `grid.boundary_order` / `vignetting.boundary_order` (the TOML picks one)",

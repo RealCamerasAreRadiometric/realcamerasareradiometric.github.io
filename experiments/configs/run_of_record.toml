@@ -15,7 +15,7 @@
 # The SUPPLEMENT group's timing (configs/supplement/timing.toml) is launched by hand until it has a stage of the graph (REPRODUCE.md,
 # "Running on Slurm"; a known limitation); the STUDIES (configs/studies/) never run here.
 # Not a paper result: golden (the package's gate), convergence (its stage `panels` makes fig:convergence-rms from the refinements
-# of record: named when wanted), chrome_index_grid (a measurement), sensor_characterisation (its record is an input of record),
+# of record: named when wanted), chrome_index_grid (a measurement), sensor_characterization (its record is an input of record),
 # paper_pdf (after accept_results).
 stages = [
     "setup", "image_regions",

@@ -50,7 +50,7 @@
         s = detect_settings(cfg, path)
         @test s.T === Float32 && s.window.derivative === :gaussian2d && s.sfop.noise_sigma == 2.0
         @test s.sfop.polarity === :light && !haskey(s.window, :polarity)          # the backlit dots: SFOP's gate on the seeds, once
-        @test s.sensor_characterisation == ""                                # decoded photographs: no sensor model (the photo kind decides)
+        @test s.sensor_characterization == ""                                # decoded photographs: no sensor model (the photo kind decides)
         # the 17 photographs DSC01289 … DSC01305, each run or excluded
         @test sort([s.photographs; collect(keys(s.excluded))]) == ["DSC0$(n).JPG" for n in 1289:1305]
     end
@@ -75,8 +75,8 @@
         @test refused(c -> c["detect"]["device"] = "gpu") === nothing       # the GPU (the configs of record's)
         e = refused(c -> c["detect"]["device"] = "cuda");                    @test e isa ArgumentError && occursin("renamed \"gpu\"", e.msg)
         e = refused(c -> c["detect"]["photos"] = "target");                  @test e isa ArgumentError && occursin("target", e.msg)
-        e = refused(c -> c["detect"]["sensor_characterisation"] = "sensor/fx3.json"); @test e isa ArgumentError && occursin("input of stage detect", e.msg)   # an input id, or empty
-        e = refused(c -> c["detect"]["sensor_characterisation"] = "none"); @test e isa ArgumentError && occursin("retired", e.msg)   # RC 0.11.2: "none" retired
+        e = refused(c -> c["detect"]["sensor_characterization"] = "sensor/fx3.json"); @test e isa ArgumentError && occursin("input of stage detect", e.msg)   # an input id, or empty
+        e = refused(c -> c["detect"]["sensor_characterization"] = "none"); @test e isa ArgumentError && occursin("retired", e.msg)   # RC 0.11.2: "none" retired
         e = refused(c -> push!(c["detect"]["photographs"], "DSC01302.JPG"));  @test e isa ArgumentError && occursin("DSC01302", e.msg)
         e = refused(c -> c["detect"]["integration_sigma"] = Dict("DSC01289.JPG" => 4.0)); @test e isa ArgumentError && occursin("integration_sigma", e.msg)   # retired: SFOP's scale
         e = refused(c -> c["inputs"]["photos"]["tier"] = "rc_raw");          @test e isa ArgumentError && occursin("rc_raw", e.msg)
@@ -204,11 +204,11 @@
         # detect on the prepare set: image raw_green exactly for a photosites set (its RAW photographs linked with their EXIF, nothing
         # decoded: detect reads the mosaics); a raw_green detect names a sensor characterisation, an input of stage detect (the zoom
         # set's record of record), and refuses noise_sigma by name (SFOP reads the sensor model's noise law)
-        fx3 = TOML.parsefile(projectdir("configs", "experiments", "chrome_evaluation_fx3_zoom48_f10.toml"))["inputs"]["fx3_sensor_characterisation"]
-        withdetect(img; sc = img == "raw_green" ? "fx3_sensor_characterisation" : "", noise = img != "raw_green") = c -> begin
-            c["inputs"]["fx3_sensor_characterisation"] = deepcopy(fx3)
+        fx3 = TOML.parsefile(projectdir("configs", "experiments", "chrome_evaluation_fx3_zoom48_f10.toml"))["inputs"]["fx3_sensor_characterization"]
+        withdetect(img; sc = img == "raw_green" ? "fx3_sensor_characterization" : "", noise = img != "raw_green") = c -> begin
+            c["inputs"]["fx3_sensor_characterization"] = deepcopy(fx3)
             d = merge(deepcopy(TOML.parsefile(path)["detect"]), Dict("photos" => "thorlabs", "image" => img, "photographs" => ["DSC05464.ARW"],
-                                                                    "excluded" => Dict(), "sensor_characterisation" => sc))
+                                                                    "excluded" => Dict(), "sensor_characterization" => sc))
             noise || delete!(d, "noise_sigma")
             c["detect"] = d
             img == "raw_green" && (c["prepare"]["thorlabs"] = Dict{String, Any}("raw" => c["prepare"]["thorlabs"]["raw"], "mode" => "photosites"))
@@ -1049,13 +1049,13 @@ end
             # with their EXIF (photosites), detect reads each mosaic under the FX3's sensor model, no noise_sigma; no decoded luma
             # photographs (the rc_baselines chrome/*.photos copies)
             d = c["detect"]
-            @test d["image"] == "raw_green" && d["sensor_characterisation"] == "fx3_sensor_characterisation" &&
+            @test d["image"] == "raw_green" && d["sensor_characterization"] == "fx3_sensor_characterization" &&
                   get(get(c, "prepare", Dict()), d["photos"], Dict())["mode"] == "photosites" && !haskey(d, "noise_sigma") &&
                   all(endswith(".ARW"), d["photographs"]) &&
                   c["inputs"][c["prepare"][d["photos"]]["raw"]]["tier"] == "rc_raw_photos" && !haskey(c["inputs"], "photos")
             # the FX3's characterisation of record in every set (the refinements' too): the all-darks record (vgio v2.0), never the
             # single-Dark exifband one it supersedes
-            sc = c["inputs"]["fx3_sensor_characterisation"]
+            sc = c["inputs"]["fx3_sensor_characterization"]
             @test sc["path"] == "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json" &&
                   sc["sha256"] == "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737" && occursin("v2.0", sc["provenance"])
         end

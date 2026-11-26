@@ -25,7 +25,7 @@ records as the run's inputs. `io.init` is a model spec, `lens:<path>` or `grid:<
 the options): a new string option has to be declared one or the other.
 """
 const PIPELINE_PATH_KEYS = ("io.images", "io.init", "io.render_state", "io.raw", "frontend.session", "frontend.schoeps",
-                            "frontend.texture", "frontend.texture_features", "camera.lens_coverage", "camera.sensor_characterisation", "edge.sdf",
+                            "frontend.texture", "frontend.texture_features", "camera.lens_coverage", "camera.sensor_characterization", "edge.sdf",
                             "resume.state", "selfcheck.poses")
 """
     names_input_path(key, value) -> Bool
@@ -235,9 +235,9 @@ end
 function _check_options(opts::PipelineOptions)
     isempty(opts.camera.lens_coverage) && throw(ArgumentError("`camera.lens_coverage` = \"\": state it — \"sensor\" (the lens lights the whole sensor) " *
                                                               "or the path of the capture set's measured image region (rc/image_region/v1.0)"))
-    opts.camera.sensor_characterisation == NO_SENSOR_CHARACTERISATION &&
-        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired: a run that does not use a sensor record present " *
-                            "states `camera.sensor_model = \"off\"`; a run that names none leaves `camera.sensor_characterisation` empty"))
+    opts.camera.sensor_characterization == NO_SENSOR_CHARACTERIZATION &&
+        throw(ArgumentError("`camera.sensor_characterization = \"none\"` is retired: a run that does not use a sensor record present " *
+                            "states `camera.sensor_model = \"off\"`; a run that names none leaves `camera.sensor_characterization` empty"))
     sensor_model_mode(opts.camera.sensor_model)                 # one of SENSOR_MODEL_TAGS
     "grid" in opts.fixed && throw(ArgumentError("\"grid\" in `fixed` is renamed \"camera\" (the geometric camera's own parameters, a grid's or a parametric camera's)"))
     "edge" in opts.fixed && throw(ArgumentError("\"edge\" in `fixed` is refused: the printed edge is never a parameter (its δ and σ_print are held at " *

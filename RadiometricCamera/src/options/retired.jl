@@ -29,7 +29,9 @@ const RETIRED_KEYS = (
     ("edge", "free")     => "the printed edge is never a parameter (its δ and σ_print are held at `edge.ink_spread_mm` and " *
                             "`edge.print_sigma_mm`); delete the key",
     ("refine", "weighting") => "weighting follows the camera's sensor model: give a characterisation with a gain to weight " *
-                            "(`camera.sensor_characterisation`; no flag); delete the key",
+                            "(`camera.sensor_characterization`; no flag); delete the key",
+    ("camera", "sensor_characteris" * "ation") => "renamed `camera.sensor_characterization` (American in identifiers, owner decision 11; " *
+                            "the value, the record's location, as it was)",
     ("camera", "image_circle_min_hole_area_px") => "the image circle is measured on the rim's log-polar profiles (VisualGeometryToolkitFeatures' " *
                             "`detect_image_circle`), with no dark-region hull and no hole to drop; delete the key",
     ("camera", "image_circle_frames") => "the image region is a step of its own, per capture set: its record " *

@@ -137,7 +137,7 @@ function _run_parameters(opts, meta, s, lens0, gfin, rcam, surf, be1, moved_m, r
         inplane_print_error = _inplane_modelled(opts, surf) ? (; free = _surface_free(opts, :inplane), start = collect(Float64, meta.inplane0)) : nothing,
         focus_distance = isfinite(fm) ? fm : nothing, focus_support_nodes = length(fv),   # 1/mean t̂ over the support nodes (Inf: at infinity)
         bearing_error = isempty(meta.be0) ? nothing : (; init_median = _med(meta.be0), init_p90 = _q90(meta.be0), refined_median = _med(be1), refined_p90 = _q90(be1)),
-        sensor_characterisation = opts.camera.sensor_characterisation, sensor_models = sensor_record(meta.names, s.sensor_models),
+        sensor_characterization = opts.camera.sensor_characterization, sensor_models = sensor_record(meta.names, s.sensor_models),
         sensor_model = hasproperty(meta, :sensor_model) ? meta.sensor_model : nothing,   # mode, used, the record present (`sensor_model_record`): "off" + present = a record not used
         camera_moved = moved_m, iterations = length(trace), seconds = round(costs.seconds),
         stopped = res === nothing ? "no LM iteration" : string(res.rule),

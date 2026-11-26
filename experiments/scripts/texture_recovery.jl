@@ -165,7 +165,7 @@ refine(fold::Integer) = produce(texture_product(fold); product_records(DRIVER, C
     # the camera held fixed is the calibration's COMPLETE camera (its observation model and render settings): the sheet's photographs
     # are read through RadiometricCamera's entry point under the camera's own sensor record, located by the case's characterisation input
     ctx = sheet_scene(RC.calibrated_camera(st), st.target, sheet, joinpath(sheet_dir(), "texture.png"), images, poses, W, H;
-                      characterisation = case_characterisation(REFINEMENT, CASE))
+                      characterization = case_characterization(REFINEMENT, CASE))
     circle = image_circle_of(st.camera)
     say(circle === nothing ? "image circle: none (the lens lights the whole sensor)" :
         @sprintf("image circle: the refinement's camera's lens coverage — centre (%.1f, %.1f), semi-axes %.1f / %.1f px", circle.center[1], circle.center[2], circle.a, circle.b))

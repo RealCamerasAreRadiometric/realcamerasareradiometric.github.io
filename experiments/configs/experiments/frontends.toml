@@ -119,46 +119,46 @@ path = "geometric_accuracy/data/target/siemens_1m/board"
 stage = "init"
 provenance = "the 1 m Siemens-star board record: the stars' design positions the index fits read (src/parametric_starts.jl board_points)"
 
-[inputs.fx3_sensor_characterisation]
+[inputs.fx3_sensor_characterization]
 tier = "unpublished"
 path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
 sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"   # sha256sum of the record of record (the B200 server, 2026-11-14), the chrome configs'
 stage = "prepare"
-provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0), the chrome configs' input fx3_sensor_characterisation: each RAW photograph's geometry image is read under its frame's model (its black, its defects missing, saturation censored), as the chrome detect reads its photographs"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation/v2.0), the chrome configs' input fx3_sensor_characterization: each RAW photograph's geometry image is read under its frame's model (its black, its defects missing, saturation censored), as the chrome detect reads its photographs"
 
 # ---- prepare: the cases (sets) and their decodes -------------------------------------------------------------------------------------------------------
 [cases.zoom48_f10_siemens]
 raw = "raw_zoom48_siemens"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = 4.0                        # frontends_history/drivers/paper_fe_chain.sh:35 GAIN=4 (the Tamron f/8 defocus set, the route of the zoom's start)
 lens_coverage = "sensor"         # the lens lights the whole sensor (no housing; the coordinator's classification, job 18294): the cameras bounded by its rectangle
 
 [cases.tamron_la_siemens]
 raw = "raw_tamron_siemens_largeaperture"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = 4.0                        # frontends_history/drivers/paper_fe_chain.sh:35 GAIN=4
 lens_coverage = "sensor"         # the lens lights the whole sensor (no housing; the coordinator's classification, job 18294): the cameras bounded by its rectangle
 
 [cases.central30cm_14mm_siemens]
 raw = "raw_14mm_siemens_central30cm"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # frontends_history/drivers/fe30_all.sh:14 (the 03.11 conversion's --auto-gain)
 lens_coverage = "sensor"         # the lens lights the whole sensor (no housing; the coordinator's classification, job 18294): the cameras bounded by its rectangle
 
 [cases.tamron17_siemens]
 raw = "raw_tamron_siemens_17cm"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # frontends_history/drivers/tamron17_fe.sh:10 (fe_si7.sh without GAIN: --auto-gain, fe_si7.sh:12)
 lens_coverage = "sensor"         # the lens lights the whole sensor (no housing; the coordinator's classification, job 18294): the cameras bounded by its rectangle
 
 [cases.texcal_14mm_siemens]
 raw = "raw_14mm_texcal_20261109"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = 7.0                        # frontends_history/drivers/tex_fe_14mm_par.sh:24 GAIN=7
 lens_coverage = "sensor"         # the lens lights the whole sensor (no housing; the coordinator's classification, job 18294): the cameras bounded by its rectangle
 
@@ -174,7 +174,7 @@ seed = 1                       # as every region of record
 [cases.fisheye30cm_siemens]
 raw = "raw_fisheye_siemens_30cm"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # as the fisheye Siemens set of 2026-10-27 at the same f/32 (fe_si7.sh's --auto-gain, fe_si7.sh:12)
 lens_coverage = "image_region:fx3_fisheye_siemens_30cm"   # the fisheye's image circle lies inside the sensor: the set's measured region
 
@@ -196,21 +196,21 @@ seed = 1                       # as above
 [cases.vig14mm_f4_siemens]
 raw = "raw_14mm_siemens_20261028"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # the decode's 99.99th-percentile rule (decode_raw): the frozen 28.10 runs record no gain of their sRGB copies
 lens_coverage = "image_region:fx3_14mm_f4_20261028"   # as radiometric_refinement_vignetting.toml states the set's
 
 [cases.vigfisheye_f4_siemens]
 raw = "raw_fisheye_siemens_20261028"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # the decode's 99.99th-percentile rule (decode_raw): the frozen 28.10 runs record no gain of their sRGB copies
 lens_coverage = "image_region:fx3_fisheye_siemens_20261028"   # as radiometric_refinement_vignetting.toml states the set's
 
 [cases.vigtamron_f28_siemens]
 raw = "raw_tamron_siemens_20261028"
 image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
-sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+sensor_characterization = "fx3_sensor_characterization"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # the decode's 99.99th-percentile rule (decode_raw): the frozen 28.10 runs record no gain of their sRGB copies
 lens_coverage = "sensor"   # as radiometric_refinement_vignetting.toml states the set's
 

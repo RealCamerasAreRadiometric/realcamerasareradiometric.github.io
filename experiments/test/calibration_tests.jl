@@ -55,12 +55,12 @@
                                        "frontend.texture" => "geometric_accuracy/data/target/siemens_1m/board/texture.png",
                                        "frontend.texture_features" => "geometric_accuracy/data/target/siemens_1m/board/texture_features.bin"]   # edge.sdf: run:siemens_1m_distance_map, a [runs] file (no input under data_root())
         @test table_runs(cfg["pipeline"]) == ["siemens_1m_distance_map"] && cfg["pipeline"]["edge"]["sdf"] == "run:siemens_1m_distance_map"
-        # an empty `camera.sensor_characterisation` names none: no input path (RadiometricCamera's `names_input_path`)
+        # an empty `camera.sensor_characterization` names none: no input path (RadiometricCamera's `names_input_path`)
         cfg, _ = load_calibration_config(calibration_config("siemens_coarse_full"))
-        c2 = deepcopy(cfg); get!(c2["pipeline"], "camera", Dict{String, Any}())["sensor_characterisation"] = ""
+        c2 = deepcopy(cfg); get!(c2["pipeline"], "camera", Dict{String, Any}())["sensor_characterization"] = ""
         @test pipeline_inputs(c2) == pipeline_inputs(cfg)
-        c2["pipeline"]["camera"]["sensor_characterisation"] = "sensor/fx3.json"
-        @test ("camera.sensor_characterisation" => "sensor/fx3.json") in pipeline_inputs(c2)
+        c2["pipeline"]["camera"]["sensor_characterization"] = "sensor/fx3.json"
+        @test ("camera.sensor_characterization" => "sensor/fx3.json") in pipeline_inputs(c2)
     end
 
     @testset "a config of record refuses what is not its own" begin

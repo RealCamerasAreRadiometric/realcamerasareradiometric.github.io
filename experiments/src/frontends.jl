@@ -31,7 +31,7 @@ const FRONTENDS_TABLES = ("experiment", "inputs", "image_regions", "cases", "sch
 image, owner 2026-11-16; no default), the sensor characterisation each frame is read under (an input of stage prepare, the chrome
 detect's), the decode's gain (a number, or \"auto\": the tool images' exposure) and the set's lens coverage (`lens_coverage`:
 \"sensor\" or \"image_region:<name>\", src/image_region.jl), which bounds the set's cameras (the Schöps import's and the fits')."""
-const FRONTEND_CASE_KEYS = ("raw", "image", "sensor_characterisation", "gain", "lens_coverage")
+const FRONTEND_CASE_KEYS = ("raw", "image", "sensor_characterization", "gain", "lens_coverage")
 """The keys of a `[schoeps.<run>]`: the decoded set (`images`, a case), the pattern and board inputs (stage detect), the container
 image (an input of stage detect, pinned by its sha256), the tool's arguments."""
 const FRONTEND_SCHOEPS_KEYS = ("images", "pattern", "board", "image", "args")
@@ -70,7 +70,7 @@ function load_frontends_config(path::AbstractString)
         input_of(t["raw"], "prepare", "$path [cases.$s] raw")
         RadiometricCamera.check_geometry_image(t, "$path [cases.$s]") == "raw_green" ||
             throw(ArgumentError("$path [cases.$s] image: the front ends decode RAW photographs, image = \"raw_green\" (\"luma\" is a decoded image's)"))
-        input_of(t["sensor_characterisation"], "prepare", "$path [cases.$s] sensor_characterisation")
+        input_of(t["sensor_characterization"], "prepare", "$path [cases.$s] sensor_characterization")
         t["gain"] == "auto" || t["gain"] isa Real && t["gain"] > 0 ||
             throw(ArgumentError("$path [cases.$s] gain: a positive number, or \"auto\" (decode_raw: the set's 99.99th percentile → 0.9)"))
         check_lens_coverage(c, t["lens_coverage"], "$path [cases.$s]")
@@ -158,7 +158,7 @@ function run_frontend_decode(cfg::AbstractDict, set::AbstractString; driver::Abs
         src = selected_raw_dir(cfg, t["raw"], dir)
         t0 = time()
         linear = decode_raw(src, dir, set; gain = t["gain"] == "auto" ? "auto" : Float64(t["gain"]), mode = t["image"], srgb = false,
-                            characterisation = config_input(cfg, t["sensor_characterisation"]))
+                            characterization = config_input(cfg, t["sensor_characterization"]))
         t1 = time()
         n = write_tool_images(linear, joinpath(dir, "$(set)_tool"))
         @printf("decode %s: %d photographs, load_raw %.1f s, tool images %.1f s (%d threads)\n", set, n, t1 - t0, time() - t1, Threads.nthreads())

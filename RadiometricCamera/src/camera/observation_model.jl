@@ -15,7 +15,7 @@ abstract type SensorStatement end
 """
     SensorRecord(sha256)
 
-The camera was calibrated on RAW photographs linearised under the sensor characterisation (a `vgio/sensor_characterisation` record)
+The camera was calibrated on RAW photographs linearised under the sensor characterisation (a `vgio/sensor_characterization` record)
 whose file's sha256 is `sha256` (lower-case hex, Core's `sha256_hex`): its black (a dark per exposure, or the measured channel black),
 its noise law and its defects. A prediction of the camera reads photographs under exactly that record; any other file is refused.
 """
@@ -132,14 +132,14 @@ _record_line(r::SensorRecord) = "the camera's sensor record (sha256 $(r.sha256))
 """
     sensor_statement(spec) -> SensorRecord
 
-The sensor record of `camera.sensor_characterisation = spec`: the [`SensorRecord`](@ref) of the file `spec` (its sha256, Core's
+The sensor record of `camera.sensor_characterization = spec`: the [`SensorRecord`](@ref) of the file `spec` (its sha256, Core's
 `sha256_hex` of the file). A `spec` that names no file, an empty one, and the retired `"none"` are `ArgumentError`s.
 """
 function sensor_statement(spec::AbstractString)
-    spec == NO_SENSOR_CHARACTERISATION &&
-        throw(ArgumentError("`camera.sensor_characterisation = \"none\"` is retired: `camera.sensor_model = \"off\"` does not use a record present"))
-    isempty(spec) && throw(ArgumentError("`camera.sensor_characterisation` names no record"))
-    isfile(spec) || throw(ArgumentError("`camera.sensor_characterisation`: no file $spec (a named record must exist: a typo never turns the sensor model off)"))
+    spec == NO_SENSOR_CHARACTERIZATION &&
+        throw(ArgumentError("`camera.sensor_characterization = \"none\"` is retired: `camera.sensor_model = \"off\"` does not use a record present"))
+    isempty(spec) && throw(ArgumentError("`camera.sensor_characterization` names no record"))
+    isfile(spec) || throw(ArgumentError("`camera.sensor_characterization`: no file $spec (a named record must exist: a typo never turns the sensor model off)"))
     return SensorRecord(open(VgtkCore.sha256_hex, spec))
 end
 """The named record of `spec`: `nothing` (empty), else `(; path, record)` ([`sensor_statement`](@ref)'s refusals)."""
@@ -150,7 +150,7 @@ _named_record(spec::AbstractString) = isempty(spec) ? nothing : (; path = String
 
 The observation model of a calibration reading the photographs `files` (the producer's: the calibration's start), by the files
 (`is_raw_file`), never by a flag: RAW photographs are [`Photosites`](@ref) under the sensor statement `sensor_model` decides
-(`sensor_model_mode`) from the record present — `spec` (`camera.sensor_characterisation`: a named record must exist) or `stated`, the
+(`sensor_model_mode`) from the record present — `spec` (`camera.sensor_characterization`: a named record must exist) or `stated`, the
 sensor statement of the camera the run continues (a start or resumed state's):
 - [`AutoSensorModel`](@ref): the named record's [`SensorRecord`](@ref); none named — [`NoSensorRecord`](@ref) (one info line), or, when
   the camera states a record, refused (its location is needed);
@@ -166,7 +166,7 @@ function observation_model(files::AbstractVector{<:AbstractString}, spec::Abstra
     ch = Symbol(channel)
     if !any(raw)
         rec === nothing ||
-            throw(ArgumentError("`camera.sensor_characterisation` = $(repr(spec)): the photographs are decoded images, which no sensor model describes"))
+            throw(ArgumentError("`camera.sensor_characterization` = $(repr(spec)): the photographs are decoded images, which no sensor model describes"))
         sensor_model isa OnSensorModel &&
             throw(ArgumentError("`camera.sensor_model = \"on\"`: the photographs are decoded images, which no sensor model describes (\"auto\" reads them)"))
         return ObservationModel(NoSensorRecord(), Decoded(linearize), ch)
@@ -182,10 +182,10 @@ _run_sensor(::AutoSensorModel, ::Nothing, ::NoSensorRecord) =
     (@info "sensor model: no sensor characterisation record is named — every RAW photograph is read under the file's black (no noise law, no defects)"; NoSensorRecord())
 _run_sensor(::Union{AutoSensorModel, OnSensorModel}, ::Nothing, r::SensorRecord) =
     throw(ArgumentError("the camera this run continues was calibrated under the sensor record sha256 $(r.sha256): name its location " *
-                        "(`camera.sensor_characterisation`), or state `camera.sensor_model = \"off\"` to read the photographs without it"))
+                        "(`camera.sensor_characterization`), or state `camera.sensor_model = \"off\"` to read the photographs without it"))
 _run_sensor(::OnSensorModel, ::Nothing, ::NoSensorRecord) =
     throw(ArgumentError("`camera.sensor_model = \"on\"`: the run requires a sensor model, and no record is named — name the body's " *
-                        "vgio/sensor_characterisation record in `camera.sensor_characterisation` (or use \"auto\" or \"off\")"))
+                        "vgio/sensor_characterization record in `camera.sensor_characterization` (or use \"auto\" or \"off\")"))
 _run_sensor(::OffSensorModel, rec::NamedTuple, _) = (warn_sensor_model_off(_record_line(rec.path, rec.record)); NoSensorRecord())
 _run_sensor(::OffSensorModel, ::Nothing, r::SensorRecord) = (warn_sensor_model_off(_record_line(r)); NoSensorRecord())
 _run_sensor(::OffSensorModel, ::Nothing, ::NoSensorRecord) = NoSensorRecord()
@@ -203,7 +203,7 @@ function sensor_model_record(mode::SensorModelMode, spec::AbstractString, stated
     return (; mode = mode_name(mode), used = om.sensor isa SensorRecord, present)
 end
 """The location `photo_set` reads the run's photographs with: the named record's path when the run's observation model uses one."""
-_characterisation_path(spec::AbstractString, om::ObservationModel) = om.sensor isa SensorRecord ? String(spec) : nothing
+_characterization_path(spec::AbstractString, om::ObservationModel) = om.sensor isa SensorRecord ? String(spec) : nothing
 
 """
     CalibratedCamera(model, observation, settings)

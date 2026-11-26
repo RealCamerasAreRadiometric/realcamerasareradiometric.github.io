@@ -19,12 +19,12 @@
         return RC.RadiometricCameraModel(lens, focus, 0.0386, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     end
     "A characterisation of the FX3 at `iso` with the channel black `black`, saved through IO at `path`; returns its sha256."
-    function write_characterisation(path; black = (512.3, 512.2, 512.3, 512.2), iso = 100, body = FX3)
+    function write_characterization(path; black = (512.3, 512.2, 512.3, 512.2), iso = 100, body = FX3)
         f = VgtkCore.sensor_fixture(; body, iso, black, gain = 11.33, read_noise = (1.09, 1.10, 1.03, 1.10), source = VgtkCore.SensorSource.measured)
-        VgtkIO.save(path, f.characterisation)
+        VgtkIO.save(path, f.characterization)
         return open(VgtkCore.sha256_hex, path)
     end
-    export RC, VgtkCore, VgtkIO, FX3, small_model, write_characterisation
+    export RC, VgtkCore, VgtkIO, FX3, small_model, write_characterization
 end
 
 @testitem "observation model: its types refuse an inconsistent statement; its record round-trips through IO" setup = [ObservationFixtures] begin
@@ -53,25 +53,25 @@ end
 @testitem "observation model: the entry point refuses another record, another photograph kind, an undescribed frame" setup = [ObservationFixtures] begin
     s = VgtkCore.parse_unit("s")
     mktempdir() do dir
-        a = joinpath(dir, "a.sensor_characterisation.json"); b = joinpath(dir, "b.sensor_characterisation.json")
-        sha_a = write_characterisation(a); sha_b = write_characterisation(b; black = (512.5, 512.4, 512.5, 512.4))
+        a = joinpath(dir, "a.sensor_characterization.json"); b = joinpath(dir, "b.sensor_characterization.json")
+        sha_a = write_characterization(a); sha_b = write_characterization(b; black = (512.5, 512.4, 512.5, 512.4))
         @test sha_a != sha_b && RC.sensor_statement(a) == RC.SensorRecord(sha_a)
         settings = RC.RenderSettings()
         raw_cam = RC.CalibratedCamera(small_model(), RC.ObservationModel(RC.SensorRecord(sha_a), RC.Photosites(), :G), settings)
         # a prediction under another record: refused, naming both
-        err = try RC.photo_set(raw_cam, ["DSC1.ARW"]; characterisation = b); nothing catch e; e end
+        err = try RC.photo_set(raw_cam, ["DSC1.ARW"]; characterization = b); nothing catch e; e end
         @test err isa ArgumentError && occursin(sha_a, err.msg) && occursin(sha_b, err.msg) && occursin(b, err.msg)
         @test_throws "give its location" RC.photo_set(raw_cam, ["DSC1.ARW"])          # the record's photographs need its location
-        @test_throws "calibrated on RAW photographs (their photosites): it predicts those only, not a.png" RC.photo_set(raw_cam, ["a.png"]; characterisation = a)
+        @test_throws "calibrated on RAW photographs (their photosites): it predicts those only, not a.png" RC.photo_set(raw_cam, ["a.png"]; characterization = a)
         # a camera calibrated without a record: a characterisation is refused; a decoded camera refuses RAW photographs
         none_cam = RC.CalibratedCamera(small_model(), RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), :G), settings)
-        @test_throws "calibrated without a sensor characterisation" RC.photo_set(none_cam, ["DSC1.ARW"]; characterisation = a)
+        @test_throws "calibrated without a sensor characterisation" RC.photo_set(none_cam, ["DSC1.ARW"]; characterization = a)
         dec_cam = RC.CalibratedCamera(small_model(), RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB), settings)
         @test_throws "calibrated on decoded images: it predicts those only, not DSC1.ARW" RC.photo_set(dec_cam, ["a.png", "DSC1.ARW"])
-        @test_throws "calibrated without a sensor characterisation" RC.photo_set(dec_cam, ["a.png"]; characterisation = a)
+        @test_throws "calibrated without a sensor characterisation" RC.photo_set(dec_cam, ["a.png"]; characterization = a)
         @test RC.photo_set(dec_cam, ["a.png", "b.png"]).models == [VgtkCore.SensorModel(), VgtkCore.SensorModel()]
         # a frame the record does not describe — an ISO without an entry (UnmatchedISO), another body (OtherBody) — is refused by name
-        c = VgtkIO.load(VgtkCore.SensorCharacterisation, a)
+        c = VgtkIO.load(VgtkCore.SensorCharacterization, a)
         at(iso; body = FX3) = VgtkCore.sensor_fixture(; body, iso, black = (512.0, 512.0, 512.0, 512.0)).capture
         @test VgtkCore.component_sources(VgtkCore.sensor_model(c, at(100), 1)).reason == VgtkCore.Matched
         RC._require_described(sha_a, ["DSC1.ARW"], [VgtkCore.sensor_model(c, at(100), 1)])            # described: accepted
@@ -143,32 +143,32 @@ end
             p = joinpath(dir, "frame_1" * lowercase(last(splitext(f)))); symlink(f, p)
             capture = Base.invokelatest(VgtkFeatures.extract_capture_settings, Dict(1 => Base.invokelatest(VgtkFeatures.load_raw_metadata, p)))
             iso = Int(round(capture.frames[1].exposure.iso))
-            rec = joinpath(dir, "own.json"); sha = write_characterisation(rec; iso, body = capture.body)
-            other = joinpath(dir, "other_iso.json"); write_characterisation(other; iso = iso + 100, body = capture.body)
+            rec = joinpath(dir, "own.json"); sha = write_characterization(rec; iso, body = capture.body)
+            other = joinpath(dir, "other_iso.json"); write_characterization(other; iso = iso + 100, body = capture.body)
             om = RC.ObservationModel(RC.SensorRecord(sha), RC.Photosites(), :G)
-            set = Base.invokelatest(RC.photo_set, om, [p]; characterisation = rec)
-            c = VgtkIO.load(VgtkCore.SensorCharacterisation, rec)
+            set = Base.invokelatest(RC.photo_set, om, [p]; characterization = rec)
+            c = VgtkIO.load(VgtkCore.SensorCharacterization, rec)
             @test set.models[1] == VgtkCore.sensor_model(c, capture, 1) && VgtkCore.component_sources(set.models[1]).reason == VgtkCore.Matched
             mosaic = Base.invokelatest(VgtkFeatures.load_raw_mosaic, p)
             vals, mask = Base.invokelatest(RC.observe, set, 1, trues(size(mosaic)))
             @test vals == VgtkCore.linearview(mosaic; sensor_model = set.models[1]) && mask == RC.photosite_mask(mosaic, :G)
             # the same photograph under a record of another ISO: refused (sha first — another file — then the frame it does not describe)
-            @test_throws "given sha256" Base.invokelatest(RC.photo_set, om, [p]; characterisation = other)
+            @test_throws "given sha256" Base.invokelatest(RC.photo_set, om, [p]; characterization = other)
             om2 = RC.ObservationModel(RC.SensorRecord(open(VgtkCore.sha256_hex, other)), RC.Photosites(), :G)
-            @test_throws "(UnmatchedISO)" Base.invokelatest(RC.photo_set, om2, [p]; characterisation = other)
+            @test_throws "(UnmatchedISO)" Base.invokelatest(RC.photo_set, om2, [p]; characterization = other)
         end
     end
 end
 
 # `camera.sensor_model` (RC 0.11.2, owner 2026-11-15): "auto" (the default) uses a record present and runs without one; "on" requires
-# one; "off" does not use a record present, with the loud once-per-run warning. Present = `camera.sensor_characterisation` names a
+# one; "off" does not use a record present, with the loud once-per-run warning. Present = `camera.sensor_characterization` names a
 # record on disk, or the camera the run continues or predicts states one. A named path that does not exist, the retired "none", any
 # other value, and every other mismatch (another sha) stay refused.
 @testitem "observation model: sensor_model auto / on / off, the six cells and the guards" setup = [ObservationFixtures] begin
     using Test
     mktempdir() do dir
-        a = joinpath(dir, "a.sensor_characterisation.json"); b = joinpath(dir, "b.sensor_characterisation.json")
-        sha_a = write_characterisation(a); sha_b = write_characterisation(b; black = (512.5, 512.4, 512.5, 512.4))
+        a = joinpath(dir, "a.sensor_characterization.json"); b = joinpath(dir, "b.sensor_characterization.json")
+        sha_a = write_characterization(a); sha_b = write_characterization(b; black = (512.5, 512.4, 512.5, 512.4))
         A = RC.SensorRecord(sha_a); raw = ["DSC1.ARW", "DSC2.ARW"]
         auto, on, off = RC.AutoSensorModel(), RC.OnSensorModel(), RC.OffSensorModel()
         @test RC.sensor_model_mode.(("auto", "on", "off")) == (auto, on, off) && RC.PipelineOptions().camera.sensor_model == "auto"
@@ -189,7 +189,7 @@ end
         @test_throws "no file" est(auto, joinpath(dir, "typo.json"))
         @test_throws "no file" est(off, joinpath(dir, "typo.json"))
         @test_throws "sensor_model = \"off\"" est(off, "none")
-        @test_throws "sensor_model = \"off\"" RC.pipeline_options(Dict("camera" => Dict("sensor_characterisation" => "none")))
+        @test_throws "sensor_model = \"off\"" RC.pipeline_options(Dict("camera" => Dict("sensor_characterization" => "none")))
         @test_throws "decoded images" RC.observation_model(["a.png"], a; channel = "RGB", sensor_model = off)
         @test_throws "decoded images" RC.observation_model(["a.png"], ""; channel = "RGB", sensor_model = on)
         @test RC.sensor_model_record(off, a, RC.NoSensorRecord(), RC.observation_model(raw, a; sensor_model = off)) ==
@@ -197,18 +197,18 @@ end
         @test RC.sensor_model_record(auto, "", RC.NoSensorRecord(), RC.observation_model(raw, "")) == (; mode = "auto", used = false, present = nothing)
         # PREDICTION: a camera calibrated under record a, and one without a record
         om_a = RC.ObservationModel(A, RC.Photosites(), :G); om_0 = RC.ObservationModel(RC.NoSensorRecord(), RC.Photosites(), :G)
-        @test RC.prediction_observation(auto, om_a, a) == (om_a, (; characterisation = a))              # auto + record: used
-        @test RC.prediction_observation(on, om_a, a) == (om_a, (; characterisation = a))                # on + record: used
-        @test RC.prediction_observation(auto, om_0, nothing) == (om_0, (; characterisation = nothing))  # auto + none: runs
+        @test RC.prediction_observation(auto, om_a, a) == (om_a, (; characterization = a))              # auto + record: used
+        @test RC.prediction_observation(on, om_a, a) == (om_a, (; characterization = a))                # on + record: used
+        @test RC.prediction_observation(auto, om_0, nothing) == (om_0, (; characterization = nothing))  # auto + none: runs
         @test_throws "no sensor model to predict with" RC.prediction_observation(on, om_0, nothing)    # on + none: refused
         @test (@test_logs (:warn, Regex("SENSOR MODEL OFF(.|\\n)*$(sha_a)")) RC.prediction_observation(off, om_a, nothing)) ==
-              (om_0, (; characterisation = nothing))                                                    # off + the camera's record: not used
-        @test (@test_logs (:warn, Regex(sha_a)) RC.prediction_observation(off, om_a, a)) == (om_0, (; characterisation = nothing))
-        @test (@test_logs (:warn, Regex(sha_b)) RC.prediction_observation(off, om_0, b)) == (om_0, (; characterisation = nothing))   # a record on disk, not used
-        @test (@test_logs RC.prediction_observation(off, om_0, nothing)) == (om_0, (; characterisation = nothing))   # off + none
+              (om_0, (; characterization = nothing))                                                    # off + the camera's record: not used
+        @test (@test_logs (:warn, Regex(sha_a)) RC.prediction_observation(off, om_a, a)) == (om_0, (; characterization = nothing))
+        @test (@test_logs (:warn, Regex(sha_b)) RC.prediction_observation(off, om_0, b)) == (om_0, (; characterization = nothing))   # a record on disk, not used
+        @test (@test_logs RC.prediction_observation(off, om_0, nothing)) == (om_0, (; characterization = nothing))   # off + none
         # every other mismatch stays refused: another sha (auto and off), a path that does not exist
         cam_a = RC.CalibratedCamera(small_model(), om_a, RC.RenderSettings())
-        err = try RC.photo_set(cam_a, raw; characterisation = b); nothing catch e; e end
+        err = try RC.photo_set(cam_a, raw; characterization = b); nothing catch e; e end
         @test err isa ArgumentError && occursin(sha_a, err.msg) && occursin(sha_b, err.msg)
         @test_throws sha_b RC.prediction_observation(off, om_a, b)
         @test_throws "no file" RC.prediction_observation(off, om_a, joinpath(dir, "typo.json"))

@@ -497,8 +497,8 @@ mount = "data"
 record = "rc_vig_derived"
 tier = "unpublished"
 required = true
-what = "the Sony ILME-FX3's sensor characterisation of record at ISO 100 (IO's vgio/sensor_characterisation record fx3.sensor_characterisation.gain-exifband-alldarks.json and its 42 dark rasters, band 1…21 dark_offset and dark_variance), the input fx3_sensor_characterisation of the refinements and chrome evaluations"
-provenance = "scripts/sensor_characterisation.jl on the frames of rc_sensor_frames (Core 0.10.3's master dark, photon transfer and defect onsets (MasterDark, PhotonTransfer, defect_onsets since Core 0.14); 2026-11-14); the configs' tier `unpublished` names it (a run key's tier, kept)"
+what = "the Sony ILME-FX3's sensor characterisation of record at ISO 100 (IO's vgio/sensor_characterisation record fx3.sensor_characterisation.gain-exifband-alldarks.json and its 42 dark rasters, band 1…21 dark_offset and dark_variance), the input fx3_sensor_characterization of the refinements and chrome evaluations"
+provenance = "scripts/sensor_characterization.jl on the frames of rc_sensor_frames (Core 0.10.3's master dark, photon transfer and defect onsets (MasterDark, PhotonTransfer, defect_onsets since Core 0.14); 2026-11-14); the configs' tier `unpublished` names it (a run key's tier, kept)"
 
 [artifacts.rc_sensor_frames_20261121]
 kind = "tree"
@@ -510,7 +510,7 @@ mount = "data"
 record = "rc_vig_derived"
 tier = "unpublished"
 required = false
-what = "the sensor campaign of 2026-11-13 (Sony ILME-FX3, ISO 100): the lens-cap dark frames E1_E2, the photon transfer series E4 and the PRNU frames E5 (ARW), the protocol's notes and its MANIFEST.tsv (sha256 and md5 per file): the inputs of configs/experiments/sensor_characterisation.toml (stage sensor_characterisation, not a default stage)"
+what = "the sensor campaign of 2026-11-13 (Sony ILME-FX3, ISO 100): the lens-cap dark frames E1_E2, the photon transfer series E4 and the PRNU frames E5 (ARW), the protocol's notes and its MANIFEST.tsv (sha256 and md5 per file): the inputs of configs/experiments/sensor_characterization.toml (stage sensor_characterization, not a default stage)"
 provenance = "captured on 2026-11-13 by D. Nakath's protocol (the notes beside the sets); the share's folder rc_sensor_characterisation_20261113, every file verified against its MANIFEST.tsv"
 
 [artifacts.rc_container_schoeps_20261121]

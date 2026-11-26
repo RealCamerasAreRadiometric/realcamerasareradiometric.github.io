@@ -32,7 +32,7 @@ function frontend_decode_product(cfg::AbstractDict, set::AbstractString)
     frontend_product("decode", Dict{String, Any}("experiment" => cfg["experiment"],
                                                  "cases" => Dict(set => filter(((k, _),) -> k != "lens_coverage", t)),
                                                  "input" => input_record(cfg["inputs"][t["raw"]]),
-                                                 "sensor_characterisation" => input_record(cfg["inputs"][t["sensor_characterisation"]]),
+                                                 "sensor_characterization" => input_record(cfg["inputs"][t["sensor_characterization"]]),
                                                  "frame_map" => decoded_frame(t["image"]).record);
                      output = joinpath("$(set)_tool", "tool_images.json"))
 end

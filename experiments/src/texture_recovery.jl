@@ -358,13 +358,13 @@ function image_circle_of(camera::RC.RadiometricCameraModel)
 end
 
 """
-    sheet_scene(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterisation = nothing) -> NamedTuple
+    sheet_scene(camera::CalibratedCamera, target, sheet, design_png, images_dir, poses, W, H; characterization = nothing) -> NamedTuple
 
 The photographs in `images_dir` (`photo_file` of each pose's name) are read through RadiometricCamera's ONE entry point under the
-camera's own observation model (`photo_set(camera, files; characterisation)`, `sample_pixels`; owner 2026-11-15: a camera predicts
+camera's own observation model (`photo_set(camera, files; characterization)`, `sample_pixels`; owner 2026-11-15: a camera predicts
 only photographs read as it was calibrated): a camera calibrated on RAW photosites under a sensor record reads the RAW photographs at
 their green photosites on the raw grid under that record — its black (the dark of the exposure), its defects masked —, the
-`characterisation` the record's location (its sha256 checked against the camera's); a camera of decoded images their pixels, the
+`characterization` the record's location (its sha256 checked against the camera's); a camera of decoded images their pixels, the
 green channel. Another record, another kind of photograph, a frame the record does not describe: refused. No flag chooses.
 
 What the page solve shares: the photographs (the `camera` — a `RadiometricCameraModel`, central — at the `poses`, camera → world)
@@ -373,14 +373,14 @@ printed-edge parameters: the calibration board's warping is never evaluated on t
 render settings (the calibration's own, `camera.settings`: the quadrature), the design (`design_png`, the green channel, as a `TW × TH` matrix [x, y]) and its texel size.
 """
 function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::AbstractString, images_dir::AbstractString, poses, W::Integer, H::Integer;
-                     characterisation::Union{Nothing, AbstractString} = nothing)
+                     characterization::Union{Nothing, AbstractString} = nothing)
     isempty(poses) && throw(ArgumentError("sheet_scene: no poses"))
     cc.observation.channel in (:G, :RGB) ||
         throw(ArgumentError("sheet_scene: the page solve observes the green channel; the camera was calibrated on $(cc.observation.channel) alone"))
     camera = cc.model; settings = cc.settings
     𝐨, 𝐮, 𝐯, _ = page_frame(sheet.page_w, sheet.page_h)
     names = [String(p[1]) for p in poses]
-    photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterisation)   # THE entry point, the camera's own model
+    photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterization)   # THE entry point, the camera's own model
     cam_poses = [EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false) for (_, R, t) in poses]   # camera → world
     bd = RC.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
     surf = RC.TargetState(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))

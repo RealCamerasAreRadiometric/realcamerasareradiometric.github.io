@@ -96,10 +96,10 @@ function _detect(dir)
     rows = Tuple[]
     # a raw_green set's photographs are read as their RAW mosaics under each frame's sensor model (`raw_photographs`), detected on
     # Features' bilinear green image on the raw grid; a luma set's are its decoded photographs (no sensor model:
-    # `sensor_characterisation` empty)
-    raw = DETECT.image == "raw_green" ? raw_photographs(CFG, DETECT.photos, names, DETECT.sensor_characterisation) : nothing
+    # `sensor_characterization` empty)
+    raw = DETECT.image == "raw_green" ? raw_photographs(CFG, DETECT.photos, names, DETECT.sensor_characterization) : nothing
     raw === nothing || VgtkIO.write_record(joinpath(dir, "sensor_models.json"),
-        Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.sensor_models, "sensor_characterisation" => DETECT.sensor_characterisation,
+        Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.sensor_models, "sensor_characterization" => DETECT.sensor_characterization,
                           "photos" => RadiometricCamera.sensor_record(names, raw.models)))
     for (i, name) in enumerate(names)
         img = raw === nothing ? detector_image(photos, name) : (VgtkFeatures.load_raw_mosaic(raw.files[i]), raw.models[i])
