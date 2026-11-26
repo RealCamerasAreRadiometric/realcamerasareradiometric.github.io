@@ -1063,12 +1063,12 @@ function start_settings(t::AbstractDict)
 end
 
 """
-    refine_settings(t) -> Dict
+    refinement_settings(t) -> Dict
 
 The settings of the case table `t` only its refinement reads: its [pipeline] table's `REFINE_ONLY_KEYS` (`split_refine_only`;
 everything else keys its start, which the refinement reads by key).
 """
-refine_settings(t::AbstractDict) = Dict{String, Any}("pipeline" => last(RadiometricCamera.split_refine_only(get(t, "pipeline", Dict{String, Any}()))))
+refinement_settings(t::AbstractDict) = Dict{String, Any}("pipeline" => last(RadiometricCamera.split_refine_only(get(t, "pipeline", Dict{String, Any}()))))
 
 """
     prepare_product(cfg, set) -> Product
@@ -1154,15 +1154,15 @@ function start_product(cfg::AbstractDict, name::AbstractString)
 end
 
 """
-    refine_product(cfg, case) -> Product
+    refinement_product(cfg, case) -> Product
 
-The refinement of `[cases.<case>]`: keyed by its refine-only settings (`refine_settings`) and the key of its start step
+The refinement of `[cases.<case>]`: keyed by its refine-only settings (`refinement_settings`) and the key of its start step
 (`start_product`, which holds every other setting, its inputs and its views) — a refine-only change re-keys the refinement alone and
 loads the start. Its output: the refinement's parameters.json.
 """
-function refine_product(cfg::AbstractDict, case::AbstractString)
+function refinement_product(cfg::AbstractDict, case::AbstractString)
     t = cfg["cases"][case]
-    rec = Dict{String,Any}("experiment" => cfg["experiment"], "refine" => Dict(case => refine_settings(t)),
+    rec = Dict{String,Any}("experiment" => cfg["experiment"], "refine" => Dict(case => refinement_settings(t)),
                            "upstream" => Dict{String, Any}("start" => start_product(cfg, case).key))
     return driver_product("refine", rec; output = "parameters.json", experiment = variant_location(cfg, case))
 end
@@ -1391,7 +1391,7 @@ reads, produced on demand (`produce_upstream`): its driver on that case through 
 a GPU's when its [pipeline] runs on one (`runs_on_gpu`).
 """
 function refinement_upstream(rc::AbstractDict, rc_path::AbstractString, case::AbstractString, stage::AbstractString, what::AbstractString)
-    p = stage == "start" ? start_product(rc, case) : stage == "refine" ? refine_product(rc, case) :
+    p = stage == "start" ? start_product(rc, case) : stage == "refine" ? refinement_product(rc, case) :
         throw(ArgumentError("refinement_upstream: stage start or refine, got $(repr(stage))"))
     return produce_upstream(p, what; driver_run(REFINEMENT_DRIVER, rc_path, stage == "start" ? "prepare,start" : "prepare,start,refine"; case)...,
                             gpu = runs_on_gpu(rc["cases"][case]))
@@ -1399,13 +1399,13 @@ end
 """
     run_refine(cfg, case; driver, config_path) -> dir
 
-Stage refine of `[cases.<case>]` on the case's resolved [pipeline] table into its refine product (`refine_product`), produced or
+Stage refine of `[cases.<case>]` on the case's resolved [pipeline] table into its refine product (`refinement_product`), produced or
 loaded: with its start produced, bin/refine.jl --start=<the start product> (bin/refine.jl refuses a start of other start options);
 with neither, ONE bin/refine.jl run (`--start-out=<the start product>`) writes the start record into the start product
 (`start_product`, the same key) and refines from it in the same process — one Julia child, the photographs read once.
 """
 function run_refine(cfg::AbstractDict, case::AbstractString; driver::AbstractString, config_path::AbstractString)
-    s = refine_product(cfg, case); st = start_product(cfg, case)
+    s = refinement_product(cfg, case); st = start_product(cfg, case)
     R = product_records(driver, config_path); source = relpath(config_path, projectdir())
     produce(s; R...) do dir
         require_prepared(cfg, cfg["cases"][case], "case $case"; driver, config_path)
@@ -1435,7 +1435,7 @@ lists it, or none is given) and the case's refinement is to be produced (not pro
 nothing for the case; two children only when the start is produced and the refinement is not.
 """
 start_with_refine(cfg::AbstractDict, case::AbstractString; argv = ARGS) =
-    stage_runs("refine"; argv) && ("--force" in argv || !produced(refine_product(cfg, case)))
+    stage_runs("refine"; argv) && ("--force" in argv || !produced(refinement_product(cfg, case)))
 
 "Whether this run runs stage `name`: `--stage` lists it, or none is given (Eval's `run_stages` rule)."
 stage_runs(name::AbstractString; argv = ARGS) = (s = cli_option(argv, "stage", ""); isempty(s) || name in split(s, ','))

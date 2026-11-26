@@ -101,7 +101,7 @@ end
 detect() = (require_stage_inputs(CFG, "detect"); nothing)
 
 # ---- init: the poses of the sheet's photographs ------------------------------------------------------------------------------
-upstream_product() = refine_product(REFINEMENT, CASE)
+upstream_product() = refinement_product(REFINEMENT, CASE)
 state_path() = joinpath(product_dir(upstream_product()), CFG["upstream"]["state"])
 function require_state()
     isfile(state_path()) && return state_path()

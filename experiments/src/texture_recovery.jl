@@ -750,13 +750,13 @@ function page_rows(ctx, rows_px, camera::RC.RadiometricCameraModel, blocks::Name
 end
 
 """
-    fit_operator(A, rows, w, D; device) -> PenalizedOperator
+    texture_operator(A, rows, w, D; device) -> PenalizedOperator
 
 Core's `PenalizedOperator` of the fit rows `rows` of the page's device rows `A` (`page_footprints`) under their weights `w` (RC's one
 weighting: `Unweighted()`, or 1/σ per fit row) and the penalty operator `D` (a host sparse matrix, uploaded): the rows selected,
 weighted and transposed on `device` (`csr_rows`, `csr_transpose`) — the arrays Core's constructor makes from the host matrix.
 """
-function fit_operator(A::VgtkCore.CSRMatrix, rows::AbstractVector{<:Integer}, w, D::SparseMatrixCSC; device)
+function texture_operator(A::VgtkCore.CSRMatrix, rows::AbstractVector{<:Integer}, w, D::SparseMatrixCSC; device)
     Af = csr_rows(A, rows; device)
     w isa RC.Unweighted || VgtkCore._launch_rows!(_weight_row!, Af.nzval, Af.m, Af.rowptr, Adapt.adapt(device, Vector{Float64}(w)))
     pen = VgtkCore.PenalizedOperator(SparseMatrixCSC{Float64, Int}(undef, 0, size(D, 2)), D; device)       # the penalty's two operators, Core's upload
@@ -822,7 +822,7 @@ page_files(dir::AbstractString, v::AbstractString) = (; texture = joinpath(dir, 
     run_page(ctx, samples, roles, cells, circle, out; settings, variants, device, values, log)
 
 The refine stage: every sampled pixel's row (`samples`, `page_footprints`: on `device`, where they stay) under each blur model of `variants`
-(`variant_camera`), the fit rows' operator built there (`fit_operator`: Core's `PenalizedOperator` on the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
+(`variant_camera`), the fit rows' operator built there (`texture_operator`: Core's `PenalizedOperator` on the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
 every weight of `settings["regularization_weights"]`); the squared errors of every solution on the fit, validation and test rows that
 fall in the scored `cells` (the test also at the centre ρ < `centre_rho` and the edge ρ > `edge_rho` of the image) with the photographs'
 sums of squares. The observed values are `values[k]`: `sample_pixels`' values of photograph `k` at its sampled pixels, read when its mask
@@ -874,7 +874,7 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
         nkept = count(R.kept); nval = count(R.kept .& isval); ntest = count(R.kept .& istest)
         wF = RC._select_rows(rw, F)                                    # the fit rows' weights (RC's one weighting: _whiten)
         bw = RC._whiten(wF, yv[F])                                     # the values whitened as the rows, or as measured
-        t2 = time(); op = fit_operator(R.A, F, wF, D; device)          # the fit rows selected, weighted and transposed on the device
+        t2 = time(); op = texture_operator(R.A, F, wF, D; device)          # the fit rows selected, weighted and transposed on the device
         scale = VgtkCore.penalty_scale(sum(abs2, Array(op.At.nzval)), TW * TH, m̄)   # λ = β · scale, the fit rows' energy in the cost's units
         log(@sprintf("page %s: %d rows kept (fit %d, validation %d, test %d), %d fit nonzeros, m̄ %.4g, λ/β %.4g, rows %s  [%.0f s]", name, nkept, length(F), nval, ntest,
                      length(op.A.nzval), m̄, scale, weighting_record(rw), time() - t1))

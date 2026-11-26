@@ -51,8 +51,8 @@ const STAGES = [
           items = () -> CASES, product = c -> start_product(CFG, c),
           run = c -> start_with_refine(CFG, c) || run_start(CFG, c; R...)),   # with its refinement to run: one child, the refine stage's
     Stage(:refine, "the radiometric refinement of every case from its start (bin/refine.jl --start)";
-          items = () -> CASES, product = c -> refine_product(CFG, c),
-          run = c -> (produced(refine_product(CFG, c)) || refuse_pending(CFG, CFG_PATH); run_refine(CFG, c; R...))),   # [pending] blocks new work only
+          items = () -> CASES, product = c -> refinement_product(CFG, c),
+          run = c -> (produced(refinement_product(CFG, c)) || refuse_pending(CFG, CFG_PATH); run_refine(CFG, c; R...))),   # [pending] blocks new work only
 ]
 
 run_stages("radiometric_refinement", STAGES)

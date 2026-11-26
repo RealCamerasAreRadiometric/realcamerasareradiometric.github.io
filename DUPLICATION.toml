@@ -50,28 +50,14 @@ file = "RadiometricCamera/benchmark/run.jl"
 function = "device_name"
 reason = "the benchmark report's device label (the CPU's model and threads, a device's name), not a computation; removed with the others when Core's device_names entry of the CPU is forward-ported"
 
-# ---- experiments/ (TEMPORARY, each: removed with the owner's ruling on experiments/, ported to RadiometricCamera 0.4.0 or pinned
-# to 0.3.0 and excluded from the checks durably) ----
-
-# ---- input fixtures ----------------------------------------------------------------------------------------------
-
-[[pattern]]
-use = "tex_macro_writer"
-file = "experiments/test/reproduce_tests.jl"
-reason = "input fixtures, not a writer: the tests write a hand-made numbers fragment for the runner to read, as Eval's own tests do (VisualGeometryToolkitEval test/paper_projects_tests.jl:19)"
-
 # ---- the sensor characterisation's producer (owner ruling D12) ---------------------------------------------------------------
 
 [[pattern]]
 use = "sensor_component"
 file = "experiments/src/sensor_characterisation.jl"
-reason = "the record's producer composes Core's measured components (MasterDark, defect_onsets, PhotonTransfer) into a SensorCharacterisation; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: deleted when Core gains a public builder (a characterisation from darks + flats)"
+reason = "the record's producer composes Core's measured components (MasterDark, defect_onsets, PhotonTransfer) into a SensorCharacterisation; coordinator ruling 2026-11-14, scoped to this file, every consumer resolving the record through Core's sensor_model. TEMPORARY: removed when VisualGeometryToolkitCore gains the public builder of a characterisation (from its darks and flats), the producer calling it"
 
 # ---- awaiting their owner (TEMPORARY: each entry goes when its item lands) ----------------------------------------------------
-
-[[similar]]
-functions = ["RadiometricCamera/benchmark/run.jl::option", "experiments/tools/texture_benchmark.jl::bench_option"]
-reason = "TEMPORARY (experiments/ frozen pending the owner's ruling): the texture benchmark's option reader restates the package benchmark's; removed with that ruling, the experiments tool calling the one reader"
 
 [[similar]]
 functions = ["RadiometricCamera/test/unit/fixture_camera.jl::saddle", "VisualGeometryToolkitCore:test/fixtures/height_surface/generate.jl::sad"]

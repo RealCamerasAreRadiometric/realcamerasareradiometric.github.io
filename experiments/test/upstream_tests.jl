@@ -57,7 +57,7 @@
                  ("src/warping_ablation.jl", "require_prepared(plan.rc, t, \"case \$(r.variant)\"; driver, config_path)"),   # ← decode
                  ("src/warping_ablation.jl", "foreach(id -> config_source(plan.rc, id), table_runs(t[\"pipeline\"]))"),       # ← the front ends' runs
                  ("src/warping_ablation.jl", "chrome_upstream(cc, cpath, \"index\""),                     # ← the chrome index
-                 ("src/warping_ablation.jl", "produce_upstream(refine_product(plan.rc, r.variant)"),       # scoring ← refinement (GPU)
+                 ("src/warping_ablation.jl", "produce_upstream(refinement_product(plan.rc, r.variant)"),       # scoring ← refinement (GPU)
                  ("scripts/warping_ablation.jl", "produce_upstream(warping_evaluate_product(CFG, PLAN, k)"),   # record ← scoring
                  ("scripts/warping_ablation.jl", "produce_upstream(rp, \"the warping ablation's record\""),     # figure ← record
                  ("src/image_region.jl", "produce_upstream(image_region_product(cfg, n)"),                  # every lens_coverage consumer

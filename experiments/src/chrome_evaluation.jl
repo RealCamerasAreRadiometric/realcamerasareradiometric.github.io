@@ -1193,15 +1193,15 @@ end
 # rigid motion model, x_cam,k = R_k (X − c) + d — the rotation centre c (target frame), the projection centre's offset from it d (camera
 # frame) and a rotation per photograph: 6 + 3N unknowns in place of 6N free poses, which would absorb most of a model's error over the
 # patch one photograph covers. Per model (round 7, owner rulings of 2026-11-11):
-#   1. the start, `fit_rotation_center`: c, d from every dot's bearing (the model's rays, `load_ray_model`, each ray's foot point
+#   1. the start, `_fit_rotation_center`: c, d from every dot's bearing (the model's rays, `load_ray_model`, each ray's foot point
 #      nearest the model's best single centre c★: the origins along a ray line are a gauge) at the index stage's rotations, the
 #      Sampson-whitened cross-product rows in one least squares (below);
-#   2. the refine: VisualGeometryToolkitEstimation's `refine_camera_and_poses` on its rotation-centre view parametrization
+#   2. the refine: Core's `LevenbergMarquardt` on VisualGeometryToolkitEstimation's `CameraPosesProblem` of its rotation-centre view parametrization
 #      (`RotationCenterViews`: one rotation per photograph, c and d shared), the model's camera held (every parameter `fixed`), on the
 #      BEARING residual (owner ruling 2026-11-12 (B)(ii)): each dot back-projected once through the model, the tangent-plane angle of its
 #      bearing to the predicted bearing of R_k(X − c) + d, whitened into pixels by the back-projection's Jacobian — no forward
 #      projection inside the solve; [evaluate] optimization_strategy (the Triggs-corrected Huber LM, one robustified solve) at
-#      efficiency_constant × the index stage's pooled noise scale (Estimation's `pooled_noise_scale` of the photographs' MAD scales of
+#      efficiency_constant × the index stage's pooled noise scale (Estimation's `PooledScale` of the photographs' MAD scales of
 #      their index pixel residuals, handed down: `ScaleUpstream`; a refine estimates no scale). No scorer, no re-selection: the refine is the stack's.
 # The gauge: none when the
 # photographs turned about two axes; a set turned about one axis is refused by Estimation. The fit is capped at [evaluate] iterations,
@@ -1240,7 +1240,7 @@ const EVALUATE_SUMMARY_COLUMNS = ("model", "variant", "photos", "dots", "coverag
                                   "all_photos", "all_median_px", "all_mean_px", "all_p95_px", "all_rms_px", "c_mm", "d_mm", "retcode")
 """The `ReturnCode` of a summary row's rotation-centre refine (`EVALUATE_SUMMARY_COLUMNS` `retcode`, written by its name): Core's
 `retcode` of the fit; of the held-out variant its two fits' records combined by Core's `worst_retcode` (the more severe)."""
-variant_retcode(fits) = first(VgtkCore.worst_retcode(((VgtkCore.retcode(f.r), VgtkCore.stop_rule(f.r)) for f in fits)...))
+variant_retcode(fits) = first(VgtkCore.worst_retcode(((f.r.retcode, f.r.stop_rule) for f in fits)...))
 """
     upstream_refinements(cfg) -> Dict
 
@@ -1265,8 +1265,8 @@ most this many dots of the grid are unassigned (`_all_dots`); it must stay below
 where a labelling shifted by a whole spacing would leave a whole row or column unassigned, so the labelling stays pinned (2026-11-06:
 the fisheye at ≈ 10 cm, whose central camera of record leaves a few rim dots > 8 px off in most photographs). `optimization_strategy`
 (required): the rotation-centre refine's strategy, an Estimation strategy table read by `optimization_strategy_from_toml` (the
-`refine_camera_and_poses` class) of type `"triggs"` — the Triggs-corrected LM at its loss and efficiency_constant × the index stage's
-pooled noise scale (`pooled_noise_scale`; a refine estimates none); `iterations`: its LM iteration cap. `holdout`, a switch
+`camera_poses_problem` class) of type `"triggs"` — the Triggs-corrected LM at its loss and efficiency_constant × the index stage's
+pooled noise scale (`PooledScale`; a refine estimates none); `iterations`: its LM iteration cap. `holdout`, a switch
 (`"on"` | `"off"`, RadiometricCamera's `read_switch`; `"on"` in the configs of record, the paper's headline): also the held-out
 variant `motion_heldout`, the motion fit on the dots of one parity of the grid nodes, (i + j) even or odd, scoring the other, pooled.
 `bootstrap` `{resamples, seed, alpha}` and `comparisons` (an array of `{model, reference}`, two labels of `models`): the paired
@@ -1327,7 +1327,7 @@ function evaluate_settings(cfg::AbstractDict, path::AbstractString = "the chrome
     holdout = RadiometricCamera.read_switch(t["holdout"], "$where holdout")       # "on" | "off" (RC 0.11.4), parsed once here
     t["optimization_strategy"] isa AbstractDict ||
         throw(ArgumentError("$where optimization_strategy must be a strategy table ({ type = \"triggs\", loss = …, efficiency_constant = … })"))
-    lo = optimization_strategy_from_toml(t["optimization_strategy"]; class = :refine_camera_and_poses, section = "$where.optimization_strategy")
+    lo = optimization_strategy_from_toml(t["optimization_strategy"]; class = :camera_poses_problem, section = "$where.optimization_strategy")
     lo isa Triggs || throw(ArgumentError("$where optimization_strategy: $(t["optimization_strategy"]["type"]) — the rotation-centre refine is the robustified LM, type \"triggs\""))
     b = check_required_keys(t["bootstrap"], ("resamples", "seed", "alpha"), "$where bootstrap")
     bootstrap = (; resamples = Int(_number(b, "resamples", "$where bootstrap"; integer = true)), seed = Int(_number(b, "seed", "$where bootstrap"; integer = true)),
@@ -1409,7 +1409,7 @@ function evaluate_model_specs(cfg::AbstractDict)
         if haskey(m, "input")
             push!(out, (m["label"], "$(m["kind"]):" * config_source(cfg, m["input"])))
         else
-            f = last_model(product_dir(refine_product(rc, m["case"])), m["kind"])
+            f = last_model(product_dir(refinement_product(rc, m["case"])), m["kind"])
             isempty(f) && throw(ArgumentError("model $(m["label"]): case $(m["case"]) has no $(m["kind"]) model yet " *
                                               "(julia --project=experiments experiments/scripts/radiometric_refinement.jl --stage=refine --case=$(m["case"]))"))
             push!(out, (m["label"], "$(m["kind"]):$f"))
@@ -1435,7 +1435,7 @@ function evaluate_product(cfg::AbstractDict)
     cases = [m["case"] for m in t["models"] if haskey(m, "case")]
     if !isempty(cases)
         rc = upstream_refinements(cfg)
-        up["radiometric_refinement"] = Dict{String,Any}(c => refine_product(rc, c).key for c in cases)
+        up["radiometric_refinement"] = Dict{String,Any}(c => refinement_product(rc, c).key for c in cases)
     end
     return driver_product("evaluate", Dict{String,Any}("experiment" => cfg["experiment"], "evaluate" => Dict{String,Any}(t),
                                                        "inputs" => inputs_record(cfg, unique(ids)), "upstream" => up); output = "summary.md")
@@ -1507,12 +1507,21 @@ function grid_symmetries(g::ThorlabsGrid)
 end
 
 """
+    _linear_least_squares(A, y) -> FitResult
+
+The plain least squares of `y ≈ A θ`: Estimation's `ReweightedLeastSquares` with no optimization strategy (its L2 solve) on
+`EstimationProblem(LinearModel, (A, y, prior))`, the prior all ones (the rows already carry their weights).
+"""
+_linear_least_squares(A, y) =
+    solve(EstimationProblem(VgtkEst.LinearModel, (A, y, ones(length(y)))), VgtkEst.ReweightedLeastSquares(; optimization_strategy = nothing))
+
+"""
     canonical_registrations(regs, g) -> Vector
 
 The registrations (`read_registrations`) in one target frame: per photograph the symmetry of the grid whose transformed pose has the
 camera on the +z side and lies nearest the set's one rotation centre, its record points relabelled by it. The candidates' poses
 (R′, t′) are scored by the rotation-centre constraint of the motion model, `|t′ − (d − R′ c)|` (Estimation's `rotation_center_pose`),
-with the centre c and the offset d the least squares of the chosen poses (Estimation's `fit_linear`). The start is a minimal
+with the centre c and the offset d the least squares of the chosen poses (`_linear_least_squares`: Estimation's `ReweightedLeastSquares` on a `LinearModel`). The start is a minimal
 sample tried exhaustively: the first photograph's first candidate (the frame's gauge) with each candidate of each other photograph
 gives a (c, d) — the minimum-norm solution of the pair, whose c is free along their relative rotation axis (two poses fix five of
 the six coordinates) — and the one that puts every photograph's nearest candidate nearest wins; then each photograph takes its
@@ -1544,9 +1553,9 @@ function canonical_registrations(regs, g::ThorlabsGrid)
     # (c, d) of the chosen labellings `sel` (photograph => labelling): the least squares of t′ = d − R′ c, `nothing` when degenerate
     function centre_of(sel)
         rows = reduce(vcat, [hcat(-labelled(k, l)[3], SMatrix{3, 3, Float64}(I)) for (k, l) in sel])
-        fit = VgtkEst.fit_linear(rows, reduce(vcat, [labelled(k, l)[4] for (k, l) in sel]), ones(size(rows, 1)); optimization_strategy = nothing)
-        converged(fit) || return nothing
-        θ = estimate(fit)
+        fit = _linear_least_squares(rows, reduce(vcat, [labelled(k, l)[4] for (k, l) in sel]))
+        successful_retcode(fit) || return nothing
+        θ = fit.u
         return SVector{3, Float64}(θ[1:3]), SVector{3, Float64}(θ[4:6])
     end
     off(cand, (center, offset)) = norm(cand[4] - translation(VgtkEst.rotation_center_pose(cand[3], center, offset)))
@@ -1558,7 +1567,7 @@ function canonical_registrations(regs, g::ThorlabsGrid)
         while length(regs) > 1 && !(choice in seen)                                 # one photograph: its own frame; a cycle ends it
             push!(seen, choice)
             cd = centre_of(collect(enumerate(choice)))
-            cd === nothing && break                                                 # fit_linear's refusal
+            cd === nothing && break                                                 # the least squares' refusal
             choice = nearest(cd)
         end
         return choice
@@ -1671,7 +1680,7 @@ end
 # `RotationCenterBearing` (base/sampson.jl), whose measurement is the dot's bearing with its pixel back-projection Jacobian M (the bearing
 # forms' convention, `EssentialMat`'s M₁, M₂), so G_x = −Bᵀ [P]× M is in pixels and Core's whitening (`whitened_residuals!`,
 # `whitened_jacobian_rows!`) reads the dot's own pixel covariance — the target side is exact. P, the ray at which the weights are taken,
-# is a column held at the index pose, so the whitened rows are linear in θ: ONE least squares (Estimation's `fit_linear` with
+# is a column held at the index pose, so the whitened rows are linear in θ: ONE least squares (`_linear_least_squares`: Estimation's `ReweightedLeastSquares` on a `LinearModel` with
 # `optimization_strategy = nothing`, its L2 solve; the rows are whitened, so its prior is all ones). Normalized on both sides with
 # Core's strategies (`AffineMap(strategy, …)`): the target side by `HartleyNormalization` of the board points' (x, y) — X′ = s (X − X̄),
 # o′ = s o, P′ = s P, θ′ = [s (c − X̄); s d], unnormalized exactly on the way out — and the image side by `DiagonalNormalization` of the
@@ -1704,7 +1713,7 @@ VgtkCore.constraint_keywords(::RotationCenterBearing, xs) = (; X = xs.X, o = xs.
 """
     RotationCenterStartMetadata
 
-The metadata of `fit_rotation_center`'s result: the singular values of its whitened 6-unknown system as solved (both sides
+The metadata of `_fit_rotation_center`'s result: the singular values of its whitened 6-unknown system as solved (both sides
 normalized) and unnormalized (the conditioning report), and the robust contract's record — no scale (`scale` NaN, `ScaleNone`).
 """
 struct RotationCenterStartMetadata
@@ -1729,19 +1738,19 @@ function _rotation_center_rows(R, dots, ids, s, X̄, σ)
 end
 
 """
-    fit_rotation_center(R, dots; image_size) -> FitResult{(; center, offset), RotationCenterStartMetadata}
+    _fit_rotation_center(R, dots; image_size) -> FitResult{(; center, offset), RotationCenterStartMetadata}
 
 The rotation-centre start: the centre c (target frame) and the offset d (camera frame) of photographs turned about one fixed point,
 from the dots of every photograph `k` (`RotationCenterBearing`) — `R[k]` its rotation (the index stage's) and `dots[k]` a
 `PointSet` of its dots' unit bearings with the columns `Σ` (pixel covariance, px²), `X` (target point), `o` (foot point), `M`
 (back-projection Jacobian) and `P` (the ray the weights are taken at; the index pose's). The whitened rows of every dot stacked
 into one 6-unknown linear system, normalized on both sides (`HartleyNormalization` of the board, `DiagonalNormalization` of the
-`image_size` (W, H) image), solved by Estimation's `fit_linear` (`optimization_strategy = nothing`, its L2 solve) and unnormalized.
-Its termination record, iterations, rms (whitened) and support are `fit_linear`'s (`ReturnCode.InitialFailure`, not `converged`, for
+`image_size` (W, H) image), solved by `_linear_least_squares` (Estimation's `ReweightedLeastSquares`, `optimization_strategy = nothing`: its L2 solve) and unnormalized.
+Its termination record, iterations, rms (whitened) and support are that solve's (`ReturnCode.InitialFailure`, not `successful_retcode`, for
 a degenerate system: c, d NaN); the metadata records the
 system's singular values, normalized and not, and no scale (`ScaleNone`).
 """
-function fit_rotation_center(R::AbstractDict{K}, dots::AbstractDict{K}; image_size) where {K}
+function _fit_rotation_center(R::AbstractDict{K}, dots::AbstractDict{K}; image_size) where {K}
     ids = sort(collect(keys(dots)))
     Set(keys(R)) == Set(ids) || throw(ArgumentError("fit_rotation_center: the rotations and the dots name different photographs"))
     B = VgtkCore.AffineMap(VgtkCore.HartleyNormalization(), [SVector(x[1], x[2]) for k in ids for x in dots[k].X])
@@ -1749,25 +1758,25 @@ function fit_rotation_center(R::AbstractDict{K}, dots::AbstractDict{K}; image_si
     σ = VgtkCore.AffineMap(VgtkCore.DiagonalNormalization(image_size)).linear[1, 1]
     A, y = _rotation_center_rows(R, dots, ids, s, X̄, σ)
     A0, _ = _rotation_center_rows(R, dots, ids, 1.0, zero(SVector{3, Float64}), 1.0)
-    fit = VgtkEst.fit_linear(A, y, ones(length(y)); optimization_strategy = nothing)
-    θ = estimate(fit)
+    fit = _linear_least_squares(A, y)
+    θ = fit.u
     est = (; center = SVector{3, Float64}(θ[1:3]) / s + X̄, offset = SVector{3, Float64}(θ[4:6]) / s)
-    return FitResult(est, VgtkCore.retcode(fit), VgtkCore.stop_rule(fit), iterations(fit), VgtkCore.rms(fit), fit.n,
+    return FitResult(est, fit.retcode, fit.stop_rule, fit.stats, fit.rms, fit.n,
                      RotationCenterStartMetadata(svdvals(A), svdvals(A0), NaN, VgtkCore.ScaleNone))
 end
 
 """
     pooled_index_scale(data) -> FitResult
 
-The set's one noise scale for the rotation-centre refine: Estimation's `pooled_noise_scale` of the photographs' index scales
+The set's one noise scale for the rotation-centre refine: Estimation's `PooledScale` of the photographs' index scales
 (the MAD of each one's final pixel residuals), as their registration records hold them (`noise_scale`, `dof`: `register_grid`, `write_registration`; a photograph
-whose record holds no scale — null, NaN — is left out of the pool, as `pooled_noise_scale` leaves out a `ScaleNone` result). An
+whose record holds no scale — null, NaN — is left out of the pool, as `PooledScale` leaves out a `ScaleNone` result). An
 `ArgumentError` when no photograph holds one: an index run before round 7 (re-run the index stage).
 """
 function pooled_index_scale(data)
     # the photographs' registrations as their records hold them: Estimation's pool of the recorded scales and degrees of freedom
-    pooled = VgtkEst.pooled_noise_scale([d.noise_scale for d in data], [d.dof for d in data])
-    converged(pooled) || throw(ArgumentError(
+    pooled = solve(EstimationProblem(NoiseScale, [d.noise_scale for d in data] => [d.dof for d in data]), VgtkEst.PooledScale())
+    successful_retcode(pooled) || throw(ArgumentError(
         "evaluate: no photograph's registration record holds a noise scale — an index run before round 7 (re-run the index stage), " *
         "or an index scorer that originated none: the rotation-centre refine needs the index stage's scale"))
     return pooled
@@ -1777,12 +1786,12 @@ end
 """
     foot_points(rays) -> (c★, feet)
 
-The best single centre of a model's rays `rays` (`(o, d)` pairs): the point closest to all their lines (least squares, Core's `nearest_point`), and each
+The best single centre of a model's rays `rays` (`(o, d)` pairs): the point closest to all their lines (least squares, Core's `NearestPoint`), and each
 ray's point nearest it (the origins along the ray lines are a gauge). Central rays (every o = 0) give c★ = 0 and feet 0.
 """
 function foot_points(rays)
     all(r -> iszero(r[1]), rays) && return zero(SVector{3, Float64}), fill(zero(SVector{3, Float64}), length(rays))
-    c = VgtkCore.nearest_point([o => d for (o, d) in rays])      # Core's least-squares point nearest to the ray lines
+    c = solve(EstimationProblem(VgtkCore.Point, [o => d for (o, d) in rays]), VgtkCore.NearestPoint()).u   # Core's least-squares point nearest to the ray lines
     return c, [o + dot(c - o, d) * d for (o, d) in rays]
 end
 
@@ -1818,8 +1827,8 @@ end
     evaluate_grid_models(index_dir, g, s, out; W, H, models, detections = nothing) -> Vector
 
 Every model of `models` (`(label, spec)` pairs: `evaluate_model_specs`) on the registered dots of `index_dir` (`read_registrations`):
-the rotation-centre refine from the index stage's rotations (see the section comment) — the start `fit_rotation_center`, then
-Estimation's `refine_camera_and_poses` on `RotationCenterViews` with the model's camera held, `s.optimization_strategy` at the index
+the rotation-centre refine from the index stage's rotations (see the section comment) — the start `_fit_rotation_center`, then
+Core's `LevenbergMarquardt` on Estimation's `CameraPosesProblem` of `RotationCenterViews` with the model's camera held, `s.optimization_strategy` at the index
 stage's pooled noise scale (`pooled_index_scale`, `ScaleUpstream`) — reported in px and mrad, overall and in the centre and edge
 regions, with a per-photograph table, the radial profile and the 8 × 6 map. Each model is fitted and scored on its own dots (those
 it unprojects): fitted on those its start projects, scored on every one of a photograph it refines that its estimate projects
@@ -1870,11 +1879,11 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
     centre_ = ρ .< s.centre_rho; edge_ = ρ .> s.edge_rho
     @printf("regions about (%.1f, %.1f) px, rmax %.1f px: centre (ρ < %.1f) %d dots, edge (ρ > %.1f) %d dots\n", s.centre..., s.rmax, s.centre_rho,
             count(centre_), s.edge_rho, count(edge_))
-    # the set's one noise scale: the photographs' index scales (pixel MAD) pooled (Estimation's pooled_noise_scale), handed to every refine
+    # the set's one noise scale: the photographs' index scales (pixel MAD) pooled (Estimation's PooledScale), handed to every refine
     pooled = pooled_index_scale(regs)
     no_scale = [r.name for r in regs if !(isfinite(r.noise_scale) && r.dof > 0)]      # left out of the pool: recorded, never silent
     @printf("the index stage's pooled noise scale: %.4f px over %d photographs (%d dof); %d without a scale left out of the pool%s\n",
-            VgtkCore.noise_scale(pooled), VgtkCore.metadata(pooled).pooled, VgtkCore.metadata(pooled).dof, length(no_scale),
+            VgtkCore.noise_scale(pooled), pooled.metadata.pooled, VgtkCore.dof(pooled), length(no_scale),
             isempty(no_scale) ? "" : ": " * join(no_scale, ", "))
     variant_names = holdout ? ("motion", "motion_heldout") : ("motion",)
     notes = String[]
@@ -1916,9 +1925,9 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
         # the rotations of the model's own photographs (`data`: those with a dot it unprojects) — a model whose camera covers fewer
         # photographs (a fisheye start with a narrower valid domain) is fitted on those, its coverage reporting the rest; the index's
         # rotations of the others are not this model's
-        start = fit_rotation_center(Dict(n => Rd[n] for n in names), dots; image_size = (W, H))
-        converged(start) || throw(ArgumentError("evaluate: $label: the rotation-centre start's system is degenerate (singular values $(VgtkCore.metadata(start).singular_values))"))
-        c0, d0 = estimate(start)
+        start = _fit_rotation_center(Dict(n => Rd[n] for n in names), dots; image_size = (W, H))
+        successful_retcode(start) || throw(ArgumentError("evaluate: $label: the rotation-centre start's system is degenerate (singular values $(start.metadata.singular_values))"))
+        c0, d0 = start.u
         # each photograph's pose at the start: Estimation's rotation-centre view pose, (R, d − R c)
         P0 = [VgtkEst.rotation_center_pose(VgtkCore.Rotations.RotMatrix{3, Float64}(Rd[d.name]), c0, d0) for d in data]
         # the dots the camera projects at the start: the refine's dots (it refuses one that does not); a dot the start does not project
@@ -1935,44 +1944,47 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
         isempty(kept) && throw(ArgumentError("evaluate: $label: the start projects the dots of no photograph"))
         tres = [norm(d.t - (d0 - d.R * c0)) for d in data]          # how far each index pose is from the one rotation centre
         startpx = reduce(vcat, [[norm(VgtkCore.reprojection_error(cm, P0[k], d.X[i], d.xy[i])) for i in findall(live[k])] for (k, d) in enumerate(data)])
-        sm = VgtkCore.metadata(start)
-        startrec = (; method = "fit_rotation_center", c_m = collect(c0), d_m = collect(d0), retcode = VgtkCore.retcode(start), stop_rule = VgtkCore.stop_rule(start),
+        sm = start.metadata
+        startrec = (; method = "fit_rotation_center", c_m = collect(c0), d_m = collect(d0), retcode = start.retcode, stop_rule = start.stop_rule,
                       singular_values = sm.singular_values, singular_values_unnormalized = sm.singular_values_unnormalized,
-                      condition = sm.singular_values[1] / sm.singular_values[end], whitened_rms = VgtkCore.rms(start),
+                      condition = sm.singular_values[1] / sm.singular_values[end], whitened_rms = start.rms,
                       residual_px = (; median = median(startpx), p95 = quantile(startpx, 0.95)), unprojected_at_start)
         @printf("%-28s start: c %s mm, d %s mm (%s, cond %.1f), dots median %.3f p95 %.3f px\n", label, @sprintf("%.1f/%.1f/%.1f", (_MM_PER_M .* c0)...),
                 @sprintf("%.1f/%.1f/%.1f", (_MM_PER_M .* d0)...), startrec.retcode, startrec.condition, startrec.residual_px.median, startrec.residual_px.p95)
         held = VgtkEst.held_parameters(camera)                 # every camera parameter held (Estimation)
-        # one rotation-centre refine on the dots of `mask` (per photograph): Estimation's refine_camera_and_poses on RotationCenterViews
+        # one rotation-centre refine on the dots of `mask` (per photograph): Core's LevenbergMarquardt on Estimation's CameraPosesProblem of RotationCenterViews
         # from the start, the camera held, `s.optimization_strategy` at the pooled index scale
-        function refine_on(mask)
+        function _refine_on(mask)
             sel = [findall(mask[k] .& live[k]) for k in 1:N]
             views = Dict(names[k] => [data[k].X[i] => data[k].xy[i] for i in sel[k]] for k in 1:N if !isempty(sel[k]))
             t0 = time()
-            r = refine_camera_and_poses(camera, RotationCenterViews(Dict(n => Rd[n] for n in keys(views)), c0, d0), views; fixed = held,
-                                        optimization_strategy = s.optimization_strategy, scale = pooled, max_iter = s.iterations)
-            v = estimate(r).views
+            f = CameraPosesProblem(views; fixed = held)
+            st = VgtkCore.default_stops(f)                       # the problem's stops of record, the cap the evaluation's
+            r = solve(RefineProblem(f, (; camera, views = RotationCenterViews(Dict(n => Rd[n] for n in keys(views)), c0, d0))),
+                      LevenbergMarquardt(; optimization_strategy = s.optimization_strategy); scale = pooled,
+                      stops = VgtkCore.LmStops(; max_iter = s.iterations, ftol = st.ftol, xtol = st.xtol))
+            v = r.u.views
             pose(k) = VgtkEst.rotation_center_pose(VgtkCore.Rotations.RotMatrix{3, Float64}(SMatrix{3, 3, Float64, 9}(v.rotations[names[k]])), v.center, v.offset)
             return (; r, pose, c = v.center, d = v.offset, seconds = time() - t0)
         end
-        fitof(f) = (; retcode = VgtkCore.retcode(f.r), stop_rule = VgtkCore.stop_rule(f.r), converged = VgtkCore.converged(f.r), iterations = iterations(f.r),
-                      scale_px = VgtkCore.noise_scale(f.r), scale_source = VgtkCore.scale_source(f.r), loss_width_px = f.r.loss_width,
-                      downweighted = count(<(0.5), VgtkCore.weights(f.r)), dots = f.r.n, rms_px = VgtkCore.rms(f.r), ν = f.r.ν, seconds = f.seconds,
+        fitof(f) = (; retcode = f.r.retcode, stop_rule = f.r.stop_rule, converged = successful_retcode(f.r), iterations = f.r.stats.nsteps,
+                      scale_px = VgtkCore.noise_scale(f.r), scale_source = VgtkCore.scale_source(f.r), loss_width_px = f.r.metadata.loss_width,
+                      downweighted = count(<(0.5), VgtkCore.weights(f.r)), dots = f.r.n, rms_px = f.r.rms, ν = VgtkCore.dof(f.r), seconds = f.seconds,
                       # the dots the refine made no row of (on bearings, every camera: no bearing, or a Jacobian that cannot whiten it),
                       # counted and named: (photograph, index into its refined dots)
-                      n_without_bearing = n_without_bearing(f.r), without_bearing = [collect(p) for p in without_bearing(f.r)])
-        extra(f) = (; c_m = collect(f.c), d_m = collect(f.d), iterations = iterations(f.r), start_translation_residual_mm = _MM_PER_M .* tres[kept],   # as distance_m: the photographs refined
+                      n_without_bearing = f.r.metadata.n_without_bearing, without_bearing = [collect(p) for p in f.r.metadata.without_bearing])
+        extra(f) = (; c_m = collect(f.c), d_m = collect(f.d), iterations = f.r.stats.nsteps, start_translation_residual_mm = _MM_PER_M .* tres[kept],   # as distance_m: the photographs refined
                       distance_m = [norm(f.pose(k)(mean(data[k].X))) for k in kept])      # the photographs refined (not the refused)
         variants = Dict{String, Any}()
         fitrec = Dict{String, Any}()
-        fi = refine_on([trues(length(d.xy)) for d in data])
+        fi = _refine_on([trues(length(d.xy)) for d in data])
         variants["motion"] = (; pose_at = (k, i) -> fi.pose(k), dots = fitted, extra = extra(fi), retcode = variant_retcode((fi,)))
         fitrec["in_sample"] = fitof(fi)
         if holdout
             # held out: each fit on one parity of the grid nodes (`even`), its poses scoring the dots of the other parity
-            fe = refine_on(even); fo = refine_on([.!e for e in even])
+            fe = _refine_on(even); fo = _refine_on([.!e for e in even])
             variants["motion_heldout"] = (; pose_at = (k, i) -> (even[k][i] ? fo : fe).pose(k), dots = scored,
-                                            extra = (; extra(fe)..., iterations = iterations(fe.r) + iterations(fo.r), c_m_odd = collect(fo.c), d_m_odd = collect(fo.d)),
+                                            extra = (; extra(fe)..., iterations = fe.r.stats.nsteps + fo.r.stats.nsteps, c_m_odd = collect(fo.c), d_m_odd = collect(fo.d)),
                                             retcode = variant_retcode((fe, fo)))
             fitrec["held_out"] = (; even = (; fitof(fe)..., dots = sum(sum, even)), odd = (; fitof(fo)..., dots = sum(e -> count(!, e), even)))
         end
@@ -1981,7 +1993,7 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
                                 "dots" => nvalid, "dots_registered" => ndots, "image_size" => [W, H],
                                 "centre" => collect(s.centre), "rmax" => s.rmax, "c_star_m" => collect(cstar),
                                 "ray_offset_mm" => (; median = median(offset_mm), max = maximum(offset_mm)), "start" => startrec,
-                                "pooled_scale" => (; scale_px = VgtkCore.noise_scale(pooled), photos = VgtkCore.metadata(pooled).pooled, dof = VgtkCore.metadata(pooled).dof,
+                                "pooled_scale" => (; scale_px = VgtkCore.noise_scale(pooled), photos = pooled.metadata.pooled, dof = VgtkCore.dof(pooled),
                                                    left_out = length(no_scale), without_scale = no_scale))
         rec["fit"] = merge(Dict{String, Any}("optimization_strategy" => s.optimization_strategy_table, "iterations" => s.iterations,
                                              "holdout" => holdout, "held_camera" => collect(String.(held))), fitrec)
@@ -2077,7 +2089,7 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
                   "(it unprojects them and its estimate projects them; in-sample, its fit saw them too: its start projects them) and their fraction of the registered dots; \"all dots\" scores it on every one of them.")
     push!(md, "", @sprintf("Regions about (%.1f, %.1f) px with rmax %.1f px: centre ρ < %.1f (%d dots), edge ρ > %.1f (%d dots).", s.centre..., s.rmax, s.centre_rho, count(centre_), s.edge_rho, count(edge_)))
     push!(md, "", @sprintf("The rotation-centre refine ran at the index stage's pooled noise scale %.4f px (ScaleUpstream), pooled over %d photographs; %d whose index scorer recorded no scale were left out of the pool%s.",
-                           VgtkCore.noise_scale(pooled), VgtkCore.metadata(pooled).pooled, length(no_scale), isempty(no_scale) ? "" : " (" * join(no_scale, ", ") * ")"))
+                           VgtkCore.noise_scale(pooled), pooled.metadata.pooled, length(no_scale), isempty(no_scale) ? "" : " (" * join(no_scale, ", ") * ")"))
     append!(md, ["", notes...])
     write_tsv(joinpath(out, "summary.tsv"), EVALUATE_SUMMARY_COLUMNS, rows)          # VisualGeometryToolkitEval's table
     write(joinpath(out, "summary.md"), join(md, '\n') * '\n')

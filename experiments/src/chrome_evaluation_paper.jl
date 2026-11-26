@@ -124,14 +124,14 @@ end
     chrome_refinement_retcode(cfg, refinements, label; where) -> String
 
 The LM `ReturnCode` (its name) of the radiometric refinement that chrome set config `cfg`'s model `label` scores: its `[evaluate]
-models` row's `case`, that case's refine product in the refinement config `refinements` (`upstream_refinements(cfg)`, `refine_product`), its
+models` row's `case`, that case's refine product in the refinement config `refinements` (`upstream_refinements(cfg)`, `refinement_product`), its
 parameters.json `retcode` (RadiometricCamera's `rc/run_parameters` record, `load_run_parameters`); `"unfinished"` when the run holds
 no parameters.json. A model with no `case` is an `ArgumentError` (`where` names the set): a table's refined row reads a refinement.
 """
 function chrome_refinement_retcode(cfg::AbstractDict, refinements::AbstractDict, label::AbstractString; where::AbstractString)
     rows = filter(x -> x["label"] == label, cfg["evaluate"]["models"])
     length(rows) == 1 && haskey(only(rows), "case") || throw(ArgumentError("$where: model $label is not one refinement case"))
-    f = joinpath(product_dir(refine_product(refinements, only(rows)["case"])), "parameters.json")
+    f = joinpath(product_dir(refinement_product(refinements, only(rows)["case"])), "parameters.json")
     isfile(f) || return "unfinished"
     return String(RadiometricCamera.load_run_parameters(f).retcode)          # the run's rc/run_parameters record
 end

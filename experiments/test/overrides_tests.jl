@@ -25,8 +25,8 @@
         @test sort(collect(keys(ab["cases"]))) == ["si30_bc5_warped", "si30_bc5_warped__lm.max_iter=3"]
         @test ab["cases"]["si30_bc5_warped"] == rc["cases"]["si30_bc5_warped"]                   # 25 is the case's own: the case itself
         @test ab["cases"]["si30_bc5_warped__lm.max_iter=3"]["pipeline"]["lm"]["max_iter"] == 3
-        @test refine_product(ab, "si30_bc5_warped").key == refine_product(rc, "si30_bc5_warped").key   # the run of record reused
-        @test refine_product(ab, "si30_bc5_warped__lm.max_iter=3").key != refine_product(rc, "si30_bc5_warped").key
+        @test refinement_product(ab, "si30_bc5_warped").key == refinement_product(rc, "si30_bc5_warped").key   # the run of record reused
+        @test refinement_product(ab, "si30_bc5_warped__lm.max_iter=3").key != refinement_product(rc, "si30_bc5_warped").key
         @test ab["experiment"] == rc["experiment"] && ab["inputs"] == rc["inputs"]
         write(f, "[experiment]\nname = \"radiometric_refinement\"\nbase = \"configs/experiments/radiometric_refinement.toml\"\ncases = [\"nope\"]\n[overrides]\n\"lm.max_iter\" = [3]\n")
         @test_throws "no case nope" load_radiometric_refinement_config(f)

@@ -1,7 +1,8 @@
 # =============================================================================
 # src/parametric_starts.jl — the geometric starts of the parametric models on a Siemens-star set, fitted to Schöps's star detections
-# through VisualGeometryToolkitEstimation: one pose per view by `find_absolute_pose` (P3P + RANSAC through the nominal camera), then
-# `refine_camera_and_poses` (the camera's intrinsics and lens coefficients jointly with every pose, the reprojection error in pixels;
+# through VisualGeometryToolkitEstimation: one pose per view by `Ransac` on `AbsolutePoseProblem` (P3P + RANSAC through the nominal
+# camera), then Core's `LevenbergMarquardt` on `CameraPosesProblem` (the camera's intrinsics and lens coefficients jointly with every
+# pose, the reprojection error in pixels;
 # Core's parameter protocol, every parameter but the skew free). The camera is Core's pixel camera, `CameraModel(K; lens)` with the
 # Kannala–Brandt lens `KannalaBrandt(k₁, …, k₄)` or the Double Sphere `Lens(DoubleSphere(ξ, α))`, saved as the camera record
 # (RadiometricCamera's `save_lens`, vgio/cameras) a refinement case starts from (`io.init = "lens:<record>"`).
@@ -17,8 +18,8 @@ using TOML: TOML
 import RadiometricCamera as RC
 import VisualGeometryToolkitCore as VgtkCore
 import VisualGeometryToolkitEstimation as VgtkEstimation
-using VisualGeometryToolkitCore: CameraModel, KannalaBrandt, DoubleSphere, Lens, EuclideanMap, BoundedCamera, Size2, estimate, found_model,
-                                 retcode, stop_rule, iterations, rms
+using VisualGeometryToolkitCore: CameraModel, KannalaBrandt, DoubleSphere, Lens, EuclideanMap, BoundedCamera, Size2, found_model,
+                                 solve, EstimationProblem, RefineProblem, LevenbergMarquardt, LmStops, default_stops
 
 "The lens families a start is fitted in: `kannala_brandt` (four coefficients), `double_sphere` (ξ, α)."
 const START_MODELS = ("kannala_brandt", "double_sphere")
@@ -73,28 +74,28 @@ _projects(camera, pose, X, u) = all(isfinite, VgtkCore.reprojection_error(camera
 """
     pose_starts(camera, views; scoring, rng) -> (poses, kept)
 
-One pose per view from Estimation's `find_absolute_pose` (P3P + RANSAC through `camera`, scored by the table `scoring`, read by
+One pose per view from Estimation's `Ransac` on `AbsolutePoseProblem(camera, cs)` (P3P + RANSAC through `camera`, scored by the table `scoring`, read by
 Estimation's `scoring_from_toml`): those that found a pose (Core's `found_model`), world → camera `EuclideanMap`s, and the indices of
 their views.
 """
 function pose_starts(camera::CameraModel, views; scoring::AbstractDict, rng::AbstractRNG = default_rng())
     sc = VgtkEstimation.scoring_from_toml(scoring; problem = VgtkEstimation.AbsolutePoseProblem, section = "fit.scoring")
-    results = [VgtkEstimation.find_absolute_pose(camera, cs; scoring = sc, rng) for (_, cs) in views]
+    results = [solve(EstimationProblem(VgtkEstimation.AbsolutePoseProblem(camera, cs)), VgtkEstimation.Ransac(; scoring = sc); rng) for (_, cs) in views]
     kept = [k for (k, r) in enumerate(results) if found_model(r)]
-    return [estimate(results[k]) for k in kept], kept
+    return [results[k].u for k in kept], kept
 end
 
 """
-    fit_start(model, views, W, H, f_mm, sensor_mm; scoring, max_iter, rng) -> NamedTuple
+    _fit_start(model, views, W, H, f_mm, sensor_mm; scoring, max_iter, rng) -> NamedTuple
 
 The start of `model` on `views` (`schoeps_views`): from the nominal camera (`nominal_camera`; the Double Sphere from each of
-`DOUBLE_SPHERE_STARTS`, the least final rms kept) the pose starts (`pose_starts`), then Estimation's `refine_camera_and_poses` over the
+`DOUBLE_SPHERE_STARTS`, the least final rms kept) the pose starts (`pose_starts`), then Core's `LevenbergMarquardt` on Estimation's `CameraPosesProblem` over the
 correspondences the start projects (a detection the nominal camera cannot project — past the lens's domain — is left out of the fit
 and counted). Returns `camera` (the refined `CameraModel`), `poses` and `names` (the fitted views), `rms` [px], the refine's
 termination record `retcode` (Core's `ReturnCode`) and `stop_rule`,
 `iterations`, `n_correspondences`, `n_dropped`, the `start` (ξ, α) and the per-view rms `view_rms`.
 """
-function fit_start(model::AbstractString, views, W::Integer, H::Integer, f_mm::Real, sensor_mm::Real;
+function _fit_start(model::AbstractString, views, W::Integer, H::Integer, f_mm::Real, sensor_mm::Real;
                    scoring::AbstractDict, max_iter::Integer, rng::AbstractRNG = default_rng())
     best = nothing
     for (xi, alpha) in (model == "double_sphere" ? DOUBLE_SPHERE_STARTS : ((0.0, 0.0),))
@@ -104,15 +105,18 @@ function fit_start(model::AbstractString, views, W::Integer, H::Integer, f_mm::R
         vs = [[c for c in views[k][2] if _projects(cam0, p, c[1], c[2])] for (k, p) in zip(kept, poses)]
         dropped = sum(length(views[k][2]) for k in kept) - sum(length, vs)
         ok = [length(v) >= 3 for v in vs]
-        r = VgtkEstimation.refine_camera_and_poses(cam0, poses[ok], vs[ok]; optimization_strategy = nothing, max_iter = Int(max_iter))
-        est = estimate(r)
+        f = VgtkEstimation.CameraPosesProblem(vs[ok])
+        d = default_stops(f)                                            # the problem's stops of record, the cap the caller's
+        r = solve(RefineProblem(f, (; camera = cam0, poses = poses[ok])), LevenbergMarquardt(; optimization_strategy = nothing);
+                  stops = LmStops(; max_iter = Int(max_iter), ftol = d.ftol, xtol = d.xtol))
+        est = r.u
         names = [views[k][1] for k in kept[ok]]
         view_rms = [sqrt(sum(sum(abs2, VgtkCore.reprojection_error(est.camera, p, c[1], c[2])) for c in v) / length(v)) for (p, v) in zip(est.poses, vs[ok])]
-        res = (; camera = est.camera, poses = est.poses, names, rms = rms(r), retcode = retcode(r), stop_rule = stop_rule(r), iterations = iterations(r),
+        res = (; camera = est.camera, poses = est.poses, names, rms = r.rms, retcode = r.retcode, stop_rule = r.stop_rule, iterations = r.stats.nsteps,
                n_correspondences = sum(length, vs[ok]), n_dropped = dropped, start = (xi, alpha), view_rms)
         (best === nothing || res.rms < best.rms) && (best = res)
     end
-    best === nothing && throw(ArgumentError("fit_start: no start of the $model camera gives two views with a pose"))
+    best === nothing && throw(ArgumentError("_fit_start: no start of the $model camera gives two views with a pose"))
     return best
 end
 

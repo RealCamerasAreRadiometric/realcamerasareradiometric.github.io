@@ -44,15 +44,21 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 VisualRadiometryToolkitCore = "544ea8c7-2427-4873-ab3e-33acc9dfb29a"
 
 [sources]
-# TEMPORARY, each until the named release is registered in General; then the line is deleted and the package resolves from the registry:
-# PanoramaStitching from its port branch vrtk/port at the commit of its fresh-clone gate on VisualGeometryToolkitCore 0.13 (its registered 0.10.0 caps
-# VisualGeometryToolkitCore at 0.11): waits for PanoramaStitching 0.11.0.
-PanoramaStitching = {url = "https://github.com/VisualGeometryToolkit/PanoramaStitching.jl", rev = "83f9295af9601140715d01717529936d1ed9606b"}
+# TEMPORARY: solve branch; remove when Core 0.14 etc. are registered
+BlobBoards = {path = "/home/jbpritts/src/_wt-bb-solve"}
+LocalOptimizationDoneRight = {path = "/home/jbpritts/src/_wt-lodr-solve"}
+PanoramaStitching = {path = "/home/jbpritts/src/_wt-ps-solve"}
+VisualGeometryToolkitCore = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitCore"}
+VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitEstimation"}
+VisualGeometryToolkitEval = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitEval"}
+VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitIO = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitIO"}
+VisualRadiometryToolkitCore = {path = "/home/jbpritts/src/_wt-vrtk-solve/VisualRadiometryToolkitCore"}
 RadiometricCamera = {path = "../RadiometricCamera"}
 
 [compat]
 Adapt = "4"
-BlobBoards = "0.7.4"
+BlobBoards = "0.8"
 CUDA = "5"
 CUDNN_jll = "9.28 - 9"
 CairoMakie = "0.15"
@@ -66,11 +72,11 @@ JSON = "1"
 JpegTurbo = "0.1"
 LibRaw_jll = "0.22.2"
 LinearAlgebra = "1"
-LocalOptimizationDoneRight = "0.7.3"
+LocalOptimizationDoneRight = "0.8"
 NLLSsolver = "5.3.4"
 NPZ = "0.4"
 PNGFiles = "0.4.5"
-PanoramaStitching = "0.11.0"  # the port onto VisualGeometryToolkitCore 0.12 (its branch `vrtk/port`, [sources] above); fit_vignetting and score_seams require saturation_margin_px (0.9.0); symmetric saturation masks; ring_correspondences; seam numbers on the fit's observations
+PanoramaStitching = "0.12"
 Printf = "1"
 RadiometricCamera = "0.4"
 Random = "1"
@@ -83,7 +89,7 @@ StatsBase = "0.34"
 TOML = "1.0.3"
 VisualGeometryToolkitCore = "0.14"
 VisualGeometryToolkitEstimation = "0.13"
-VisualGeometryToolkitEval = "0.11"
+VisualGeometryToolkitEval = "0.12"
 VisualGeometryToolkitFeatures = "0.10"
 VisualGeometryToolkitIO = "0.12"
 VisualRadiometryToolkitCore = "0.1.1"

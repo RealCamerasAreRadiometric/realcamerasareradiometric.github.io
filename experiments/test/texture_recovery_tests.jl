@@ -172,7 +172,7 @@ end
     Rxyz(a, b, c) = SMatrix{3, 3, Float64}(VgtkCore.Rotations.RotXYZ(a, b, c))
     CT = BlobBoards.CoordinateTransformations                                        # BlobBoards' frame maps (AffineMap)
     # BlobBoards' example board (its artifact) and its print raster (box-averaged ×8, ≈ 150 dpi); a camera with a strong division lens,
-    # and its SplineLens BoundedCamera (Estimation's fit_camera over the sensor): the camera held fixed is the spline
+    # and its SplineLens BoundedCamera (Estimation's CameraRegression over the sensor): the camera held fixed is the spline
     bjson = joinpath(BlobBoards.example_data(:boards), "blob_board_028_fd896.json")
     board = BlobBoards.load_board(bjson)
     raster = BlobBoards._board_raster(board.image_path, board.bundle, board.config_hash; density = board.density)
@@ -180,8 +180,8 @@ end
     world_to_r8 = CT.AffineMap(SMatrix{2, 2, Float64}(1 / k, 0, 0, 1 / k), SVector(0.0, 0.0)) ∘ CT.AffineMap(board.bundle, :world, :pixel; density = board.density)
     W, H = 1200, 900
     model = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(VgtkCore.CameraCalibrationMat(900.0VgtkCore.px, [600.0VgtkCore.px, 450.0VgtkCore.px])), VgtkCore.Division(-0.2, -0.05))
-    spline = VgtkCore.BoundedCamera(VgtkCore.estimate(VgtkEstimation.fit_camera(VgtkCore.SplineLens, VgtkCore.BoundedCamera(model, VgtkCore.Size2(W, H)),
-                                                                                  VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H)); tolerance = 1.0e-2)), VgtkCore.Size2(W, H))
+    spline = VgtkCore.BoundedCamera(VgtkCore.solve(VgtkCore.EstimationProblem(VgtkEstimation.CameraRegressionProblem(VgtkCore.SplineLens, VgtkCore.BoundedCamera(model, VgtkCore.Size2(W, H)),
+                                                                                  VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H)))), VgtkEstimation.CameraRegression(; tolerance = 1.0e-2)).u, VgtkCore.Size2(W, H))
     # a photograph of the board (board world → camera, mm; the camera on the printed side) through the spline: every pixel's ray onto
     # the board's plane, the raster sampled bilinearly
     function photograph(R, t)
@@ -324,13 +324,13 @@ end
     A = R.blocks.all.A
     @test all(R.kept) && R.blocks.all.rows == eachindex(rows_px) && size(A) == (length(rows_px), TW * TH)
     I_true = A * vec(design)
-    # the operators built where the rows are computed (page_footprints, fit_operator: the rows selected, weighted and transposed on
+    # the operators built where the rows are computed (page_footprints, texture_operator: the rows selected, weighted and transposed on
     # the device) are Core's operators of the host matrix, array for array; a selection keeps its order
     P = page_footprints(ctx, rows_px, ctx.camera, rows_by_photograph(rows_px); device = VgtkCore.KA.CPU())
     Fsel = findall(isodd, eachindex(rows_px)); wsel = [1.0 + 0.1 * (q % 7) for q in Fsel]; Dp = VgtkCore.difference_rows((TW, TH), 1)
     same(a, b) = size(a) == size(b) && a.rowptr == b.rowptr && a.colval == b.colval && a.nzval == b.nzval
     for (w, Ah) in ((wsel, RC._whiten(wsel, A[Fsel, :])), (RC.Unweighted(), A[Fsel, :]))
-        opd = fit_operator(P.A, Fsel, w, Dp; device = VgtkCore.KA.CPU()); oph = VgtkCore.PenalizedOperator(Ah, Dp; device = VgtkCore.KA.CPU())
+        opd = texture_operator(P.A, Fsel, w, Dp; device = VgtkCore.KA.CPU()); oph = VgtkCore.PenalizedOperator(Ah, Dp; device = VgtkCore.KA.CPU())
         @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
     end
     @test all(P.kept) && host_sparse(P.A) == A && host_sparse(csr_rows(P.A, reverse(Fsel); device = VgtkCore.KA.CPU())) == A[reverse(Fsel), :]
@@ -453,12 +453,12 @@ end
     end
     sg2 = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], rtol = 1e-9, maxit = 3000)
     @test sg2.main.x == sg.main.x                                    # deterministic on the device
-    # the operators' construction on the device (the rows selected, weighted, transposed there: csr_rows, csr_transpose, fit_operator)
+    # the operators' construction on the device (the rows selected, weighted, transposed there: csr_rows, csr_transpose, texture_operator)
     # gives the arrays Core uploads from the host matrix
     dev = gpu.device; sel = findall(q -> q % 3 != 0, 1:size(A, 1)); w = [1.0 + 0.01 * (q % 11) for q in sel]
     same(a, b) = size(a) == size(b) && Array(a.rowptr) == Array(b.rowptr) && Array(a.colval) == Array(b.colval) && Array(a.nzval) == Array(b.nzval)
     @test same(csr_transpose(gpu.A; device = dev), gpu.At) && same(csr_rows(gpu.A, sel; device = dev), VgtkCore.CSRMatrix(A[sel, :]; device = dev))
-    opd = fit_operator(gpu.A, sel, w, D; device = dev); oph = VgtkCore.PenalizedOperator(RadiometricCamera._whiten(w, A[sel, :]), D; device = dev)
+    opd = texture_operator(gpu.A, sel, w, D; device = dev); oph = VgtkCore.PenalizedOperator(RadiometricCamera._whiten(w, A[sel, :]), D; device = dev)
     @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
     @test host_sparse(csr_rows(gpu.A, reverse(sel); device = dev)) == A[reverse(sel), :]
     @test TextureGPU.gpu_name() isa String

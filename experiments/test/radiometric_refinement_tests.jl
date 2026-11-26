@@ -27,7 +27,7 @@
             err = try run_refine(rc, "si30_bc5_warped"; driver = "scripts/radiometric_refinement.jl", config_path = rpath); nothing catch e; e end
             @test err isa Exception && !occursin("run its stage", sprint(showerror, err))
             set = rc["cases"]["si30_bc5_warped"]["images"]
-            @test !produced(prepare_product(rc, set)) && !produced(refine_product(rc, "si30_bc5_warped"))
+            @test !produced(prepare_product(rc, set)) && !produced(refinement_product(rc, "si30_bc5_warped"))
             @test require_prepared(rc, Dict{String,Any}("kind" => "lens"), "a table without images"; driver = "d", config_path = rpath) === nothing   # reads no decode
         end
     end
@@ -64,12 +64,12 @@
         @test isdisjoint(rc["views"]["fx3_14mm_siemens_central30cm_si"], ["DSC06034.png", "DSC06129.png"])
         # a view list keys the run; a provenance text does not
         c2 = deepcopy(rc); c2["views"]["fx3_14mm_siemens_central30cm_si"] = ["DSC06030.png"]
-        @test refine_product(c2, "si30_bc5_warped").key != refine_product(rc, "si30_bc5_warped").key
+        @test refinement_product(c2, "si30_bc5_warped").key != refinement_product(rc, "si30_bc5_warped").key
         c2 = deepcopy(rc); c2["inputs"]["siemens_1m_board"]["provenance"] = "edited"
-        @test refine_product(c2, "si30_bc5_warped").key == refine_product(rc, "si30_bc5_warped").key
+        @test refinement_product(c2, "si30_bc5_warped").key == refinement_product(rc, "si30_bc5_warped").key
         @test isempty(get(rc, "pending", Dict()))
         c2 = deepcopy(rc); c2["pending"] = Dict{String,Any}("x" => "y")     # a [pending] note is description: it never re-keys the run
-        @test refine_product(c2, "si30_bc5_warped").key == refine_product(rc, "si30_bc5_warped").key
+        @test refinement_product(c2, "si30_bc5_warped").key == refinement_product(rc, "si30_bc5_warped").key
         # the defocus ablation's pinhole: sitla_spline_pinhole_warped is the Tamron f/8 central spline as the plain pinhole (r₀ = f / 2N = 1 µm,
         # f = 21.1975 mm, held: "aperture" in fixed) with the focus surface held. The 14 mm f/22 control (si30_spline_pinhole_warped) left the
         # experiment (owner 2026-11-15: tab:defocus is the Tamron and the zoom lens)
@@ -77,8 +77,8 @@
         tp = rc["cases"]["sitla_spline_pinhole_warped"]["pipeline"]
         @test tp["camera"]["f_mm"] / (2 * tp["camera"]["fnumber"]) ≈ 1e-3 atol = 1e-6
         @test tp["fixed"] == ["focus", "aperture"] && !haskey(tp["camera"], "r_min")
-        kp, ka = refine_product(rc, "sitla_spline_pinhole_warped").key, refine_product(rc, "sitla_spline_warped").key
-        @test kp != ka && kp == refine_product(deepcopy(rc), "sitla_spline_pinhole_warped").key   # its own run key, deterministic
+        kp, ka = refinement_product(rc, "sitla_spline_pinhole_warped").key, refinement_product(rc, "sitla_spline_warped").key
+        @test kp != ka && kp == refinement_product(deepcopy(rc), "sitla_spline_pinhole_warped").key   # its own run key, deterministic
     end
 
     @testset "a refinement config refuses what is not its own" begin
@@ -120,9 +120,9 @@
         @test !any(f -> occursin(r"^chrome_evaluation_fx3_14mm_central30cm_", f), readdir(projectdir("configs", "experiments")))
         # the evaluation is keyed by the refinement's run and the inputs it reads
         eff = evaluate_product(tc).record
-        @test eff["upstream"]["radiometric_refinement"]["si30_bc5_warped"] == refine_product(rc, "si30_bc5_warped").key
+        @test eff["upstream"]["radiometric_refinement"]["si30_bc5_warped"] == refinement_product(rc, "si30_bc5_warped").key
         @test eff["upstream"]["index"] == index_product(tc).key
-        @test issubset(["bc5_si30", "target"], keys(eff["inputs"])) && all(c -> eff["upstream"]["radiometric_refinement"][c] == refine_product(rc, c).key,
+        @test issubset(["bc5_si30", "target"], keys(eff["inputs"])) && all(c -> eff["upstream"]["radiometric_refinement"][c] == refinement_product(rc, c).key,
                                                                          [m["case"] for m in s.models if haskey(m, "case")])
     end
 

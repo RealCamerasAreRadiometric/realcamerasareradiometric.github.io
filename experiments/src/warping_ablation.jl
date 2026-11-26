@@ -230,7 +230,7 @@ function warping_evaluate_product(cfg::AbstractDict, plan, k::AbstractString)
     cc = plan.sets[k]
     M = warping_models(plan, k; reference = cfg["ablation"]["reference"])
     up = Dict{String, Any}("index" => index_product(cc).key,
-                           "radiometric_refinement" => Dict{String, Any}(r.variant => refine_product(plan.rc, r.variant).key for r in M.rows))
+                           "radiometric_refinement" => Dict{String, Any}(r.variant => refinement_product(plan.rc, r.variant).key for r in M.rows))
     n = lens_coverage_name(cc["evaluate"]["lens_coverage"])
     n === nothing || (up["image_region"] = image_region_product(cc, n).key)
     ids = unique([cc["evaluate"]["target"]; [s.input for s in M.starts]])
@@ -252,7 +252,7 @@ warping_record_product(cfg::AbstractDict, plan) =
     driver_product("record", Dict{String, Any}("experiment" => cfg["experiment"], "ablation" => cfg["ablation"], "modes" => cfg["modes"],
                                                "record" => EXPERIMENT_RECORD_SCHEMAS.warping_ablation,
                                                "upstream" => Dict{String, Any}("evaluate" => Dict{String, Any}(k => warping_evaluate_product(cfg, plan, k).key for k in keys(plan.sets)),
-                                                                               "refine" => Dict{String, Any}(r.variant => refine_product(plan.rc, r.variant).key for r in plan.rows)));
+                                                                               "refine" => Dict{String, Any}(r.variant => refinement_product(plan.rc, r.variant).key for r in plan.rows)));
                    output = WARPING_RECORD_FILE, threads = nothing)
 
 """
@@ -274,7 +274,7 @@ The refinement of `variant` (a case of `plan.rc`): the refinement driver's own s
 produced or loaded by their keys, every upstream produced on demand), refused while the refinements' config has `[pending]`.
 """
 function warping_refine(cfg::AbstractDict, plan, variant::AbstractString; driver::AbstractString, config_path::AbstractString)
-    produced(refine_product(plan.rc, variant)) || refuse_pending(plan.rc, projectdir(cfg["upstream"]["radiometric_refinement"]))
+    produced(refinement_product(plan.rc, variant)) || refuse_pending(plan.rc, projectdir(cfg["upstream"]["radiometric_refinement"]))
     return run_refine(plan.rc, variant; driver, config_path)
 end
 
@@ -316,7 +316,7 @@ function warping_evaluate(cfg::AbstractDict, plan, k::AbstractString; driver::Ab
     produce(warping_evaluate_product(cfg, plan, k); product_records(driver, config_path)...) do dir
         specs = [(s.label, "$(s.kind):" * config_source(cc, s.input)) for s in M.starts]
         for r in M.rows
-            rdir = produce_upstream(refine_product(plan.rc, r.variant), "the refinement $(r.variant)";
+            rdir = produce_upstream(refinement_product(plan.rc, r.variant), "the refinement $(r.variant)";
                                     make = () -> warping_refine(cfg, plan, r.variant; driver, config_path),
                                     command = driver_run(driver, config_path, "refine"; case = r.variant).command,
                                     gpu = runs_on_gpu(plan.rc["cases"][r.variant]))

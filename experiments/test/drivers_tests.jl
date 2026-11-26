@@ -232,7 +232,7 @@ end
         e = refused(x -> x["cases"][c]["images"] = "nope");                   @test e isa ArgumentError && occursin("prepare.nope", e.msg)
         e = refused(x -> x["experiment"]["name"] = "other");                  @test e isa ArgumentError && occursin("radiometric_refinement", e.msg)
         # the run keys: an input's provenance text never re-keys a run; a setting and the thread count do
-        k(cfg) = refine_product(cfg, c).key
+        k(cfg) = refinement_product(cfg, c).key
         c2 = deepcopy(good); c2["inputs"][raw]["provenance"] = "edited"
         @test k(c2) == k(good)
         c2 = deepcopy(good); c2["cases"][c]["pipeline"]["lm"]["max_iter"] = 13
@@ -242,7 +242,7 @@ end
         # a run is keyed by the inputs its table reads, not by every input of the config
         other = "aprilgrid400_14mm_ag400_green_bc5_fit_json"                 # ag30_bc5_warped's start, which si30_bc5_warped does not read
         c2 = deepcopy(good); c2["inputs"][other]["path"] = "elsewhere/bc5_fit.json"
-        @test k(c2) == k(good) && refine_product(c2, "ag30_bc5_warped").key != refine_product(good, "ag30_bc5_warped").key
+        @test k(c2) == k(good) && refinement_product(c2, "ag30_bc5_warped").key != refinement_product(good, "ag30_bc5_warped").key
         # its front end's run (a [runs] entry of frontends.toml) keys it by that run's key: another Schöps run re-keys it
         c2 = deepcopy(good); c2["runs"]["fx3_14mm_central30cm_schoeps_green"]["run"] = "schoeps.tamron17_siemens_w80"
         @test k(c2) != k(good)
@@ -307,7 +307,7 @@ end
     @testset "the keys of a start and a refinement: each keyed by only what it reads" begin
         db = load_radiometric_refinement_config(experiment_config("radiometric_refinement"))
         c = "si30_spline_warped"                                   # a Schöps-started spline: the case's own start state
-        ki(cfg) = start_product(cfg, c).key; kc(cfg) = refine_product(cfg, c).key
+        ki(cfg) = start_product(cfg, c).key; kc(cfg) = refinement_product(cfg, c).key
         c2 = deepcopy(db); c2["cases"][c]["pipeline"]["lm"]["max_iter"] = 3      # a refinement setting: the start is the same product
         @test ki(c2) == ki(db) && kc(c2) != kc(db)
         for k in RadiometricCamera.REFINE_ONLY_KEYS                              # every refine-only key, RadiometricCamera's declaration
@@ -332,9 +332,9 @@ end
         end
         @test !haskey(start_settings(db["cases"][c]), "start_from_init") && !haskey(start_settings(db["cases"][c]), "kind")
         @test !haskey(get(start_settings(db["cases"][c])["pipeline"], "lm", Dict()), "max_iter")
-        @test haskey(refine_settings(db["cases"][c])["pipeline"], "lm") && keys(refine_settings(db["cases"][c])["pipeline"]["lm"]) ⊆ Set(["max_iter", "max_time"])
+        @test haskey(refinement_settings(db["cases"][c])["pipeline"], "lm") && keys(refinement_settings(db["cases"][c])["pipeline"]["lm"]) ⊆ Set(["max_iter", "max_time"])
         @test RadiometricCamera.start_pipeline_table(db["cases"][c]["pipeline"]) == start_settings(db["cases"][c])["pipeline"] &&
-              last(RadiometricCamera.split_refine_only(db["cases"][c]["pipeline"])) == refine_settings(db["cases"][c])["pipeline"]
+              last(RadiometricCamera.split_refine_only(db["cases"][c]["pipeline"])) == refinement_settings(db["cases"][c])["pipeline"]
         # the start's key reads what RC's start reads (code review 0.11.0, finding 5): no output key (io.out, lm.log) keys a start
         let t = merge(deepcopy(db["cases"][c]), Dict("pipeline" => merge(deepcopy(db["cases"][c]["pipeline"]),
                                                      Dict("io" => merge(get(db["cases"][c]["pipeline"], "io", Dict()), Dict("out" => "/x")), "lm" => Dict("log" => "lm.tsv", "max_iter" => 3)))))

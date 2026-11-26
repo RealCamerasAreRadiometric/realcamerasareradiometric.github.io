@@ -36,8 +36,8 @@ end
     @test haskey(ab["cases"], v)
     @test variant_location(ab, v) == "studies/radiometric_refinement_ablation_lens_coverage_scale/radiometric_refinement"
     @test variant_location(ab, "si30_kb_warped") == "radiometric_refinement"            # the 1.0 variant IS the case: its run of record
-    @test refine_product(ab, "si30_kb_warped").key == refine_product(rc, "si30_kb_warped").key
-    @test startswith(product_dir(refine_product(ab, v)), joinpath(results_root(), "studies", "radiometric_refinement_ablation_lens_coverage_scale"))
+    @test refinement_product(ab, "si30_kb_warped").key == refinement_product(rc, "si30_kb_warped").key
+    @test startswith(product_dir(refinement_product(ab, v)), joinpath(results_root(), "studies", "radiometric_refinement_ablation_lens_coverage_scale"))
     sm = load_radiometric_refinement_config(projectdir("configs", "studies", "radiometric_refinement_smoothness_si30fe.toml"))
     @test length(sm["cases"]) == 3 && all(t -> t["pipeline"]["lm"]["max_iter"] == 25, values(sm["cases"]))
     @test sort([t["pipeline"]["grid"]["smoothness"]["weight"] for t in values(sm["cases"])]) == [0.001, 0.01, 0.1]

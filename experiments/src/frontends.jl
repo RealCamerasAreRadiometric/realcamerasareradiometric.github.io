@@ -13,8 +13,8 @@
 #             and moved onto the raw grid through the decode's frame map (the identity for raw_green; Core's `reframed_calibration` for the
 #             camera, the map itself for the detections): `camera.json` (RadiometricCamera's `save_grid`) and `detections.json`
 #             (IO's vgio/target_points2d), the files RadiometricCamera's `schoeps_run_file` reads before the tool's own
-#   init      the index cameras: Estimation's `find_absolute_pose` per view, then `refine_camera_and_poses` (src/parametric_starts.jl
-#             `fit_start`, the one fit of a parametric start) on the imported detections; RadiometricCamera's `save_lens`
+#   init      the index cameras: Estimation's `Ransac` on `AbsolutePoseProblem` per view, then `LevenbergMarquardt` on `CameraPosesProblem` (src/parametric_starts.jl
+#             `_fit_start`, the one fit of a parametric start) on the imported detections; RadiometricCamera's `save_lens`
 #
 # Every run is a RESULT, keyed under results_root() (src/frontends_runs.jl: <results>/frontends/<stage>/<key>, by its table, its
 # inputs and the keys of the runs it reads; never by the thread count: no step sums over threads); a config that reads one names it
@@ -286,8 +286,8 @@ frontend_upstream_schoeps(cfg::AbstractDict, name::AbstractString, what::Abstrac
 """
     run_frontend_fit(cfg, name; driver, config_path) -> dir
 
-Stage init of `[fits.<name>]`: `fit_start` (src/parametric_starts.jl: Estimation's `find_absolute_pose` per view, then
-`refine_camera_and_poses`) of the family `model` on the imported detections of its Schöps run (`schoeps_views` of the run: the
+Stage init of `[fits.<name>]`: `_fit_start` (src/parametric_starts.jl: Estimation's `Ransac` on `AbsolutePoseProblem` per view, then
+Core's `LevenbergMarquardt` on `CameraPosesProblem`) of the family `model` on the imported detections of its Schöps run (`schoeps_views` of the run: the
 views with ≥ `min_features`), the board's design points (`board_points`), the camera of the raw grid's size; `camera.json`
 (RadiometricCamera's `save_lens`, `write_start`) and the fit's report `fit.toml`.
 """
@@ -304,13 +304,13 @@ function run_frontend_fit(cfg::AbstractDict, name::AbstractString; driver::Abstr
         W, H = VgtkCore.extent(sc)
         views = schoeps_views(sch, board_points(board); min_features = Int(t["min_features"]))
         t0 = time()
-        r = fit_start(t["model"], views, W, H, t["f_mm"], t["sensor_mm"]; scoring = t["scoring"], max_iter = Int(t["max_iter"]), rng)
+        r = _fit_start(t["model"], views, W, H, t["f_mm"], t["sensor_mm"]; scoring = t["scoring"], max_iter = Int(t["max_iter"]), rng)
         params = start_parameters(r.camera)
         @printf("fit %s: %s on %d views (%d correspondences, %d not projected), %s (%s) after %d iterations, rms %.4f px [%.1f s]\n", name, t["model"],
                 length(r.names), r.n_correspondences, r.n_dropped, r.retcode, r.stop_rule, r.iterations, r.rms, time() - t0)
         write_start(joinpath(dir, "camera.json"), r.camera, W, H; lens_coverage = VgtkCore.lens_coverage(sc),   # the set's, as its import holds it
                     provenance = (; model = name, source = "scripts/frontends.jl (configs/experiments/frontends.toml [fits.$name])",
-                                  method = "VisualGeometryToolkitEstimation find_absolute_pose per view, then refine_camera_and_poses",
+                                  method = "VisualGeometryToolkitEstimation Ransac on AbsolutePoseProblem per view, then LevenbergMarquardt on CameraPosesProblem",
                                   detections = sch, views = length(r.names), correspondences = r.n_correspondences, rms_px = r.rms,
                                   retcode = string(r.retcode), stop_rule = string(r.stop_rule)))
         report = Dict{String, Any}("fit" => name, "model" => t["model"], "retcode" => string(r.retcode), "stop_rule" => string(r.stop_rule),

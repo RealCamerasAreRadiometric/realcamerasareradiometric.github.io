@@ -53,7 +53,7 @@
         r(case, m) = only(x for x in plan.rows if x.case == case && x.mode == m)
         @test r("si17ta_kb_warped", "both").variant == "si17ta_kb_warped"
         @test plan.rc["cases"]["si17ta_kb_warped"] == rc["cases"]["si17ta_kb_warped"]
-        @test refine_product(plan.rc, "si17ta_kb_warped").key == refine_product(rc, "si17ta_kb_warped").key   # the run of record, by its key
+        @test refinement_product(plan.rc, "si17ta_kb_warped").key == refinement_product(rc, "si17ta_kb_warped").key   # the run of record, by its key
         a = r("si17ta_kb_warped", "rigid"); b = r("si17ta_kb_warped", "heights")
         @test a.variant == "si17ta_kb_warped__warping.degree=0__warping.inplane=none__warping.inplane_start=unset"
         @test b.variant == "si17ta_kb_warped__warping.inplane=none__warping.inplane_start=unset"
@@ -62,7 +62,7 @@
         @test wb["degree"] == rc["cases"]["si17ta_kb_warped"]["pipeline"]["warping"]["degree"] && wb["inplane"] == "none" && !haskey(wb, "inplane_start")
         o = pipeline_options(plan.rc["cases"][a.variant]["pipeline"])
         @test o.warping.degree == 0 && o.warping.inplane == "none"
-        @test length(unique(refine_product(plan.rc, x.variant).key for x in plan.rows)) == length(plan.rows)
+        @test length(unique(refinement_product(plan.rc, x.variant).key for x in plan.rows)) == length(plan.rows)
         @test a.label == "si17ta_kb_rigid" && r("si30_spline_warped", "heights").label == "si30_spline_heights"
         # nothing else of the case changes
         for x in (a, b)
@@ -82,7 +82,7 @@
         cc = plan.sets["tamron_si17"]
         @test p.name == "evaluate" && p.record["upstream"]["index"] == index_product(cc).key
         rr = p.record["upstream"]["radiometric_refinement"]
-        @test length(rr) == 15 && rr["si17ta_kb_warped"] == refine_product(rc, "si17ta_kb_warped").key
+        @test length(rr) == 15 && rr["si17ta_kb_warped"] == refinement_product(rc, "si17ta_kb_warped").key
         @test !haskey(p.record["chrome"]["tamron_si17"], "models") && p.record["chrome"]["tamron_si17"]["holdout"] == "on"
         cmp = [(c["model"], c["reference"]) for c in p.record["comparisons"]]
         @test ("si17ta_kb_rigid", "si17ta_kb_both") in cmp && ("si17ta_kb_heights", "si17ta_kb_both") in cmp && ("si17ta_kb_both", "si17ta_kb_start") in cmp

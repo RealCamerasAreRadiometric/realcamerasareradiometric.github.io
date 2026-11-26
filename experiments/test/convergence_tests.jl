@@ -35,7 +35,7 @@
         @test p.name == "convergence" && p.output == CONVERGENCE_RECORD_FILE
         rc = convergence_refinements(cfg); cc = convergence_chrome(cfg, "ag10fe_spline_warped")
         up = p.record["upstream"]
-        @test up["refine"] == refine_product(rc, "ag10fe_spline_warped").key && up["index"] == index_product(cc).key
+        @test up["refine"] == refinement_product(rc, "ag10fe_spline_warped").key && up["index"] == index_product(cc).key
         @test p.record["chrome"]["holdout"] == "on" && !any(k -> haskey(p.record["chrome"], k), ("models", "bootstrap", "comparisons"))   # keyed by what it reads
         @test convergence_figure_product(cfg, "ag10fe_spline_warped").record["upstream"]["convergence"] == p.key
         @test p.key != convergence_product(cfg, "si30_spline_warped").key

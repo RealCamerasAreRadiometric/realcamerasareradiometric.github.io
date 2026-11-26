@@ -21,12 +21,12 @@
     import VisualGeometryToolkitIO as VgtkIO
     using VisualGeometryToolkitCore: HuberShape, GaussianShape
     using VisualGeometryToolkitCore: Irls, Triggs
-    using VisualGeometryToolkitEstimation: locally_optimize, CountedLO
+    using VisualGeometryToolkitEstimation: LocalOptimization, Ransac, CountedLO
     using VisualGeometryToolkitCore: StudentTUniformScoring
     import VisualGeometryToolkitEval.Reproduce as Reproduce
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
-    include(srcdir("radiometric_refinement.jl"))                         # a refinement case's product (refine_product), the evaluate stage's model
+    include(srcdir("radiometric_refinement.jl"))                         # a refinement case's product (refinement_product), the evaluate stage's model
     include(srcdir("chrome_evaluation.jl"))
     include(srcdir("figures.jl"))
     include(srcdir("chrome_evaluation_paper.jl"))                        # the paper stages: a refinement's evaluation into its table
@@ -403,10 +403,11 @@
         @test m[length(keep) + 2] == n0 && !haskey(m, length(keep) + 1) && isinf(ac.distance[length(keep) + 1])
         @test !(n1 in values(m))                                                       # its dot gone, the node stays free
         # MSAC sweeps the dustbin's Inf as an outlier: its cost the threshold's square, a finite score, never NaN
-        res = ransac(p, sc; local_optimization_strategy = s.local_optimization_strategy, config = s.ransac, rng = StableRNG(1))
-        ρ = res.residuals
+        res = VgtkCore.solve(VgtkCore.EstimationProblem(p), Ransac(; scoring = sc, local_optimization_strategy = s.local_optimization_strategy, config = s.ransac);
+                             rng = StableRNG(1))
+        ρ = res.resid
         @test count(isinf, ρ) == 5 && all(.!VgtkCore.inlier_mask(res)[isinf.(ρ)]) && count(VgtkCore.inlier_mask(res)) == 289
-        @test isfinite(res.quality) && isapprox(res.quality, sum(x -> 1 - min(x^2, 2.5^2) / 2.5^2, Float64.(ρ)); rtol = 1e-5)
+        @test isfinite(res.metadata.quality) && isapprox(res.metadata.quality, sum(x -> 1 - min(x^2, 2.5^2) / 2.5^2, Float64.(ρ)); rtol = 1e-5)
     end
 
     @testset "index: the local optimization refits on the scorer's matches, frozen — plain least squares in board millimetres" begin
@@ -418,11 +419,11 @@
         seed = VgtkCore.EuclideanMap(Rz * SMatrix{3,3,Float64}(Rt), Rz * SVector(-0.035, -0.03, 0.30))
         p = GridPoseProblem(camera, xy, grid; s.seed_tolerance)
         lo = CountedLO(s.local_optimization_strategy)
-        r = locally_optimize(p, seed; local_optimization_strategy = lo, scoring = index_scoring(p, s.scoring))
+        r = VgtkCore.solve(VgtkCore.RefineProblem(p, seed), LocalOptimization(lo; scoring = index_scoring(p, s.scoring)))
         @test lo.calls[] == 1
         # the LO weighs the consensus set alone (Estimation 0.11.2+: non-finite residuals weigh 0 under the Gaussian shape), so its
         # refit is accepted: at the truth to the noise (it was @test_broken on Estimation 0.11.1, every datum weighed 1, the cost Inf)
-        @test maximum(on_grid(estimate(r))) < 0.05
+        @test maximum(on_grid(r.u)) < 0.05
         @test count(VgtkCore.inlier_mask(r)) == 289 && all(i -> true_point[i] != 0, findall(VgtkCore.inlier_mask(r)))   # every dot, no distractor
         θ1 = VgtkCore.refine!(nothing, p, seed, ones(length(xy)))                          # the LO's step: on the seed's matches, at the truth
         @test maximum(on_grid(θ1)) < 0.05
@@ -623,9 +624,9 @@
         write_registration(dir, "noscale", "noscale.JPG", merge(reg, (; noise_scale = NaN)), u, s, id)
         rn = only(filter(x -> x.name == "noscale", read_registrations(dir, grid)))
         @test isnan(rn.noise_scale) && VgtkIO.read_record(joinpath(dir, "registration", "noscale_scale.json"))["noise_scale"] === nothing
-        # the pool leaves a photograph without a scale out (Estimation's pooled_noise_scale); with none at all it refuses, naming why
+        # the pool leaves a photograph without a scale out (Estimation's PooledScale); with none at all it refuses, naming why
         both = read_registrations(dir, grid)
-        @test VgtkCore.noise_scale(pooled_index_scale(both)) ≈ reg.noise_scale && VgtkCore.metadata(pooled_index_scale(both)).left_out == 1
+        @test VgtkCore.noise_scale(pooled_index_scale(both)) ≈ reg.noise_scale && pooled_index_scale(both).metadata.left_out == 1
         e = try pooled_index_scale([rn]); nothing catch err; err end
         @test e isa ArgumentError && occursin("noise scale", e.msg) && occursin("originated none", e.msg)
     end
@@ -698,7 +699,7 @@
         rec = VgtkIO.read_record(joinpath(out, "eval_rec.json"))
         @test !haskey(rec, "free") && !haskey(rec, "fixed") && haskey(rec, "motion")
         f = rec["fit"]["in_sample"]
-        # the rotation-centre refine: Estimation's refine_camera_and_poses, converged, at the index stage's pooled scale handed down
+        # the rotation-centre refine: Core's LevenbergMarquardt on Estimation's CameraPosesProblem, converged, at the index stage's pooled scale handed down
         @test f["converged"] && f["retcode"] == "Success" && f["iterations"] < 80 && f["scale_source"] == "ScaleUpstream"
         @test 0 < f["scale_px"] < 1 && f["scale_px"] ≈ rec["pooled_scale"]["scale_px"] && f["loss_width_px"] ≈ 3.0 * f["scale_px"]
         @test rec["pooled_scale"]["photos"] == 5 && !isempty(rec["fit"]["held_camera"])          # every camera parameter held
@@ -744,14 +745,14 @@
 
         # A refinement case's model flows from its refine product, through the evaluate stage, into tab:refinement-chrome (owner 2026-11-14): a
         # chrome set's [evaluate] model of `case` reads the case's refine product of its [upstream] radiometric_refinement (the product
-        # refine_product names under results_root(): here a fixture product holding the camera of record as its lens.json, no parameters.json), the
+        # refinement_product names under results_root(): here a fixture product holding the camera of record as its lens.json, no parameters.json), the
         # evaluate stage scores it beside its start, and the tables stage prints both rows of that evaluation, the refinement's
         # retcode read from the run ("unfinished": no parameters.json, recorded, never printed)
         withenv("VGTK_RESULTS_ROOT" => mktempdir()) do
             ccfg = Dict{String, Any}("upstream" => Dict{String, Any}("radiometric_refinement" => "configs/experiments/radiometric_refinement.toml"),
                                      "evaluate" => Dict{String, Any}("models" => [Dict{String, Any}("label" => "ref", "kind" => "lens", "case" => "si30_bc5_warped")]))
             rc = upstream_refinements(ccfg)
-            rdir = product_dir(refine_product(rc, "si30_bc5_warped"))
+            rdir = product_dir(refinement_product(rc, "si30_bc5_warped"))
             @test_throws ArgumentError evaluate_model_specs(ccfg)                       # no model in the run yet: named, never guessed
             mkpath(rdir); cp(lpath, joinpath(rdir, "lens.json"))
             specs = evaluate_model_specs(ccfg)
@@ -888,7 +889,7 @@
     @testset "evaluate: the local scale" begin
         # a pinhole camera (f 1000 px, centre (500, 400))
         K = VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(1000.0, 0, 0, 0, 1000.0, 0, 500.0, 400.0, 1))
-        pin = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Pinhole())
+        pin = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Lens(VgtkCore.Perspective()))
         # the local scale: the direction's derivative per px, 1/f at the principal point; NaN off the camera
         @test _local_scale(pin, SVector(500.0, 400.0)) ≈ 1e-3 rtol = 1e-12
         @test isnan(_local_scale(pin, SVector(NaN, 400.0)))
@@ -1086,8 +1087,8 @@ end
     end
 end
 
-# The rotation-centre start (src/chrome_evaluation.jl fit_rotation_center, round 7): c, d from the dots' bearings through Core's
-# constraint protocol and whitening (RotationCenterBearing) and Estimation's fit_linear (its L2 solve), both sides normalized by Core's
+# The rotation-centre start (src/chrome_evaluation.jl _fit_rotation_center, round 7): c, d from the dots' bearings through Core's
+# constraint protocol and whitening (RotationCenterBearing) and `_linear_least_squares` (Estimation's ReweightedLeastSquares on a LinearModel, its L2 solve), both sides normalized by Core's
 # strategies (Hartley on the board, the half-diagonal on the image), its rotations fixed — recovered to rounding from exact data; the
 # conditioning the same normalized or not (the image scale cancels in the whitening, the board's scales every column alike) and the
 # normalized solve accurate where the unnormalized one loses digits (an ill-scaled set); and on a set whose index poses carry
@@ -1109,7 +1110,7 @@ end
     # a pinhole (f 3000 px, centre (2128, 1424), a 4256 × 2848 image) turned about one point: rotation centre c (target frame), offset
     # d (camera frame), rotations about all three axes; a 17 × 17 board at 5 mm
     K = VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(3000.0, 0, 0, 0, 3000.0, 0, 2128.0, 1424.0, 1))
-    pin = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Pinhole())
+    pin = VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Lens(VgtkCore.Perspective()))
     image = (4256, 2848)
     board = [SVector(0.005 * i, 0.005 * j, 0.0) for i in 0:16 for j in 0:16]
     R0 = SMatrix{3, 3, Float64}(1, 0, 0, 0, -1, 0, 0, 0, -1)                  # the camera looks at the board's +z side
@@ -1132,17 +1133,17 @@ end
     ts = [d - R * c for R in Rs]
     # the unnormalized solve, for the comparison (the same rows at s = 1, X̄ = 0, σ = 1)
     unnormalized(Rs, dots) = (ids = sort(collect(keys(dots))); (A, y) = _rotation_center_rows(Rd(Rs), dots, ids, 1.0, zero(SVector{3, Float64}), 1.0);
-                              θ = VgtkCore.estimate(VgtkEst.fit_linear(A, y, ones(length(y)); optimization_strategy = nothing)); (SVector{3}(θ[1:3]), SVector{3}(θ[4:6])))
+                              θ = _linear_least_squares(A, y).u; (SVector{3}(θ[1:3]), SVector{3}(θ[4:6])))
 
     @testset "exact data: (c, d) recovered to rounding, normalized and not; the record" begin
         dots = dots_of(Rs, ts, board, c, d)
-        st = fit_rotation_center(Rd(Rs), dots; image_size = image)
-        e = VgtkCore.estimate(st)
-        @test VgtkCore.retcode(st) == VgtkCore.ReturnCode.Success && VgtkCore.stop_rule(st) == VgtkCore.ClosedForm && norm(e.center - c) < 1e-10 && norm(e.offset - d) < 1e-10
+        st = _fit_rotation_center(Rd(Rs), dots; image_size = image)
+        e = st.u
+        @test st.retcode == VgtkCore.ReturnCode.Success && st.stop_rule == VgtkCore.ClosedForm && norm(e.center - c) < 1e-10 && norm(e.offset - d) < 1e-10
         cu, du = unnormalized(Rs, dots)
         @test norm(cu - c) < 1e-10 && norm(du - d) < 1e-10
-        md = VgtkCore.metadata(st)
-        @test length(md.singular_values) == 6 && length(md.singular_values_unnormalized) == 6 && VgtkCore.rms(st) < 1e-8
+        md = st.metadata
+        @test length(md.singular_values) == 6 && length(md.singular_values_unnormalized) == 6 && st.rms < 1e-8
         @test md.scale_source === VgtkCore.ScaleNone && isnan(md.scale)
         # the image side cancels in the whitening: the rows at the half-diagonal's σ and at 1 are the same, to rounding
         ids = sort(collect(keys(dots)))
@@ -1153,7 +1154,7 @@ end
         # the board's scale multiplies every column alike: the conditioning is the same normalized or not
         cond(sv) = sv[1] / sv[end]
         @test cond(md.singular_values) ≈ cond(md.singular_values_unnormalized) rtol = 1e-9
-        @test_throws ArgumentError fit_rotation_center(Dict(k => R for (k, R) in enumerate(Rs[1:end-1])), dots; image_size = image)
+        @test_throws ArgumentError _fit_rotation_center(Dict(k => R for (k, R) in enumerate(Rs[1:end-1])), dots; image_size = image)
     end
 
     @testset "an ill-scaled set: the normalized solve is the accurate one" begin
@@ -1163,7 +1164,7 @@ end
         Xf = [x + far for x in board]; cf = c + far
         tsf = [d - R * cf for R in Rs]
         dots = dots_of(Rs, tsf, Xf, cf, d)
-        e = VgtkCore.estimate(fit_rotation_center(Rd(Rs), dots; image_size = image))
+        e = _fit_rotation_center(Rd(Rs), dots; image_size = image).u
         cu, du = unnormalized(Rs, dots)
         @test norm(e.center - cf) < 1e-10 && norm(e.offset - d) < 1e-12
         @test norm(e.center - cf) < norm(cu - cf) / 100 && norm(e.offset - d) < norm(du - d) / 100
@@ -1177,9 +1178,9 @@ end
         dots = dots_of(Rs, tn, board, c, d; σpx = 0.1, rng)                    # the pixels of the truth; P at the noisy poses
         Mls = reduce(vcat, [hcat(Matrix{Float64}(I, 3, 3), -Matrix(R)) for R in Rn]); dc = Mls \ reduce(vcat, collect.(tn))
         c_ls, d_ls = SVector{3}(dc[4:6]), SVector{3}(dc[1:3])
-        st = fit_rotation_center(Rd(Rn), dots; image_size = image)
-        e = VgtkCore.estimate(st)
-        @test VgtkCore.retcode(st) == VgtkCore.ReturnCode.Success && VgtkCore.stop_rule(st) == VgtkCore.ClosedForm
+        st = _fit_rotation_center(Rd(Rn), dots; image_size = image)
+        e = st.u
+        @test st.retcode == VgtkCore.ReturnCode.Success && st.stop_rule == VgtkCore.ClosedForm
         @test norm(e.center - c) < norm(c_ls - c) / 3 && norm(e.offset - d) < norm(d_ls - d) / 3
         @test norm(e.offset - d) < 2e-3
     end
@@ -1209,7 +1210,7 @@ end
         fit = run_source(cfg, ix.camera)                                               # the front end's fit product, produced here
         K = VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(1000.0, 0, 0, 0, 1000.0, 0, 500.0, 400.0, 1))
         produce(fit; driver = "test", config_source = path) do dir
-            write_start(joinpath(dir, cfg["runs"][ix.camera]["path"]), VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Pinhole()), 1000, 800;
+            write_start(joinpath(dir, cfg["runs"][ix.camera]["path"]), VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(K), VgtkCore.Lens(VgtkCore.Perspective())), 1000, 800;
                         lens_coverage = VgtkCore.Rect2{Float64}(0, 0, 1000, 800), provenance = (; source = "test"))
             write(joinpath(dir, fit.output), "fit = \"test\"\n"); nothing
         end

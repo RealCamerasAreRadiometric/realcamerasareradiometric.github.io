@@ -302,7 +302,7 @@ function run_arm((c, arm))
 end
 
 arm_items() = [(c, a) for c in CASES for a in arms(c)]
-arm_product((c, a)) = refine_product(loaded_refinement(c), arm_case(c, a))
+arm_product((c, a)) = refinement_product(loaded_refinement(c), arm_case(c, a))
 "The produced arms of case `c` among `as` (the variants, or the variants and the context)."
 produced_arms(c, as) = [a for a in as if produced(arm_product((c, a)))]
 
@@ -499,7 +499,7 @@ function record_rows()
         ev = Dict(k => (cf = chrome_config(c, k); cf === nothing ? nothing : (p = eval_product((c, k)); produced(p) ? product_dir(p) : nothing)) for k in EVAL_KINDS)
         cdir = c in compare_items() ? (p = compare_product(c); produced(p) ? product_dir(p) : nothing) : nothing
         for a in arms(c)
-            n = arm_case(c, a); sp = start_product(rc, n); rp = refine_product(rc, n)
+            n = arm_case(c, a); sp = start_product(rc, n); rp = refinement_product(rc, n)
             row = Dict{String, Any}("case" => c, "arm" => a, "kind" => a in SS["variants"] ? "variant" : "context", "case_name" => n,
                                     "start_key" => sp.key, "refine_key" => rp.key, "label" => LABEL, "overrides" => a in SS["variants"] ? variant_overrides(c, a) : nothing)
             if produced(sp)
@@ -574,7 +574,7 @@ function run_record(_)
         for r in rows
             haskey(r, "case_name") || continue                       # a context input: no run of this experiment
             rc = loaded_refinement(r["case"])
-            for (st, p) in (("start", start_product(rc, r["case_name"])), ("refine", refine_product(rc, r["case_name"])))
+            for (st, p) in (("start", start_product(rc, r["case_name"])), ("refine", refinement_product(rc, r["case_name"])))
                 push!(idx, ("sampling_strategy", r["case"], r["arm"], st, p.key, product_dir(p), produced(p) ? "complete" : "missing", LABEL))
             end
         end

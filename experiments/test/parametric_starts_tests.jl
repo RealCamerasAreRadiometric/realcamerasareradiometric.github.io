@@ -74,7 +74,7 @@ end
     for (model, truth) in (("kannala_brandt", kb), ("double_sphere", ds))
         views = observe(truth, 0.1, StableRNG(5))
         @test length(views) == 12 && all(v -> length(v[2]) > 400, views)
-        r = fit_start(model, views, W, H, 14.6776, 35.6; scoring = Dict{String, Any}("type" => "msac", "threshold" => 8.0), max_iter = 100, rng = StableRNG(1))
+        r = _fit_start(model, views, W, H, 14.6776, 35.6; scoring = Dict{String, Any}("type" => "msac", "threshold" => 8.0), max_iter = 100, rng = StableRNG(1))
         @test VgtkCore.successful_retcode(r.retcode) && r.n_dropped == 0 && length(r.names) == 12 && r.names == ["V$k" for k in 1:12]
         @test 0.12 < r.rms < 0.16                                       # √2 · σ: the rms of the 2-vector residuals at σ = 0.1 px, not more
         θ, θtrue = VgtkCore.parameter_vector(r.camera), VgtkCore.parameter_vector(truth)

@@ -39,7 +39,7 @@
 #             baseline, kind "schoeps", is T. Schöps's own camera, refused otherwise), and paired.tsv: the paired photograph
 #             bootstrap of [evaluate] comparisons (src/chrome_evaluation.jl paired_differences). The start is
 #             fit_rotation_center (c, d from the dots' bearings at the index rotations); the refine is Estimation's
-#             refine_camera_and_poses on RotationCenterViews, the model's camera held, at [evaluate] optimization_strategy (required;
+#             LevenbergMarquardt on CameraPosesProblem of RotationCenterViews, the model's camera held, at [evaluate] optimization_strategy (required;
 #             an Estimation strategy table, type "triggs": the Triggs-corrected LM at efficiency_constant × the index stage's pooled
 #             noise scale), capped at [evaluate] iterations; eval_<label>.json's `fit` records its retcode, iterations, scale and width. The optional weights / holdout switches whiten the dots by the detect run's covariances and add
 #             the held-out variant (EVALUATE_FIT_SWITCHES). The registrations are the

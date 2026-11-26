@@ -74,11 +74,11 @@ end
     timing_product(cfg, tc, r) -> Product
 
 Replicate `r` of the timed refinement (`tc = timing_case(cfg)`): keyed by [timing], the replicate, the case's refine-only settings
-(`refine_settings`) and its start's key; output timing.json (`timing_replicate_record`).
+(`refinement_settings`) and its start's key; output timing.json (`timing_replicate_record`).
 """
 function timing_product(cfg::AbstractDict, tc, r::Integer)
     rec = Dict{String, Any}("experiment" => cfg["experiment"], "timing" => cfg["timing"], "replicate" => Int(r),
-                            "refine" => Dict(tc.case => refine_settings(tc.rc["cases"][tc.case])),
+                            "refine" => Dict(tc.case => refinement_settings(tc.rc["cases"][tc.case])),
                             "upstream" => Dict{String, Any}("start" => start_product(tc.rc, tc.case).key))
     return driver_product("time", rec; output = TIMING_REPLICATE_FILE)
 end

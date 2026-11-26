@@ -20,7 +20,7 @@ using DrWatson
 @quickactivate "experiments"
 include(srcdir("experiments.jl"))
 include(srcdir("drivers.jl"))
-include(srcdir("radiometric_refinement.jl"))                                  # the refinement configs the focus-surface panels name (refine_product)
+include(srcdir("radiometric_refinement.jl"))                                  # the refinement configs the focus-surface panels name (refinement_product)
 include(srcdir("figures.jl"))
 using .Figures: focus_surface_figure
 import VisualGeometryToolkitEval.Reproduce as Reproduce
@@ -53,11 +53,11 @@ const CFG = let c = load_driver_config(CFG_PATH, "focus_surfaces"; tables = ("ex
     c
 end
 
-"The focus-surface panels' refinements, `(config, case) => product` (`refine_product` of the refinement config), resolved once."
+"The focus-surface panels' refinements, `(config, case) => product` (`refinement_product` of the refinement config), resolved once."
 const FOCUS_CASES = Dict{Tuple{String,String}, Product}(
     (String(p["config"]), String(p["case"])) => let rc = load_radiometric_refinement_config(projectdir(p["config"]))
         haskey(rc["cases"], p["case"]) || throw(ArgumentError("$CFG_PATH [figures]: $(p["config"]) has no case $(repr(p["case"]))"))
-        refine_product(rc, p["case"])
+        refinement_product(rc, p["case"])
     end
     for t in values(CFG["figures"]) for p in t["panels"])
 

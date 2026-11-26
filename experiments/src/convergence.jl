@@ -98,7 +98,7 @@ the chrome set's detect and index, its image region).
 """
 function convergence_product(cfg::AbstractDict, case::AbstractString)
     rc = convergence_refinements(cfg); cc = convergence_chrome(cfg, case)
-    up = Dict{String, Any}("refine" => refine_product(rc, case).key, "start" => start_product(rc, case).key,
+    up = Dict{String, Any}("refine" => refinement_product(rc, case).key, "start" => start_product(rc, case).key,
                            "detect" => detect_product(cc).key, "index" => index_product(cc).key)
     n = lens_coverage_name(cc["evaluate"]["lens_coverage"])
     n === nothing || (up["image_region"] = image_region_product(cc, n).key)
@@ -231,7 +231,7 @@ into `chrome/` of the product (eval_it<N>.json, summary.tsv: the scorer's own re
 function run_convergence(cfg::AbstractDict, case::AbstractString; driver::AbstractString, config_path::AbstractString)
     rc = convergence_refinements(cfg); cc = convergence_chrome(cfg, case); cpath = convergence_chrome_path(cfg, case)
     produce(convergence_product(cfg, case); product_records(driver, config_path)...) do dir
-        rp = refine_product(rc, case); sp = start_product(rc, case)
+        rp = refinement_product(rc, case); sp = start_product(rc, case)
         rdir = refinement_upstream(rc, cfg["upstream"]["radiometric_refinement"], case, "refine", "the refinement of case $case")
         sdir = refinement_upstream(rc, cfg["upstream"]["radiometric_refinement"], case, "start", "the start of case $case")
         chrome_upstream(cc, cpath, "index", "the chrome index of $(cfg["cases"][case]["chrome"])")
@@ -388,7 +388,7 @@ panel, the convergence record's key and the refinement's and its start's (the de
 """
 function convergence_panels_product(cfg::AbstractDict)
     rc = convergence_refinements(cfg); p = cfg["panels"]
-    up = Dict{String, Any}(s => Dict("convergence" => convergence_product(cfg, s).key, "refine" => refine_product(rc, s).key,
+    up = Dict{String, Any}(s => Dict("convergence" => convergence_product(cfg, s).key, "refine" => refinement_product(rc, s).key,
                                      "start" => start_product(rc, s).key) for s in (p["left"], p["right"]))
     return driver_product("panels", Dict{String, Any}("experiment" => cfg["experiment"], "panels" => p, "upstream" => up);
                           output = "numbers.tex", threads = nothing)

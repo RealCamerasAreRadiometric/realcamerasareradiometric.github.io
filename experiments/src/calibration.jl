@@ -104,7 +104,7 @@ end
     calibration_products(cfg; threads = execution_threads()) -> (; selfcheck, output, start, refine, evaluate, figures)
 
 The products of a calibration case `cfg` (scripts/calibrate.jl), each keyed by only what it reads, under the driver's name: its
-start (stage start: `start_settings` of its [pipeline], the start record's schema), its refinement (`refine_settings` and the
+start (stage start: `start_settings` of its [pipeline], the start record's schema), its refinement (`refinement_settings` and the
 start's key; a self-check, `selfcheck.only`, is one product keyed by its whole [pipeline], no start), the metrics (evaluate) and the
 summary table (figures, keyed by `[render]`); the thread count `threads` keys the start and the refinement (bin/refine.jl).
 """
@@ -118,7 +118,7 @@ function calibration_products(cfg::AbstractDict; threads::AbstractString = execu
                                                      "start_record" => RadiometricCamera.RECORD_SCHEMAS.refinement_start, runs...);
                            experiment = "calibrate", output = RadiometricCamera.START_RECORD_FILE, threads)
     refine = selfcheck ? driver_product("refine", Dict{String, Any}("experiment" => e, "pipeline" => cfg["pipeline"], runs...); experiment = "calibrate", output, threads) :
-             driver_product("refine", Dict{String, Any}("experiment" => e, "refine" => refine_settings(cfg), "upstream" => Dict("start" => start.key));
+             driver_product("refine", Dict{String, Any}("experiment" => e, "refine" => refinement_settings(cfg), "upstream" => Dict("start" => start.key));
                             experiment = "calibrate", output, threads)
     evaluate = driver_product("evaluate", Dict{String, Any}("experiment" => e, "upstream" => Dict("refine" => refine.key));
                               experiment = "calibrate", output = "metrics.toml", threads = nothing)

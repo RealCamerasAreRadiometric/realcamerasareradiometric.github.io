@@ -54,7 +54,7 @@ for r in PLAN.rows
 end
 
 record_dirs() = (; evaluate = Dict(k => product_dir(warping_evaluate_product(CFG, PLAN, k)) for k in keys(PLAN.sets)),
-                 refine = Dict(r.variant => product_dir(refine_product(PLAN.rc, r.variant)) for r in PLAN.rows),
+                 refine = Dict(r.variant => product_dir(refinement_product(PLAN.rc, r.variant)) for r in PLAN.rows),
                  start = Dict(r.variant => product_dir(start_product(PLAN.rc, r.variant)) for r in PLAN.rows))
 "Stage record: every scoring read (produced on demand: `warping_evaluate`), the record warping_ablation.json written last, its table before it."
 record(p) = produce(p; R...) do dir
@@ -88,7 +88,7 @@ const STAGES = [
     Stage(:upstream, "every upstream of each chrome set's refinements and scoring (decodes, front ends' runs, image regions, chrome detect and index, start models)";
           items = () -> CHROMES, product = k -> index_product(PLAN.sets[k]), run = k -> warping_upstreams(CFG, PLAN, k; R...)),
     Stage(:refine, "every case's refinement in every mode (the refinement driver's start and refine products; one per GPU)";
-          items = () -> [r.variant for r in ROWS], product = v -> refine_product(PLAN.rc, v), run = v -> warping_refine(CFG, PLAN, v; R...)),
+          items = () -> [r.variant for r in ROWS], product = v -> refinement_product(PLAN.rc, v), run = v -> warping_refine(CFG, PLAN, v; R...)),
     Stage(:evaluate, "every chrome set's scoring of its starts and every mode's refinement (the chrome scorer; paired bootstrap against the reference and the start)";
           items = () -> CHROMES, product = k -> warping_evaluate_product(CFG, PLAN, k), run = k -> warping_evaluate(CFG, PLAN, k; R...)),
     Stage(:record, "the record warping_ablation.json and its table warping_ablation.tsv";

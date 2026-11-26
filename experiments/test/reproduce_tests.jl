@@ -170,9 +170,11 @@
         experiments = load_config_tables(projectdir("configs", "figures", "numbers.toml"), NUMBERS_CONFIG_KEYS)["runs"]["experiments"]
         # one fake fragment per driver, in a figures run of its own, as the drivers' figures stages write them
         frags = [joinpath(results, "figures-$i", "numbers.tex") for i in eachindex(experiments)]
+        # each fragment written as a driver writes it: Eval's number macros (`PaperNumbers`, `add_number!`, `write_numbers`), its value typeset text
+        fragment(path, name, value) = (mkpath(dirname(path));
+            Reproduce.write_numbers(path, Reproduce.add_number!(Reproduce.PaperNumbers(; driver = "a driver", config = "test", run_key = "0", commit = "0"), name, value)))
         for (i, f) in enumerate(frags)
-            mkpath(dirname(f))
-            write(f, "% written by a driver\n\\newcommand{\\fakeNumber$(('A':'Z')[i])}{$(i).5}\n")
+            fragment(f, "fakeNumber$(('A':'Z')[i])", "$(i).5")
         end
         # a paper laid out as this one: main.tex in paper/src, built from paper/, reading src/latex/numbers and its prose
         latexdir = mkpath(joinpath(tmp, "paper", "src", "latex"))
@@ -208,7 +210,7 @@
         # the output goes through the citation check: the one macro the prose does not cite is found
         @test uncited_macros(out, [main]; root = tmp, search_dirs = ["paper"]) == ["fakeNumber$(('A':'Z')[length(experiments)])"]
         # a fragment that changes a number: refused again without sign-off
-        write(frags[1], "\\newcommand{\\fakeNumberA}{9.5}\n")
+        fragment(frags[1], "fakeNumberA", "9.5")
         @test_throws ErrorException gather(false)
         @test occursin("{1.5}", read(out, String))
         @test length(runs()) == 2                       # the fragment's numbers key the run: rewritten in place, a new run

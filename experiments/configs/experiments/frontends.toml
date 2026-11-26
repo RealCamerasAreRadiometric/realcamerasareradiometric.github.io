@@ -358,7 +358,7 @@ board = "siemens_board"
 image = "schoeps_image"
 args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels 4 --feature_refinement_type gradients_xy --refinement_window_half_extent 10"   # window 10, the frozen default verbatim: no Thorlabs pair, and the Tamron's two geometric-accuracy sets disagree (f/8: 20 over 40; 17 cm: 80 over 40), so the tie-breaks decide on this set's own runs — coverage 98.1 % vs 95.4 % of the sensor at 10 vs 40 (139 vs 163 of 163 localised)
 
-# ---- init: the index cameras (Estimation's fit; src/parametric_starts.jl fit_start) ----------------------------------------------
+# ---- init: the index cameras (Estimation's fit; src/parametric_starts.jl _fit_start) ----------------------------------------------
 # scoring and max_iter: the retired configs/inputs/parametric_starts.toml [fit] (the pose starts' scorer of record, 8 px; the joint LM's cap);
 # min_features 20: fe_si7.sh's MINF=20 of the Siemens sets (paper_fe_chain.sh:35, :48; tamron17_fe.sh:10); sensor 35.6 mm: the FX3's width.
 [fits.zoom48_f10_kb]

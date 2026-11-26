@@ -68,7 +68,7 @@ function panels(p)
             r = load_convergence_record(joinpath(produce_upstream(convergence_product(CFG, c), "the convergence record of $c";
                                                                   make = () -> run_convergence(CFG, c; driver = DRIVER, config_path = CFG_PATH),
                                                                   command = driver_run(DRIVER, CFG_PATH, "convergence"; case = c).command), CONVERGENCE_RECORD_FILE))
-            sdir = product_dir(start_product(rc, c)); rdir = product_dir(refine_product(rc, c))
+            sdir = product_dir(start_product(rc, c)); rdir = product_dir(refinement_product(rc, c))
             d = detection_reprojection_series(sdir, rdir, r.iterations)
             h = r.thorlabs_px.motion_heldout
             for narrow in (false, true)
@@ -92,7 +92,7 @@ const GPU_STAGES = [gpu_stages(:refine => [RC_CFG["cases"][c] for c in CASES]);
                     any(c -> get(load_chrome_evaluation_config(projectdir(c))["detect"], "device", "cpu") == "gpu", CHROMES) ? [:chrome] : Symbol[]]
 const STAGES = [
     Stage(:refine, "every case's refinement with its per-iteration checkpoints (scripts/radiometric_refinement.jl: prepare, start, refine)";
-          items = () -> CASES, product = c -> refine_product(RC_CFG, c), run = refine),
+          items = () -> CASES, product = c -> refinement_product(RC_CFG, c), run = refine),
     Stage(:chrome, "every chrome set's index (scripts/chrome_evaluation.jl: prepare, detect, index)";
           items = () -> CHROMES, product = c -> index_product(load_chrome_evaluation_config(projectdir(c))), run = chrome),
     Stage(:convergence, "every case's record: the bearing divergence and the Thorlabs scores per LM iteration (convergence.json)";
