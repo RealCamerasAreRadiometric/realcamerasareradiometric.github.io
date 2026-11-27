@@ -82,7 +82,7 @@ end
         "RC_EDGE_FREE" => ["fixed"],   # the printed edge once held by "edge" in lm.fixed (edge.free retired 2026-11-11; "edge" refused, RC 0.11.0)
         "RC_MAXITERS" => ["optimizer.max_iter"], "RC_MAXTIME" => ["optimizer.max_time"], "RC_FIX" => ["fixed"],   # [lm] until RC 0.4.0's [optimizer]
         "RC_LM_LOG" => ["optimizer.log"],
-        "RC_SWEEP_EACH" => ["sweep.lm_chunk"], "RC_SWEEP_" * "PA" * "SSES" => ["sweep.iterations"], "RC_SWEEP_JOINT" => ["sweep.joint"],   # the second: its name spelled apart (check_naming R7)
+        "RC_SWEEP_EACH" => ["sweep.lm_chunk"], "RC_SWEEP_" * "PA" * "SSES" => ["sweep.iterations"], "RC_SWEEP_JOINT" => ["sweep.radiometry"],   # the second: its name spelled apart (check_naming R7); the third: version 2's sweep.joint (configuration version 3)
         "RC_RESUME_STATE" => ["resume.state"], "RC_IT_OFFSET" => ["resume.iteration_offset"], "RC_RESUME_SWEEP" => ["resume.sweep"],
         "RC_SELFCHECK_ONLY" => ["selfcheck.only"], "RC_SELFCHECK_POSES" => ["selfcheck.poses"],
         "RC_BACKEND" => ["compute.backend"], "RC_JAC_CHUNK" => ["compute.jacobian_chunk"],
@@ -502,7 +502,13 @@ end
     jrun, jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
     _, joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
     @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.optimizer === jon.refinement.optimizer && joff.refinement.radiometry isa RC.RadiometryBlockDescent
-    @test RC.config_dict(jrun, jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(jrun, joff, joff_stops)["sweep"]["joint"] == "off"
+    @test RC.config_dict(jrun, jon, joff_stops)["sweep"]["radiometry"] == "joint_radiometry" && RC.config_dict(jrun, joff, joff_stops)["sweep"]["radiometry"] == "radiometry_block_descent"
+    # version 3 names the algorithm by its tag; version 2's switch is refused in a current file, naming its version
+    cur = RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
+    @test cur == 3 && RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "vignetting" => none["vignetting"],
+                                                            "sweep" => Dict{String, Any}("radiometry" => "joint_radiometry")))[2].refinement.radiometry isa RC.JointRadiometry
+    @test occursin("sweep.joint", thrown_message(() -> RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "sweep" => Dict{String, Any}("joint" => "on")))))
+    @test_throws ArgumentError RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "sweep" => Dict{String, Any}("radiometry" => "joint")))
     @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
     for (t, k) in switches
         cfg(v) = Dict{String, Any}(t => Dict{String, Any}(k => v))
@@ -547,10 +553,10 @@ end
     @test isempty(RC.boolean_switch_violations([joinpath(RC_ROOT, "configs")]))
 end
 
-@testitem "pipeline options (TOML): the configuration converter — version 1 ([lm], the old key spellings) reads as version 2" setup = [RCFixtures, PipelineOptionsHelpers] begin
+@testitem "pipeline options (TOML): the configuration converter — version 1 ([lm], the old key spellings) reads as the current version" setup = [RCFixtures, PipelineOptionsHelpers] begin
     old = "sensor_characteris" * "ation"                                       # the British spelling, split (check_naming's banned word)
     cur = RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
-    @test cur == 2
+    @test cur == 3
     # a version-1 file (no config_version): [lm] is the optimizer's table, the old key spelling the current key, values as stored
     v1 = Dict{String, Any}("lm" => Dict{String, Any}("max_iter" => 7, "log" => "x.tsv"), "camera" => Dict{String, Any}(old => "s.json"))
     run, alg, stops = RC.read_calibration(v1)
@@ -560,7 +566,7 @@ end
     @test occursin("optimizer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "lm" => Dict{String, Any}()))))
     @test occursin("sensor_characterization",
                    thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "camera" => Dict{String, Any}(old => "s.json")))))
-    @test occursin("newer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 3))))
+    @test occursin("newer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => cur + 1))))
     # the writer states the current version, and its record reads back
     d = RC.config_dict(run, alg, stops)
     @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && (r2 = RC.read_calibration(d); r2[1] == run && r2[2].refinement.settings == alg.refinement.settings)

@@ -18,6 +18,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   LmStops(; max_iter = 40, ftol = 1e-12), verbose)` lose their `sweeps`/`reltol` fields; `JointRadiometry` takes its optimizer as an
   argument (was its `damping`) and its inner LM's stops as a field (were hard-wired). `RadiometricRefinement(settings; …,
   radiometry_stops)` holds the stops of its sweeps between LM chunks (`[sweep] iterations`, as before). The same sweeps, bit for bit.
+- **Breaking: configuration version 3: `[sweep] radiometry`, the closed-form blocks' algorithm by its tag** (`RADIOMETRY_TAGS`,
+  a Core `TagRegistry`: `"radiometry_block_descent"` | `"joint_radiometry"`), in place of the switch `[sweep] joint` that picked it.
+  `RC_CONFIG_VERSIONS`' step 2 → 3 reads a version-2 (or earlier) file's `joint = "on"` / `"off"` as the tag; a current file holding
+  `joint` is refused naming its version. configs/default.toml is version 3.
 - **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
   `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
   converge now says so in one line, as the parametric starts did).

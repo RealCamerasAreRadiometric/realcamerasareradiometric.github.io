@@ -621,7 +621,7 @@ _with_schedule(a::RadiometryBlockDescent; vignetting_smoothness = a.vignetting_s
 _with_schedule(a::JointRadiometry; vignetting_smoothness = 0.0, verbose = a.verbose) =
     (_check_joint_smoothness(vignetting_smoothness); JointRadiometry(a.optimizer; a.stops, verbose))
 _check_joint_smoothness(w) = w == 0 ||
-    throw(ArgumentError("JointRadiometry has no vignetting smoothness penalty; `vignetting.smoothness` weight = $(repr(w)) (`sweep.joint` with a smoothness)"))
+    throw(ArgumentError("JointRadiometry has no vignetting smoothness penalty; `vignetting.smoothness` weight = $(repr(w)) (`sweep.radiometry = \"joint_radiometry\"` with a smoothness)"))
 
 const _BLOCKS_ALL = (; light = true, vignetting = true, mu = true)
 

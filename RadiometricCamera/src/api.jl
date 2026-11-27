@@ -46,7 +46,7 @@ public CalibrationData, CalibrationParameters, flat_vignetting, center_constrain
        config_dict, write_pipeline_config, IOOptions, LensIdentityOptions, FrontendOptions, CameraOptions, GridOptions,
        StartPerturbationOptions, FocusOptions, MaskOptions, RenderingOptions, LightingOptions, MaterialOptions,
        VignettingOptions, WarpingOptions, EdgeOptions, ResumeOptions, SelfcheckOptions,
-       ComputeOptions, OPTIMIZER_TAGS, RC_CONFIG_VERSIONS, config_key, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, default_backend, FIXABLE_BLOCKS,
+       ComputeOptions, OPTIMIZER_TAGS, RADIOMETRY_TAGS, RC_CONFIG_VERSIONS, config_key, FRONTEND_TAGS, VIGNETTING_CONFIG_TAGS, BACKEND_TAGS, rc_backend, default_backend, FIXABLE_BLOCKS,
        PIPELINE_PATH_KEYS, PIPELINE_OUTPUT_KEYS, START_RECORD_FILE, START_MASKS_DIR, load_refinement_start, masked_observations, Unweighted, AbstractFrontend, BlobFrontend, vignetting_center, SchoepsFrontend, AbstractComputeBackend,
        CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule,
        DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason

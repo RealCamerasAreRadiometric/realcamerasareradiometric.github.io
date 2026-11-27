@@ -41,18 +41,25 @@ using VisualGeometryToolkitCore: toml_default, parse_defaults
     RC_CONFIG_VERSIONS
 
 RadiometricCamera's configuration converter (VisualGeometryToolkitCore's `ConfigVersions`): a run's TOML states `config_version`
-(configs/default.toml: the current one, 2). Version 1 (RC ≤ 0.3: the LM's settings in `[lm]`) is read at version 2 through
+(configs/default.toml: the current one, 3). Version 1 (RC ≤ 0.3: the LM's settings in `[lm]`) is read at version 2 through
 `migrate_config`: `[lm]` is the `[optimizer]` table, its keys kept, and the key `camera.sensor_characteris…ation` (the British
-spelling, before owner decision 11: American in identifiers) is `camera.sensor_characterization`, its value as it was, so every
-config of record of version 1 loads as it is on disk.
+spelling, before owner decision 11: American in identifiers) is `camera.sensor_characterization`, its value as it was. Version 2's
+`[sweep] joint` (a switch that picked the closed-form blocks' algorithm) is version 3's `[sweep] radiometry`, the algorithm's tag
+([`RADIOMETRY_TAGS`](@ref)): `"on"` → `"joint_radiometry"`, `"off"` → `"radiometry_block_descent"`. Every config of record of an
+earlier version loads as it is on disk.
 """
 const RC_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera",
     VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
                                          "vignetting", "warping", "edge", "lm", "sweep", "resume", "selfcheck", "compute"],
                               renames = ["lm" => "optimizer",
-                                         "camera.sensor_characteris" * "ation" => "camera.sensor_characterization"]);   # (the old spelling split: check_naming's banned word)
+                                         "camera.sensor_characteris" * "ation" => "camera.sensor_characterization"]),   # (the old spelling split: check_naming's banned word)
+    VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
+                                         "vignetting", "warping", "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"],
+                              values = ["sweep.joint" => v -> ("sweep.radiometry" => _joint_radiometry_tag(v))]);
     tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material", "vignetting", "warping",
               "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"])
+# version 2's `sweep.joint` switch as version 3's `sweep.radiometry` tag (a Bool refused as every switch's, `read_switch`)
+_joint_radiometry_tag(v) = read_switch(v, "sweep.joint") ? "joint_radiometry" : "radiometry_block_descent"
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
 # `parse_defaults`/`toml_default`, as every stack package's file is (the binding name is per-package infrastructure in Core's check_duplication).
 const _TOML_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "..", "configs", "default.toml")); versions = RC_CONFIG_VERSIONS)
@@ -249,14 +256,20 @@ Base.@kwdef struct OptimizerTable <: AbstractOptionsTable
 end
 _table_name(::Type{OptimizerTable}) = "optimizer"
 
-"""`[sweep]`: the refinement's closed-form (lighting, vignetting, μ) solves — `iterations` the sweeps of one solve, `joint` the
-blocks jointly ([`JointRadiometry`](@ref); else [`RadiometryBlockDescent`](@ref)) — and `lm_chunk`, the LM iterations between two
-of them (0: none between): the table [`read_calibration`](@ref) reads into a [`RadiometricCalibration`](@ref)'s `radiometry` and
+"""The tags of the closed-form blocks' algorithms (`sweep.radiometry`; a Core `TagRegistry`): [`RadiometryBlockDescent`](@ref) and
+[`JointRadiometry`](@ref)."""
+const RADIOMETRY_TAGS = TagRegistry(:radiometry, "", "radiometry_block_descent" => RadiometryBlockDescent, "joint_radiometry" => JointRadiometry;
+                                    paths = [r"sweep\.radiometry"])
+
+"""`[sweep]`: the refinement's closed-form (lighting, vignetting, μ) refines — `radiometry` their algorithm (a tag of
+[`RADIOMETRY_TAGS`](@ref): [`RadiometryBlockDescent`](@ref) or [`JointRadiometry`](@ref) of the optimizer; version 2's `joint`
+switch), `iterations` the sweeps of one solve (its stops) — and `lm_chunk`, the LM iterations between two of them (0: none
+between): the table [`read_calibration`](@ref) reads into a [`RadiometricRefinement`](@ref)'s `radiometry`, `radiometry_stops` and
 `lm_chunk`. Not a table of [`CalibrationSettings`](@ref): the refinement's own fields."""
 Base.@kwdef struct SweepTable <: AbstractOptionsTable
     lm_chunk::Int = _option_default(SweepTable, :lm_chunk)                                   # LM iterations between sweeps (0 = no sweeps)
     iterations::Int = _option_default(SweepTable, :iterations)                               # block-solve iterations of one sweep
-    joint::Bool = _option_default(SweepTable, :joint)                                        # the closed-form blocks jointly (JointRadiometry)
+    radiometry::Type = _option_default(SweepTable, :radiometry)                              # the closed-form blocks' algorithm (RADIOMETRY_TAGS)
 end
 _table_name(::Type{SweepTable}) = "sweep"
 

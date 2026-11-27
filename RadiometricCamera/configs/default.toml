@@ -4,8 +4,9 @@
 # [--set table.key=value ...]) states only what differs; an unknown table or key is refused.
 # A switch is the string "on" | "off" (RC 0.11.4, owner 2026-11-15): TOML true/false is refused, naming the new spelling.
 
-config_version = 2   # the configuration's version (RadiometricCamera's RC_CONFIG_VERSIONS): 1 (RC ≤ 0.3) named the optimizer's table [lm],
-                     #   read at 2 as [optimizer]; a config without the key is version 1
+config_version = 3   # the configuration's version (RadiometricCamera's RC_CONFIG_VERSIONS): 1 (RC ≤ 0.3) named the optimizer's table [lm],
+                     #   read as [optimizer]; 2 picked the closed-form blocks' algorithm by the switch [sweep] joint, read as
+                     #   [sweep] radiometry; a config without the key is version 1
 fixed = []           # the blocks held at their start: poses, camera (the geometric camera's parameters), focus, aperture, material,
                      #   vignetting, lighting, inplane; none by default (RC 0.11.0: lm.fixed moved here, "grid" renamed "camera")
 
@@ -147,7 +148,7 @@ support_min = 0.1    # a node with less than this share of the mean data weight 
 # the gauge V(centre) = 1 is exact (the centre's free direction eliminated); no key pins it
 smoothness = { type = "pspline", order = 3, weight = 0.0 }   # [vignetting.smoothness]: the closed-form vignetting solve's Δ³ penalty over the
                           # free nodes (weight normalized as the grid's; 0 = none; "gcv" = chosen by generalized cross-validation
-                          # in every solve; not with sweep.joint) | "none"
+                          # in every solve; not with sweep.radiometry = "joint_radiometry") | "none"
 boundary_order = 2   # the dependent nodes' extrapolation past the supported nodes, 2 (Δ²c = 0) | 3 (Δ³c = 0)
 chart = "projective"  # the chart of the normalized radius: projective ρ = d / (r_max + d) (Core 0.10.11's knots: the linear chart's pixel
                      # spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1: no pixel is ever clamped, whatever the
@@ -185,7 +186,8 @@ log = ""             # EXPERIMENT (nlls5): append a per-iteration line of the LM
 [sweep]
 lm_chunk = 0         # LM iterations between closed-form (lighting, vignetting, μ) sweeps; 0 = no sweeps
 iterations = 5       # block-solve iterations of one sweep
-joint = "off"        # solve the closed-form blocks jointly (their joint Levenberg–Marquardt)
+radiometry = "radiometry_block_descent"   # the closed-form blocks' algorithm: "radiometry_block_descent" | "joint_radiometry" (their
+                                          #   joint Levenberg–Marquardt, of the [optimizer]); version 2: joint = "off" | "on"
 
 [resume]
 state = ""             # continue from this state file (state.json)

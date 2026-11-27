@@ -209,8 +209,8 @@ end
 
 The radiometric calibration a run's TOML states: `run` its [`RunOptions`](@ref) (the problem's context), `algorithm` the
 [`RadiometricCalibration`](@ref) of the [`RadiometricRefinement`](@ref) of its [`CalibrationSettings`](@ref) ([`pipeline_options`](@ref)), of its `[optimizer]` table (`type`, a tag of [`OPTIMIZER_TAGS`](@ref): Core's
-`LevenbergMarquardt` at Levenberg's damping λ·I; `log`, its per-iteration log) and of its `[sweep]` table (`joint`: the closed-form
-blocks by [`JointRadiometry`](@ref) of the optimizer, else [`RadiometryBlockDescent`](@ref); `iterations` the sweeps of their stops,
+`LevenbergMarquardt` at Levenberg's damping λ·I; `log`, its per-iteration log) and of its `[sweep]` table (`radiometry`: the closed-form
+blocks' algorithm, a tag of [`RADIOMETRY_TAGS`](@ref) — [`JointRadiometry`](@ref) of the optimizer or [`RadiometryBlockDescent`](@ref); `iterations` the sweeps of their stops,
 `radiometry_stops`; `lm_chunk`), and `stops` its solve's stop settings (Core's
 `LmStops`: `max_iter`, `max_time`, `ftol`, `xtol_rel` of the table, Core's absolute step tolerance of record) —
 `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run)), algorithm; stops)`. A version-1 config's `[lm]` is the `[optimizer]` table ([`RC_CONFIG_VERSIONS`](@ref)).
@@ -222,7 +222,7 @@ function read_calibration(d::AbstractDict; set = ())
     t = _read_table(OptimizerTable, get(d, "optimizer", Dict{String, Any}()), "optimizer")
     sw = _read_table(SweepTable, get(d, "sweep", Dict{String, Any}()), "sweep")
     optimizer = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping())   # the optimizer `t.type` names (one tag, OPTIMIZER_TAGS)
-    radiometry = sw.joint ? JointRadiometry(optimizer) : RadiometryBlockDescent()
+    radiometry = _radiometry_algorithm(sw.radiometry, optimizer)   # the algorithm `sw.radiometry` names (RADIOMETRY_TAGS)
     algorithm = RadiometricCalibration(RadiometricRefinement(settings; optimizer, radiometry, radiometry_stops = _radiometry_stops(sw.iterations),
                                                              sw.lm_chunk, log = t.log))
     return run, algorithm, VgtkCore.LmStops(; max_iter = t.max_iter, max_time = t.max_time, ftol = t.ftol, xtol_rel = t.xtol_rel, xtol = CORE_LM_XTOL)
@@ -233,9 +233,14 @@ function config_dict(run::RunOptions, algorithm::RadiometricCalibration, stops::
     d = config_dict(run, r.settings)
     d["optimizer"] = toml_table(OptimizerTable(; type = VgtkCore.LevenbergMarquardt, stops.max_iter, stops.max_time, stops.ftol, stops.xtol_rel,
                                                r.log))
-    d["sweep"] = toml_table(SweepTable(; r.lm_chunk, iterations = r.radiometry_stops.max_iter, joint = r.radiometry isa JointRadiometry))
+    d["sweep"] = toml_table(SweepTable(; r.lm_chunk, iterations = r.radiometry_stops.max_iter, radiometry = _radiometry_type(r.radiometry)))
     return d
 end
+# the closed-form blocks' algorithm of its tag's type (`[sweep] radiometry`), and the type of an algorithm (its tag's)
+_radiometry_algorithm(::Type{JointRadiometry}, optimizer::VgtkCore.LevenbergMarquardt) = JointRadiometry(optimizer)
+_radiometry_algorithm(::Type{RadiometryBlockDescent}, ::VgtkCore.LevenbergMarquardt) = RadiometryBlockDescent()
+_radiometry_type(::JointRadiometry) = JointRadiometry
+_radiometry_type(::RadiometryBlockDescent) = RadiometryBlockDescent
 write_pipeline_config(dir::AbstractString, run::RunOptions, algorithm::RadiometricCalibration, stops::VgtkCore.LmStops; header::AbstractString = "") =
     _write_pipeline_config(dir, config_dict(run, algorithm, stops), run; header)
 

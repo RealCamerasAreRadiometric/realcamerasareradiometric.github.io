@@ -133,6 +133,7 @@ _vignetting_model(::Type{M}, key) where {M} =
                         "about the principal point (the tensor-product surface is no option of the pipeline since 2026-11-14)"))
 _option_from_toml(::Type{ComputeOptions}, ::Val{:backend}, v, key) = BACKEND_TAGS[convert_field(String, v, key)]
 _option_from_toml(::Type{OptimizerTable}, ::Val{:type}, v, key) = OPTIMIZER_TAGS[convert_field(String, v, key)]
+_option_from_toml(::Type{SweepTable}, ::Val{:radiometry}, v, key) = RADIOMETRY_TAGS[convert_field(String, v, key)]
 # a penalty weight: a number β ≥ 0, or the string "gcv" (selected by Estimation's GeneralizedCrossValidation() at its defaults)
 function _penalty_weight_from_toml(v, key)
     v isa AbstractString && (v == "gcv" ? (return VgtkEstimation.GeneralizedCrossValidation()) : throw(ArgumentError("`$key` = $(repr(v)) is not a weight β ≥ 0 or \"gcv\"")))
@@ -210,6 +211,7 @@ toml_field(c::VignettingOptions, ::Val{:model}) = tag_of(VIGNETTING_TAGS, c.mode
 toml_field(c::VignettingOptions, ::Val{:chart}) = switch_spelling(c.chart, VrtkCore.RADIAL_CHART_TAGS)
 toml_field(c::ComputeOptions, ::Val{:backend}) = tag_of(BACKEND_TAGS, c.backend)
 toml_field(c::OptimizerTable, ::Val{:type}) = tag_of(OPTIMIZER_TAGS, c.type)
+toml_field(c::SweepTable, ::Val{:radiometry}) = tag_of(RADIOMETRY_TAGS, c.radiometry)
 toml_field(c::GridOptions, ::Val{:lattice}) = switch_spelling(c.lattice, LATTICE_TAGS)
 toml_field(c::GridOptions, ::Val{:start_perturbation}) = c.start_perturbation === nothing ? nothing : toml_table(c.start_perturbation)
 toml_field(c::Union{GridOptions, VignettingOptions, FocusOptions}, ::Val{:smoothness}) = smoothness_table(c.smoothness)
