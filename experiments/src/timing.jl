@@ -138,11 +138,11 @@ A replicate's record (`timing_replicate_record`'s fields) read back through Visu
 function load_timing_replicate(path::AbstractString)
     r = VgtkIO.read_record(path)
     r["schema"] == EXPERIMENT_RECORD_SCHEMAS.timing || throw(ArgumentError("$path: schema $(r["schema"]), not $(EXPERIMENT_RECORD_SCHEMAS.timing)"))
-    solve(d) = (; refine_s = Float64(d["refine_s"]), save_s = Float64(d["save_s"]), wall_s = Float64(d["wall_s"]), iterations = Int(d["iterations"]),
+    timing_entry(d) = (; refine_s = Float64(d["refine_s"]), save_s = Float64(d["save_s"]), wall_s = Float64(d["wall_s"]), iterations = Int(d["iterations"]),
                 lm_seconds = Float64(d["lm_seconds"]), refine_compile_s = Float64(d["refine_compile_s"]), save_compile_s = Float64(d["save_compile_s"]),
                 refine_gc_s = Float64(d["refine_gc_s"]))
     P = r["parameters"]; q = r["problem"]
-    return (; schema = String(r["schema"]), replicate = Int(r["replicate"]), warmup = [solve(w) for w in r["warmup"]], timed = solve(r["timed"]),
+    return (; schema = String(r["schema"]), replicate = Int(r["replicate"]), warmup = [timing_entry(w) for w in r["warmup"]], timed = timing_entry(r["timed"]),
             parameters = NamedTuple(Symbol(k) => Int(P[String(k)]) for k in (:camera, :lens, :focus, :aperture, :vignetting, :poses, :target,
                                                                               :lighting, :total, :grid_nodes_present, :lens_solver_coordinates)),
             problem = (; views = Int(q["views"]), image_size = Int.(q["image_size"]), samples_per_view = Int(q["samples_per_view"]),

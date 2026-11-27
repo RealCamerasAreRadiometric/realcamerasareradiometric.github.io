@@ -770,17 +770,22 @@ end
 
 The pose refined from `pose` on the correspondences `pairs` (point => node) at the weights `w`: Core's LevenbergMarquardt (its stop
 settings `LmStops()`) from the origin of the pose's chart (`minimal_manifold`) over the weighted board-plane residuals (`BoardRows`, mm).
-`nothing` when the LM goes non-finite.
+The accepted ends, stated: a solution with a non-finite entry is refused, `nothing`; every refine whose solution is finite is
+accepted whatever its termination record — a tolerance stop (converged), and the iteration cap, a stall or a rejected trial too,
+since the LM keeps only steps that lower the cost, so its pose is never worse than `pose` (the index's next Hungarian round and the
+final pixel refit judge it).
 """
 function board_refit(p::GridPoseProblem, pose, pairs, w::AbstractVector)
     ch = VgtkCore.minimal_manifold(pose)
-    x = _board_lm(BoardRows(ch, p, collect(pairs), sqrt.(w)))
-    any(!isfinite, x) && return nothing
-    return convert(typeof(pose), VgtkCore.retract(ch, x))
+    r = _board_lm(BoardRows(ch, p, collect(pairs), sqrt.(w)))
+    _board_refit_accepted(r) || return nothing
+    return convert(typeof(pose), VgtkCore.retract(ch, r.u))
 end
+# `board_refit`'s acceptance: every refine whose solution is finite (any termination record: the LM keeps only descending steps)
+_board_refit_accepted(r::VgtkCore.FitResult) = all(isfinite, r.u)
 
-# The LM of the rows from the chart origin (a function barrier static in the chart's size): the solution chart vector.
-_board_lm(lm::BoardRows{N}) where {N} = VgtkCore.solve(VgtkCore.RefineProblem(lm, zero(SVector{N, Float64})), VgtkCore.LevenbergMarquardt()).u
+# The LM of the rows from the chart origin (a function barrier static in the chart's size): the refine's FitResult.
+_board_lm(lm::BoardRows{N}) where {N} = VgtkCore.solve(VgtkCore.RefineProblem(lm, zero(SVector{N, Float64})), VgtkCore.LevenbergMarquardt())
 
 """
     index_scoring(p, table) -> AbstractScoring
@@ -962,7 +967,10 @@ end
 
 The pose refined from `pose` on the correspondences `pairs` (point => node) in PIXELS through the problem's camera: Core's
 `LevenbergMarquardt` on Estimation's `AbsolutePoseProblem` (the raw-pixel reprojection error) at `strategy` (`[index] refine_strategy`: plain least squares); an
-`ArgumentError` naming `name` (the photograph refused) when no pose comes back.
+`ArgumentError` naming `name` (the photograph refused) when no pose comes back: `(InitialFailure, NoRule)`, fewer matches than a
+minimal sample. Every other end is accepted, its pose returned: a tolerance stop (converged), and the iteration cap, a stall or a
+rejected last step too, since the LM accepts only steps that lower the reprojection cost, so the pose is never worse than `pose`
+(the photograph's record keeps the refit's residuals, which the evaluation reads).
 """
 function pixel_refit(p::GridPoseProblem, pose, pairs::AbstractDict, strategy; name::AbstractString = "the photograph")
     obs = [_node_point(p, nd) => p.xy[i] for (i, nd) in sort(collect(pairs); by = first)]

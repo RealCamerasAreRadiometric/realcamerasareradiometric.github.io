@@ -175,7 +175,7 @@ end
     # and its SplineLens BoundedCamera (Estimation's CameraRegression over the sensor): the camera held fixed is the spline
     bjson = joinpath(BlobBoards.example_data(:boards), "blob_board_028_fd896.json")
     board = BlobBoards.load_board(bjson)
-    raster = BlobBoards._board_raster(board.image_path, board.bundle, board.config_hash; density = board.density)
+    raster = BlobBoards.board_raster(board)
     k = 8; r8 = [sum(Float32(raster[(i - 1) * k + a, (j - 1) * k + b]) for a in 1:k, b in 1:k) / k^2 for i in 1:(size(raster, 1) ÷ k), j in 1:(size(raster, 2) ÷ k)]
     world_to_r8 = CT.AffineMap(SMatrix{2, 2, Float64}(1 / k, 0, 0, 1 / k), SVector(0.0, 0.0)) ∘ CT.AffineMap(board.bundle, :world, :pixel; density = board.density)
     W, H = 1200, 900
