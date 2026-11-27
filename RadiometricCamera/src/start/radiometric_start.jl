@@ -26,5 +26,5 @@ function _vignetting_spec(settings::CalibrationSettings, W₀, H₀, coverage, c
     rmax = VgtkCore.farthest_radius(coverage isa VgtkCore.Ellipse ? sensor ∩ coverage : sensor, c)
     return () -> RadialVignetting(n, c, rmax; degree = p, chart),
            @sprintf("radial profile, %d nodes (degree %d, P_0 = P_1) about the principal point (%.1f, %.1f) px, %s chart with %s", n, p, c...,
-                    chart, chart == :linear ? @sprintf("ρ = 1 at %.1f px", rmax) : @sprintf("ρ = ½ at %.1f px (pixel-uniform knots to there, one tail span beyond)", rmax))
+                    switch_spelling(chart, VrtkCore.RADIAL_CHART_TAGS), chart isa VrtkCore.LinearChart ? @sprintf("ρ = 1 at %.1f px", rmax) : @sprintf("ρ = ½ at %.1f px (pixel-uniform knots to there, one tail span beyond)", rmax))
 end

@@ -6,7 +6,7 @@
 
 @testsetup module NoVignettingScene
     using RadiometricCamera, StaticArrays
-    using RadiometricCamera: compute_mask, flat_vignetting, Focus, Material, TexturedTarget, RenderSettings, sphere_radius, 𝔟
+    using RadiometricCamera: compute_mask, flat_vignetting, Focus, Material, TexturedTarget, RenderSettings, sphere_radius
     using VisualGeometryToolkitCore: exp_so3
     import VisualRadiometryToolkitCore
     using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, NoVignetting
@@ -20,12 +20,12 @@
     VisualRadiometryToolkitCore.control_points(::UnitField{T}) where {T} = SMatrix{1, 1, T, 1}(one(T))
     VgtkCore.convert_eltype(::Type{T}, ::UnitField) where {T} = UnitField{T}()
     function no_vignetting_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board()), [0.0, 0.0, 1.5])
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector(0.05, -0.05, 1.5); check = false)
         lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.0, 12.0), 24, 24)
         none = RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386)                    # the default: NoVignetting
         flat = RadiometricCameraModel(lens; focus = 1.5, aperture_radius = 0.0386, vignetting = flat_vignetting(lens))
-        light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))
+        light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), VgtkCore.centroid(board), sphere_radius(VgtkCore.centroid(board), [pose.t]))
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
         mask = compute_mask(flat, pose, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
         unit = RadiometricCamera.with_vignetting(none, UnitField{Float64}())

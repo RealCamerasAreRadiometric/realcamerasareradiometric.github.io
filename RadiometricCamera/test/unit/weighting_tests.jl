@@ -11,7 +11,7 @@
     NL = RC.NLLSsolver
     S = NEScene.SCENE
     state(; kw...) = RC.calibration_problem(S.sc, S.st, RC.with_vignetting(S.camera, VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, NEScene.W, NEScene.W); degree = 2)),
-                                         copy(S.poses), RC.with_μ(S.mat, 0.7), VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, kw...)
+                                         copy(S.poses), RC.with_diffuse_weight(S.mat, 0.7), VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, kw...)
     su = state()
     wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.f.ϕ]
     sw = state(; weights = wts)

@@ -74,14 +74,14 @@ _image_size(v::View) = _image_size(v.geometric)
 
 # ---- the camera-frame maps of a view: VisualRadiometryToolkitCore's, on the view's parts (one-line forwards)
 @inline chief_direction(v::View, 𝐩::StaticVector{2}) = chief_direction(v.geometric, 𝐩)
-@inline 𝔣(v::View, 𝐩::StaticVector{2}) = 𝔣(v.geometric, v.focus, 𝐩)
-@inline t̂(v::View, 𝐩::StaticVector{2}) = t̂(v.geometric, v.focus, 𝐩)
-# (π̂⁻¹ is VisualGeometryToolkitCore's `backproject`: a view's method takes the aperture point as its third argument; the part-wise
+@inline focus_point(v::View, 𝐩::StaticVector{2}) = focus_point(v.geometric, v.focus, 𝐩)
+@inline inverse_focus_distance(v::View, 𝐩::StaticVector{2}) = inverse_focus_distance(v.geometric, v.focus, 𝐩)
+# (the radiometric back-projection π̂⁻¹ is VisualGeometryToolkitCore's `backproject`: a view's method takes the aperture point as its third argument; the part-wise
 # implementation is VisualRadiometryToolkitCore's `aperture_direction`)
-@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = aperture_direction(v.geometric, v.focus, 𝐩, 𝐚)
+@inline VgtkCore.backproject(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = aperture_direction(v.geometric, v.focus, 𝐩, 𝐚)
 """As above with a hoisted `t̂(𝐩)` (evaluated once per sensor sample by `Φ_pixel`)."""
-@inline π̂⁻¹(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = aperture_direction(v.geometric, 𝐩, 𝐚, t̂val)
-@inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = world_ray(v.pose, 𝐚, π̂⁻¹(v, 𝐩, 𝐚))
-@inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, π̂⁻¹(v, 𝐩, 𝐚, t̂val))
+@inline VgtkCore.backproject(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = aperture_direction(v.geometric, 𝐩, 𝐚, t̂val)
+@inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}) = world_ray(v.pose, 𝐚, backproject(v, 𝐩, 𝐚))
+@inline world_ray(v::View, 𝐩::StaticVector{2}, 𝐚::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, backproject(v, 𝐩, 𝐚, t̂val))
 """The view's ray of the aperture point 𝐚 with the UNIT chief direction `chief_direction(𝐩)` hoisted by the caller (once per sensor sample)."""
 @inline world_ray_dir(v::View, 𝐚::StaticVector{3}, dch::StaticVector{3}, t̂val) = world_ray(v.pose, 𝐚, aperture_direction(dch, 𝐚, t̂val))

@@ -5,14 +5,14 @@
 
 @testitem "penalties: the vignetting solve's Δ³ penalty, fixed and by GCV" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
-                             sphere_radius, with_vignetting, 𝔟
+                             sphere_radius, with_vignetting
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
     using VisualGeometryToolkitEstimation: GeneralizedCrossValidation
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     focus_t = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
@@ -20,7 +20,7 @@
     vig_t = let v = TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 6); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:6, j in 1:6]) end
     camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
     camera_0 = with_vignetting(camera_t, TensorProductVignetting((6, 6), VgtkCore.Rect(0, 0, W, H); degree = 2))   # the flat start
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

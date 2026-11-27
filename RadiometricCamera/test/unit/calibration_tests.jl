@@ -1,7 +1,7 @@
 @testitem "calibration" setup = [RCFixtures] begin
     using RadiometricCamera: all_parts, aperture_radius, build_problem, compute_mask, cost, focus, Focus, FocusSpline, Material,
                              PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, _lm_radiometry!,
-                             _update_lighting!, _update_vignetting!, _update_diffuse_weight!, sphere_radius, with_nonlinear, with_vignetting, with_μ, 𝔟
+                             _update_lighting!, _update_vignetting!, _update_diffuse_weight!, sphere_radius, with_nonlinear, with_vignetting, with_diffuse_weight
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
@@ -11,7 +11,7 @@
     using Rotations: rotation_angle, RotMatrix
 
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
@@ -21,7 +21,7 @@
     # the truth field at V(𝐜) = 1, the pin every state holds (2026-11-11: no `pin_center = false`): a solve recovers it exactly
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
     camera_t = RadiometricCameraModel(lens_t, focus_t, r_t, vig_t)          # the true camera; a start's camera is it with another vignetting
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
@@ -42,11 +42,11 @@
     @test size(RC.vignetting_basis(s.f, s.u0)) == (36, count(rule.interior) - 1) && Int(RC.NLLSsolver.nvars(VgtkCore.restrict(VgtkCore.ParameterManifold(s.u0.camera.vignetting), RC.vignetting_basis(s.f, s.u0)))) == count(rule.interior) - 1   # the pin V(𝐜) = 1 takes one direction, always
     P0 = Matrix(s.u0.camera.vignetting.P); _update_vignetting!(s.f, s.u0); P1 = Matrix(s.u0.camera.vignetting.P)
     @test P1 ≈ VgtkCore.extend_controls(rule, P1, P0) && P1[rule.interior] != P0[rule.interior]
-    s = calibration_problem(board, st, camera_t, poses, with_μ(mat_t, 0.8), light_t, targets; masks)
+    s = calibration_problem(board, st, camera_t, poses, with_diffuse_weight(mat_t, 0.8), light_t, targets; masks)
     _update_diffuse_weight!(s.f, s.u0); @test s.u0.mat.diffuse_weight ≈ 0.4 atol = 1e-8
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
-    s = calibration_problem(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
+    s = calibration_problem(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_diffuse_weight(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
     parts_j = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_j; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj = RC.parts_cost(s.f, s.u0, parts_j)
     @test cj < 1e-16 * sum(sum(abs2, v) for v in s.f.ϕ)
     ratio_j = [s.u0.camera.vignetting(SVector(x, y)) / vig_t(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
@@ -93,7 +93,7 @@
     a_p = 0.8 .* a_t; a_p[:, 4] .= 0.0
     s2 = calibration_problem(board, st, RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.15, 0.5)), 30.0, (12.0, 12.0), W, H), Focus(tps_t, fill(1 / 1.7, 9)), 0.03, vig_p),
                           [VgtkCore.retract(VgtkCore.LeftRigidManifold6(p), vcat(SVector(0.01, -0.008, 0.012), SVector(0.01, -0.01, 0.015))) for p in poses],
-                          with_μ(with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), 0.55), EnvironmentLight(SphericalHarmonicMap(a_p, 2), b, r_SH), targets; masks)
+                          with_diffuse_weight(with_nonlinear(mat_t, SVector(0.2, 0.3, 1.5, 1.5, 1.5, 1.4, 1.4, 1.4)), 0.55), EnvironmentLight(SphericalHarmonicMap(a_p, 2), b, r_SH), targets; masks)
     c0 = cost(s2.f, s2.u0)[1]
     # The joint LM recovers EVERY block of this two-view fixture to machine precision (≈ 90 iterations with the relative stopping test at
     # 1e-12: cost/c0 2e-26, r and 𝛂 to 1e-14, μ and the lighting to 1e-12). The (aperture radius, μ, lighting, focus) direction is flat but not
@@ -164,7 +164,7 @@
     targets_r = [render_view(k, with_vignetting(camera_t, vig_r), poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     s = calibration_problem(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
     _update_vignetting!(s.f, s.u0); @test maximum(abs, Matrix(VrtkCore.control_points(s.u0.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
-    s = calibration_problem(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_μ(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
+    s = calibration_problem(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_diffuse_weight(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
     parts_r = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_r; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj_r = RC.parts_cost(s.f, s.u0, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.f.ϕ)
     ratio_r = [s.u0.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
@@ -180,7 +180,7 @@ end
 @testitem "calibration parametric warping" setup = [RCFixtures] begin
     using RadiometricCamera: board_surface, TargetState, build_problem, compute_mask, cost, Focus, FocusSpline, HEIGHT_NC,
                              HEIGHT_NFREE, height_on, Material, PerViewResidual, TexturedTarget, render_view, RenderSettings,
-                             sphere_radius, with_state, 𝔟
+                             sphere_radius, with_state
     # 2026-10-30: the parametric (per-view) route with a FREE board warping — `build_problem(; height_degree = 1)` / `_lm_views!(; height_degree)`:
     # the nodal heights ride in the material block as in the grid route (MaterialVar{Float64, HEIGHT_NC}: 9 + HEIGHT_NFREE columns,
     # h = h₀ + B y, B the board's height_basis), seeded as duals from a FLAT start h₀ = 0 (ForwardDiff's `iszero` of a seeded dual is false, so the
@@ -192,7 +192,7 @@ end
     import VisualRadiometryToolkitCore as VrtkCore
 
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     h_true = SVector{HEIGHT_NC}([3e-3 * (1 - 4 * ((b[1] - 0.5)^2 + (b[2] - 0.5)^2)) + 1e-3 * 4 * (b[1] - 0.5) * (b[2] - 0.5) for b in RC.HEIGHT_NODES])   # bowl 3 mm + saddle 1 mm on the 2 m board
     board_t = RadiometricCamera.with_state(board, TargetState(h = h_true))
@@ -204,7 +204,7 @@ end
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
     vig_t = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     camera_t = RadiometricCameraModel(lens_t, focus_t, r_t, vig_t)
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

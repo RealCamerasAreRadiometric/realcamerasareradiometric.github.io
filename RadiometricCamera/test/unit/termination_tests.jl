@@ -3,14 +3,14 @@
 # converged by definition, with no stationarity postcondition; the caps are not converged (one uniform convergence record, Core's).
 @testitem "refinement termination: a step-size stop is Success (Core 0.11.0: a tolerance stop is converged)" setup = [RCFixtures] begin
     using RadiometricCamera: compute_mask, cost, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
-                             _lm_views!, sphere_radius, 𝔟
+                             _lm_views!, sphere_radius
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     import VisualGeometryToolkitCore as VgtkCore
     import VisualRadiometryToolkitCore as VrtkCore
 
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
@@ -19,7 +19,7 @@
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
     vig_t = RC.gauge_center_value(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

@@ -67,7 +67,7 @@ const BE = RC.rc_backend(BACKEND; fallback = false)          # top level: the ve
 
 function benchmark_board()
     texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-    board = RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture), [0.0, 0.0, 1.5])
     f = 30.9 * W / 24
     K = CameraCalibrationMat(f, 0.0, 0.0, 0.0, f, 0.0, W / 2, H / 2, 1.0)
     lens = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), Size2(W, H))
@@ -75,7 +75,7 @@ function benchmark_board()
     board = RC.with_state(board, surface)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
     poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:VIEWS]
-    b = RC.𝔟(board); r_SH = RC.sphere_radius(b, [p.t for p in poses])
+    b = RC.VgtkCore.centroid(board); r_SH = RC.sphere_radius(b, [p.t for p in poses])
     xs = range(-0.5, 0.5; length = 4)
     flat = TensorProductVignetting((4, 4), Rect(0, 0, W, H); degree = 2)
     vig = VisualRadiometryToolkitCore.with_control_points(flat, [1 - 0.4 * (x^2 + y^2) for x in xs, y in xs])

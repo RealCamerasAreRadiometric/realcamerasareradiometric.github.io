@@ -50,7 +50,7 @@ function fill_unimaged_nodes(values::AbstractVector{<:Real}, nodes::AbstractVect
     else
         f = Focus(FocusSpline(nodes[ok]), v[ok])
         for i in findall(.!ok)
-            v[i] = clamp(t̂(f, SVector{2, Float64}(nodes[i])), lo, hi)
+            v[i] = clamp(inverse_focus_distance(f, SVector{2, Float64}(nodes[i])), lo, hi)
         end
     end
     return v
@@ -125,12 +125,12 @@ end
 
 The data support of the focus surface's nodes under the run's masked pixels `px`: the camera's one support rule (`node_support`,
 the vignetting's) on the nodes' data weights `Σ_pixels b_i(𝐩)²` (`data_weight`), `b_i` the TPS's cardinal function of node `i`
-(the surface with t̂ = 1 at node `i`, 0 at the others: ∂t̂(𝐩)/∂t̂ᵢ). An unsupported node is DEPENDENT: the start (`_start_state`) builds the
+(the surface with t̂ = 1 at node `i`, 0 at the others: ∂inverse_focus_distance(𝐩)/∂t̂ᵢ). An unsupported node is DEPENDENT: the start (`_start_state`) builds the
 TPS on the supported nodes alone, which continues the surface over it (the minimal-bending interpolant of the supported nodes is the
 TPS of all of them with the dependent values continued) — never a free parameter (2026-11-15: the fisheye f/4's four nodes on the
 region's border, a weak share of the data, ran to infinite focus).
 """
 function focus_node_support(f::Focus, px, support_min::Real)
-    sys = FocusSpline(f).sys                                    # the cardinal functions at 𝐩: Core's `nodal_weights`, ∂t̂(𝐩)/∂t̂ᵢ (one SVector)
+    sys = FocusSpline(f).sys                                    # the cardinal functions at 𝐩: Core's `nodal_weights`, ∂inverse_focus_distance(𝐩)/∂t̂ᵢ (one SVector)
     return node_support(data_weight(𝐩 -> VgtkCore.nodal_weights(sys, 𝐩), px, length(f.t̂_i)), support_min)
 end

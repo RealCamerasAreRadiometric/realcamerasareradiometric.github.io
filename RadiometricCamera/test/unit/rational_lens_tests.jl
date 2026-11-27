@@ -1,6 +1,6 @@
 @testitem "division lens (BlobBoards division model)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, Focus, FocusSpline, _image_start, in_domain, Material, PerViewResidual,
-                             TexturedTarget, render_view, RenderSettings, sphere_radius, View, chief_ray, 𝔟
+                             TexturedTarget, render_view, RenderSettings, sphere_radius, View, chief_ray
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
@@ -35,10 +35,10 @@
     # the LM machinery with a rational lens: Jacobian columns of f (tied: the aspect W/H fixed) and the two coefficients vs finite differences
     # of the block's own update (Core's ParameterManifold: f on its log chart)
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     tps_r = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))); focus_r = Focus(tps_r, fill(1 / 1.5, 9))
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    vig_r = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    vig_r = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     camera_r = RadiometricCameraModel(lens, focus_r, 0.0386, vig_r)
     @test has_lens(View(poses[1], camera_r).geometric, VgtkCore.Division{2, Float64})     # the kernels' view keeps the rational lens
     light_r = EnvironmentLight(SphericalHarmonicMap(2.0, 2), b, r_SH); mat_r = Material()

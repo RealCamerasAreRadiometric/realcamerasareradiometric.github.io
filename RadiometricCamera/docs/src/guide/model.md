@@ -50,7 +50,7 @@ RadiometricCamera
 ## Data conventions
 
 Pixel coordinates are COLMAP convention (pixel i spans [i, i+1), centre i + 0.5): every sensor position 𝐩 of the package —
-the cameras' K, the focus and vignetting splines, the masks, the detections — is in them (`𝐩_of_pixel``(u, v)` of
+the cameras' K, the focus and vignetting splines, the masks, the detections — is in them (`sensor_position``(u, v)` of
 Julia's 1-based pixel `(u, v)`). Camera frame x right, y down, z forward; a photograph is the `RadiometricCameraModel` at a
 pose, VisualGeometryToolkitCore's camera → world `EuclideanMap` (`R = R_cw`, `t` = the camera centre 𝐜; world = the board / session frame, metres). Photographs are
 RAW files (VisualGeometryToolkitFeatures' `load_raw_mosaic`, linearised under each photograph's sensor model:
@@ -62,7 +62,7 @@ board textures are read linearly too, as the renderers see them.
 
 ```
 src/RadiometricCamera.jl            module (the identifier → paper-symbol table is its docstring)
-(VisualRadiometryToolkitCore)       RadiometricCameraModel (Θ_d, Θ_f, r, V: the camera, one object), 𝔣, π̂⁻¹, the world rays; Focus;
+(VisualRadiometryToolkitCore)       RadiometricCameraModel (Θ_d, Θ_f, r, V: the camera, one object), focus_point, backproject, the world rays; Focus;
                                     the vignetting fields; the sensor domain ℐ and the quadrature rules; EnvironmentLight; Material
                                     {Θ_m} with D, G₂, F_c, visible-normal sampling and f^CT — the generic radiometric types
 src/camera/                         the geometric camera's chief-ray models and the kernels' view of the radiometric camera

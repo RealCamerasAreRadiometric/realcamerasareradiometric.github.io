@@ -31,7 +31,7 @@ neither BlobBoards nor CaliBlobs. Absolute checks plus the comparison with `gold
 
 | # | consumer | absolute check | golden tolerance |
 |---|---|---|---|
-| 0 | fixture conventions | board-291 chart from `geometry.json` = the checked-in corners; the COLMAP pixel frame (`𝐩_of_pixel`); the rig record loads | — |
+| 0 | fixture conventions | board-291 chart from `geometry.json` = the checked-in corners; the COLMAP pixel frame (`sensor_position`); the rig record loads | — |
 | 1 | `camera.json` → the division camera as Core's pixel camera (a `BoundedCamera` of a `Division` camera model) | the session's residual median (provenance) < 0.15 px | f 0.5 %, centre 3 px, k 0.01, residual 0.03 px |
 | 3 | the 35 × 35 grid init sampled from that camera (`GridLens`) | vs the division camera inside ρ ≤ 0.4: median < 0.05 mrad, p95 < 1 mrad | — |
 | 4 | `target_poses.json` → Blender world (similarity on the board frame) vs the manifest's true poses (centre at the entrance pupil) | rotation < 0.5°, centre < 10 mm, board similarity residual < 1e-9 | 0.1°, 3 mm |
@@ -61,7 +61,7 @@ which the package pins separately (`[compat] VisualGeometryCore = "0.6"`, the pa
   pinhole, unified-camera (ξ = 0.5) and division-model (k₁ = −0.1) back-projections of the normalized point (0.3, 0.2) to 1e-6, the
   adapter's pinhole; a pixel through a pose rotated 90° about z with centre (0.1, 0.2, 0) hitting the board at (0.35, 0.7, 2)
   = chart (0.675, 0.85), the camera coordinates (0.5, −0.25, 2) through `R_cwᵀ(X − 𝐜)` and through the VGC `EuclideanMap`,
-  and the projection back to the pixel; `𝐩_of_pixel` / `pixel_of_𝐩` (the COLMAP pixel frame);
+  and the projection back to the pixel; `sensor_position` / `pixel_position` (the COLMAP pixel frame);
   and one **rendered** check: a board with a single blob at chart (0.6, 0.35), seen by a pinhole 1.5 m above it, must show its
   dark spot at the predicted 1-based pixel (34.1, 30.9).
 

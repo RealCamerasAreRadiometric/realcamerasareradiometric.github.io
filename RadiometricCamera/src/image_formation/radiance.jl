@@ -4,7 +4,7 @@
 #   L_c(𝐱, ω; Θ_r) ≈ (1/N) Σ_{i=1}^{N} f_c^CT(𝐱, ω_o, ω′_i; Θ_m) L_c^SVSH(𝐱, ω′_i; Θ_l) |cos α′(ω′_i)| / PDF(𝐧_i, ω_o; 𝛂)
 #
 # where ω is the direction from the aperture point to the board point 𝐱 (the paper's second argument
-# π̂⁻¹(𝐩, 𝐚) − 𝐚) and ω_o = −ω the outgoing direction of the BRDF, with 𝐧_i ~ D^v(⋅, ω_o; 𝛂(𝐛)),
+# backproject(𝐩, 𝐚) − 𝐚) and ω_o = −ω the outgoing direction of the BRDF, with 𝐧_i ~ D^v(⋅, ω_o; roughness(𝐛)),
 # ω′_i = 2(ω_o⋅𝐧_i)𝐧_i − ω_o. The only surface is the planar
 # board, so 𝐱′(𝐱, ω′) lies on the light sphere (single bounce). The uniform draws
 # come from a counter-based hash of a `SampleKey` (view, pixel, sub-pixel, aperture
@@ -110,7 +110,7 @@ the printed edge) at the DESIGN point the physical 𝐛 shows, blending ink ↔ 
 @inline function _radiance_material(bd::TexturedTarget, m::Material, 𝐛::StaticVector{2})
     ρ = printed_albedo(bd, design_chart(bd, 𝐛))
     wv = texture_weight(ρ)
-    return ρ, 𝛂(m, wv), 𝛈(m, wv)
+    return ρ, roughness(m, wv), refractive_index(m, wv)
 end
 """`L_c`'s Monte-Carlo estimator at its local inputs: the albedo ρ, roughness α, refractive indices η, the outgoing direction ω_l
 (board frame, facing: ω_l[3] > 0) and the board point 𝐱; `Tz` its element type. μ and the lighting enter as they are."""
@@ -162,7 +162,7 @@ function radiance_parts(bd::TexturedTarget, m::Material, lt::EnvironmentLight{<:
     ω_l[3] <= 0 && return RadianceParts{J, T, 3J}(Bd, Bs)
     ρ = printed_albedo(bd, design_chart(bd, 𝐛))   # the texture (or the printed edge) at the DESIGN point the physical 𝐛 shows
     wv = texture_weight(ρ)                                                # the texture value blends ink ↔ no ink
-    α = 𝛂(m, wv); η = 𝛈(m, wv)
+    α = roughness(m, wv); η = refractive_index(m, wv)
     h = key_hash(s, key)
     Tu = typeof(ForwardDiff.value(zero(T)))
     pdf_guard = eps(Tu) * Tu(10000)

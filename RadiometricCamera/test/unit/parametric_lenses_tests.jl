@@ -4,7 +4,7 @@
 @testitem "Kannala–Brandt / 14-coefficient lenses (cv2, parametric LM)" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, in_domain, lens_type_name, load_lens,
                              load_model, load_parametric_lens, Material, PerViewResidual, TexturedTarget, render_view,
-                             RenderSettings, _lm_views!, save_lens, sphere_radius, View, chief_ray, 𝔟
+                             RenderSettings, _lm_views!, save_lens, sphere_radius, View, chief_ray
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points
@@ -91,7 +91,7 @@
     # the per-view parametric route with an 18-coordinate lens block (Core's ParameterManifold of the pixel camera, the skew fixed): layout,
     # Jacobian vs finite differences of the block's own update, a few LM steps
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     lens_t = _cv14(SVector(1.288, 1.288, 0.01, -0.02, -0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005), 24, 24)
     tps_t = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))); focus_t = Focus(tps_t, [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -99,7 +99,7 @@
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
     camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
     @test has_lens(View(poses[1], camera_t).geometric, typeof(VgtkIO.opencv_lens(zeros(14))))     # the kernels' view keeps the 14-coefficient lens
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

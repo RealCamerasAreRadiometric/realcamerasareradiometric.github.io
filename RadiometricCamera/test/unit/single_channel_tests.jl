@@ -6,7 +6,7 @@
 
 @testsetup module SingleChannelScene
     using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
-                             sphere_radius, 𝔟
+                             sphere_radius
     using RadiometricCamera, StaticArrays
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap

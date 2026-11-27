@@ -85,13 +85,13 @@ end
 
 @testitem "lattice padding: a start whose node counts are not patch multiples runs through build_problem_grid and the LM" setup = [RCFixtures, SchoepsSource] begin
     using RadiometricCamera: build_problem_grid, compute_mask, _exact_start, Focus, FocusSpline, GRID_PATCH, grid_dims, _image_start,
-                             grid_present, Material, TexturedTarget, render_view, RenderSettings, _lm_tiles!, sphere_radius, 𝔟
+                             grid_present, Material, TexturedTarget, render_view, RenderSettings, _lm_tiles!, sphere_radius
     using RadiometricCamera, StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
 
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     spline = subdivided(_image_start(src_t, (10, 10)).camera, 2)                      # a SplineLens source of 7 × 7 cells split 2 × 2: 17 nodes per axis
@@ -102,7 +102,7 @@ end
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
     vig = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
     camera = RadiometricCameraModel(glens, focus, 0.0386, vig)
-    b = 𝔟(board)
+    b = VgtkCore.centroid(board)
     a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, sphere_radius(b, [p.t for p in poses]))
     mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

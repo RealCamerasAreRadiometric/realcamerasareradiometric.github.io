@@ -18,7 +18,7 @@ include(joinpath(@__DIR__, "..", "unit", "fixture_camera.jl"))
 
 dev = rc_backend(get(ARGS, 1, "cpu"))
 W, H, n, reps = length(ARGS) >= 5 ? parse.(Int, ARGS[2:5]) : (6000, 4000, 27500, 3)
-board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board(); facing = [0.0, 0.0, 1.5])
+board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], fixture_board()), [0.0, 0.0, 1.5])
 pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.1, 0.05, 0.0))), SVector{3}(SVector(0.05, -0.05, 1.5)); check = false)
 f = 0.9 * W                                                              # the board fills about half the frame
 camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), f, (W / 2, H / 2), W, H), Focus(3, 1.5, W, H), 0.0386,

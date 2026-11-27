@@ -13,7 +13,7 @@ using VisualGeometryToolkitCore: exp_so3
 using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
 # the public names of RadiometricCamera (not exported, D13) and the generic radiometric layer's (VisualRadiometryToolkitCore's) the stage uses
 using RadiometricCamera: compute_mask, render_view, RenderSettings, sphere_radius, _image_start
-using VisualRadiometryToolkitCore: TexturedTarget, Focus, FocusSpline, Material, intersect_board, world_point, 𝐩_of_pixel, pixel_of_𝐩, 𝔟
+using VisualRadiometryToolkitCore: TexturedTarget, Focus, FocusSpline, Material, intersect_board, world_point, sensor_position, pixel_position
 using VisualGeometryToolkitCore: chart, cost
 const RC = RadiometricCamera
 include(joinpath(@__DIR__, "..", "unit", "fixture_board.jl"))
@@ -58,7 +58,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "board plane hit" begin
         tex = rand(64, 96, 3)
-        bd = TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+        bd = RadiometricCamera.with_facing(TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex), [0.0, 0.0, 0.0])
         s, 𝐱 = intersect_board(bd, SVector(0.0, 0.0, 0.0), SVector(0.25, 0.5, 1.0))
         @test 𝐱 ≈ SVector(0.5, 1.0, 2.0) atol = 1e-12
         @test s ≈ 2 atol = 1e-12
@@ -78,7 +78,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "ray-tracing pipeline smoke (CPU): mask → render → cost with every lens type" begin
         tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         sensor = 1.288 * 0.066
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))), fill(1 / 1.5, 9))
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
@@ -87,7 +87,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         @test RC.grid_angular_error(gl, rl) < 5e-3                          # 25×25 quasi-interpolation of the rational lens: 1.1 mrad
         vk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
         for lens in (cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), 24, 24), rl, gl, vk)
-            vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+            vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
             camera = RadiometricCameraModel(lens, focus, 0.0386, vig)
             # the contract's values are the paper's integral ∝ r²: the render divides by πr², so the lighting carries it
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.0386^2, 2), b, r_SH); mat = Material()
@@ -131,7 +131,7 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "fixed values: pose, board hit, board chart, forward projection" begin
         tex = fill(0.5, 8, 8, 3)
-        bd = TexturedTarget([-1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+        bd = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 0.0])
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), 100.0, (50.0, 50.0), 100, 100)
         # identity pose: the pixel (75, 37.5) (m = (0.25, −0.125)) hits z = 2 at (0.5, −0.25, 2) → board chart (0.75, 0.375)
         s, X = intersect_board(bd, SVector(0.0, 0.0, 0.0), chief_ray(pin, SVector(75.0, 37.5)))
@@ -154,8 +154,8 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
 
     @testset "fixed values: the pixel convention of the toolchain" begin
         # colmap px (pixel i spans [i, i + 1), centre i + ½): Julia's 1-based pixel (u, v) has its centre at (u − ½, v − ½)
-        @test 𝐩_of_pixel(1, 1) == SVector(0.5, 0.5) && 𝐩_of_pixel(512, 512) == SVector(511.5, 511.5)
-        @test pixel_of_𝐩(SVector(300.25, 70.5)) == SVector(300.75, 71.0)
+        @test sensor_position(1, 1) == SVector(0.5, 0.5) && sensor_position(512, 512) == SVector(511.5, 511.5)
+        @test pixel_position(SVector(300.25, 70.5)) == SVector(300.75, 71.0)
     end
 
     @testset "fixed value through the renderer: a single blob lands on its predicted pixel" begin
@@ -166,8 +166,8 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         ι1 = [clamp(hypot((j - 0.5) / 256 - C[1], (i - 0.5) / 256 - C[2]) / Rb, 0.0, 1.0) for i in 1:256, j in 1:256]
         tex1 = cat(ι1, ι1, ι1; dims = 3)
         o = [-1.0, -1.0, 0.0]; u = [2.0, 0.0, 0.0]; v = [0.0, 2.0, 0.0]; facing = [0.0, 0.0, 1.5]
-        board = TexturedTarget(o, u, v, tex1; facing)
-        white = TexturedTarget(o, u, v, ones(256, 256, 3); facing)
+        board = RadiometricCamera.with_facing(TexturedTarget(o, u, v, tex1), facing)
+        white = RadiometricCamera.with_facing(TexturedTarget(o, u, v, ones(256, 256, 3)), facing)
         NPX = 48
         pin = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.0, 0.0)), Float64(NPX), (NPX / 2, NPX / 2), NPX, NPX)
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)       # R_cw = diag(1, −1, −1): looking down at the board
@@ -178,10 +178,10 @@ const WORK = get(ENV, "RC_MIG_WORK", joinpath(@__DIR__, "work", "adhoc")); mkpat
         Y = pose.R' * (X - pose.t)                                              # (0.2, 0.3, 1.5)
         @test Y ≈ SVector(0.2, 0.3, 1.5) atol = 1e-12
         pc = VgtkCore.project(pin, Y)                                               # (30.4, 33.6) COLMAP px
-        col, row = pixel_of_𝐩(SVector{2, Float64}(pc))                              # the 1-based pixel: (30.9, 34.1)
+        col, row = pixel_position(SVector{2, Float64}(pc))                              # the 1-based pixel: (30.9, 34.1)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)   # the contract's values are the paper's integral ∝ r²: the lighting carries the πr²
         function render_board(bd)
-            board = bd; b = 𝔟(bd)
+            board = bd; b = VgtkCore.centroid(bd)
             light = EnvironmentLight(SphericalHarmonicMap(2.0 * π * 0.02^2, 2), b, sphere_radius(b, [pose.t]))
             mask = compute_mask(camera, pose, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU())
             return render_view(1, camera, pose, Material(), light, board, st, mask)[:, :, 1], mask

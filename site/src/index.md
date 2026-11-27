@@ -94,12 +94,13 @@ photographs and recovers the lighting, the vignetting and the material from them
 using CUDA                                    # the GPU when there is one: the default device (else the CPU with a warning)
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
 using RadiometricCamera: RenderSettings, compute_mask, render_view, sphere_radius, Φ_pixel
-using VisualRadiometryToolkitCore: Material, 𝔟
+using VisualRadiometryToolkitCore: Material, with_facing
+using VisualGeometryToolkitCore: centroid
 
 # A printed 2 m × 2 m checkerboard of 8 × 8 squares, and a 320 × 240 px fisheye
 # camera (VisualGeometryToolkitCore's double-sphere lens) 1.5 m in front of it, looking at it.
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+board = with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture), [0.0, 0.0, 1.5])
 sz = Size2(320, 240)                          # the image, in pixels
 K = CameraCalibrationMat(412.0, sz)   # focal length 412 px, principal point at the centre
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), sz)
@@ -109,7 +110,7 @@ geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), 
 camera = RadiometricCameraModel(geometric; focus = 1.5, aperture_radius = 0.04)
 # The photograph's pose, camera → world, metres: lookat_pose(camera centre, the point it looks at, the world's up direction, which fixes the roll)
 pose = lookat_pose(Vec3(0.05, -0.05, 1.5), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0))
-light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(board), sphere_radius(𝔟(board), [pose.t]))   # VisualRadiometryToolkitCore's light, L ≡ 1
+light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), centroid(board), sphere_radius(centroid(board), [pose.t]))   # VisualRadiometryToolkitCore's light, L ≡ 1
 settings = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 4)
 mask = compute_mask(camera, pose, board, settings; δ = 0.02)   # on the default device: the GPU, else the CPU
 img = render_view(1, camera, pose, Material(), light, board, settings, mask)   # photograph 1 (its index keys its Monte Carlo samples)

@@ -5,7 +5,7 @@
 # The scene, the CPU problem and the perturbed camera and poses both items use (the GPU item compares its device tiles with `tiles`).
 @testsetup module GridTilesScene
     using RadiometricCamera: build_problem_grid, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget,
-                             render_view, RenderSettings, sphere_radius, 𝔟
+                             render_view, RenderSettings, sphere_radius
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -17,7 +17,7 @@
     export tex, board, W, H, board, src_t, glens_t, tps_t, focus_t, r_t, poses, camera_t, vig_t, b, r_SH, a_t, light_t, mat_t, st, masks, targets, s, prob, idx, tiles, G_p, glens_p, camera_p, poses_p
 
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     src_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     glens_t = _image_start(src_t, (10, 10)).camera               # 7 × 7 cells; patches 5 × 5 → 2 × 2 patch blocks
@@ -28,7 +28,7 @@
     # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
     vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
     camera_t = RadiometricCameraModel(glens_t, focus_t, r_t, vig_t)
-    b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2); a_t[:, 4] .= (0.1, 0.15, 0.2)
     light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
     mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)

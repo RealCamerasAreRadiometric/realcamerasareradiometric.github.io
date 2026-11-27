@@ -1,5 +1,5 @@
-# The focus point and every ray use the UNIT chief direction (decision 2026-10-23): 1/t̂(𝐩) is the distance from the centre of projection to
-# 𝔣(𝐩) for every lens class — including the grid lens, whose bicubic blend of unit node directions is not unit. The grid here has its
+# The focus point and every ray use the UNIT chief direction (decision 2026-10-23): 1/inverse_focus_distance(𝐩) is the distance from the centre of projection to
+# focus_point(𝐩) for every lens class — including the grid lens, whose bicubic blend of unit node directions is not unit. The grid here has its
 # nodes deliberately scaled (±20 %) so that the raw blend is far from unit length.
 @testitem "unit chief direction (focus point)" setup = [RCFixtures] begin
     using Test, StaticArrays, LinearAlgebra, ForwardDiff
@@ -22,12 +22,12 @@
             d̂ = RCU.chief_direction(g_u, 𝐩)
             @test norm(d̂) ≈ 1 atol = 1e-14
             @test d̂ ≈ normalize(RCU.chief_ray(g_u, 𝐩)) atol = 1e-14
-            @test norm(RCU.𝔣(camera_u, 𝐩)) * RCU.t̂(camera_u.focus, 𝐩) ≈ 1 atol = 1e-12  # 𝔭 = 0: the focus distance is exactly 1/t̂
+            @test norm(RCU.focus_point(camera_u, 𝐩)) * RCU.inverse_focus_distance(camera_u.focus, 𝐩) ≈ 1 atol = 1e-12  # 𝔭 = 0: the focus distance is exactly 1/t̂
             for 𝐚 in (SVector(0.0, 0.0, 0.0), SVector(0.003, -0.002, 0.0), SVector(-0.001, 0.0035, 0.0))
-                @test RCU.π̂⁻¹(camera_u, 𝐩, 𝐚) ≈ normalize(RCU.𝔣(camera_u, 𝐩) - 𝐚) atol = 1e-12
-                @test norm(RCU.π̂⁻¹(camera_u, 𝐩, 𝐚)) ≈ 1 atol = 1e-14
+                @test RCU.backproject(camera_u, 𝐩, 𝐚) ≈ normalize(RCU.focus_point(camera_u, 𝐩) - 𝐚) atol = 1e-12
+                @test norm(RCU.backproject(camera_u, 𝐩, 𝐚)) ≈ 1 atol = 1e-14
             end
-            @test RCU.π̂⁻¹(camera_u, 𝐩, SVector(0.0, 0.0, 0.0)) ≈ d̂ atol = 1e-14              # π̂⁻¹(𝐩, 𝔭) = d̂(𝐩)
+            @test RCU.backproject(camera_u, 𝐩, SVector(0.0, 0.0, 0.0)) ≈ d̂ atol = 1e-14              # backproject(𝐩, 𝔭) = d̂(𝐩)
             # the sensor Jacobian of the UNIT direction is tangent to the unit sphere
             Jg = ForwardDiff.jacobian(p -> RCU.chief_direction(g_u, p), 𝐩)
             @test all(abs.(Jg' * d̂) .< 1e-10)

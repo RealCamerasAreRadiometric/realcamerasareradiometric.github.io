@@ -4,15 +4,15 @@
 @testitem "grid I/O (Schöps import)" setup = [RCFixtures] begin
     using RadiometricCamera: grid_dims, _image_start, initialization_region, load_camera, load_grid, load_lens, load_model,
                              load_parametric_lens, load_start, save_grid, save_initialization_region, save_lens,
-                             save_run_parameters, _schoeps_start, _schoeps_start, stored_initialization_region, 𝐩_of_pixel
+                             save_run_parameters, _schoeps_start, _schoeps_start, stored_initialization_region, sensor_position
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
     using Random
 
     @testset "Julia pixel ↔ COLMAP" begin
-        @test 𝐩_of_pixel(1, 1) == SVector(0.5, 0.5)                                # colmap centre 0.5 = 1-based pixel 1
-        @test VrtkCore.pixel_of_𝐩(SVector(320.0, 240.0)) == SVector(320.5, 240.5)
+        @test sensor_position(1, 1) == SVector(0.5, 0.5)                                # colmap centre 0.5 = 1-based pixel 1
+        @test VrtkCore.pixel_position(SVector(320.0, 240.0)) == SVector(320.5, 240.5)
     end
 
     @testset "the records: camera and grid camera round trips" begin

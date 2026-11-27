@@ -11,7 +11,7 @@
     using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap
     const RC = RadiometricCamera
     function run_board(dir, lm::AbstractDict, tex, cam; checkpoint = "on", tables = Dict{String, Any}(), start_only = false)   # tex, cam: RCFixtures' fixture_board(), cam
-        board = RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         W = H = 24
         glens = RC._image_start(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H), (10, 10)).camera
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
@@ -19,7 +19,7 @@
         focus = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
         vig = RC.gauge_center_value(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
         camera = RC.RadiometricCameraModel(glens, focus, 0.0386, vig)
-        b = RC.𝔟(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
+        b = RC.VgtkCore.centroid(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))
         mat = RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         rs = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)

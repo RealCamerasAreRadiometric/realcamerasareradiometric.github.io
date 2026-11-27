@@ -131,7 +131,7 @@ function _frontend(::Type{SchoepsFrontend}, run::RunOptions, ::CalibrationSettin
             @printf("  %s: %d stars, pose fit bearing median %.3f px, camera at (%.3f, %.3f, %.3f) m\n", names[k], length(features[k]), fpx0 * e, poses0[k].t...)
         end
     end
-    board = TexturedTarget(𝐨, 𝐮, 𝐯, texture; facing = poses0[1].t, design = Symbol(splitext(basename(run.frontend.texture))[1]))
+    board = with_facing(TexturedTarget(𝐨, 𝐮, 𝐯, texture; design = Symbol(splitext(basename(run.frontend.texture))[1])), poses0[1].t)
     flip < 0 && @warn "the state's page frame has rows along −y (page_flip = −1, a state written before 2026-11-05): the same board as +y rotated 180° about x; a new run uses +y"
     return (; board, names, poses0, lens0, init_region, W₀, H₀, st0.resample, features, features_for = (surf::TargetState) -> feature_sets(𝐯, surf.h, surf.inplane), page_flip = flip,
             board_y_sign = 1.0, world = "printed page (origin top-left, x right, y down)")

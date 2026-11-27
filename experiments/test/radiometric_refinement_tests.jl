@@ -42,7 +42,7 @@
         @test last(o).masks.samples_per_view == 8192 && last(o).masks.gradient_bias == 0.0 && last(o).masks.edge_fraction == 0.0 && last(o).masks.addon_samples == 0
         @test last(o).rendering.N == 16 && last(o).rendering.n_p == 2 && last(o).rendering.hammersley
         @test (last(o).material.alpha_ink, last(o).material.alpha_noink, last(o).material.eta_ink, last(o).material.eta_noink, last(o).material.mu) == (0.6, 0.6, 2.0, 1.3, 0.244)
-        @test last(o).vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && last(o).vignetting.node_count == 19 && last(o).vignetting.chart === :projective
+        @test last(o).vignetting.model === RadiometricCamera.VrtkCore.RadialVignetting && last(o).vignetting.node_count == 19 && last(o).vignetting.chart === RadiometricCamera.VrtkCore.ProjectiveChart()
         @test last(o).warping.degree == 1 && last(o).edge.print_sigma_mm == 0.0277 && stops.max_iter == 25 && isempty(last(o).fixed)
         @test first(o).io.checkpoint_each && first(o).io.channel == "G" && first(o).compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)

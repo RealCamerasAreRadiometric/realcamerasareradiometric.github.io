@@ -1,5 +1,5 @@
 @testitem "B-spline vignetting" setup = [RCFixtures] begin
-    using RadiometricCamera: center_constraint, 𝐩_of_pixel
+    using RadiometricCamera: center_constraint, sensor_position
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualGeometryToolkitCore: center
@@ -24,7 +24,7 @@
     P1 = rand(5, 5); P2 = rand(5, 5); σ = 0.37
     @test with_control_points(vig, σ * P1 + P2)(𝐩) ≈ σ * with_control_points(vig, P1)(𝐩) + with_control_points(vig, P2)(𝐩)
     # radial profile (2026-10-21): a B-spline in the pixel radius about a fixed centre, radially symmetric by construction
-    W, H = 400, 300; 𝐜 = 𝐩_of_pixel(210.0, 140.0); rv = RadialVignetting(7, 𝐜, 120.0)
+    W, H = 400, 300; 𝐜 = sensor_position(210.0, 140.0); rv = RadialVignetting(7, 𝐜, 120.0)
     @test n_control_points(rv) == 7 && size(control_points(rv)) == (7, 1) && center(rv) == 𝐜
     for 𝐩 in (𝐜, SVector(320.0, 90.0), SVector(0.0, 300.0))
         @test rv(𝐩) ≈ 1 && sum(coefficient_jacobian(rv, 𝐩)) ≈ 1                                   # partition of unity, flat start

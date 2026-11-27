@@ -17,11 +17,11 @@
     sphere_radius(b::TexturedTarget, centres) -> r_SH
 
 The pipeline's light-sphere radius about the board centre 𝔟: the farthest of the camera centres AND of the page's corners
-(`sphere_radius(𝔟(b), centres)` is the cameras alone). Every board point then lies inside the sphere, so every light ray from the
+(`sphere_radius(VgtkCore.centroid(b), centres)` is the cameras alone). Every board point then lies inside the sphere, so every light ray from the
 page leaves it through the sphere (Core's `exit_direction` with Δ ≥ 0) — with cameras closer than the page's half-diagonal (the
 27.10 set: 0.61 m against 0.71 m) the corners lay outside, where the exit falls back to the ray's closest point (2026-11-04).
 """
-sphere_radius(b::TexturedTarget, centres) = max(sphere_radius(𝔟(b), centres), maximum(norm(c - 𝔟(b)) for c in corners(b)))
+sphere_radius(b::TexturedTarget, centres) = max(sphere_radius(VgtkCore.centroid(b), centres), maximum(norm(c - VgtkCore.centroid(b)) for c in corners(b)))
 """
     sphere_radius(𝔟, centres) -> r_SH
 

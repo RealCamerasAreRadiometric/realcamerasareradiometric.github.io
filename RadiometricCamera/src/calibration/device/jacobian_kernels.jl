@@ -143,7 +143,7 @@ Base.@propagate_inbounds function _jacobian_row!(J, i, r, ids, bufidx, gidx, H, 
         dt̂ = SMatrix{3, NS, Float64}(ntuple(q -> S[klay.off_f + (q - 1) ÷ 3 + 1, (q - 1) % 3 + 1, iv], Val(3 * NS)))
         _focus_chain!(rows, 0, dt̂, g, klay.focus_cols)
     end
-    𝐩of = ks -> 𝐩_sample(sensor, ks, u, v)
+    𝐩of = ks -> sensor_sample(sensor, ks, u, v)
     if pxy !== nothing                                     # a tile's patches: the chief directions' gradients fanned out on its window
         dg = ntuple(ks -> (x = chief_ray(lensw, 𝐩of(ks));
                            ntuple(c -> _dir_gradient(S[klay.off_dir + 2ks - 1, c, iv], S[klay.off_dir + 2ks, c, iv], x), Val(3))), Val(NS))

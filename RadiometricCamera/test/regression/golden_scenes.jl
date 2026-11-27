@@ -11,8 +11,8 @@
 using RadiometricCamera, StaticArrays, LinearAlgebra
 using RadiometricCamera: all_parts, aperture_radius, TargetState, build_problem, build_problem_grid, compute_mask, cost, focus,
                          Focus, FocusSpline, height_basis, HEIGHT_NFREE, geometric, material, Material, PerViewResidual,
-                         TexturedTarget, render_all, RenderSettings, residuals, _lm_views!, _lm_radiometry!, sphere_radius, t̂,
-                         View, with_sdf, with_μ, Φ_pixel, 𝔟
+                         TexturedTarget, render_all, RenderSettings, residuals, _lm_views!, _lm_radiometry!, sphere_radius, inverse_focus_distance,
+                         View, with_sdf, with_diffuse_weight, Φ_pixel
 const RCg = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
 using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, control_points, EnvironmentLight, SphericalHarmonicMap,
@@ -31,7 +31,7 @@ gold_mat() = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive
 
 """Board, scene (with the warping h and the edge parameters as the stack wants them) and the material."""
 function gold_board(W, H; h = nothing, edge = nothing, sdf = nothing)
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], sdf === nothing ? GOLD_TEX : ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], sdf === nothing ? GOLD_TEX : ones(16, 16, 3)), [0.0, 0.0, 1.5])
     sdf === nothing || (board = with_sdf(board, sdf...))
     m = gold_mat()
     if OLD_STACK
@@ -46,7 +46,7 @@ const GOLD_W = 32                                       # the scenes' image: GOL
 gold_focus() = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, GOLD_W, GOLD_W))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
 gold_vig() = (v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, GOLD_W, GOLD_W); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]))
 function gold_light(board)
-    b = 𝔟(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
+    b = VgtkCore.centroid(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
     return EnvironmentLight(SphericalHarmonicMap(a, 2), b, sphere_radius(b, [p.t for p in gold_poses()]))
 end
 const GOLD_ST = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 42)   # Φ over πr² (re-recorded 2026-11-11: the un-normalized integral is retired)
@@ -75,12 +75,12 @@ function gold_state(board, m, lens)
         views = [View(p, lens, gold_focus(), 0.0386) for p in poses]
         masks = [compute_mask(v, board, GOLD_ST; δ = 0.03, backend = dev) for v in views]
         tg = let p = calibration_problem(board, GOLD_ST, copy(views), gold_vig(), m, light, zero_targets; masks); render_all(p.f, p.u0) end
-        return calibration_problem(board, GOLD_ST, copy(views), vig_start, with_μ(m, 0.55), light_start, tg; masks)
+        return calibration_problem(board, GOLD_ST, copy(views), vig_start, with_diffuse_weight(m, 0.55), light_start, tg; masks)
     end
     camera = gold_camera(lens)
     masks = [compute_mask(camera, p, board, GOLD_ST; δ = 0.03, backend = dev) for p in poses]
     tg = let p = calibration_problem(board, GOLD_ST, camera, poses, m, light, zero_targets; masks); render_all(p.f, p.u0) end
-    return calibration_problem(board, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_μ(m, 0.55), light_start, tg; masks)
+    return calibration_problem(board, GOLD_ST, RCg.with_vignetting(camera, vig_start), poses, with_diffuse_weight(m, 0.55), light_start, tg; masks)
 end
 """
 The height columns of a tile Jacobian in a form that does not depend on the warping's basis. The columns are `J_h = HS · B`
@@ -140,7 +140,7 @@ function gold_outputs()
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
     s3 = deepcopy(s); cost0 = cost(s3.f, s3.u0)[1]; _lm_views!(s3.f, s3.u0; stops = RCg._calibration_stops(; max_iter = 3, ftol = 1e-12, xtol = 1e-14), damping = VgtkCore.LevenbergDamping())
     out["lm3"] = (; cost = cost(s3.f, s3.u0)[1], cost0, Θ_d = collect(RCg.VgtkCore.parameter_vector(VgtkCore.model(geometric(s3.u0)))), t̂ = collect(focus(s3.u0).t̂_i), r = aperture_radius(s3.u0),
-                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.u0.poses], mat = collect(RCg.Θ_m_nonlinear(s3.u0.mat)), μ = s3.u0.mat.diffuse_weight)
+                  poses = [vcat(vec(p.R), collect(p.t)) for p in s3.u0.poses], mat = collect(RCg.nonlinear_parameters(s3.u0.mat)), μ = s3.u0.mat.diffuse_weight)
     # 3. per-tile problem (grid model, warping free): the largest tile
     s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
     prob, _ = build_problem_grid(s.f, s.u0; patch = (5, 5), height_degree = 1)

@@ -84,11 +84,11 @@ end
 @testitem "observation model: a state predicts only photographs read as it was estimated (load_state_into!)" setup = [RCFixtures, ObservationFixtures] begin
     using StaticArrays
     tex = fixture_board()
-    board = RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     camera = small_model(); W = H = 24
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(VgtkCore.exp_so3(SVector(π, 0.0, 0.0))), SVector(0.0, 0.0, 1.4); check = false)]
     a = zeros(3, 9); a[:, 1] .= 1.0
-    light = EnvironmentLight(SphericalHarmonicMap(a, 2), RC.𝔟(board), 2.5)
+    light = EnvironmentLight(SphericalHarmonicMap(a, 2), RC.VgtkCore.centroid(board), 2.5)
     mat = RC.Material(; roughness_ink = 0.2, roughness_paper = 0.3, refractive_index_ink = 1.5, refractive_index_paper = 1.4, diffuse_weight = 0.5)
     settings = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     s = RC.calibration_problem(board, settings, camera, poses, mat, light, [zeros(H, W, 3)])       # decoded renders, no record

@@ -27,10 +27,10 @@ parts (`TargetRadiometry`, … — `RadiometricTarget` is exported, above), the 
 the paper's symbols (`Φ_pixel`, `L_c`, …: public, not exported). The list is `src/api.jl`'s `public` statement.
 
 The generic radiometric types and functions are VisualRadiometryToolkitCore's and are not public names of this package: the camera's
-parts and maps (`geometric`, `focus`, `aperture_radius`, `with_…`, `chief_direction`, `focus_point`, `center_of_projection`, `backproject(camera, 𝐩, 𝐚)`, `world_ray`; the paper's symbols `𝔣`, `𝔭`, `π̂⁻¹`, `t̂`, … are its public aliases of the same functions), the focus surface
-(`Focus`, `FocusSpline`, `t̂`, `𝔱`), the vignetting fields, the sensor domain and quadrature (`𝐩_of_pixel`, `SensorQuadrature`,
+parts and maps (`geometric`, `focus`, `aperture_radius`, `with_…`, `chief_direction`, `focus_point`, `center_of_projection`, `backproject(camera, 𝐩, 𝐚)`, `world_ray`; the paper's symbols `𝔣`, `𝔭`, `π̂⁻¹`, `t̂` are its notation in prose, no alias since its 0.2.0), the focus surface
+(`Focus`, `FocusSpline`, `inverse_focus_distance`, `focus_distance`), the vignetting fields, the sensor domain and quadrature (`sensor_position`, `SensorQuadrature`,
 `ApertureQuadrature`, …), the light (`EnvironmentLight`), the material (`Material`, `cook_torrance`, …) and the board — the textured target
 `TexturedTarget` with its own state `TargetState` (its chart, `albedo`, the printed edge, the warped page, the in-plane print error;
-the paper's `𝔟` and `ρ_c` are aliases there). There is no scene type: a render takes the camera, the pose and the board, and the
+its centre VisualGeometryToolkitCore's `centroid`, its facing `with_facing`). There is no scene type: a render takes the camera, the pose and the board, and the
 image size is the camera's. Import them from there:
 `using VisualRadiometryToolkitCore: Focus, Material`.

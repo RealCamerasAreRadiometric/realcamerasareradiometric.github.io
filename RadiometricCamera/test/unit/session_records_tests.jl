@@ -4,7 +4,7 @@
 # canvas texture (its rectangle and its image), the scene's world is the target's frame, and every view maps the board's points to where
 # the trajectory record maps them.
 @testitem "session records (load_session)" setup = [RCFixtures] begin
-    using RadiometricCamera: board_normal, world_point, 𝔟
+    using RadiometricCamera: board_normal, world_point
     using StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     import VisualGeometryToolkitIO as VgtkIO
@@ -37,8 +37,8 @@
             for X in (SVector(0.0, 0.0, 0.0), SVector(0.03, -0.02, 0.0), SVector(-0.05, 0.04, 0.0))
                 @test inv(ds.poses[k])(X) ≈ T(X) atol = 1e-12
             end
-            @test dot(ds.poses[k].t - 𝔟(b), board_normal(b)) > 0
-            q = VgtkCore.project(ds.lens₀, inv(ds.poses[k])(𝔟(b)))             # the board centre images inside the picture
+            @test dot(ds.poses[k].t - VgtkCore.centroid(b), board_normal(b)) > 0
+            q = VgtkCore.project(ds.lens₀, inv(ds.poses[k])(VgtkCore.centroid(b)))             # the board centre images inside the picture
             @test all(0 .< q .< 128)
         end
         @test ds.d_s > 0 && all(d -> 0.05 < d < 0.2, ds.center_distances)       # the 130 mm board at ≈ 9 cm (130/2000 of the 2 m render)

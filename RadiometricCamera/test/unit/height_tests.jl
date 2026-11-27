@@ -5,7 +5,7 @@
 # The saddle and the two-view scene with its targets both items use.
 @testsetup module HeightScene
     using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, _image_start, HEIGHT_NC, Material, TexturedTarget,
-                             render_all, RenderSettings, sphere_radius, with_state, 𝔟
+                             render_all, RenderSettings, sphere_radius, with_state
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -16,12 +16,12 @@
     export page_board, sad, hh, tex_h, board_hs, Wh, Hh, board_h, board_hh, glens_h, focus_h, poses_h, camera_h, vig_h, b_h, a_h, light_h, mat_h, st_h, masks_h, blank_h, height_true, targets_h
 
     """A board of `aspect` = height / width (2 m wide), seen from z > 0."""
-    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3)), [0.0, 0.0, 1.5])
     hh = SVector{HEIGHT_NC}([VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     # ---------------------------------------------------------------------------------------------------------------
     # 2. a two-view scene of the blob fixture; the truth = a saddle with a 2 % sag of the board width at the edge (≈ 0.6 px at 40°)
     tex_h = fixture_board()
-    board_hs = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+    board_hs = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_h), [0.0, 0.0, 1.5])
     Wh = Hh = 32
     board_h = board_hs
     board_hh(h) = RadiometricCamera.with_state(board_h, TargetState(h = h))               # the warping is the scene's surface parameter
@@ -29,7 +29,7 @@
     focus_h = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wh, Hh))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_h = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_h = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wh, Hh); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
-    b_h = 𝔟(board_hs); a_h = zeros(3, 9); a_h[:, 1] .= (2.0, 1.9, 1.8); a_h[:, 3] .= (0.4, 0.3, 0.2)
+    b_h = VgtkCore.centroid(board_hs); a_h = zeros(3, 9); a_h[:, 1] .= (2.0, 1.9, 1.8); a_h[:, 3] .= (0.4, 0.3, 0.2)
     light_h = EnvironmentLight(SphericalHarmonicMap(a_h, 2), b_h, sphere_radius(b_h, [p.t for p in poses_h]))
     mat_h = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     st_h = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
@@ -67,7 +67,7 @@ end
             @test board_height(W1, hh, 𝐛) ≈ hh[i] - (a[1] + a[2] * 𝐛[1] + a[3] * 𝐛[2]) atol = 1e-10
         end
     end
-    board_h1 = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], rand(8, 8, 3); facing = [0.0, 0.0, 1.5])
+    board_h1 = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], rand(8, 8, 3)), [0.0, 0.0, 1.5])
     @test board_h1.warping isa VgtkCore.MappedSurface                                     # the flat warping's parts, Core's surface
     oh = SVector(0.3, -0.2, 1.4); dh = normalize(SVector(-0.4, 0.3, -1.0))
     sh0, 𝐱h0 = intersect_board(board_h1, oh, dh)
@@ -195,7 +195,7 @@ end
     const Adapt = RC.Adapt
     # a board of a non-square page carries its page's warping (Core's flat surface over its nodes), and its Float32 board the
     # converted one: the same hits to Float32 rounding; adapt (an Array adaptor) keeps it bit for bit
-    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+    tall = RadiometricCamera.with_facing(TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h), [0.0, 0.0, 1.5])
     @test warping_aspect(tall) ≈ 0.7 && tall.warping isa VgtkCore.MappedSurface
     t32 = VgtkCore.convert_eltype(Float32, tall)
     ta = Adapt.adapt(Array, t32)
@@ -220,7 +220,7 @@ end
     # α = 0.7 give the CPU's residuals and height columns
     require_gpu()
     if RC_GPU_TESTS
-        tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h; facing = [0.0, 0.0, 1.5])
+        tall = RadiometricCamera.with_facing(TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex_h), [0.0, 0.0, 1.5])
         @test warping_aspect(tall) ≈ 0.7
         wd = Adapt.adapt(CUDA.CuArray, VgtkCore.convert_eltype(Float32, tall.warping))
         @test wd isa VgtkCore.MappedSurface                                     # the flat field's system on the device
@@ -252,7 +252,7 @@ end
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     const RC = RadiometricCamera
-    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3)), [0.0, 0.0, 1.5])
     W1 = page_board(1.0)
     B = Matrix(RC.height_basis(W1))
     @test B == VgtkCore.retract_jacobian(RC.height_manifold(W1))
@@ -315,7 +315,7 @@ end
     # on a page that is not square.
     h = SVector{HEIGHT_NC}([1e-3 * sin(2.1i) for i in 1:HEIGHT_NC])
     for (Wm, Hm) in ((2.0, 2.0), (0.8, 0.6), (0.297, 0.210), (1.0, 2.5))
-        b = TexturedTarget([0.0, 0.0, 0.0], [Wm, 0.0, 0.0], [0.0, Hm, 0.0], rand(4, 4, 3); facing = [0.4, 0.3, 1.5])
+        b = RadiometricCamera.with_facing(TexturedTarget([0.0, 0.0, 0.0], [Wm, 0.0, 0.0], [0.0, Hm, 0.0], rand(4, 4, 3)), [0.4, 0.3, 1.5])
         metric = VgtkCore.ThinPlateSplineSystem([SVector(n[1] * Wm, n[2] * Hm) for n in RC.HEIGHT_NODES])
         wm, am = VgtkCore.tps_coefficients(metric, collect(h))
         probes = [SVector(x, y) for x in 0.05:0.1:0.95 for y in 0.05:0.1:0.95]
@@ -334,7 +334,7 @@ end
     end
     # the per-axis chart is NOT the same bending on a non-square page (the defect this replaces): a measurable difference
     chart_tps = VgtkCore.ThinPlateSplineSystem(RC.HEIGHT_NODES)
-    page_board(aspect) = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])
+    page_board(aspect) = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0 * aspect, 0.0], rand(4, 4, 3)), [0.0, 0.0, 1.5])
     wc, _ = VgtkCore.tps_coefficients(chart_tps, collect(h))
     old(𝐛) = VgtkCore.tps_evaluate(chart_tps.nodes, wc, zero(SVector{3, Float64}), 𝐛)
     wp = page_board(0.5)

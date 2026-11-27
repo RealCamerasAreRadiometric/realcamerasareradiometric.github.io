@@ -13,20 +13,20 @@
     exported = Set(n for n in names(RC) if Base.isexported(RC, n) && n !== :RadiometricCamera)   # (names() lists the public names too)
     @test exported == documented
     @test length(exported) <= 20                                                   # a headline, not the package
-    @test !Base.ispublic(RC, :𝔣) && !Base.ispublic(RC, :𝔭) && RC.𝔣 === RC.VrtkCore.𝔣     # the paper's camera symbols are VisualRadiometryToolkitCore's
+    @test !isdefined(RC, :𝔣) && !isdefined(RC, :𝔭) && RC.focus_point === RC.VrtkCore.focus_point     # the camera's maps are VisualRadiometryToolkitCore's (its 0.2.0: no notation alias)
     for n in (:Φ_pixel, :render_view, :build_problem, :build_problem_grid, :save_state, :load_distance_map, :selfcheck)
         @test Base.ispublic(RC, n) && !Base.isexported(RC, n)
     end
     # the board is VisualRadiometryToolkitCore's textured target with its own state, and there is no scene (owner 2026-11-20): its names
     # are that package's (imported here where used, never public here), and the retired ones are refused by name with the replacement
-    @test RC.TexturedTarget === RC.VrtkCore.TexturedTarget && RC.TargetState === RC.VrtkCore.TargetState && RC.𝔟 === RC.VrtkCore.target_center
+    @test RC.TexturedTarget === RC.VrtkCore.TexturedTarget && RC.TargetState === RC.VrtkCore.TargetState && !isdefined(RC, :𝔟)   # the board's centre: Core's `centroid`
     @test !any(n -> Base.ispublic(RC, n), (:TexturedTarget, :TargetState, :PrintedTarget, :BoardSurface, :Scene, :with_surface, :with_state, :ρ_c, :𝔟,
                                            :intersect_board, :HEIGHT_NC, :edge_albedo))
     @test_throws "the board is VisualRadiometryToolkitCore's `TexturedTarget`" RC.PrintedTarget(nothing, nothing)
     @test_throws "VisualRadiometryToolkitCore's `TargetState(; h, edge, inplane)`" RC.BoardSurface()
     @test_throws "there is no scene type. The image size is the camera's" RC.Scene(nothing, 4, 4)
     @test_throws "VisualRadiometryToolkitCore's `with_state(board, state)`" RC.with_surface(nothing, nothing)
-    @test_throws "`albedo` (the paper's symbol stays its alias, `ρ_c`)" RC.ρ_c(nothing, nothing)
+    @test_throws "`albedo`" RC.albedo(nothing, nothing)
     @test_throws "`edge_albedo(target, 𝐛)`" RC.edge_albedo(nothing, nothing, nothing)
     @test_throws "`posed_target(target)`" RC.posed_target(nothing)
     @test_throws "`physical_chart`" RC.physical_chart(nothing, nothing, nothing)

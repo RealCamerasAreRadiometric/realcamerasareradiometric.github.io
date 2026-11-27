@@ -309,10 +309,10 @@ end
     @test 0.2 * s1.masked < length(s2.px) < 0.4 * s1.masked
     # the footprint (one row of page_rows, the KernelAbstractions kernel on the CPU backend): the pinhole's is the chief ray's bilinear
     # texels times V (the pixel-centre quadrature); the learned one spreads, sums to V
-    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.camera.vignetting(RC.𝐩_of_pixel(u, v))
+    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.camera.vignetting(RC.sensor_position(u, v))
     row(camera) = (R = page_rows(ctx, [(1, u, v)], camera, (; all = [true]), Dict(1 => [1]); device = VgtkCore.KA.CPU()); (R.kept[1], R.blocks.all.A[1, :]))
     okp, rp = row(variant_camera(ctx, "pinhole"; pinhole_r = 1e-9))
-    o, d = RC.world_ray(ctx.camera, ctx.poses[1], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
+    o, d = RC.world_ray(ctx.camera, ctx.poses[1], RC.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
     tw = Dict(texel_weights(RC.chart(ctx.bd, 𝐱), TW, TH))
     @test okp && sum(rp) ≈ Vuv && all(isapprox(Vuv * get(tw, t, 0.0), rp[t]; atol = 1e-9) for t in findall(!iszero, rp))
     okl, rl = row(variant_camera(ctx, "learned"; pinhole_r = 1e-9))

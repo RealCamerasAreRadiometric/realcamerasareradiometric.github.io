@@ -2,8 +2,8 @@
 # Radiant flux of pixel 𝐮 (paper eq. rad-flux-with-vignetting: the aperture integral divided by |𝒜| = πr²), with the aperture
 # integral pulled back to the fixed unit disc 𝒟 (𝐚 = r â, d𝐚 = r² dâ):
 #
-#   Φ_c(𝐮; Θ̄) ≈ 1/(πr²) ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟 r² L_c(π̂⁻¹(𝐩, r â; Θ_c), π̂⁻¹(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
-#              =  1/π    ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟    L_c(π̂⁻¹(𝐩, r â; Θ_c), π̂⁻¹(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
+#   Φ_c(𝐮; Θ̄) ≈ 1/(πr²) ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟 r² L_c(backproject(𝐩, r â; Θ_c), backproject(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
+#              =  1/π    ∫_{ℐ_𝐮} V(𝐩; Θ_v) ∫_𝒟    L_c(backproject(𝐩, r â; Θ_c), backproject(𝐩, r â; Θ_c) − r â; Θ_r) dâ d𝐩
 #
 # The r² of the substitution cancels against the normalisation: the rule's weights are r² w̃ (Σ w̃ = π) and Φ_pixel divides its sum
 # by πr², so r is no scale of the flux and enters through the nodes r â alone (the defocus).
@@ -44,7 +44,7 @@ end
 @inline pixel_id(u::Integer, v::Integer, H::Integer) = UInt64((u - 1) * H + v)
 
 """Per-sensor-sample seed of the hoisted `t̂` value: slot `fbase + ks` of a dual (the focus chain rule —
-`∂Φ/∂t̂_i = Σ_ks ∂Φ/∂t̂(𝐩_ks) · gᵢ(𝐩_ks)` with the TPS nodal weights `g` applied on the host). `nothing`: no seed."""
+`∂Φ/∂t̂_i = Σ_ks ∂Φ/∂inverse_focus_distance(𝐩_ks) · gᵢ(𝐩_ks)` with the TPS nodal weights `g` applied on the host). `nothing`: no seed."""
 @inline _t̂_seeded(x, ::Nothing, ks::Integer) = x
 """The unit partial of slot `slot` as a dual of `P` partials (zero when the slot is outside `1:P`: a sentinel or another chunk's)."""
 @inline _unit_partial(::Type{Tag}, ::Type{V}, slot::Integer, ::Val{P}) where {Tag, V, P} =
@@ -83,7 +83,7 @@ end
 end
 """The seeded `t̂` (the focus surface's thin plate spline at 𝐩) and the unit chief direction of a sensor sample."""
 @inline function _focus_and_dir(view::View, 𝐩, fseed, dirseed, ks::Integer)
-    t̂s = _t̂_seeded(t̂(view.focus, 𝐩), fseed, ks)
+    t̂s = _t̂_seeded(inverse_focus_distance(view.focus, 𝐩), fseed, ks)
     return t̂s, normalize(_dir_seeded(chief_ray(view.geometric, 𝐩), dirseed, ks, t̂s))
 end
 @inline function _t̂_seeded(x::ForwardDiff.Dual{Tag, V, P}, fbase::Integer, ks::Integer) where {Tag, V, P}
@@ -251,12 +251,12 @@ radiance.
     pid = pixel_id(u, v, H)
     rays = _pixel_rays(hrays, board)                                    # the board warping h's relief, formed once for the pixel's rays
     @inbounds for ks in 1:length(st.sensor)
-        𝐩 = 𝐩_sample(st.sensor, ks, u, v)
+        𝐩 = sensor_sample(st.sensor, ks, u, v)
         V𝐩 = vig(𝐩)
         t̂s, dch = _focus_and_dir(view, 𝐩, fseed, dirseed, ks)   # t̂ and the UNIT chief direction, hoisted once per sensor sample (seeded, then normalised)
         inner = _ray_zero(hrays, Tz)
         for la in 1:n_disc(st.aperture)
-            𝐚 = 𝐚_sample(st.aperture, la, view.r)
+            𝐚 = aperture_sample(st.aperture, la, view.r)
             o, d = world_ray_dir(view, 𝐚, dch, t̂s)
             ri = (ks - 1) * n_disc(st.aperture) + la
             s, 𝐱, 𝐧 = _ray_hit(hrays, lrays, ri, rays, o, d)                # the board warping h (the plane when zero); a chunk: the recorded hit's tangent plane
@@ -264,7 +264,7 @@ radiance.
             𝐱ᵣ = _ray_point(hrays, s, 𝐱, o, d)
             𝐛 = chart(bd, 𝐱ᵣ)
             L = _ray_radiance(lrays, ri, bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱ᵣ, d, 𝐧)
-            inner = _ray_add(hrays, inner, 𝐚_weight(st.aperture, la, view.r) * L, s)
+            inner = _ray_add(hrays, inner, aperture_weight(st.aperture, la, view.r) * L, s)
         end
         acc += (st.sensor.weights[ks] * V𝐩) * inner
     end
@@ -339,13 +339,13 @@ const _MASK_CORNERS = (SVector(-0.5, -0.5), SVector(0.5, -0.5), SVector(-0.5, 0.
     u, v = _decode_px(id, f.H)
     view, bd, ap = f.view, f.board, f.aperture
     for c in _MASK_CORNERS
-        𝐩 = 𝐩_of_pixel(u + c[1], v + c[2])
+        𝐩 = sensor_position(u + c[1], v + c[2])
         in_domain(view.geometric, 𝐩) || return false
-        o, d = world_ray(view, 𝐩, 𝔭)
+        o, d = world_ray(view, 𝐩, center_of_projection)
         s, 𝐱 = intersect_board(bd, o, d)
         (isfinite(s) && s > 0 && inside(chart(bd, 𝐱), f.δ)) || return false
         for j in 1:n_border(ap)
-            𝐚, _, _, _ = 𝐚_border(ap, j, view.r)
+            𝐚, _, _, _ = aperture_border_sample(ap, j, view.r)
             o, d = world_ray(view, 𝐩, 𝐚)
             s, 𝐱 = intersect_board(bd, o, d)
             (isfinite(s) && s > 0 && inside(chart(bd, 𝐱), f.δ)) || return false
@@ -423,7 +423,7 @@ function tie_channels(light::EnvironmentLight, c::Integer)
     return with_coefficients(light, a[[light_tie(c, ch) for ch in 1:3], :])
 end
 function tie_channels(m::Material, c::Integer)
-    θ = Θ_m_nonlinear(m)
+    θ = nonlinear_parameters(m)
     return with_nonlinear(m, SVector(ntuple(i -> θ[material_tie(c)[i]], Val(8))))
 end
 
@@ -431,7 +431,7 @@ end
 """
     material_tie(c) -> NTuple{8, Int}
 
-The single-channel layout of the material's 8 nonlinear coordinates (`Θ_m_nonlinear`'s order: `α_ink, α_¬ink, η_ink[1:3],
+The single-channel layout of the material's 8 nonlinear coordinates (`nonlinear_parameters`'s order: `α_ink, α_¬ink, η_ink[1:3],
 η_¬ink[1:3]`): each coordinate's source in a channel-`c` fit — the α's their own, every channel's η_ink channel `c`'s (`2 + c`),
 every η_¬ink channel `c`'s (`5 + c`); `c = 0` (the three channels) each its own. `material_sources(c)` are the sources, the fit's
 coordinates in order. `tie_channels`, `MaterialVar`'s update, the Jacobian's columns (`_channel_jacobian`) all read it.

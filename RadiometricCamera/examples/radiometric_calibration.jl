@@ -4,7 +4,7 @@
 # calibration board through it, and refines the lens radiometrically against real photographs. Every symbol is the paper's:
 #
 # * `π⁻¹(𝐩)` chief-ray back-projection of the sensor point 𝐩 (COLMAP pixels, ℐ = [0, W] × [0, H]), `Θ_d` its parameters;
-# * `𝔣(𝐩) = 𝔭 + π⁻¹(𝐩)/t̂(𝐩)` the focus surface, `t̂` the inverse focus depth (thin plate spline with kernel `U` and affine part
+# * `𝔣(𝐩) = 𝔭 + π⁻¹(𝐩)/inverse_focus_distance(𝐩)` the focus surface, `t̂` the inverse focus depth (thin plate spline with kernel `U` and affine part
 #   `a_1, a_x, a_y`, nodal values `Θ_f`); `π̂⁻¹(𝐩, 𝐚)` the radiometric back-projection through the aperture point `𝐚 = r â`;
 # * `V(𝐩; Θ_v)` vignetting (B-spline surface, V = 1 at the sensor centre), `L_SH` / `L_SVSH` the ambient light on the sphere `(𝔟, r_SH)`
 #   (`Θ_l`), `cook_torrance` the Cook–Torrance SVBSDF with `𝛂, 𝛈` blended by the texture value and the diffuse weight `μ` (`Θ_m`);
@@ -20,7 +20,7 @@
 using RadiometricCamera, StaticArrays, LinearAlgebra, Statistics, Printf, Random
 using RadiometricCamera: grid_angular_error, grid_dims, GridStart, ImageLattice, DerivedLattice, load_camera, load_session, render_all, RenderSettings, _lm_tiles!,
                          save_grid, all_parts, RadiometryBlocks, RadiometryBlockDescent, sphere_radius
-using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, t̂, 𝔟   # the generic radiometric layer
+using VisualRadiometryToolkitCore: aperture_radius, focus, Focus, FocusSpline, geometric, Material, inverse_focus_distance   # the generic radiometric layer
 using VisualGeometryToolkitCore: cost                                        # a calibration's ½ Σ (Φ − ϕ)² and its relative RMS
 import CUDA, KernelAbstractions
 import VisualRadiometryToolkitCore as VrtkCore
@@ -89,7 +89,7 @@ focus0 = Focus(FocusSpline(nodes), [normalize(VgtkCore.backproject(lens0, 𝐩))
 r0 = 17e-3 / (2 * 8)                                                          # f/8 → r = f / (2N) = 1.06 mm
 vig0 = VrtkCore.TensorProductVignetting((5, 5), VgtkCore.Rect(0, 0, W, H); degree = 2)
 camera0 = RadiometricCameraModel(lens0, focus0, r0, vig0)                    # the radiometric camera: geometric camera, focus, aperture, vignetting
-b = 𝔟(ds.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
+b = VgtkCore.centroid(ds.board); r_SH = sphere_radius(b, [p.t for p in ds.poses])
 light0 = VrtkCore.EnvironmentLight(VrtkCore.SphericalHarmonicMap(1.0, 2), b, r_SH)
 mat0 = Material(; roughness_ink = 0.15, roughness_paper = 0.4, refractive_index_ink = 1.6, refractive_index_paper = 1.33, diffuse_weight = 0.5)
 st = RenderSettings(; n_𝐩 = 2, n_ρ = 3, n_φ = 8, N = 8)

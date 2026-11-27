@@ -14,7 +14,7 @@
 #     --limit           evaluate only the first n candidates (a timing probe)
 using RadiometricCamera, Printf, StaticArrays
 using RadiometricCamera: all_parts, cost, set_vignetting!, RadiometryBlocks, RadiometryBlockDescent
-using VisualRadiometryToolkitCore: Material, with_μ
+using VisualRadiometryToolkitCore: Material, with_diffuse_weight
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
 const RC = RadiometricCamera
@@ -76,10 +76,10 @@ function fit_light_mu!(s, parts)
     lighting(s) = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false, mu = false)), RadiometryBlockDescent())
     best = (Inf, 0.5)
     for μ in 0.0:0.1:1.0
-        s.u0.mat = with_μ(s.u0.mat, μ); c = lighting(s).metadata.cost
+        s.u0.mat = with_diffuse_weight(s.u0.mat, μ); c = lighting(s).metadata.cost
         c < best[1] && (best = (c, μ))
     end
-    s.u0.mat = with_μ(s.u0.mat, best[2]); c = lighting(s).metadata.cost
+    s.u0.mat = with_diffuse_weight(s.u0.mat, best[2]); c = lighting(s).metadata.cost
     r = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false)), RadiometryBlockDescent(; sweeps = 100, reltol = 1e-7))
     return min(c, r.metadata.cost)
 end

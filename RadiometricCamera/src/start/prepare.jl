@@ -77,7 +77,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     sensor = run_sensor(run, W₀, H₀)                            # Core's Sensor: the image's pixels, the pitch of the sensor width
     f_m = start === nothing ? fpx * _pixel_pitch(sensor) : _recorded(start, :f_m, fpx * _pixel_pitch(sensor))   # the focal length (m)
     board = g.target
-    𝐛_c = 𝔟(board)
+    𝐛_c = VgtkCore.centroid(board)
     d_c = start === nothing ? mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0) : _recorded(start, :d_c, mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0))
     d_s = f_m * d_c / (d_c - f_m)
     # the run's one support: Core's imaged region of the lens whose lens coverage is the capture set's, as `camera.lens_coverage` states
@@ -119,7 +119,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     st = RenderSettings(; n_𝐩 = settings.rendering.n_p, n_ρ = settings.rendering.n_rho, n_φ = settings.rendering.n_phi, N = settings.rendering.N,
                         hammersley = settings.rendering.hammersley)
     settings.rendering.hammersley && @printf("radiance samples: the Hammersley set of %d, shifted per (view, pixel, sub-pixel, aperture) key\n", settings.rendering.N)
-    b = 𝔟(board); r_SH = sphere_radius(board, [v.pose.t for v in views0])          # ≥ the page's corners too (2026-11-04)
+    b = VgtkCore.centroid(board); r_SH = sphere_radius(board, [v.pose.t for v in views0])          # ≥ the page's corners too (2026-11-04)
     @printf("light sphere: r_SH %.3f m about the board centre (farthest camera %.3f m, farthest page corner %.3f m)\n", r_SH,
             sphere_radius(b, [v.pose.t for v in views0]), maximum(norm(c - b) for c in corners(board)))
     rng = StableRNG(settings.masks.seed)                                            # version-stable stream (_subsample)

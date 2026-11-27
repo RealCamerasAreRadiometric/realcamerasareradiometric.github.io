@@ -4,7 +4,7 @@
 @testitem "Core lens as a fixed pixel camera" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, grid_angular_error, _image_start, in_domain,
                              Material, PerViewResidual, TexturedTarget, render_view, RenderSettings, _lm_views!, sphere_radius,
-                             chief_ray, 𝔟
+                             chief_ray
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
@@ -54,11 +54,11 @@
     @test fixed_f && names_f == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(l))) && free_names(RC.lens_manifold(l; fixed = VgtkCore.parameter_names(VgtkCore.model(l)))) == names_f
     # per-view problem with a KB lens on the synthetic board: Jacobian layout, zero distortion columns, LM smoke
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     lk = cam(VgtkCore.KannalaBrandt(-0.01, 0.002, 0.0, 0.0), 31.2, (12.24, 11.52), 24, 24)
     tps_k = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, 24, 24))); focus_k = Focus(tps_k, fill(1 / 1.5, 9))
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    vig_k = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+    vig_k = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2); b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
     camera_k = RadiometricCameraModel(lk, focus_k, 0.0386, vig_k)
     light_k = EnvironmentLight(SphericalHarmonicMap(2.0, 2), b, r_SH); mat_k = Material()
     st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)

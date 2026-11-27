@@ -35,7 +35,7 @@
 
     # 3. the options: no centre keys; the retired ones are unknown keys (Core check_keys lists the allowed)
     o = RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial", "chart" => "projective")))
-    @test last(o).vignetting.chart == :projective && RC.pipeline_options(RC.config_dict(o...)) == o
+    @test last(o).vignetting.chart == RC.VrtkCore.ProjectiveChart() && RC.pipeline_options(RC.config_dict(o...)) == o
     @test !any(k -> haskey(RC.config_dict(o...)["vignetting"], k), ("center", "center_px", "center_bound_px"))
     bad(t) = thrown_message(() -> RC.pipeline_options(Dict("vignetting" => t)))
     for k in ("center", "center_px", "center_bound_px")
@@ -62,12 +62,12 @@
     op = RC.pipeline_options(Dict("vignetting" => Dict("model" => "radial", "node_count" => 19, "chart" => "projective")))
     vl = RC._vignetting_spec(last(ol), Ws, Hs, nothing, c)[1]()
     mkp, dp = RC._vignetting_spec(last(op), Ws, Hs, nothing, c); vp = mkp()
-    @test vl isa RadialVignetting && radial_chart(vl) == :linear && center(vl) == c
+    @test vl isa RadialVignetting && radial_chart(vl) == RC.VrtkCore.LinearChart() && center(vl) == c
     @test field_radius(vl) ≈ maximum(hypot(x - c[1], y - c[2]) for x in (0, Ws), y in (0, Hs))     # no box: r_max is the region's alone
-    @test vp == RadialVignetting(19, c, field_radius(vl); chart = :projective) && radial_chart(vp) == :projective
+    @test vp == RadialVignetting(19, c, field_radius(vl); chart = RC.VrtkCore.ProjectiveChart()) && radial_chart(vp) == RC.VrtkCore.ProjectiveChart()
     @test collect(knot_vectors(vp)[1]) == collect(projective_knots(19, 3)) && occursin("principal point", dp) && occursin("projective", dp)
     # the defaults of 0.11.4 (configs/default.toml): the projective chart, 19 nodes
-    @test RC.CalibrationSettings().vignetting.chart === :projective && RC.CalibrationSettings().vignetting.node_count == 19
+    @test RC.CalibrationSettings().vignetting.chart === RC.VrtkCore.ProjectiveChart() && RC.CalibrationSettings().vignetting.node_count == 19
     @test !occursin("FREE", dp)
     @test RC.CalibrationSettings().vignetting.model === RadialVignetting && !hasfield(RC.VignettingOptions, :size)   # the one field the pipeline builds
 
@@ -87,7 +87,7 @@
 
     # 6. _same_field: the centre and the chart count
     @test RC._same_field(v16, v16) && !RC._same_field(v16, with_center(v16, c + SVector(30.0, 0.0))) &&
-          !RC._same_field(v16, RadialVignetting(16, c, 2560.5; chart = :projective))
+          !RC._same_field(v16, RadialVignetting(16, c, 2560.5; chart = RC.VrtkCore.ProjectiveChart()))
 
     # 7. the records: Core's projective profile in a radiometric camera round-trips through IO's body
     mktempdir() do dir

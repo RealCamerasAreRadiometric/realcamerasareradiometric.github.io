@@ -382,7 +382,7 @@ function sheet_scene(cc::RC.CalibratedCamera, target, sheet, design_png::Abstrac
     names = [String(p[1]) for p in poses]
     photos = RC.photo_set(cc, [RC.photo_file(images_dir, n) for n in names]; characterization)   # THE entry point, the camera's own model
     cam_poses = [EuclideanMap(SMatrix{3, 3, Float64}(R'), SVector{3, Float64}(-R' * t); check = false) for (_, R, t) in poses]   # camera → world
-    bd = VrtkCore.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3); facing = cam_poses[1].t)
+    bd = VrtkCore.with_facing(VrtkCore.TexturedTarget(𝐨, 𝐮, 𝐯, fill(0.5, 4, 4, 3)), cam_poses[1].t)
     surf = VrtkCore.TargetState(; h = zero(target.warping), edge = RC.edge_parameters(target.radiometry))
     board = VrtkCore.with_state(bd, surf); rays = VrtkCore.BoardRays(board)
     img = VgtkFeatures.load_linear_image(design_png); TH, TW = size(img, 1), size(img, 2)
@@ -442,7 +442,7 @@ function sample_pixels(ctx, k::Integer, external; fraction::Real, seed::Integer,
     rng = StableRNG(seed + k); px = NTuple{4, Float64}[]
     for (u, v) in RC.masked_pixels(mask)
         rand(rng) < fraction || continue
-        o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[k], RC.𝐩_of_pixel(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
+        o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[k], RC.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
         (isfinite(sr) && sr > 0) || continue
         𝐛 = VgtkCore.chart(ctx.bd, 𝐱); push!(px, (u, v, 𝐛[1] * ctx.page_mm[1], 𝐛[2] * ctx.page_mm[2]))
     end
@@ -555,13 +555,13 @@ _footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
     TW, TH = Int(f.TW), Int(f.TH)
     base = (Int(q) - 1) * _footprint_slots(st); n = 0; tot = 0.0
     @inbounds for ks in 1:length(st.sensor)
-        𝐩 = RC.𝐩_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
+        𝐩 = RC.sensor_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
         for la in 1:VrtkCore.n_disc(st.aperture)
-            𝐚 = RC.𝐚_sample(st.aperture, la, rs)
+            𝐚 = RC.aperture_sample(st.aperture, la, rs)
             o, d = VrtkCore.world_ray(view, 𝐩, 𝐚); sr, 𝐱 = VrtkCore.intersect_board(rays, o, d)
             (isfinite(sr) && sr > 0) || return Int32(0)
             tw = texel_weights(VgtkCore.chart(bd, 𝐱), TW, TH); tw === nothing && return Int32(0)
-            w = sw * RC.𝐚_weight(st.aperture, la, rs)
+            w = sw * RC.aperture_weight(st.aperture, la, rs)
             for (t, b) in tw                                           # the texel's slot (a linear search of the ≤ n so far), or a new one
                 c = Int32(t); i = base + 1
                 while i <= base + n && f.cols[i] != c
@@ -576,7 +576,7 @@ _footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
         end
     end
     tot > 0 || return Int32(0)
-    V = f.vig(RC.𝐩_of_pixel(Int(u), Int(v)))
+    V = f.vig(RC.sensor_position(Int(u), Int(v)))
     @inbounds for i in (base + 1):(base + n)
         f.vals[i] = V * (f.vals[i] / tot)
     end
@@ -1375,7 +1375,7 @@ function page_photograph(img::AbstractMatrix, lens, R, t; TW::Integer, TH::Integ
     n = SVector{3, Float64}(R[1, 3], R[2, 3], R[3, 3]); tt = SVector{3, Float64}(t); nt = dot(n, tt)   # the page's plane in the camera frame: n · X = n · t
     Rm = SMatrix{3, 3, Float64}(R)
     function on_page(u, v)                                           # pixel (u, v)'s chief ray on the page, in texels from its top-left corner
-        𝐩 = RC.𝐩_of_pixel(u, v)
+        𝐩 = RC.sensor_position(u, v)
         RC.in_domain(lens, 𝐩) || return SVector(NaN, NaN)
         d = SVector{3, Float64}(VgtkCore.backproject(lens, 𝐩)); all(isfinite, d) || return SVector(NaN, NaN)
         s = nt / dot(n, d); (isfinite(s) && s > 0) || return SVector(NaN, NaN)

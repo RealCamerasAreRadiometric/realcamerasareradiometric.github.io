@@ -200,7 +200,7 @@ function _tied_material_coordinates(u, start::Integer, n::Integer, c::Integer)
 end
 # The material and the surface finite.
 _finite_material(m::Material, s::TargetState) =
-    all(isfinite, Θ_m_nonlinear(m)) && isfinite(m.diffuse_weight) && all(isfinite, s.h) && all(isfinite, s.edge) && all(isfinite, s.inplane)
+    all(isfinite, nonlinear_parameters(m)) && isfinite(m.diffuse_weight) && all(isfinite, s.h) && all(isfinite, s.edge) && all(isfinite, s.inplane)
 """Number of free height parameters of the block: `HEIGHT_NFREE` when the warping is free (dual columns), else 0."""
 n_height_free(::MaterialVar{T, NH}) where {T, NH} = NH > 0 ? HEIGHT_NFREE : 0
 NLLSsolver.nvars(v::MaterialVar) = static(1 + n_material_nonlinear(v) + n_height_free(v) + n_inplane(v))
@@ -211,10 +211,10 @@ n_inplane(::MaterialVar{T, NH, NI}) where {T, NH, NI} = NI
 (α > 0), η = 1 + eᵘ (η > 1: a dielectric in air; the floor keeps a value rounded to η = 1 movable), μ = lo + (hi − lo) σ(w) on the
 block's `mu_bounds`; held (`HM`, `fixed = (:material,)`): unchanged."""
 function _material_update(v::MaterialVar, u, start)
-    θ = Θ_m_nonlinear(v.mat)
+    θ = nonlinear_parameters(v.mat)
     θ′ = SVector(ntuple(i -> i <= 2 ? θ[i] * exp(u[start + i - 1]) : 1 + max(θ[i] - 1, 1e-9) * exp(u[start + i - 1]), Val(8)))
     lo, hi = v.mu_bounds
-    return with_μ(with_nonlinear(v.mat, θ′), _μ_chart(v.mat.diffuse_weight, u[start + 8], lo, hi))
+    return with_diffuse_weight(with_nonlinear(v.mat, θ′), _μ_chart(v.mat.diffuse_weight, u[start + 8], lo, hi))
 end
 _material_update(v::MaterialVar{T, NH, NI, HB, CH, true}, u, start) where {T, NH, NI, HB, CH} = v.mat
 function NLLSsolver.update(v::MaterialVar{T, NH, NI, HB, CH, HM}, u, start = 1) where {T, NH, NI, HB, CH, HM}
@@ -242,7 +242,7 @@ end
 return of a Jacobian, beside `_log_r_column!`."""
 @inline function _chart_material_columns!(Jm, lay, m::MaterialVar)
     lay.μ_col > 0 || return Jm
-    θ = Θ_m_nonlinear(m.mat)
+    θ = nonlinear_parameters(m.mat)
     @inbounds for i in 1:8
         Jm[:, lay.μ_col - 9 + i] .*= (i <= 2 ? θ[i] : θ[i] - 1)
     end
@@ -401,9 +401,9 @@ end
 """The focus's nodal weights at every sensor sample of pixel `(u, v)` (closure-free for type stability): Core's `nodal_weights` of
 the focus's thin plate spline system at the sample's sensor position."""
 @inline _nodal_weights_at(tps, sensor, u, v, ::Val{NS}) where {NS} =
-    ntuple(ks -> VgtkCore.nodal_weights(tps.sys, 𝐩_sample(sensor, ks, u, v)), Val(NS))
+    ntuple(ks -> VgtkCore.nodal_weights(tps.sys, sensor_sample(sensor, ks, u, v)), Val(NS))
 
-"""Chain rule for the focus columns of one pixel: `J[row, focus_cols[i]] = Σ_ks ∂Φ/∂t̂(𝐩_ks) · gᵢ(𝐩_ks)`."""
+"""Chain rule for the focus columns of one pixel: `J[row, focus_cols[i]] = Σ_ks ∂Φ/∂inverse_focus_distance(𝐩_ks) · gᵢ(𝐩_ks)`."""
 @inline function _focus_chain!(Jm, row0::Integer, dt̂::SMatrix{3}, g, focus_cols)
     fc0 = first(focus_cols) - 1
     @inbounds for c in 1:3, i in 1:length(focus_cols)
@@ -420,7 +420,7 @@ end
 parameters constant, the nodal heights seeded at `off_h + 1:HEIGHT_NC` when `off_h > 0` (free warping), the in-plane print error's
 parameters at `off_i + 1:INPLANE_NC` when `off_i > 0`; `sd(x, slot)` = the caller's seeding function. Returns `(mat_d, surf_d)`."""
 function _material_dual(m::Material, surf::TargetState, sd, off_m::Integer, ::Type{D}; off_h::Integer = 0, off_i::Integer = 0) where {D}
-    θm = Θ_m_nonlinear(m)
+    θm = nonlinear_parameters(m)
     mat_d = Material(sd(θm[1], off_m + 1), sd(θm[2], off_m + 2),
                      SVector{3, D}(ntuple(i -> sd(θm[2 + i], off_m + 2 + i), Val(3))),
                      SVector{3, D}(ntuple(i -> sd(θm[5 + i], off_m + 5 + i), Val(3))), sd(m.diffuse_weight, 0))

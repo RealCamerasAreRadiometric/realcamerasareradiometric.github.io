@@ -29,9 +29,9 @@
         return nothing
     end
     @compile_workload begin
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         focus_t = Focus(FocusSpline(grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
-        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+        b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
         light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, r_SH)
         mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
@@ -42,7 +42,7 @@
             cpu = KernelAbstractions.CPU()                                       # the workload's CPU data, chosen (no default's warning)
             masks = [compute_mask(camera, p, board_, st_; δ = 0.02, backend = cpu) for p in poses]
             targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
-            return calibration_problem(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
+            return calibration_problem(board_, st_, camera, poses, with_diffuse_weight(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
         damping = RadiometricRefinement(CalibrationSettings()).optimizer.damping   # the algorithm's default
         per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; kw...); first_block(prob, filter(c -> c isa PerViewResidual{9}, prob.blocks)))

@@ -1,5 +1,5 @@
 @testitem "focus start" setup = [RCFixtures] begin
-    using RadiometricCamera: Focus, FocusSpline, in_domain, t̂
+    using RadiometricCamera: Focus, FocusSpline, in_domain, inverse_focus_distance
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -22,7 +22,7 @@
         @test any(i -> imaged[i] && normalize(VgtkCore.backproject(kb, nodes[i]))[3] < 0, eachindex(nodes)) && count(iszero, t[imaged]) >= 1   # back rays floored
         lo, hi = extrema(t[imaged])
         f = Focus(FocusSpline(nodes[imaged]), t[imaged])
-        @test all(t[i] == clamp(RC.t̂(f, nodes[i]), lo, hi) for i in findall(.!imaged))
+        @test all(t[i] == clamp(RC.inverse_focus_distance(f, nodes[i]), lo, hi) for i in findall(.!imaged))
         # a support (the blob_kb image circle: the centre cross of 5 nodes) restricts the usable nodes further
         sup = [hypot(𝐩[1] - 2604, 𝐩[2] - 1738) < 1318 for 𝐩 in nodes]
         ts = RC.focus_start(kb, nodes, 0.232; support = sup)

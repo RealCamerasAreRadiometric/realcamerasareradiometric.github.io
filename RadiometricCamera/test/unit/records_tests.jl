@@ -5,13 +5,13 @@
 @testitem "records: a calibration state, its radiometric camera and target read back as written" setup = [RCFixtures] begin
     using RadiometricCamera: board_surface, TargetState, edge_parameters, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera,
                              load_radiometric_target, load_state, Material, TexturedTarget, RECORD_SCHEMAS, RenderSettings,
-                             save_radiometric_camera, save_radiometric_target, save_state, TargetRadiometry, warping_aspect, 𝔟
+                             save_radiometric_camera, save_radiometric_target, save_state, TargetRadiometry, warping_aspect
     using VisualRadiometryToolkitCore: posed_target
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
     tex = fixture_board()
-    board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+    board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)
     focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
@@ -22,7 +22,7 @@
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
     a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2)
-    light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)
+    light = EnvironmentLight(SphericalHarmonicMap(a, 2), VgtkCore.centroid(board), 2.5)
     rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     target = RadiometricTarget(VgtkCore.model(posed_target(board)), SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC)), warping_aspect(board), rad)
     settings = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 7)
@@ -86,13 +86,13 @@ end
 @testitem "records: a target's warping knows its page's aspect; another page's board refuses it" setup = [RCFixtures] begin
     using RadiometricCamera: board_surface, TargetState, Focus, FocusSpline, HEIGHT_NC, load_radiometric_target, load_state,
                              Material, TexturedTarget, radiometric_target, RenderSettings, save_radiometric_target, save_state,
-                             TargetRadiometry, warping_aspect, 𝔟
+                             TargetRadiometry, warping_aspect
     using StaticArrays, LinearAlgebra
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
     tex = fixture_board()
-    square = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
+    square = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
+    tall = RadiometricCamera.with_facing(TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex), [0.0, 0.0, 1.5])       # aspect 0.7
     @test warping_aspect(square) == 1.0 && warping_aspect(tall) ≈ 0.7
     rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
@@ -129,7 +129,7 @@ end
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                        SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k); check = false) for k in 1:2]
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
-        light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(tall), 2.5)
+        light = EnvironmentLight(SphericalHarmonicMap(a, 2), VgtkCore.centroid(tall), 2.5)
         settings = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
         names = ["V01.png", "V02.png"]
         dec = RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :RGB)          # a state of decoded renders, as `state_on`'s
@@ -151,8 +151,8 @@ end
                              save_radiometric_target, TargetRadiometry
     using StaticArrays, LinearAlgebra
     tex = fixture_board()
-    square = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
-    tall = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex; facing = [0.0, 0.0, 1.5])       # aspect 0.7
+    square = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
+    tall = RadiometricCamera.with_facing(TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], tex), [0.0, 0.0, 1.5])       # aspect 0.7
     rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
     h = SVector{HEIGHT_NC}(1e-4 .* sin.(1:HEIGHT_NC))
     θ = SVector(0.0123456789, -0.00098765)
@@ -218,7 +218,7 @@ end
 
 @testitem "records: the camera's lens coverage and sensor pitch survive (IO's bounded camera body), a parametric and a grid lens" setup = [RCFixtures] begin
     using RadiometricCamera: TargetState, Focus, FocusSpline, HEIGHT_NC, load_radiometric_camera, load_state, Material,
-                             TexturedTarget, RenderSettings, save_radiometric_camera, save_state, TargetRadiometry, 𝔟
+                             TexturedTarget, RenderSettings, save_radiometric_camera, save_state, TargetRadiometry
     using VisualRadiometryToolkitCore: posed_target
     using StaticArrays, LinearAlgebra, Random
     using VisualGeometryToolkitCore: Ellipse, Point2, Sensor, Size2, μm, lens_coverage, sensor, exp_so3
@@ -251,11 +251,11 @@ end
         end
         # …and through the calibration state that holds the camera
         tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         rad = TargetRadiometry(Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), TargetState(; edge = [0.021, 0.034]))
         target = RadiometricTarget(VgtkCore.model(posed_target(board)), zero(SVector{HEIGHT_NC, Float64}), nothing, rad)
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
-        light = EnvironmentLight(SphericalHarmonicMap(a, 2), 𝔟(board), 2.5)
+        light = EnvironmentLight(SphericalHarmonicMap(a, 2), VgtkCore.centroid(board), 2.5)
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector(0.0, 0.0, 1.4); check = false)]
         camera = RadiometricCameraModel(central, focus, 0.0386, vig)
         f = joinpath(dir, "state.json")

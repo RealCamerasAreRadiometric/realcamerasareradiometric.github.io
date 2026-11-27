@@ -23,12 +23,12 @@ compute in Float32, so the checks below hold to Float32's precision on either de
 ```@example tutorial
 using CUDA                                      # the GPU, when there is one: RadiometricCamera's default device
 using RadiometricCamera, VisualGeometryToolkitCore, VisualRadiometryToolkitCore
-using VisualGeometryToolkitCore: cost   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here
-using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, 𝔟   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
+using VisualGeometryToolkitCore: cost, centroid   # Core's public `cost` (not exported): ½ Σ‖Φ − ϕ‖² of the state, here; a shape's `centroid`: the board's centre
+using VisualRadiometryToolkitCore: Focus, Material, with_vignetting, with_facing   # the generic radiometric layer: the focus surface, the material, a camera's parts, the board's centre
 using RadiometricCamera: RenderSettings, compute_mask, render_view, all_parts, RadiometryBlocks, JointRadiometry, sphere_radius
 
 texture = [Float64(isodd(fld(i - 1, 32) + fld(j - 1, 32))) for i in 1:256, j in 1:256, c in 1:3]
-board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture; facing = [0.0, 0.0, 1.5])
+board = with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], texture), [0.0, 0.0, 1.5])
 sz = Size2(320, 240)                              # the image, in pixels
 K = CameraCalibrationMat(412.0, sz)
 geometric = BoundedCamera(CameraModel(K; lens = Lens(DoubleSphere(0.25, 0.4))), sz)
@@ -47,12 +47,12 @@ The camera takes two photographs, from two poses (camera → world, metres) arou
 ```@example tutorial
 # lookat_pose(camera centre, the point it looks at — the board's centre, the world's up direction, which fixes the roll)
 poses = [lookat_pose(Vec3(0.3cos(k), 0.3sin(k), 1.4 + 0.1k), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0)) for k in 1:2]
-b = 𝔟(board)
+b = centroid(board)
 r_SH = sphere_radius(b, [p.t for p in poses])
 nothing # hide
 ```
 
-The lighting lives on the sphere around the board's centre 𝔟 of radius `r_SH`, which [`sphere_radius`](@ref) chooses to hold
+The lighting lives on the sphere around the board's centre (Core's `centroid`, the paper's 𝔟) of radius `r_SH`, which [`sphere_radius`](@ref) chooses to hold
 every camera centre (the pipeline's `sphere_radius(board, centres)` also every corner of the page, so that no light ray from the
 board misses the sphere).
 

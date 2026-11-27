@@ -47,13 +47,13 @@ aperture norm). [`pixel_parts`](@ref) calls it, and through it the parts kernels
     Bd = Z; Bs = Z
     rs = view.r
     for la in 1:n_disc(st.aperture)
-        𝐚 = 𝐚_sample(st.aperture, la, rs)
+        𝐚 = aperture_sample(st.aperture, la, rs)
         o, d = world_ray(view, 𝐩, 𝐚)
         sray, 𝐱 = _parts_hit(lrays, (ks - 1) * n_disc(st.aperture) + la, rays, o, d)
         (isfinite(sray) && sray > 0) || continue
         𝐛 = chart(bd, 𝐱)
         parts = radiance_parts(bd, mat, light, st.sampler, SampleKey(k, pid, ks, la), 𝐛, 𝐱, d)
-        w = 𝐚_weight(st.aperture, la, rs) * scale
+        w = aperture_weight(st.aperture, la, rs) * scale
         Bd += w * parts.Bd
         Bs += w * parts.Bs
     end
@@ -90,7 +90,7 @@ closed-form solves, `_PartsAt` for the LM's analytic columns, which gives the pi
     bd = board
     pid = pixel_id(u, v, H)
     scale = 1 / (π * view.r^2)
-    𝐩s = ntuple(ks -> SVector{2, F}(𝐩_sample(st.sensor, ks, u, v)), Val(NS))
+    𝐩s = ntuple(ks -> SVector{2, F}(sensor_sample(st.sensor, ks, u, v)), Val(NS))
     rays = BoardRays(board)                                  # the warping's relief, once for the pixel's rays (bit for bit the per-ray form)
     BdBs = ntuple(ks -> _sample_parts(view, mat, light, board, st, rays, k, pid, ks, 𝐩s[ks], scale, zero(SMatrix{3, J, F, 3J}), lrays), Val(NS))
     return PixelParts{J, 3J, NS, F}(SVector{NS}(𝐩s), SVector{NS, F}(ntuple(ks -> F(st.sensor.weights[ks]), Val(NS))),
@@ -473,7 +473,7 @@ in μ) of the μ-only normal equations, the reduction kernel's (`radiometry_norm
 """
 function _update_diffuse_weight!(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts = all_parts(f, θ))
     _, g, H = radiometry_normal_equations(f, θ, parts; light = false, vignetting = false, mu = true, chart = false)
-    H[1, 1] > 0 && (θ.mat = with_μ(θ.mat, clamp(θ.mat.diffuse_weight - g[1] / H[1, 1], f.mu_bounds...)))
+    H[1, 1] > 0 && (θ.mat = with_diffuse_weight(θ.mat, clamp(θ.mat.diffuse_weight - g[1] / H[1, 1], f.mu_bounds...)))
     return θ
 end
 
@@ -509,7 +509,7 @@ function _lm_radiometry!(f::CalibrationData, θ::CalibrationParameters, parts::R
         a1 = Matrix(_trial_coefficients(lay, lm.chs, lm.a, x))
         θ.light = f.channel == 0 ? with_coefficients(θ.light, a1) : tie_channels(with_coefficients(θ.light, a1), f.channel)
     end
-    mu && (θ.mat = with_μ(θ.mat, first(_trial_μ(lay, lm.μ, x))))
+    mu && (θ.mat = with_diffuse_weight(θ.mat, first(_trial_μ(lay, lm.μ, x))))
     verbose && @printf("      joint LS: %d unknowns (V %d, light %d, μ %d), %d iterations, %s / %s\n", lay.N, lay.nv, lay.om - lay.ol,
                        Int(mu), iterations, record[1], record[2])
     return record

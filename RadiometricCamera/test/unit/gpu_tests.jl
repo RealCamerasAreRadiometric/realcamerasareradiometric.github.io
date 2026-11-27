@@ -2,7 +2,7 @@
 
 # The two Kannala–Brandt lenses and the 24² scene of the out-of-domain checks both items use.
 @testsetup module GPUDomainScene
-    using RadiometricCamera: Material, TexturedTarget, RenderSettings, 𝔟
+    using RadiometricCamera: Material, TexturedTarget, RenderSettings
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, EnvironmentLight, SphericalHarmonicMap
@@ -15,16 +15,16 @@
     kb_in = cam(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), 9.6, (12.0, 12.0), 24, 24)             # equidistant, θ ≤ 1.77 at the sensor corners: all imaged
     kb_out = cam(VgtkCore.KannalaBrandt(0.0, 0.0, 0.0, 0.0), 4.8, (12.0, 12.0), 24, 24)            # θ = 3.54 > π at the corners: no ray there
     dom_board, dom_args = let tex_d = fixture_board()
-        bd = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_d; facing = [0.0, 0.0, 1.5])
+        bd = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_d), [0.0, 0.0, 1.5])
         sc = bd
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)
-        sc, (; pose, vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2), mat = Material(), light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(bd), 2.0),
+        sc, (; pose, vig = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 24, 24); degree = 2), mat = Material(), light = EnvironmentLight(SphericalHarmonicMap(1.0, 2), VgtkCore.centroid(bd), 2.0),
               st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4), sensor = 0.066)
     end
 end
 
 @testitem "GPU backend (CPU side)" setup = [RCFixtures, GPUDomainScene] begin
-    using RadiometricCamera: cost, Focus, in_domain, Material, TexturedTarget, render_view, RenderSettings, View, Φ_pixel, 𝔟
+    using RadiometricCamera: cost, Focus, in_domain, Material, TexturedTarget, render_view, RenderSettings, View, Φ_pixel
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting
@@ -42,10 +42,10 @@ end
     @test isbitstype(typeof(VgtkCore.convert_eltype(Float32, RenderSettings())))
     let tex32
         tex32 = fixture_board()
-        bd = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex32; facing = [0.0, 0.0, 1.5])
+        bd = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex32), [0.0, 0.0, 1.5])
         sc = bd
         pose = VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0))), SVector{3}(SVector(0.0, 0.0, 1.5)); check = false)
-        vg = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 32, 32); degree = 2); mt = Material(); lt = EnvironmentLight(SphericalHarmonicMap(1.0, 2), 𝔟(bd), 2.0)
+        vg = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, 32, 32); degree = 2); mt = Material(); lt = EnvironmentLight(SphericalHarmonicMap(1.0, 2), VgtkCore.centroid(bd), 2.0)
         camera = RadiometricCameraModel(cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.0, 16.0), 32, 32), Focus(3, 1.5, 32, 32), 0.0386, vg)
         stt = RenderSettings(; N = 4)
         args32 = VgtkCore.convert_eltype.(Float32, (View(pose, camera), vg, mt, lt, sc, stt))   # the kernels' Float32 record (the device's element type)
@@ -78,7 +78,7 @@ end
 @testitem "GPU backend" tags = [:gpu] setup = [RCFixtures, RCGPU, GPUDomainScene] begin
     using RadiometricCamera: build_problem, compute_mask, cost, Focus, FocusSpline, Material, PerViewResidual, TexturedTarget,
                              render_all, render_view, RenderSettings, _lm_views!, _update_vignetting!, sphere_radius, View, with_nonlinear,
-                             chief_ray, 𝐩_of_pixel, 𝔟
+                             chief_ray, sensor_position
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, RadialVignetting, with_control_points
@@ -90,7 +90,7 @@ end
     if RC_GPU_TESTS
         @info "GPU tests on $(CUDA.name(CUDA.device()))"
         tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         W = H = 32
         lens_t = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 41.216, (16.32, 15.36), W, H)
         tps_g = FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H)))
@@ -99,7 +99,7 @@ end
         # the truth in the hard pin's gauge V(𝐜) = 1 (`gauge_center_value`; the default pin, 2026-10-30): a state built from it is the truth itself
         vig_t = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2); g = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.4 * (g[i]^2 + g[j]^2) for i in 1:4, j in 1:4]) end)
         camera_t = RadiometricCameraModel(lens_t, focus_t, 0.0386, vig_t)
-        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+        b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a_t = zeros(3, 9); a_t[:, 1] .= (2.0, 1.9, 1.8); a_t[:, 3] .= (0.4, 0.3, 0.2)
         light_t = EnvironmentLight(SphericalHarmonicMap(a_t, 2), b, r_SH)
         mat_t = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
@@ -197,7 +197,7 @@ end
         sr_fit = calibration_problem(board, st, RC.with_vignetting(camera_t, RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W)), poses, mat_t, light_t, targets_r;
                                   masks, backend = CUDABackend())
         _update_vignetting!(sr_fit.f, sr_fit.u0)
-        pts_r = [𝐩_of_pixel(u, v) for (u, v) in sr_fit.f.px[1]]
+        pts_r = [sensor_position(u, v) for (u, v) in sr_fit.f.px[1]]
         @test maximum(abs(sr_fit.u0.camera.vignetting(𝐩) - vig_r(𝐩)) for 𝐩 in pts_r) < 5e-3
         # the LM problem with the radial block on the device: residual parity with the CPU and finite columns
         probr_c, _ = build_problem(sr_cpu.f, sr_cpu.u0); probr_g, _ = build_problem(sr_gpu.f, sr_gpu.u0)

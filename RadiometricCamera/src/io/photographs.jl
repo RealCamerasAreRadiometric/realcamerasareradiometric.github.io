@@ -98,7 +98,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
     frames = sort!(collect(keys(traj.poses)))
     names = [traj.images[t] for t in frames]
     cam_poses = [_pose_eltype(Float64, inv(VgtkCore.ustrip(VgtkCore.m, traj.poses[t]))) for t in frames]
-    board = TexturedTarget(target, tex; facing = cam_poses[1].t)
+    board = with_facing(TexturedTarget(target, tex), cam_poses[1].t)
     photo(n) = VgtkFeatures.load_linear_image(joinpath(image_dir, n); srgb = linearize, downsample)
     targets = load_targets ? [photo(n) for n in names] : Array{Float64, 3}[]
     t1 = load_targets ? targets[1] : photo(names[1])
@@ -121,7 +121,7 @@ function load_session(records::AbstractString, image_dir::AbstractString; compon
         dot(world_point(board, SVector(0.0, 0.0)) - p.t, board_normal(board)) / dot(dir, board_normal(board))
     end
     g = mean(board_distances)
-    𝐛_c = 𝔟(board)                                         # board-centre point (world)
+    𝐛_c = VgtkCore.centroid(board)                                         # board-centre point (world)
     center_distances = [dot(p.R[:, 3], 𝐛_c - p.t) for p in cam_poses]   # axial distance to the board centre
     d_c = mean(center_distances)
     d_s = image_distance === nothing ? (focus_init === :board_center ? f_m * d_c / (d_c - f_m) : f_m) :

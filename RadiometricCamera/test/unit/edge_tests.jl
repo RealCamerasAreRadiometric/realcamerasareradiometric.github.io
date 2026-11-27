@@ -4,7 +4,7 @@
 # The distance-map board, the two-view scene and its targets both items use.
 @testsetup module EdgeScene
     using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget, render_all,
-                             RenderSettings, sphere_radius, with_sdf, with_state, 𝔟
+                             RenderSettings, sphere_radius, with_sdf, with_state
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -35,7 +35,7 @@
         return out
     end
     sdf_e = sdf_rects(rects_e, 160, 160, page_e)
-    board_e0 = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5])
+    board_e0 = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3)), [0.0, 0.0, 1.5])
     board_e = with_sdf(board_e0, sdf_e, page_e)
     # ---------------------------------------------------------------------------------------------------------------
     # 3. a two-view scene on the distance-map board and its render
@@ -46,7 +46,7 @@
     poses_e = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_e = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, We, He); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     camera_e = RadiometricCameraModel(glens_e, focus_e, 0.0386, vig_e)
-    b_e = 𝔟(board_e); a_e = zeros(3, 9); a_e[:, 1] .= (2.0, 1.9, 1.8); a_e[:, 3] .= (0.4, 0.3, 0.2)
+    b_e = VgtkCore.centroid(board_e); a_e = zeros(3, 9); a_e[:, 1] .= (2.0, 1.9, 1.8); a_e[:, 3] .= (0.4, 0.3, 0.2)
     light_e = EnvironmentLight(SphericalHarmonicMap(a_e, 2), b_e, sphere_radius(b_e, [p.t for p in poses_e]))
     st_e = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
     masks_e = [compute_mask(camera_e, p, board_e, st_e; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_e]
@@ -73,7 +73,7 @@ end
     @test board_e.sdf == sdf_e                                                                      # the distance map as given
     @test VgtkCore.convert_eltype(Float32, board_e).sdf isa Matrix{Float32} && VgtkCore.convert_eltype(Float32, board_e).page_mm == SVector{2, Float32}(200, 200)
     @test_throws ArgumentError TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(4, 4, 3); sdf = sdf_e)
-    @test VrtkCore.printed_albedo(VrtkCore.with_state(board_e0, TargetState()), SVector(0.3, 0.4)) == VrtkCore.ρ_c(board_e0, SVector(0.3, 0.4))
+    @test VrtkCore.printed_albedo(VrtkCore.with_state(board_e0, TargetState()), SVector(0.3, 0.4)) == VrtkCore.albedo(board_e0, SVector(0.3, 0.4))
 
     # the profile across the left edge of the square (12.5…37.5 mm)²: paper at x < 12.5 (d = 12.5 − x), at mid-height y = 25 mm
     m_e = TargetState(edge = SVector(0.4, 0.3))

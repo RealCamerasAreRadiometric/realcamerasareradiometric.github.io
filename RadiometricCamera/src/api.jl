@@ -93,18 +93,16 @@ with_lens(args...; kwargs...) = throw(ArgumentError("with_lens is retired: a rad
 # ---- moved names (the generic radiometric layer is VisualRadiometryToolkitCore's). The names this package uses are
 # imported from there (src/RadiometricCamera.jl) and are no longer public here; the ones it does not use are refused by name with
 # their replacement (no alias, no forwarding).
-# VisualRadiometryToolkitCore's public names are descriptive; a symbol of the paper is its public alias of the same function, and a
-# plain old spelling has no alias: each row names what to call there.
+# VisualRadiometryToolkitCore's public names are descriptive (no alias of the paper's notation since its 0.2.0): each row names what
+# to call there.
 _moved_name_refusal(name::Symbol, replacement::AbstractString) = throw(ArgumentError(
     "RadiometricCamera.$name moved to VisualRadiometryToolkitCore: $replacement"))
 # each moved name with what to call there
 const _MOVED_REPLACEMENTS = (
         :with_geometric => "`with_geometric`", :with_focus => "`with_focus`", :with_aperture_radius => "`with_aperture_radius`",
         :aperture_samples => "`aperture_samples`", :aperture_border => "`aperture_border`", :luma => "`luma`", :n_nodes => "`n_nodes`",
-        :pixel_of_𝐩 => "`pixel_position` (the paper's symbol stays its alias, `pixel_of_𝐩`)",
-        :ℐ_𝐮 => "`pixel_footprint` (the paper's symbol stays its alias, `ℐ_𝐮`)",
-        :𝔱 => "`focus_distance` (the paper's symbol stays its alias, `𝔱`)",
-        :Λ_ggx => "`ggx_lambda` (the paper's symbol stays its alias, `Λ_ggx`)",
+        :ℐ_𝐮 => "`pixel_footprint`",
+        :𝔱 => "`focus_distance`",
         :G1_ggx => "`ggx_masking`", :D_ggx => "`ggx_distribution`", :G2_ggx => "`ggx_masking_shadowing`",
         :F_dielectric => "`fresnel_dielectric`", :D_v => "`visible_normal_density`",
         :chief_dir => "`chief_direction`", :sample_vndf_caps => "`sample_visible_normal`", :PDF_reflect => "`reflection_pdf`",
@@ -114,7 +112,7 @@ const _MOVED_REPLACEMENTS = (
         # the textured target's names this package does not use itself (the ones it uses are imported, no longer public here)
         :posed_target => "`posed_target(target)` (under its state) or `posed_target(target, state)`", :texture_size => "`texture_size`",
         :has_sdf => "`has_sdf`", :warping_field => "`warping_field`", :board_relief => "`board_relief`", :physical_chart => "`physical_chart`",
-        :ρ_c => "`albedo` (the paper's symbol stays its alias, `ρ_c`)",
+        :ρ_c => "`albedo`",
         :edge_albedo => "`edge_albedo(target, 𝐛)`: the printed edge is the target's state's (`with_edge(target, (δ, σ_print))`)")
 """The names this package refuses by name since they moved to VisualRadiometryToolkitCore, each with what to call there (the
 stack's `MOVED_NAMES` convention: VisualGeometryToolkitCore's `check_duplication` reads `MOVED_NAMES` and counts a listed name as a
@@ -133,7 +131,7 @@ end
 """Retired: VisualRadiometryToolkitCore's `TexturedTarget`."""
 PrintedTarget(args...; kwargs...) = throw(ArgumentError(
     "PrintedTarget is retired: the board is VisualRadiometryToolkitCore's `TexturedTarget` (the same constructors: " *
-    "`TexturedTarget(target, texture; facing, sdf, page_mm)`, `TexturedTarget(𝐨, 𝐮_B, 𝐯_B, texture; …)`), which holds its own state"))
+    "`TexturedTarget(target, texture; sdf, page_mm)` and `with_facing(board, viewpoint)`, `TexturedTarget(𝐨, 𝐮_B, 𝐯_B, texture; …)`), which holds its own state"))
 """Retired: VisualRadiometryToolkitCore's `TargetState`, the state of a `TexturedTarget`."""
 BoardSurface(args...; kwargs...) = throw(ArgumentError(
     "BoardSurface is retired: the board's warping h, printed edge and in-plane print error are the textured target's own state, " *
@@ -158,4 +156,4 @@ green_photosite_mask(args...; kwargs...) = throw(ArgumentError(
 """Removed with the focus surfaces on the chief directions: the inverse focus distance is read at a sensor position."""
 t̂_dir(args...; kwargs...) = throw(ArgumentError(
     "t̂_dir was removed with the focus surfaces on the chief directions: the focus surface is the sensor-grid thin plate spline, read at " *
-    "a sensor position — VisualRadiometryToolkitCore's `inverse_focus_distance(focus, 𝐩)` (the paper's `t̂`, its alias)"))
+    "a sensor position — VisualRadiometryToolkitCore's `inverse_focus_distance(focus, 𝐩)` (the paper's `t̂`)"))

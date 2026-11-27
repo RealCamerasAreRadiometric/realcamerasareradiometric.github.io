@@ -18,7 +18,7 @@
 # item compares the device Jacobian with `J_g`).
 @testsetup module RichardsonScene
     using RadiometricCamera: TargetState, build_problem_grid, compute_mask, Focus, FocusSpline, _image_start, HEIGHT_NC, Material,
-                             TexturedTarget, render_all, RenderSettings, sphere_radius, with_state, with_μ, 𝔟
+                             TexturedTarget, render_all, RenderSettings, sphere_radius, with_state, with_diffuse_weight
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, n_control_points, EnvironmentLight, SphericalHarmonicMap,
@@ -40,14 +40,14 @@
     # ---------------------------------------------------------------------------------------------------------------
     # the scene: the blob fixture with a saddle warping, two views, 32 × 32 pixels, the small fixed rule
     tex_r = fixture_board()
-    board_r = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_r; facing = [0.0, 0.0, 1.5])
+    board_r = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_r), [0.0, 0.0, 1.5])
     Wr = Hr = 32
     h_r = SVector{HEIGHT_NC}([VgtkCore.Synthetic.saddle_height(𝐛) for 𝐛 in RC.HEIGHT_NODES])
     board_r = RadiometricCamera.with_state(board_r, TargetState(h = h_r))
     focus_r = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, Wr, Hr))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
     poses_r = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))), SVector{3}(SVector(0.2 * cos(k), 0.2 * sin(k), 1.2 + 0.1 * k)); check = false) for k in 1:2]
     vig_r = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wr, Hr); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
-    b_r = 𝔟(board_r); a_r = zeros(3, 9); a_r[:, 1] .= (2.0, 1.9, 1.8); a_r[:, 3] .= (0.4, 0.3, 0.2)
+    b_r = VgtkCore.centroid(board_r); a_r = zeros(3, 9); a_r[:, 1] .= (2.0, 1.9, 1.8); a_r[:, 3] .= (0.4, 0.3, 0.2)
     light_r = EnvironmentLight(SphericalHarmonicMap(a_r, 2), b_r, sphere_radius(b_r, [p.t for p in poses_r]))
     mat_r = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)      # strictly inside every box
     st_r = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4, seed = 42)
@@ -59,7 +59,7 @@
     camera_g = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
     masks_g = [compute_mask(camera_g, p, board_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
     targets_g = let p = calibration_problem(board_r, st_r, camera_g, poses_r, mat_r, light_r, blank_r; masks = masks_g); render_all(p.f, p.u0) end
-    s_g = calibration_problem(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g)
+    s_g = calibration_problem(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_diffuse_weight(mat_r, 0.55), light_r, targets_g; masks = masks_g)
     prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5), height_degree = 1)
     tiles_g = RC.tile_costs(prob_g)
     res_g = tiles_g[argmax([length(t.pix) for t in tiles_g])]
@@ -80,7 +80,7 @@ end
 
 @testitem "pathwise Jacobian vs Richardson finite differences" setup = [RCFixtures, RichardsonScene] begin
     using RadiometricCamera: TargetState, build_problem, build_problem_grid, compute_mask, focus, material, PerViewResidual,
-                             TexturedTarget, render_all, t̂, with_sdf, with_state, with_μ, with_vignetting, 𝛂, 𝛈
+                             TexturedTarget, render_all, inverse_focus_distance, with_sdf, with_state, with_diffuse_weight, with_vignetting, roughness, refractive_index
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: with_control_points, control_points, n_control_points
@@ -110,7 +110,7 @@ end
     camera_r = RadiometricCameraModel(kb_r, focus_r, 0.0386, vig_r)
     masks_r = [compute_mask(camera_r, p, board_r, st_r; δ = 0.03, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses_r]
     targets_r = let p = calibration_problem(board_r, st_r, camera_r, poses_r, mat_r, light_r, blank_r; masks = masks_r); render_all(p.f, p.u0) end
-    s_v = calibration_problem(board_r, st_r, with_vignetting(camera_r, with_control_points(vig_r, 1.05 .* Matrix(control_points(vig_r)))), poses_r, with_μ(mat_r, 0.55),
+    s_v = calibration_problem(board_r, st_r, with_vignetting(camera_r, with_control_points(vig_r, 1.05 .* Matrix(control_points(vig_r)))), poses_r, with_diffuse_weight(mat_r, 0.55),
                            with_coefficients(light_r, 0.9 .* a_r), targets_r; masks = masks_r)          # away from the truth: residuals ≠ 0
     prob_v, idx_v = build_problem(s_v.f, s_v.u0)
     res_v = filter(c -> c isa PerViewResidual{9}, prob_v.blocks)[1]
@@ -183,7 +183,7 @@ end
         end
         out
     end
-    board_e_r = with_sdf(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3); facing = [0.0, 0.0, 1.5]), sdf_r, page_r)
+    board_e_r = with_sdf(RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], ones(16, 16, 3)), [0.0, 0.0, 1.5]), sdf_r, page_r)
     # the print's (δ, σ_print) on the surface: σ_print 3 mm, about one pixel on the board, so the render resolves the edge
     board_e_r = RadiometricCamera.with_state(board_e_r, TargetState(edge = SVector(0.3, 3.0)))
     camera_e_r = RadiometricCameraModel(glens_r, focus_r, 0.0386, vig_r)
@@ -207,7 +207,7 @@ end
 end
 
 @testitem "pathwise Jacobian vs Richardson finite differences (GPU)" tags = [:gpu] setup = [RCFixtures, RCGPU, RichardsonScene] begin
-    using RadiometricCamera: TargetState, build_problem_grid, focus, material, t̂, with_state, with_μ
+    using RadiometricCamera: TargetState, build_problem_grid, focus, material, inverse_focus_distance, with_state, with_diffuse_weight
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     import CUDA
@@ -216,7 +216,7 @@ end
     # 4. the Float32 device path (under the GPU gate): CPU / GPU column parity per family and the residual bitwise from the flux kernel
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
-        s_gd = calibration_problem(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_μ(mat_r, 0.55), light_r, targets_g; masks = masks_g,
+        s_gd = calibration_problem(RadiometricCamera.with_state(board_r, TargetState(h = 0.5 .* h_r)), st_r, camera_g, poses_r, with_diffuse_weight(mat_r, 0.55), light_r, targets_g; masks = masks_g,
                                 backend = CUDA.CUDABackend())
         prob_gd, idx_gd = build_problem_grid(s_gd.f, s_gd.u0; patch = (5, 5), height_degree = 1)
         tiles_gd = RC.tile_costs(prob_gd)

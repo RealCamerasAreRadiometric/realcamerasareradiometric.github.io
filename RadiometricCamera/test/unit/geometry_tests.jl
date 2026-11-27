@@ -1,7 +1,7 @@
 @testitem "pose / board / back-projection" setup = [RCFixtures] begin
-    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, TexturedTarget, world_point, world_ray, π̂⁻¹,
-                             chief_ray, 𝔟, 𝔣, 𝔭
-    using VisualRadiometryToolkitCore: ρ_c
+    using RadiometricCamera: board_normal, chart, Focus, inside, intersect_board, TexturedTarget, world_point, world_ray, backproject,
+                             chief_ray, focus_point, center_of_projection
+    using VisualRadiometryToolkitCore: albedo
     using StaticArrays, LinearAlgebra, Statistics, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
 
@@ -31,17 +31,17 @@
     end
     # board
     tex = rand(64, 96, 3)
-    bd = TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex; facing = [0.0, 0.0, 0.0])
+    bd = RadiometricCamera.with_facing(TexturedTarget([0.0, 0.0, 2.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], tex), [0.0, 0.0, 0.0])
     @test board_normal(bd)[3] < 0
     s, 𝐱 = intersect_board(bd, SVector(0.0, 0.0, 0.0), SVector(0.25, 0.5, 1.0))
     @test 𝐱[3] ≈ 2 && chart(bd, 𝐱) ≈ SVector(0.5, 1.0)
     @test world_point(bd, SVector(0.5, 1.0)) ≈ 𝐱
-    @test 𝔟(bd) ≈ SVector(0.5, 0.5, 2.0)
+    @test VgtkCore.centroid(bd) ≈ SVector(0.5, 0.5, 2.0)
     @test inside(SVector(0.5, 0.5), 0.1) && !inside(SVector(0.05, 0.5), 0.1)
     𝐛 = SVector((10 - 0.5) / 96, (7 - 0.5) / 64)
-    @test ρ_c(bd, 𝐛) ≈ SVector(tex[7, 10, :]...)
-    @test ρ_c(bd, ForwardDiff.Dual.(𝐛, 1.0)) isa SVector{3, <:ForwardDiff.Dual}
-    @test all(isfinite, ρ_c(bd, SVector(NaN, 0.5)))
+    @test albedo(bd, 𝐛) ≈ SVector(tex[7, 10, :]...)
+    @test albedo(bd, ForwardDiff.Dual.(𝐛, 1.0)) isa SVector{3, <:ForwardDiff.Dual}
+    @test all(isfinite, albedo(bd, SVector(NaN, 0.5)))
     # Core reference ray–plane intersection
     X = Base.intersect(bd.quad.plane, VgtkCore.Point3(0.0, 0.0, 0.0), VgtkCore.Vec3(0.25, 0.5, 1.0))
     @test SVector(X...) ≈ 𝐱

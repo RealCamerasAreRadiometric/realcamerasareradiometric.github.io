@@ -7,7 +7,7 @@
 
 @testsetup module NEScene
     using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
-                             sphere_radius, with_μ, with_vignetting, 𝔟
+                             sphere_radius, with_diffuse_weight, with_vignetting
     using RadiometricCamera, StaticArrays, LinearAlgebra
     import VisualGeometryToolkitCore as VgtkCore
     using VisualGeometryToolkitCore: exp_so3
@@ -19,7 +19,7 @@
     export RC, ne_state, ne_host, relerr, coefficients, control_points
     const W = 24
     const SCENE = let tex = fixture_board()
-        board = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex; facing = [0.0, 0.0, 1.5])
+        board = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
         lens = cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, W)
         focus = Focus(FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, W))), [1 / (1.5 + 0.1 * sin(3i)) for i in 1:9])
         poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
@@ -27,7 +27,7 @@
         vig = RC.gauge_center_value(let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2); gr = range(-0.5, 0.5, length = 4)
             with_control_points(v, [1.0 - 0.4 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end)
         camera = RadiometricCameraModel(lens, focus, 0.0386, vig)
-        b = 𝔟(board); r_SH = sphere_radius(b, [p.t for p in poses])
+        b = VgtkCore.centroid(board); r_SH = sphere_radius(b, [p.t for p in poses])
         a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8); a[:, 3] .= (0.4, 0.3, 0.2); a[:, 4] .= (0.1, 0.15, 0.2)
         mat = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
         st = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
@@ -39,7 +39,7 @@
     "A start away from the truth (flat V, grey light, μ 0.7): every residual and every Jacobian column nonzero."
     ne_state(; backend = VgtkCore.KA.CPU(), channel = 0) = (S = SCENE;
         calibration_problem(S.sc, S.st, with_vignetting(S.camera, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, W); degree = 2)), copy(S.poses),
-                         with_μ(S.mat, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, backend, channel))
+                         with_diffuse_weight(S.mat, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), S.b, S.r_SH), S.targets; S.masks, backend, channel))
     """The normal equations of the lighting and vignetting blocks (μ held) assembled on the host from the design-row kernel's rows:
     J = [A_v Z | the lighting columns per measured channel], r = Φ − ϕ with Φ the lighting rows times the coefficients."""
     function ne_host(s, parts)

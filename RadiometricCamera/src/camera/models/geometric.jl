@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # The geometric camera (paper §Radiometric Camera Model): any geometric back-projection model π⁻¹ supplies the chief ray of the
-# radiometric back-projection π̂⁻¹(𝐩, 𝐚) = (𝔣(𝐩) − 𝐚)/‖𝔣(𝐩) − 𝐚‖ with the focus point 𝔣(𝐩) = 𝔭 + t(𝐩) π⁻¹(𝐩)/‖π⁻¹(𝐩)‖
+# radiometric back-projection backproject(𝐩, 𝐚) = (focus_point(𝐩) − 𝐚)/‖focus_point(𝐩) − 𝐚‖ with the focus point focus_point(𝐩) = 𝔭 + t(𝐩) π⁻¹(𝐩)/‖π⁻¹(𝐩)‖
 # (VisualRadiometryToolkitCore's `π̂⁻¹`). A chief-ray model is a VisualGeometryToolkitCore camera of the run's image, on its pixels:
 #
 #   chief_ray(c, 𝐩)      VisualRadiometryToolkitCore's: the image formation's chief-ray direction (camera frame; need not be normalised) of

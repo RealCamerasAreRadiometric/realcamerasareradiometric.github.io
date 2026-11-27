@@ -7,7 +7,7 @@
 # of the 2 m board, ≈ 0.5 px at the 32-px camera (the height tests' scene, with the in-plane error in place of the saddle).
 @testsetup module InplaneScene
     using RadiometricCamera: TargetState, compute_mask, Focus, FocusSpline, _image_start, Material, TexturedTarget, render_all,
-                             RenderSettings, sphere_radius, with_state, 𝔟
+                             RenderSettings, sphere_radius, with_state
     using RadiometricCamera, StaticArrays, LinearAlgebra, ForwardDiff
     using VisualGeometryToolkitCore: exp_so3
     using VisualRadiometryToolkitCore: TensorProductVignetting, with_control_points, EnvironmentLight, SphericalHarmonicMap
@@ -19,7 +19,7 @@
 
     θ_true = SVector(0.03, 0.02)                                                           # (a, u): x by e^0.03 against y, shear 2 %
     tex_i = fixture_board()
-    board_i = TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_i; facing = [0.0, 0.0, 1.5])
+    board_i = RadiometricCamera.with_facing(TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex_i), [0.0, 0.0, 1.5])
     Wi = Hi = 32
     board_i = board_i
     board_iθ(θ) = RadiometricCamera.with_state(board_i, TargetState(inplane = θ))                        # the print error is the scene's surface parameter
@@ -30,7 +30,7 @@
     vig_i = let v = TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, Wi, Hi); degree = 2); gr = range(-0.5, 0.5, length = 4); with_control_points(v, [1.0 - 0.3 * (gr[i]^2 + gr[j]^2) for i in 1:4, j in 1:4]) end
     camera_i = RadiometricCameraModel(glens_i, focus_i, 0.0386, vig_i)                    # the grid camera
     camera_param_i = RadiometricCameraModel(lens_param_i, focus_i, 0.0386, vig_i)         # the parametric camera it is sampled from
-    b_i = 𝔟(board_i); a_i = zeros(3, 9); a_i[:, 1] .= (2.0, 1.9, 1.8); a_i[:, 3] .= (0.4, 0.3, 0.2)
+    b_i = VgtkCore.centroid(board_i); a_i = zeros(3, 9); a_i[:, 1] .= (2.0, 1.9, 1.8); a_i[:, 3] .= (0.4, 0.3, 0.2)
     light_i = EnvironmentLight(SphericalHarmonicMap(a_i, 2), b_i, sphere_radius(b_i, [p.t for p in poses_i]))
     mat_i = Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.6)
     st_i = RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
@@ -52,7 +52,7 @@ end
     # 1. the map: Core's Aspect ∘ Skew in the placed chart (the page in widths, origin top-left, y up), the identity at zero, its inverse
     @test INPLANE_NC == 2
     θ = SVector(0.01, -0.004)
-    wp = TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], rand(4, 4, 3); facing = [0.0, 0.0, 1.5])   # a 10 : 7 page
+    wp = RadiometricCamera.with_facing(TexturedTarget([-1.0, -0.7, 0.0], [2.0, 0.0, 0.0], [0.0, 1.4, 0.0], rand(4, 4, 3)), [0.0, 0.0, 1.5])   # a 10 : 7 page
     cal = inplane_calibration(θ)
     @test VgtkCore.members(cal) == (VgtkCore.Aspect(0.01), VgtkCore.Skew(-0.004))
     for 𝐛 in (SVector(0.3, 0.6), SVector(0.0, 0.0), SVector(1.0, 0.7), SVector(0.97, 0.03))

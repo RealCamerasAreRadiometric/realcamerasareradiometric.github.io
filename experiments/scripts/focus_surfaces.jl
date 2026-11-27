@@ -70,7 +70,7 @@ figures_product() = driver_product("figures", Dict{String,Any}("experiment" => C
     focus_surface_points(camera, W, H; spacing) -> (X, Y, Z, D)
 
 The in-focus points of a `RadiometricCameraModel` on the `spacing`-px lattice of its `W × H` sensor (COLMAP pixels): for a pixel 𝐩 the lens
-images, RadiometricCamera's focus point 𝔣(𝐩) = 𝔱(𝐩) d̂(𝐩) of the camera in its own frame (`𝔣(camera, 𝐩)`:
+images, RadiometricCamera's focus point focus_point(𝐩) = focus_distance(𝐩) d̂(𝐩) of the camera in its own frame (`𝔣(camera, 𝐩)`:
 the chief ray's unit direction from the centre of projection and the focus distance 𝔱 = 1 / t̂ of the camera's focus, whatever its
 kind — the sensor TPS or a direction chart), metres; NaN where the lens images nothing (`in_domain`) or t̂ ≤ 0. `D` = 𝔱.
 """
@@ -81,8 +81,8 @@ function focus_surface_points(camera, W::Integer, H::Integer; spacing::Integer)
         p = SVector(Float64(x), Float64(y))
         RadiometricCamera.in_domain(camera.geometric, p) || continue
         all(isfinite, VgtkCore.backproject(camera.geometric, p)) || continue
-        t̂ = VrtkCore.t̂(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
-        X[i, j], Y[i, j], Z[i, j] = VrtkCore.𝔣(camera, p); D[i, j] = 1 / t̂  # RC's focus point 𝔣(𝐩) = d̂(𝐩) / t̂(𝐩), camera frame
+        t̂ = VrtkCore.inverse_focus_distance(camera, p); (isfinite(t̂) && t̂ > 0) || continue   # the camera's t̂: the focus kind's (sensor TPS or a direction chart)
+        X[i, j], Y[i, j], Z[i, j] = VrtkCore.focus_point(camera, p); D[i, j] = 1 / t̂  # RC's focus point focus_point(𝐩) = d̂(𝐩) / inverse_focus_distance(𝐩), camera frame
     end
     return X, Y, Z, D
 end

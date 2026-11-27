@@ -58,6 +58,16 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     names (the directory `sensor_characterisation/`, the files `fx3.sensor_characterisation.*`, the tier
     `rc_sensor_characterisation_20261113`, the former IO kind `vgio/sensor_characterisation/v2.0` the record of record holds,
     read through IO's steps). No number moves.
+- **On VisualRadiometryToolkitCore 0.2.0** (`[compat]` `"0.2"`, VisualRadiometryToolkitIO `"0.1.2"`): its notation aliases are
+  deleted, and RC calls the functions by their names, with no alias of its own. `𝔣` → `focus_point`, `t̂` → `inverse_focus_distance`, `π̂⁻¹` → Core's
+  `backproject` (RC's `View` method of it), `𝔭` → `center_of_projection`, `𝐩_of_pixel` → `sensor_position`, `𝐩_sample` →
+  `sensor_sample`, `𝐚_sample` → `aperture_sample`, `𝐚_weight` → `aperture_weight`, `𝐚_border` → `aperture_border_sample`,
+  `Θ_m_nonlinear` → `nonlinear_parameters`, `with_μ` → `with_diffuse_weight`, `𝛂` → `roughness`, `𝛈` → `refractive_index`, `𝔟` → Core's
+  `centroid`, `ρ_c` → `albedo` (the symbols stay the paper's notation in prose, fields and locals). A board's facing is
+  `with_facing(TexturedTarget(…), viewpoint)` (the `facing` keyword is gone). `VignettingOptions.chart` is the radial chart's
+  value (`LinearChart()`, `ProjectiveChart()`, `EquisolidChart()`), read and written through `RADIAL_CHART_TAGS`. The TOML keeps its
+  strings (`chart = "projective"`), so there is no converter step. RC's refusals of the names that moved to VisualRadiometryToolkitCore
+  stay, with the old "the paper's symbol stays its alias" hints dropped.
 - **Breaking: the run's data are the problem's `p`; `PipelineOptions` is split (#16).** `PipelineOptions` is removed, with no alias and
   no property forwarding, into two values, each TOML table in one (the TOML does not change: no key moves, no converter step):
   - `RunOptions` (the run's data and input/output: `io`, `frontend`, `camera` — the capture's facts —, `resume`, `selfcheck`,

@@ -359,7 +359,7 @@ function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; pa
     for k in 1:K
         groups = Dict{Tuple{Int, Int}, Vector{Int}}()
         for (i, (u, v)) in enumerate(f.px[k])
-            𝐩 = 𝐩_of_pixel(u, v)
+            𝐩 = sensor_position(u, v)
             cx, _, cy, _ = _grid_support(lens0, 𝐩)
             I = clamp(fld(cx - 1, px_n), 0, nPx - 2)
             Jt = clamp(fld(cy - 1, py_n), 0, nPy - 2)
@@ -370,7 +370,7 @@ function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; pa
             for i in pix
                 u, v = f.px[k][i]
                 free === nothing || _check_reads_present(lens0, f.settings.sensor, u, v, k)
-                𝐩 = 𝐩_of_pixel(u, v)
+                𝐩 = sensor_position(u, v)
                 cx, _, cy, _ = _grid_support(lens0, 𝐩)
                 ((max(cx - 1, 0) >= I * px_n) && (min(cx + 1, C_x - 1) + 3 <= (I + 2) * px_n - 1) &&
                  (max(cy - 1, 0) >= Jt * py_n) && (min(cy + 1, C_y - 1) + 3 <= (Jt + 2) * py_n - 1)) ||

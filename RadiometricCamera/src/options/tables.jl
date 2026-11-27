@@ -213,7 +213,7 @@ Base.@kwdef struct VignettingOptions <: AbstractOptionsTable
                                                      #   nodes (`RadiometryBlockDescent`; its weight normalized as the grid's; 0 = none; "gcv" = chosen
                                                      #   by GCV per solve, 2026-11-04) | none
     boundary_order::Int = _option_default(VignettingOptions, :boundary_order)                           # the dependent nodes' extrapolation past the supported nodes, 2 Δ²c = 0 | 3 Δ³c = 0 (`BOUNDARY_ORDERS`)
-    chart::Symbol = _option_default(VignettingOptions, :chart)                           # the chart of the normalized radius (Core's `RADIAL_CHARTS`, 2026-11-10): linear ρ = d / r_max, uniform
+    chart::VrtkCore.AbstractRadialChart = _option_default(VignettingOptions, :chart)     # the chart of the normalized radius (VisualRadiometryToolkitCore's `RADIAL_CHART_TAGS`, 2026-11-10): linear ρ = d / r_max, uniform
                                                      #   knots over the imaged region | projective ρ = d / (r_max + d) (VisualRadiometryToolkitCore's `RadialVignetting(…; chart = :projective)`: the linear chart's pixel
                                                      #   spacing up to r_max and p − 1 knots past it at that spacing, then the span to 1 (VisualGeometryToolkitCore's rule): no pixel is ever clamped)
 end

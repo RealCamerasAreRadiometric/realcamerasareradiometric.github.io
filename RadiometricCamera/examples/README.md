@@ -15,7 +15,7 @@
    VisualGeometryToolkitCore's SplineLens camera — with `GridStart(; lattice = ImageLattice(G_x, G_y))`.
 2. **The radiometric model around it** — `Focus` (inverse depth `t̂`, TPS), the vignetting (`V`), the camera that holds them with
    the geometric camera (`geometric`) and the aperture radius as one object (`RadiometricCameraModel`; a photograph is the camera at
-   a pose), the light `EnvironmentLight` (a `SphericalHarmonicMap` on `(𝔟, r_SH)`), `Material` (Θ_m = `𝛂, 𝛈, μ`), `RenderSettings` —
+   a pose), the light `EnvironmentLight` (a `SphericalHarmonicMap` on the sphere about the board's `centroid` of radius `r_SH`), `Material` (Θ_m: `roughness`, `refractive_index`, `diffuse_weight`), `RenderSettings` —
    and what each symbol is in the paper.
 3. **Problem, masks, start prediction** — `calibration_problem` (`CalibrationData`, `CalibrationParameters`), `compute_mask`, `render_all`, `cost`.
 4. **Calibration** — the closed-form linear sweep (`RadiometryBlockDescent`: Θ_l, Θ_v, μ), the joint LM over all blocks on the GPU

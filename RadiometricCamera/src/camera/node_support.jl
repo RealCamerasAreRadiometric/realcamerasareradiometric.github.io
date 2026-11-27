@@ -15,7 +15,7 @@ normal matrix, up to the pixels' weights.
 function data_weight(basis, px, n::Integer)
     w = zeros(n)
     for list in px, (u, q) in list
-        b = basis(𝐩_of_pixel(u, q))
+        b = basis(sensor_position(u, q))
         for i in 1:n; w[i] += b[i] * b[i]; end
     end
     return w

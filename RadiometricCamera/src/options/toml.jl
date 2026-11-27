@@ -125,6 +125,7 @@ function boolean_switch_violations(config_dirs; data = ())
 end
 _option_from_toml(::Type{FrontendOptions}, ::Val{:type}, v, key) = FRONTEND_TAGS[convert_field(String, v, key)]
 _option_from_toml(::Type{VignettingOptions}, ::Val{:model}, v, key) = _vignetting_model(VIGNETTING_TAGS[convert_field(String, v, key)], key)
+_option_from_toml(::Type{VignettingOptions}, ::Val{:chart}, v, key) = read_switch(v, key, VrtkCore.RADIAL_CHART_TAGS)   # the chart value (its tag the stored string)
 # Core's registry names every vignetting field; a refinement fits the radial profile alone.
 _vignetting_model(::Type{M}, key) where {M <: RadialVignetting} = M
 _vignetting_model(::Type{M}, key) where {M} =
@@ -206,6 +207,7 @@ _field_toml(b::Bool) = switch_spelling(b)
 _field_toml(x) = VgtkCore.toml_value(x)
 toml_field(c::FrontendOptions, ::Val{:type}) = tag_of(FRONTEND_TAGS, c.type)
 toml_field(c::VignettingOptions, ::Val{:model}) = tag_of(VIGNETTING_TAGS, c.model)
+toml_field(c::VignettingOptions, ::Val{:chart}) = switch_spelling(c.chart, VrtkCore.RADIAL_CHART_TAGS)
 toml_field(c::ComputeOptions, ::Val{:backend}) = tag_of(BACKEND_TAGS, c.backend)
 toml_field(c::OptimizerTable, ::Val{:type}) = tag_of(OPTIMIZER_TAGS, c.type)
 toml_field(c::GridOptions, ::Val{:lattice}) = switch_spelling(c.lattice, LATTICE_TAGS)
@@ -254,7 +256,6 @@ function _check_options(run::RunOptions, settings::CalibrationSettings)
     settings.warping.inplane in INPLANE_KINDS || throw(ArgumentError("`warping.inplane` = $(repr(settings.warping.inplane)) is not one of $(collect(INPLANE_KINDS))"))
     length(settings.warping.inplane_start) in (0, INPLANE_NC) && all(isfinite, settings.warping.inplane_start) ||
         throw(ArgumentError("`warping.inplane_start` needs $INPLANE_NC finite values [a, u] (the log-stretch and the shear) or none, got $(settings.warping.inplane_start)"))
-    settings.vignetting.chart in VrtkCore.RADIAL_CHARTS || throw(ArgumentError("`vignetting.chart` = :$(settings.vignetting.chart) is not one of $(collect(VrtkCore.RADIAL_CHARTS))"))
     # the components' smoothness: the grid any type; the vignetting profile a pspline of its Δ³ (the closed-form solve's operator,
     # `vignetting_smoothness`) or none; the focus surface a bending of a number (no GCV) or none
     _check_smoothness(settings.grid.smoothness, "grid.smoothness")
