@@ -201,33 +201,15 @@ function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParame
     p1 = GridSmoothness(unit.type, unit.rows, unit.d0, 1.0, unit.β, unit.m̄)       # row weight 1: its Gauss–Newton block is DᵀD
     problem, idx = build_problem_grid(f, θ; patch, smoothness = p1, build_kwargs...)
     free_blocks = sort(setdiff(vec(idx.patches), idx.dependent_patches))
-    off = Dict{Int, Int}(); ncol = 0
-    for i in free_blocks
-        off[i] = ncol; ncol += Int(NLLSsolver.nvars(problem.variables[i]))
+    # the Gauss–Newton systems of the per-tile data and of the unit-weight smoothness over the free patch blocks, every
+    # other block held: Core's linearization of the bundle (NLLSsolver's visit order; the tiles of a view evaluated in one
+    # batch, one at a time, at the vector its `prepare_evaluation!` names)
+    data, smooth_rows = _with_registered(f, θ, problem, idx; concurrent = false, vectors = problem.solver) do
+        VgtkCore.linearize(problem, problem.variables; free = free_blocks, classes = (PerTileResidual, GridSmoothnessResidual))
     end
-    G = zeros(ncol, ncol); h = zeros(ncol); Q = zeros(ncol, ncol); q = zeros(ncol); rr = 0.0; n = 0
-    # the tiles of a view are evaluated in one batch, as _lm_tiles! does (bitwise the per-tile path's values)
-    _with_registered(f, θ, problem, idx; concurrent = false) do       # the tiles of a view in its batch; one at a time
-        for c in _visit_order(problem)                                # in the LM's order of its blocks (each accumulation's order)
-            data = c isa PerTileResidual
-            (data || c isa GridSmoothnessResidual) || continue
-            vi = NLLSsolver.varindices(c); vars = NLLSsolver.getvars(c, problem.variables)
-            flags = 0; cols = Int[]
-            for (k, v) in enumerate(vi)
-                haskey(off, v) || continue
-                flags |= 1 << (k - 1); append!(cols, off[v] .+ (1:Int(NLLSsolver.nvars(vars[k]))))
-            end
-            res, J = flags == 0 ? (NLLSsolver.computeresidual(c, vars...), zeros(0, 0)) : NLLSsolver.computeresjac(flags, c, vars...)
-            if data                                      # min ‖J δ − (−res)‖²: the data's linearization
-                n += length(res); rr += sum(abs2, res)
-                flags == 0 && continue
-                G[cols, cols] .+= J' * J; h[cols] .-= J' * res
-            else                                         # ‖J_p δ − (−res_p)‖²: the unit-weight smoothness's
-                flags == 0 && continue
-                Q[cols, cols] .+= J' * J; q[cols] .-= J' * res
-            end
-        end
-    end
+    G, h, rr, n = data.G, data.h, data.S, data.nrows      # min ‖J δ − (−res)‖²: the data's linearization
+    Q, q = smooth_rows.G, smooth_rows.h                    # ‖J_p δ − (−res_p)‖²: the unit-weight smoothness's
+    ncol = size(G, 1)
     sel = _gcv_selection(VgtkEstimation.gcv_curve(G, h, rr, Q, q, n), VgtkCore.penalty_scale(ϕ², count(interior), unit.m̄), smoothness_weight(sm))
     smooth = grid_smoothness(sm, lens, ϕ², interior; weight = sel.β)
     return smooth, (; sel..., kind = smoothness_type(sm), n_observations = n, n_columns = ncol,

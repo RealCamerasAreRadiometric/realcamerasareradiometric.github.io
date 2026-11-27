@@ -65,6 +65,11 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   a Core `TagRegistry`: `"radiometry_block_descent"` | `"joint_radiometry"`), in place of the switch `[sweep] joint` that picked it.
   `RC_CONFIG_VERSIONS`' step 2 → 3 reads a version-2 (or earlier) file's `joint = "on"` / `"off"` as the tag; a current file holding
   `joint` is refused naming its version. configs/default.toml is version 3.
+- **The grid smoothness's GCV linearization is Core's `linearize`** (audit RC #8, R22: no NLLSsolver solver call outside Core):
+  `select_grid_smoothness_weight` reads the Gauss–Newton systems of the per-tile data and of the unit-weight smoothness over the free
+  patch blocks from `VgtkCore.linearize(bundle, bundle.variables; free, classes = (PerTileResidual, GridSmoothnessResidual))`, its
+  tiles' view batches registered at the vector Core's `prepare_evaluation!` names, where it accumulated them itself through NLLSsolver's
+  `varindices`, `getvars` and `computeresjac`. The same blocks in the same order with the same sums: bit-identical.
 - **Breaking: `read_back!`, `extract_variables` and `extract_variables_grid` are internal** (the bundle's variable layout is no
   public protocol): a `CalibrationBundle(variables, blocks, free, decode)` holds its route's reading of a variable vector, and its
   `block_result` (Core's block contract) assembles the LM result's `u`, the NamedTuple `(; camera, poses, mat, surface, light)`

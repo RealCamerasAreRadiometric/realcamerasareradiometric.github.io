@@ -257,7 +257,7 @@ end
     # the two routes' one per-iteration callback and one read-back (review finding 7: the grid route duplicated both)
     srcs = [read(joinpath(pkgdir(RadiometricCamera), "src", "calibration", "lm", f), String) for f in ("per_view.jl", "per_tile.jl")]
     @test all(t -> occursin("_lm_callback(f, θ, idx, _extract_variables", t), srcs) && occursin("_solve_bundle!(f, θ, bundle, idx;", srcs[2])
-    @test !occursin("read_back!(", srcs[2]) && count("_read_back!(θ, r.u)", srcs[1]) == 1   # the one read-back, in _solve_bundle!
+    @test !occursin("_read_back!(", srcs[2]) && count("_read_back!(θ, r.u)", srcs[1]) == 1  # the one read-back, in _solve_bundle!
     @test !occursin("state.u", srcs[2]) && count("extract(f, θ, state.u, idx)", srcs[1]) == 1                                  # the iterate read: once, in _lm_callback
     res_p = filter(c -> c isa PerViewResidual{9}, prob_p.blocks)[1]
     vars_p = RC.NLLSsolver.getvars(res_p, prob_p.variables)
