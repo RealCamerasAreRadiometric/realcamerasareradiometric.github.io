@@ -15,6 +15,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   - `_lm_views!`, `_lm_tiles!` and the refinement's chunks return the LM's `FitResult` (`retcode`, `stop_rule`, `stats.nsteps`,
     `metadata.cost` = ‖r‖²) in place of `(; code, rule, iterations, cost)`; `CalibrationMetadata.solver` holds it; `lm_termination`
     reads `(r.retcode, r.stop_rule)`; `read_back!(f, u0, vars, idx, extract)` takes the solution's variable vector (`r.u`);
+  - the solve's blocks are evaluated in batches again (the concurrent window, the grid's view batches): the bundle's
+    `prepare_evaluation!` (Core's block-contract generic) records the two vectors NLLSsolver evaluates them at in
+    `bundle.solver`, where the requests find their variables, as they found them in the `LmProblem`'s fields before; the
+    same values, bit for bit;
   - the per-iteration callback is Core's `callback = state -> Bool` on an `LmIterationState` (the iterate `state.u`, `cost`,
     `best_cost`, `damping`, `linear_solves`, `scaling`, `trial_ready`): the trace, the monitor, the `log` lines and the final
     iteration's mark read the same values from it; `verbose` prints RC's own line per iteration (`_lm_print`, was NLLSsolver's);

@@ -504,8 +504,9 @@ const WINDOW_MEMORY_FOOTPRINT = 0.4
 Enable the concurrent evaluation (`_windowed`) of the residual blocks of `bundle` (a [`CalibrationBundle`](@ref)) whose type `select`
 accepts (in NLLSsolver's visit order, `_visit_order`): `width` blocks ahead of each request, or (`nothing`)
 `_window_width`'s, derived after the first block. `vectors` is where the requests' variables live (`_trial_vectors`): the bundle's own
-variables, or the solver's (`_solver_vectors`) while it solves. `_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall
-postcondition register their problem and unregister it on exit (`_unregister_window!`).
+variables, or the solver's while it solves (`bundle.solver`, which VisualGeometryToolkitCore's `prepare_evaluation!` fills).
+`_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall postcondition register their problem and unregister it on exit
+(`_unregister_window!`).
 """
 function _register_window!(f::CalibrationData, θ::CalibrationParameters, bundle, select; width::Union{Nothing, Integer} = nothing, vectors = bundle)
     _unregister_window!(f)
@@ -525,10 +526,9 @@ end
 registered on the data `f` (at the parameters `θ`), and unregistered on exit whatever `work` does — the one teardown of `_lm_views!`,
 `_lm_tiles!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view batches
 (`_register_grid_problem!`); with `concurrent` its blocks in the window (`_register_window!`: the views of a per-view problem, the tiles
-of a grid problem). `vectors = nothing` registers nothing: every block evaluates on its own (the same values, bit for bit).
+of a grid problem).
 """
 function _with_registered(work, f::CalibrationData, θ::CalibrationParameters, bundle, idx = nothing; concurrent::Bool = true, vectors = bundle)
-    vectors === nothing && return work()
     grid = idx !== nothing && hasproperty(idx, :patches)
     grid && _register_grid_problem!(f, θ, bundle, idx; vectors)
     try
@@ -737,13 +737,18 @@ the lens or the grid's patches, focus, aperture, material, vignetting, lighting)
 smoothness rows) and the free mask `free` over the variables (a held block: NLLSsolver's unfixed mask). A bundle of
 VisualGeometryToolkitCore's block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary: the
 result is the LM's own, `u` its variables), solved by `init(RefineProblem(bundle, bundle.variables), LevenbergMarquardt(; damping);
-stops, callback)` and `solve!` (`_solve_bundle!`).
+stops, callback)` and `solve!` (`_solve_bundle!`). `solver` holds the two vectors the solve evaluates the blocks at (NLLSsolver's
+`variables` and `varnext`, as VisualGeometryToolkitCore's `prepare_evaluation!` names them; empty before a solve), where its batched
+requests find their variables (`_with_registered`).
 """
 struct CalibrationBundle <: VgtkCore.AbstractBlockProblem
     variables::Vector{Any}
     blocks::Vector{Any}
     free::BitVector
+    solver::Base.RefValue{Any}
 end
+CalibrationBundle(variables, blocks, free) = CalibrationBundle(variables, blocks, free, Ref{Any}((; variables = Any[], varnext = Any[])))
+VgtkCore.prepare_evaluation!(b::CalibrationBundle, variables, varnext) = (b.solver[] = (; variables, varnext); nothing)
 VgtkCore.block_structure(b::CalibrationBundle, _u0) = (b.variables, b.blocks, nothing)
 VgtkCore.fixed_variables(b::CalibrationBundle) = findall(!, b.free)
 VgtkCore.default_optimization_strategy(::CalibrationBundle) = nothing    # plain least squares: the rows are whitened at the data
@@ -755,14 +760,14 @@ VgtkCore.block_result(::CalibrationBundle, _u0, r::VgtkCore.FitResult, _summary)
 
 The calibration LM of `bundle` on the data `f` at the parameters `θ` (`idx` its indices): VisualGeometryToolkitCore's
 LevenbergMarquardt at the optimizer's `damping` under `stops` (`_lm_stops`: their residual resolution the data's), the solve with
-the bundle registered (`_with_registered`, the solver's variables `_solver_vectors`), the solution read back into `θ` through the
+the bundle registered (`_with_registered`, the solver's variables `bundle.solver`), the solution read back into `θ` through the
 route's `extract` (`read_back!`). The result is the LM's: its termination record, `stats.nsteps` the accepted iterations,
 `metadata.cost` ‖r‖² at the solution.
 """
 function _solve_bundle!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx, extract; stops::VgtkCore.LmStops,
                         damping::VgtkCore.LmDamping, callback = nothing)
     c = VgtkCore.init(VgtkCore.RefineProblem(bundle, bundle.variables), VgtkCore.LevenbergMarquardt(; damping); stops = _lm_stops(f, stops), callback)
-    r = _with_registered(() -> VgtkCore.solve!(c), f, θ, bundle, idx; vectors = _solver_vectors(c))
+    r = _with_registered(() -> VgtkCore.solve!(c), f, θ, bundle, idx; vectors = bundle.solver)
     read_back!(f, θ, r.u, idx, extract)
     return r
 end
@@ -774,12 +779,10 @@ function _visit_order(b::CalibrationBundle)
 end
 _union_types(U::Union) = (_union_types(U.a)..., _union_types(U.b)...)
 _union_types(T::Type) = (T,)
-"""Where a solve's requests find their variables (`_register_window!`): the solver's own vectors while `solve!(c)` runs; none
-(`nothing`: each block evaluated on its own) until VisualGeometryToolkitCore states them."""
-_solver_vectors(_c) = nothing
-"""The variable vectors a request's variables are located in (`_locate_vars`): a bundle's own, or a solver problem's variables and
-trial (NLLSsolver's `variables`, `varnext`)."""
+"""The variable vectors a request's variables are located in (`_locate_vars`): a bundle's own, or the solve's variables and trial
+(NLLSsolver's `variables`, `varnext`: `bundle.solver`, as `prepare_evaluation!` last named them)."""
 _trial_vectors(b::CalibrationBundle) = (b.variables,)
+_trial_vectors(r::Base.RefValue{Any}) = _trial_vectors(r[])
 _trial_vectors(p) = (p.variables, p.varnext)
 
 """
