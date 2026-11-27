@@ -190,7 +190,8 @@ unit-weight smoothness's `DᵀD` over the same columns (its residual is zero at 
 β Σϕ² / N / m̄` (the smoothness's row weight squared), so β is the same normalized weight `[grid.smoothness] weight` states. The problem is
 `build_problem_grid(f, θ; patch, smoothness, build_kwargs...)`, the LM's own; one Jacobian evaluation of every tile and one
 dense generalized eigendecomposition of the free columns (O(n³) in their number: 2 per present node, up to 2·7875 for a 105 × 75
-grid). `(nothing, nothing)` for none. `selection` is `_gcv_selection`'s record plus the counts of the linearization.
+grid). `(nothing, nothing)` for none; a smoothness of a stated weight β (not `GeneralizedCrossValidation()`) is an `ArgumentError`, before
+the linearization. `selection` is `_gcv_selection`'s record plus the counts of the linearization.
 """
 function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParameters, sm::AbstractSmoothness, interior::AbstractMatrix{Bool}; patch::Tuple{Int, Int} = GRID_PATCH,
                                        build_kwargs...)
@@ -198,6 +199,9 @@ function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParame
     ϕ² = data_norm2(f)
     unit = grid_smoothness(sm, lens, ϕ², interior; weight = 1.0)
     unit === nothing && return nothing, nothing
+    alg = smoothness_weight(sm)        # the weight is chosen here: a smoothness of a stated β has nothing to select
+    alg isa VgtkEstimation.GeneralizedCrossValidation || throw(ArgumentError(
+        "select_grid_smoothness_weight: the smoothness's weight is β = $alg, not GeneralizedCrossValidation(): nothing to select"))
     p1 = GridSmoothness(unit.type, unit.rows, unit.d0, 1.0, unit.β, unit.m̄)       # row weight 1: its Gauss–Newton block is DᵀD
     problem, idx = build_problem_grid(f, θ; patch, smoothness = p1, build_kwargs...)
     free_blocks = sort(setdiff(vec(idx.patches), idx.dependent_patches))
@@ -210,7 +214,7 @@ function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParame
     G, h, rr, n = data.G, data.h, data.S, data.nrows      # min ‖J δ − (−res)‖²: the data's linearization
     Q, q = smooth_rows.G, smooth_rows.h                    # ‖J_p δ − (−res_p)‖²: the unit-weight smoothness's
     ncol = size(G, 1)
-    sel = _gcv_selection(VgtkEstimation.gcv_curve(G, h, rr, Q, q, n), VgtkCore.penalty_scale(ϕ², count(interior), unit.m̄), smoothness_weight(sm))
+    sel = _gcv_selection(VgtkEstimation.gcv_curve(G, h, rr, Q, q, n), VgtkCore.penalty_scale(ϕ², count(interior), unit.m̄), alg)
     smooth = grid_smoothness(sm, lens, ϕ², interior; weight = sel.β)
     return smooth, (; sel..., kind = smoothness_type(sm), n_observations = n, n_columns = ncol,
                    linearization = "the grid's free patch blocks at the start (Gauss-Newton of the per-tile data; other blocks held)")

@@ -9,7 +9,8 @@ function _frontend(::Type{BlobFrontend}, run::RunOptions, settings::CalibrationS
                       texture_downsample = run.frontend.texture_downsample, sensor_width = _sensor_width(run), r₀ = R0, linearize = run.io.linearize,
                       load_targets = false,   # the photographs are streamed below; decoding all of them here cost ≈ 2 s per view
                       raw_dir = isempty(run.io.raw) ? nothing : run.io.raw, lens_identity = run.io.lens_identity === nothing ? nothing : lens_identity(run.io.lens_identity))
-    ds.settings === nothing || println("camera settings: ", settings_line(ds.settings; lens_stated = run.io.lens_identity !== nothing))
+    capture = ds.settings                                        # read once: the test below narrows it (`ds` may infer as a Union)
+    capture === nothing || println("camera settings: ", settings_line(capture; lens_stated = run.io.lens_identity !== nothing))
     board = ds.board; names = copy(ds.names); W₀, H₀ = ds.extent
     poses0 = copy(ds.poses)
     stored = start.stored                                         # a start record (`load_refinement_start`): its lens, region and poses, no fit

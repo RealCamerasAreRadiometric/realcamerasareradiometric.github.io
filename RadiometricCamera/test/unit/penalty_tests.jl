@@ -100,6 +100,7 @@ end
     @test sel.n_observations == 3 * sum(length, sp.f.px) && 0 < sel.dof <= sel.n_columns
     @test 1e-8 <= sel.β <= 1e4
     @test RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.NoSmoothness(), held_p) == (nothing, nothing)
+    @test_throws ArgumentError RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, 0.5), held_p)   # a stated β: nothing to select
     # the nodes held: Core's footprint rule; :all every node the lens holds
     @test RC.grid_present(glens_t) == VgtkCore.node_mask(VgtkCore.model(glens_t), VgtkCore.imaged_region(glens_t))
     @test RC.grid_present(glens_t; nodes = :all) == trues(10, 10)
