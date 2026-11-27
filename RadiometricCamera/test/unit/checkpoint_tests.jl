@@ -37,7 +37,7 @@
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
         data = RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos; run, settings,
                                          device = RC.KernelAbstractions.CPU())
-        prob = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, data), alg; stops).cache.prob   # the start
+        prob = RC.compute_calibration_start(alg, data)                    # the start
         start_only && return prob
         # the refinement, the run's checkpoints its driver's callback (ruling R1: the run's I/O is never the algorithm's)
         fit = VgtkCore.solve(prob, alg.refinement; stops, callback = RC.calibration_checkpoints(prob, run))

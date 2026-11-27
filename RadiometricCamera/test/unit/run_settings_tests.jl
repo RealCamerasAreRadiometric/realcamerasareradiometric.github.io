@@ -36,7 +36,7 @@
         meta = (; names = ["a", "b"], W₀ = W, H₀ = H, fpx = 41.216, lens0 = s.u0.camera.geometric, views0 = nothing,
                 features = nothing, costs = (; linear = (0.0, 0.0)), grid_smoothness = nothing)
         s.f.start = meta
-        @test_throws "stop" RC.load_calibration_state(RC.VgtkCore.RefineProblem(s.f, s.u0), run.resume.state; load_state = _ -> error("stop"))
+        @test_throws "stop" RC.load_calibration_state!(RC.VgtkCore.RefineProblem(s.f, s.u0), alg.refinement, run.resume.state; load_state = _ -> error("stop"))
 
         # the next problem of the session: the material free, μ on (0, 1), no LM log
         s2 = fresh()

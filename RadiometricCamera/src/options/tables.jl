@@ -318,7 +318,7 @@ facts (`[camera]`: the sensor, the lens, the sensor characterization), resuming 
 self-check (`[selfcheck]`) and the device (`[compute]`). No problem's context (ruling R1): a calibration's start reads the run's
 start options from its data ([`CalibrationPhotographs`](@ref)`(geometry, photographs; run, settings, device)`), and its outputs
 (`io.out`, the checkpoints, `io.optimizer_log`, `resume.iteration_offset`) are the driver's ([`calibration_checkpoints`](@ref),
-[`save_radiometric_calibration`](@ref)), a resume the driver's [`load_calibration_state`](@ref). Read from TOML with the algorithm's
+[`save_radiometric_calibration`](@ref)), a resume the driver's [`load_calibration_state!`](@ref). Read from TOML with the algorithm's
 settings by [`pipeline_options`](@ref), written for the run record with [`config_dict`](@ref). Required: `io.images`, `io.out` and
 the front end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`). A
 `selfcheck.only` run reads no photograph: it needs no `io.images`.

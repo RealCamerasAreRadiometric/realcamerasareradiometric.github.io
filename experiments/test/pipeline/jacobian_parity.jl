@@ -34,8 +34,7 @@ function jacobian_parity(root, images, nviews = 2)
     run, settings, alg, stops = RC.read_calibration(p)                   # the run's options, the calibration's settings, the calibration (its optimizer), its solve's stops
     s = redirect_stdout(devnull) do
         g = RC.start_geometry(run, settings); dir = joinpath(run.io.out, "start")   # (the start reads its own options: `init`'s, the record's)
-        start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run, g.names); run, settings, device = CUDA.CUDABackend())),
-                              alg; stops).cache.prob
+        start = RC.compute_calibration_start(alg, RC.CalibrationPhotographs(g, RC.start_photographs(run, g.names); run, settings, device = CUDA.CUDABackend()))
         RC.save_calibration_start(dir, start.f, start.u0; run)
         RC.load_calibration_start(dir; run, settings, device = CUDA.CUDABackend())
     end

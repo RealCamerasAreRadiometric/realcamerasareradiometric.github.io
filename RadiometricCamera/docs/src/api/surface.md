@@ -22,7 +22,7 @@ reach is `public`: write it qualified (`RadiometricCamera.RenderSettings`) or im
 
 ## Public
 
-A driver's pieces of a run (ruling R1: a run's I/O is its driver's): [`load_calibration_state`](@ref RadiometricCamera.load_calibration_state) (a resume, the refinement's
+A driver's pieces of a run (ruling R1: a run's I/O is its driver's): [`compute_calibration_start`](@ref RadiometricCamera.compute_calibration_start) (the start: the refinement's started problem from a calibration's data), [`load_calibration_state!`](@ref RadiometricCamera.load_calibration_state!) (a resume, the refinement's
 problem continued from a finished state) and [`calibration_checkpoints`](@ref RadiometricCamera.calibration_checkpoints) (a run's checkpoints and optimizer log, the
 `callback` its driver hands the refinement's solve). The refinement problem's data and parameters (`CalibrationData`, `CalibrationParameters`), the image formation (`RenderSettings`, `Φ_pixel`, `render_view`: each of the camera at a pose), the camera's and the target's
 parts (`TargetRadiometry`, … — `RadiometricTarget` is exported, above), the closed-form blocks, the LM's blocks for building a problem of one's own (`build_problem`,

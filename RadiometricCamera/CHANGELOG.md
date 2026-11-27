@@ -26,10 +26,13 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     `callback` (was `iter_callback(it, cost, camera, poses, mat, surface, light)` and `lm_log`).
   - The checkpoints (`lens_ckpt.json` | `grid_ckpt.json` every 5 iterations; with `io.checkpoint_each` `*_it<N>.json`, `poses_it<N>.json`,
     `state_it<N>.json`) and the LM's per-iteration log are a callback the driver builds, `calibration_checkpoints(prob, run)` (new,
-    public); the live monitor stays the refinement's printed output. bin/refine.jl hands it to the solve.
-  - A resume is a problem built from a finished state, `load_calibration_state(prob, path)` (new, public: the state loaded into
-    `u0`, the vignetting tied to its rule and gauged, the printed edge started; `f.start.resumed` records it); `resume.sweep` (and a
-    state whose vignetting is not the run's, left flat) is the driver's closed-form sweep before the refinement. **Numbering:**
+    public); the live monitor stays the refinement's printed output. It reads the started problem, which a driver obtains from
+    `compute_calibration_start(alg, data) -> RefineProblem(f, u0)` (new, public: the start, what the calibration's `init` refines;
+    no reach into a cache's fields, R22). bin/refine.jl hands the callback to the solve.
+  - A resume is the started problem continued from a finished state in place, `load_calibration_state!(prob, refinement, path;
+    sweep = false)` (new, public: the state loaded into `u0`, the vignetting tied to its rule and gauged, the printed edge started,
+    then the closed-form sweep by `refinement`'s radiometry when the driver asks, `sweep = resume.sweep`, and always when the
+    state's vignetting is not the run's; `f.start.resumed` records it). **Numbering:**
     `resume.iteration_offset` numbers the checkpoints and the LM log (`calibration_checkpoints`); the monitor's `it` lines and the
     "sweep after it" lines of refine.log count the refinement's own iterations from 1 on a resumed run (they included the offset), and
     the "resumed from" line no longer prints the offset. The LM log's first column is the refinement's iteration across its chunks,
@@ -209,7 +212,7 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     `save_calibration_start(dir, f, u0; options)`; the retired View-form `CalibrationState` and `lens(::CalibrationState)` stubs are
     gone with the type. No arithmetic moves: the same kernels on the same values;
   - `RadiometricCalibration`'s `init` runs its refinement stage through the front end (spec §9 G-l): its cache is
-    `init(RefineProblem(f, u0), refinement; stops)`, an `EstimationCache` of the `CalibrationCache` (`c.cache.prob` the started
+    `init(RefineProblem(f, u0), refinement; stops)`, an `EstimationCache` of the `CalibrationCache` (holding the started
     problem, as before), so `solve!` records the stage's problem and algorithm before relabelling the result with the calibration's.
 - **Experiments: `experiments/chrome_evaluation/v2.0`, the FitResult's names in the eval record (decision 11).** Each fit of
   `eval_<label>.json`'s `fit` (`in_sample`, `held_out.even` / `.odd`) records `successful_retcode` (was `converged`) and

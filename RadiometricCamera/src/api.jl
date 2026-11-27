@@ -19,7 +19,7 @@ export RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_cal
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        calibration_problem, CalibrationPhotographs, RadiometricCameraModel, RadiometricTarget, RunOptions, CalibrationSettings, pipeline_options, CalibratedCamera
 
-public load_calibration_state, calibration_checkpoints   # a run's resume and its outputs (the driver's: ruling R1)
+public compute_calibration_start, load_calibration_state!, calibration_checkpoints   # a run's start, its resume and its outputs (the driver's: ruling R1)
 public CalibrationData, CalibrationParameters, flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
        coverage_region, check_coverage, calibrated_folds, grid_angular_error,
        load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,

@@ -14,7 +14,7 @@
 # poses_{init,refined}.json (trajectory records), state.json, radiometric_camera.json, radiometric_target.json (RadiometricCamera's
 # records), parameters.json, the run's options as pipeline_config.toml, and with `io.checkpoint_each` the per-iteration
 # lens_it<N>.json | grid_it<N>.json, poses_it<N>.json, state_it<N>.json and with `io.optimizer_log` the LM's per-iteration log (this
-# driver's: the solve's `callback`, `calibration_checkpoints`). `resume.state` continues a finished state (`load_calibration_state`,
+# driver's: the solve's `callback`, `calibration_checkpoints`). `resume.state` continues a finished state (`load_calibration_state!`,
 # with `resume.sweep` the closed-form sweep on it, and the checkpoints numbered from `resume.iteration_offset`). Diagnostic modes: `selfcheck.only` (held-out detections through
 # `io.init`'s model), `io.render_init`, `io.render_state = "<state.json>"`.
 # THE START is a step of its own (the owner's rule of 2026-11-14): `--stage=start` computes it from the options without the
@@ -96,7 +96,7 @@ if isempty(start_dir)
     start_dir = start_only ? run_options.io.out : isempty(start_out) ? joinpath(run_options.io.out, "start") : start_out
     ts = @timed begin
         g = RC.start_geometry(srun, ssettings)
-        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(srun, g.names); run = run_options, settings, device = backend)), alg; stops).cache.prob
+        RC.compute_calibration_start(alg, RC.CalibrationPhotographs(g, RC.start_photographs(srun, g.names); run = run_options, settings, device = backend))
     end
     s0 = ts.value
     if !isempty(srun.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state
@@ -151,8 +151,7 @@ for r in 1:repeat
     global s = tp.value
     tr = @timed begin
         if !isempty(run_options.resume.state)                              # a resume: the problem built from the finished state (and its sweep)
-            RC.load_calibration_state(s, run_options.resume.state)
-            (run_options.resume.sweep || !s.f.start.resumed.vignetting) && RC._resumed_sweep!(s, alg.refinement)
+            RC.load_calibration_state!(s, alg.refinement, run_options.resume.state; sweep = run_options.resume.sweep)
         end
         VgtkCore.solve(s, alg.refinement; stops, callback = RC.calibration_checkpoints(s, run_options))   # the run's checkpoints and LM log: this driver's
     end

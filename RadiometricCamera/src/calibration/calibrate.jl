@@ -5,7 +5,7 @@
 # closed-form sweep between them, with the live monitor), its result a Core FitResult whose estimate is the `CalibrationEstimate`
 # (the calibrated camera, the poses, the radiometric target, the light). The problem's structure is its data's (ruling R1:
 # `f.calibration_settings`); a run's I/O is the driver's — the checkpoints and the optimizer's log a `callback` it builds
-# (`calibration_checkpoints`), a resume a problem it builds from a state (`load_calibration_state`, calibration/resume.jl).
+# (`calibration_checkpoints`), a resume a problem it builds from a state (`load_calibration_state!`, calibration/resume.jl).
 # ---------------------------------------------------------------------------
 
 """
@@ -116,9 +116,9 @@ observations streamed, the vignetting and the lighting by the closed-form start,
 `init` returns the start: its cache is the refinement stage's `init(RefineProblem(f, u0), refinement; stops, callback)` (an
 `EstimationCache` of a [`CalibrationCache`](@ref); its `prob`, the started `RefineProblem(f, u0)`); `solve!` of it, as `solve`, the
 refinement — its result [`RadiometricRefinement`](@ref)'s, recorded by the front end for the stage and relabelled for the
-calibration (spec §9 G-l). A started calibration (`load_calibration_start`'s, `load_calibration_state`'s, or a caller's
-`RefineProblem(f, u0)`) is solved by the refinement itself: `solve(RefineProblem(f, u0), refinement; stops, callback)`. A run's
-checkpoints and optimizer log are the `callback` its driver builds, [`calibration_checkpoints`](@ref).
+calibration (spec §9 G-l). A started calibration ([`compute_calibration_start`](@ref)'s, `load_calibration_start`'s, `load_calibration_state!`'s, or a
+caller's `RefineProblem(f, u0)`) is solved by the refinement itself: `solve(RefineProblem(f, u0), refinement; stops, callback)`. A
+run's checkpoints and optimizer log are the `callback` its driver builds from the started problem, [`calibration_checkpoints`](@ref).
 
 ```julia
 run, settings, alg, stops = read_calibration("run.toml")
@@ -170,14 +170,28 @@ function _calibration_stops(; kw...)
     return VgtkCore.LmStops(; s.max_iter, s.ftol, s.xtol, s.xtol_rel, s.stationarity_tol, s.max_time, s.residual_resolution, kw...)
 end
 
-function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:CalibrationPhotographs, VgtkCore.NullParameters},
-                         alg::RadiometricCalibration; stops::VgtkCore.LmStops = _calibration_stops(), callback = nothing)
-    d = prob.f
+"""
+    compute_calibration_start(alg::RadiometricCalibration, data::CalibrationPhotographs) -> RefineProblem
+
+The START of the calibration `alg` on its data `data` (a [`CalibrationPhotographs`](@ref)): the geometric calibration lifted into the
+refinement's problem, `RefineProblem(f, u0)` of the data `f` ([`CalibrationData`](@ref), its `start` the start's record) and the
+started parameters `u0` ([`CalibrationParameters`](@ref)) — the focus surface, the aperture, the image region, the masks, the
+photographs' observations streamed, the closed-form start of the lighting, the vignetting and μ (by `alg.refinement`'s radiometry),
+the grid smoothness. What [`RadiometricCalibration`](@ref)'s `init` refines and [`save_calibration_start`](@ref) records; a stored
+start is [`load_calibration_start`](@ref)'s. A driver that hands the refinement a run's callback starts here
+(`prob = compute_calibration_start(alg, data)`; `solve(prob, alg.refinement; stops, callback =
+calibration_checkpoints(prob, run))`: the checkpoints read the started problem). A joint radiometry with a vignetting smoothness
+is refused before the start.
+"""
+function compute_calibration_start(alg::RadiometricCalibration, data::CalibrationPhotographs)
     refinement = alg.refinement
-    _scheduled_radiometry(refinement, d.calibration_settings)   # (a joint solve takes no smoothness: refused before the start)
-    f, θ = _start_state(d.geometry, d.photographs, d.run_options, d.calibration_settings, nothing; backend = d.device, refinement.radiometry)
-    return VgtkCore.init(VgtkCore.RefineProblem(f, θ), refinement; stops, callback)   # the refinement stage through the front end (spec §9 G-l)
+    _scheduled_radiometry(refinement, data.calibration_settings)   # (a joint solve takes no smoothness: refused before the start)
+    f, θ = _start_state(data.geometry, data.photographs, data.run_options, data.calibration_settings, nothing; backend = data.device, refinement.radiometry)
+    return VgtkCore.RefineProblem(f, θ)
 end
+VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:CalibrationPhotographs, VgtkCore.NullParameters},
+                alg::RadiometricCalibration; stops::VgtkCore.LmStops = _calibration_stops(), callback = nothing) =
+    VgtkCore.init(compute_calibration_start(alg, prob.f), alg.refinement; stops, callback)   # the refinement stage through the front end (spec §9 G-l)
 function VgtkCore.__init(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters, VgtkCore.NullParameters}, alg::RadiometricRefinement;
                          stops::VgtkCore.LmStops = _calibration_stops(), callback = nothing)
     _scheduled_radiometry(alg, prob.f.calibration_settings)   # (a joint solve takes no smoothness)
@@ -260,7 +274,7 @@ write_pipeline_config(dir::AbstractString, run::RunOptions, settings::Calibratio
     _run_refinement!(f, θ, meta, alg, stops, callback) -> (result, trace, (; linear, final, seconds, termination))
 
 The Levenberg–Marquardt over Θ̄ (`θ`, in place) on the data `f` (the structure `f.calibration_settings`) from the prepared start
-`meta` (a resumed one's state and cost, `meta.resumed`: [`load_calibration_state`](@ref)) by `alg`'s optimizer at the solve's
+`meta` (a resumed one's state and cost, `meta.resumed`: [`load_calibration_state!`](@ref)) by `alg`'s optimizer at the solve's
 `stops`: runs `stops.max_iter` iterations (in chunks of `alg.lm_chunk` with a closed-form sweep between them when set), prints the
 live monitor after every iteration and calls `callback` (Core's `callback(state::LmIterationState) -> Bool`, `nothing`: none) with
 the refinement's state: its iteration across the chunks, the iterate's estimate decoded (`(; camera, poses, mat, surface, light)`),
@@ -373,7 +387,7 @@ end
     calibration_checkpoints(prob, run) -> callback
 
 The checkpoints and the optimizer's log of a run of the refinement of `prob` (a started `RefineProblem(f, u0)`:
-[`RadiometricCalibration`](@ref)'s `init`'s, [`load_calibration_start`](@ref)'s or [`load_calibration_state`](@ref)'s) in the
+[`compute_calibration_start`](@ref)'s, [`load_calibration_start`](@ref)'s or [`load_calibration_state!`](@ref)'s) in the
 outputs of `run` (its [`RunOptions`](@ref)): the `callback` its driver hands the solve, `solve(prob, refinement; stops, callback)`
 (ruling R1: a run's I/O is the driver's, never the algorithm's or the problem's). After the refinement's iteration `it`
 (`state.iteration`, numbered from `resume.iteration_offset`: a resumed run continues its numbering) it writes, into `io.out`, the
@@ -387,7 +401,7 @@ damping) and the time. It never stops the solve.
 function calibration_checkpoints(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters}, run::RunOptions)
     f, θ = prob.f, prob.u0
     meta = f.start
-    meta === nothing && throw(ArgumentError("calibration_checkpoints: the data have no start (RadiometricCalibration's `init`, load_calibration_start or load_calibration_state build one)"))
+    meta === nothing && throw(ArgumentError("calibration_checkpoints: the data have no start (compute_calibration_start, load_calibration_start or load_calibration_state! build one)"))
     out = run.io.out
     isempty(out) && throw(ArgumentError("calibration_checkpoints: io.out required (the run's checkpoints are written there)"))
     mkpath(out)
@@ -423,20 +437,52 @@ function calibration_checkpoints(prob::VgtkCore.RefineProblem{<:CalibrationData,
     end
 end
 
-"""The closed-form sweep of the radiometric blocks the settings leave free (lighting, vignetting, μ: `fixed`) on a resumed state
-(`load_calibration_state`'s problem `prob`), by the refinement `alg`'s radiometry at its `radiometry_stops` (one sweep at least):
-the driver's (bin/refine.jl's `resume.sweep`, and a resumed state whose vignetting is not the run's). Its GCV selections join the
-start's; the resumed cost is the swept state's."""
-function _resumed_sweep!(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters}, alg::RadiometricRefinement)
+"""
+    load_calibration_state!(prob, refinement, path; sweep = false, load_state = RadiometricCamera.load_state) -> prob
+
+A resume: the started refinement problem `prob` (`RefineProblem(f, u0)`: [`compute_calibration_start`](@ref)'s or
+[`load_calibration_start`](@ref)'s) continued from the finished state `path` (a `state.json`, [`load_state`](@ref)), in place: the
+state's poses, camera, target and — when their sizes and geometry are the run's — vignetting and lighting loaded into `u0`
+(`load_state_into!`, its observation model the run's: the start's `camera.sensor_model` decides whether a record present is used),
+the vignetting's dependent points tied to its rule and its gauge `V(𝐜) = 1` set, the printed edge's start set when the run models the
+edge and the state carries none. Then the closed-form sweep of the blocks the settings leave free (lighting, vignetting, μ) by
+`refinement`'s radiometry at its `radiometry_stops` (one sweep at least), when the driver asks for it (`sweep`, bin/refine.jl's
+`resume.sweep`) and always when the state's vignetting is not the run's (V flat otherwise: no start of it). Returns `prob`, refined
+from there by `solve(prob, refinement; stops, callback)` (ruling R1: a resume is a problem built from the loaded state; its
+iteration numbering is the driver's, `resume.iteration_offset` in [`calibration_checkpoints`](@ref)). The data record the resume
+(`f.start.resumed`: the state's path, whether its vignetting was loaded, the cost at the resumed — and swept — state); the sweep's
+GCV selections join the start's.
+"""
+function load_calibration_state!(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters}, refinement::RadiometricRefinement,
+                                 path::AbstractString; sweep::Bool = false, load_state = RadiometricCamera.load_state)
     f, θ = prob.f, prob.u0
-    meta = f.start; settings = f.calibration_settings
-    tsw = time()
-    rs = alg.radiometry_stops                                   # at least one sweep on the resumed geometry
-    _update_radiometry!(f, θ, _scheduled_radiometry(alg, settings),
-                        (; light = !("lighting" in settings.fixed), vignetting = !("vignetting" in settings.fixed), mu = !("material" in settings.fixed));
-                        stops = VgtkCore.ToleranceStops(; max_iter = max(rs.max_iter, 1), rs.rtol, rs.atol), gcv_record = meta.vignetting_gcv)
+    meta = f.start
+    meta === nothing && throw(ArgumentError("load_calibration_state!: the data have no start (compute_calibration_start or load_calibration_start build one)"))
+    settings = f.calibration_settings
+    sst = load_state(path)
+    smode = sensor_model_mode(meta.sensor_model.mode)                  # the start's `camera.sensor_model`
+    # a resumed state's record present and not used, the run naming none (else the run's resolution warned): the warning, here
+    smode isa OffSensorModel && sst.observation.sensor isa SensorRecord && meta.sensor_model.present === nothing &&
+        warn_sensor_model_off(_record_line(sst.observation.sensor))
+    vig_ok, _ = load_state_into!(f, θ, sst, meta.names; sensor_model = smode)
+    set_vignetting!(θ, tie_pole(θ.camera.vignetting, f.vig_rule))   # a state of the untied radial profile (before 2026-10-29): P_1 := P_0, V(𝐜) kept; the rule's dependent points set
+    set_vignetting!(θ, gauge_center_value(θ.camera.vignetting))   # the gauge's start: V(𝐜) = 1 exactly
+    if !isempty(settings.edge.sdf) && iszero(board_surface(θ).edge)                 # resumed without the edge model: start it (the print's)
+        set_surface!(θ, with_edge(board_surface(θ), collect(_edge_start(settings))))
+    end
     c1, rms1 = cost(f, θ)
-    @printf("closed-form sweep on the resumed geometry (%.0f s): rel-RMS %.4f; μ %.4f; V(31/48/58°) %s\n", time() - tsw, rms1, θ.mat.diffuse_weight, _Vprof(θ.camera.vignetting)); flush(stdout)
-    f.start = (; meta..., resumed = (; meta.resumed..., costs = (c1, rms1)))
+    sv = sst.camera.vignetting
+    @printf("resumed from %s: rel-RMS %.4f%s\n", path, rms1,
+            vig_ok ? "" : "; the state's vignetting ($(nameof(typeof(sv))), $(join(size(control_points(sv)), " × "))$(sv isa RadialVignetting ? ", r_max $(round(VrtkCore.field_radius(sv); digits = 1)) px" : "")) is not the run's ($(meta.vig_desc)) → V flat"); flush(stdout)
+    if !vig_ok || sweep                                         # the closed-form start of the linear blocks on the resumed geometry (and material)
+        tsw = time()
+        rs = refinement.radiometry_stops                        # at least one sweep on the resumed geometry
+        _update_radiometry!(f, θ, _scheduled_radiometry(refinement, settings),
+                            (; light = !("lighting" in settings.fixed), vignetting = !("vignetting" in settings.fixed), mu = !("material" in settings.fixed));
+                            stops = VgtkCore.ToleranceStops(; max_iter = max(rs.max_iter, 1), rs.rtol, rs.atol), gcv_record = meta.vignetting_gcv)
+        c1, rms1 = cost(f, θ)
+        @printf("closed-form sweep on the resumed geometry (%.0f s): rel-RMS %.4f; μ %.4f; V(31/48/58°) %s\n", time() - tsw, rms1, θ.mat.diffuse_weight, _Vprof(θ.camera.vignetting)); flush(stdout)
+    end
+    f.start = (; meta..., resumed = (; state = String(path), vignetting = vig_ok, costs = (c1, rms1)))
     return prob
 end
