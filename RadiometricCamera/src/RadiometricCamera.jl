@@ -125,6 +125,7 @@ include("target/target_radiometry.jl")               # the target's radiometry a
 include("image_formation/radiance.jl")
 # image formation, the calibration (the state, the closed form, the LM over all blocks on the device), the loaders
 include("image_formation/flux.jl")
+include("image_formation/texture_footprint.jl")   # a pixel's footprint over a printed page's texture (the texture-recovery experiment's rows)
 include("camera/observation_model.jl")          # the observation model: a calibrated camera's sensor record, photograph kind and channel
 include("calibration/weighting.jl")                 # the rows' weights: whitened residuals under the sensor noise (D14), or as measured
 include("calibration/state.jl")

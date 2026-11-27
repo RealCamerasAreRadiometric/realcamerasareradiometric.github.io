@@ -11,7 +11,7 @@ CurrentModule = RadiometricCamera
 
 ```@autodocs
 Modules = [RadiometricCamera]
-Pages = ["image_formation/flux.jl"]
+Pages = ["image_formation/flux.jl", "image_formation/texture_footprint.jl"]
 Private = false
 ```
 

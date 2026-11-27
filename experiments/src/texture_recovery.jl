@@ -18,7 +18,7 @@
 # bootstrap. Only the cells enough fit, validation and test photographs cover are scored.
 # =============================================================================
 using RadiometricCamera
-using RadiometricCamera: compute_mask, draws, photo_file
+using RadiometricCamera: compute_mask, draws, photo_file, texel_weights
 using VisualGeometryToolkitCore: chart, residuals                  # Core's (RC adds methods to them)
 using VisualRadiometryToolkitCore: focus, inside, world_ray        # the radiometric layer's
 const RC = RadiometricCamera
@@ -526,85 +526,8 @@ end
 
 # ---- the rows: every pixel's footprint over the page's texels ------------------------------------------------------------------------
 
-"""
-    texel_weights(𝐛, TW, TH) -> ((texel, weight) × 4) or nothing
-
-The bilinear weights of the page position `𝐛` (∈ [0, 1]², the design's chart) over the `TW × TH` texels (texel `(i, j)` is column
-`(j − 1) TW + i`, x fastest): Core's `bilinear_weights` (the half-texel chart of `bilinear_sample`), the position strictly inside the
-texel centres' grid, `nothing` otherwise (Core's clamp would extend the edge; a footprint off the grid is dropped).
-"""
-@inline function texel_weights(𝐛, TW::Integer, TH::Integer)
-    uv = SVector(𝐛[1], 𝐛[2])
-    VgtkCore.is_inside_texel_centers(uv, (TW, TH)) || return nothing
-    i, j, fx, fy = VgtkCore.bilinear_weights(uv, (TW, TH))
-    tid(a, b) = (b - 1) * TW + a
-    return ((tid(i, j), (1 - fx) * (1 - fy)), (tid(i + 1, j), fx * (1 - fy)), (tid(i, j + 1), (1 - fx) * fy), (tid(i + 1, j + 1), fx * fy))
-end
-
-"""
-    _FootprintAt(view, board, st, vig, TW, TH, cols, vals)
-
-The blur row of a sampled pixel `(q, u, v)` (`q` its index in the launch) under `view`, the renderer's quadrature: for every sensor
-sample and every aperture-disc sample the ray `world_ray`, its intersection with the sheet and the bilinear texels there
-(`texel_weights`), weighted by the sensor and aperture weights and accumulated per texel in sample order, normalised to a sum of 1 and
-scaled by the chief ray's vignetting `V(𝐩)` (a pixel's model is I = V · Σ w x). Its `n` distinct texels go into the first `n` of the
-`_footprint_slots(st)` slots from `(q − 1) · slots + 1` of `cols` (the texel, ascending) and `vals` (its weight); returns
-`n`, or 0 when a sample misses the sheet or the grid (the pixel is dropped). A functor of Core's `pointwise!`: one KernelAbstractions
-kernel on every backend, the CPU's included.
-"""
-struct _FootprintAt{V, S, T, G, C, W}
-    view::V
-    board::S
-    st::T
-    vig::G
-    TW::Int32
-    TH::Int32
-    cols::C
-    vals::W
-end
-Adapt.@adapt_structure _FootprintAt
-"The slots of a pixel's blur row: 4 bilinear texels per sensor sample × aperture-disc sample of the render settings `st` (its most distinct texels)."
-_footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
-@inline function (f::_FootprintAt)(q::Int32, u::Int32, v::Int32)
-    st, view = f.st, f.view
-    bd = f.board; rays = VrtkCore.BoardRays(f.board)
-    TW, TH = Int(f.TW), Int(f.TH)
-    base = (Int(q) - 1) * _footprint_slots(st); n = 0; tot = 0.0
-    @inbounds for ks in 1:length(st.sensor)
-        𝐩 = VrtkCore.sensor_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
-        for la in 1:VrtkCore.n_disc(st.aperture)
-            𝐚 = VrtkCore.aperture_sample(st.aperture, la, rs)
-            o, d = VrtkCore.world_ray(view, 𝐩, 𝐚); sr, 𝐱 = VrtkCore.intersect_board(rays, o, d)
-            (isfinite(sr) && sr > 0) || return Int32(0)
-            tw = texel_weights(VgtkCore.chart(bd, 𝐱), TW, TH); tw === nothing && return Int32(0)
-            w = sw * VrtkCore.aperture_weight(st.aperture, la, rs)
-            for (t, b) in tw                                           # the texel's slot (a linear search of the ≤ n so far), or a new one
-                c = Int32(t); i = base + 1
-                while i <= base + n && f.cols[i] != c
-                    i += 1
-                end
-                if i > base + n
-                    n += 1; f.cols[i] = c; f.vals[i] = 0.0
-                end
-                f.vals[i] += w * b
-            end
-            tot += w
-        end
-    end
-    tot > 0 || return Int32(0)
-    V = f.vig(VrtkCore.sensor_position(Int(u), Int(v)))
-    @inbounds for i in (base + 1):(base + n)
-        f.vals[i] = V * (f.vals[i] / tot)
-    end
-    @inbounds for i in (base + 2):(base + n)                              # the row's texels ascending: the order of a sparse operator's row
-        c = f.cols[i]; x = f.vals[i]; j = i - 1
-        while j > base && f.cols[j] > c
-            f.cols[j + 1] = f.cols[j]; f.vals[j + 1] = f.vals[j]; j -= 1
-        end
-        f.cols[j + 1] = c; f.vals[j + 1] = x
-    end
-    return Int32(n)
-end
+# a pixel's footprint over the page's texels: RadiometricCamera's `texel_weights`, `texture_footprint_slots` and `texture_footprints!`
+# (the kernel on the kernels' View, which stays RC's)
 
 "The indices of `rows_px` (`(k, u, v)` each) by photograph `k`, each in order."
 function rows_by_photograph(rows_px)
@@ -714,22 +637,21 @@ host_sparse(C::VgtkCore.CSRMatrix) =
 """
     page_footprints(ctx, rows_px, camera, groups; device) -> (; A, kept)
 
-The blur rows (`_FootprintAt`) of every sampled pixel `rows_px[q] = (k, u, v)` of `camera` (a `RadiometricCameraModel`: the blur model,
+The blur rows (RadiometricCamera's `texture_footprints!`) of every sampled pixel `rows_px[q] = (k, u, v)` of `camera` (a `RadiometricCameraModel`: the blur model,
 `variant_camera`) at photograph `k`'s pose `ctx.poses[k]`, on `device` and kept there: one footprint kernel per photograph (`groups`,
 `rows_by_photograph`; Core's `pointwise!` on `OnBackend`), its slots compacted by a gather kernel. `A` is Core's `CSRMatrix` of
 `length(rows_px)` rows in `rows_px` order over the page's `TW · TH` texels, each row's texels ascending (a texel its samples share
 summed); a pixel with a sample off the sheet is dropped: an empty row, `kept[q]` false.
 """
 function page_footprints(ctx, rows_px, camera::RC.RadiometricCameraModel, groups::AbstractDict{<:Integer, <:AbstractVector{<:Integer}}; device)
-    N = _footprint_slots(ctx.sett); nT = ctx.TW * ctx.TH; KA = VgtkCore.KA
+    N = RC.texture_footprint_slots(ctx.sett); nT = ctx.TW * ctx.TH; KA = VgtkCore.KA
     order = Int[]; cnts = Any[]; cols = Any[]; vals = Any[]
     for k in sort!(collect(keys(groups)))
         qs = groups[k]; m = length(qs)
         m == 0 && continue
         slot_cols = KA.zeros(device, Int32, N * m); slot_vals = KA.zeros(device, Float64, N * m); n = KA.zeros(device, Int32, m)
-        f = _FootprintAt(RC.View(ctx.poses[k], camera), ctx.board, ctx.sett, camera.vignetting, Int32(ctx.TW), Int32(ctx.TH), slot_cols, slot_vals)   # the kernel's view: the camera at pose k
-        VgtkCore.pointwise!(f, n, Adapt.adapt(device, Int32.(1:m)), Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]),
-                            Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); exec = VgtkCore.OnBackend(device))
+        RC.texture_footprints!(n, slot_cols, slot_vals, camera, ctx.poses[k], ctx.board, ctx.sett, (ctx.TW, ctx.TH),
+                               Adapt.adapt(device, Int32[rows_px[q][2] for q in qs]), Adapt.adapt(device, Int32[rows_px[q][3] for q in qs]); device)
         KA.synchronize(device)
         cnt = Int.(n); dst = cumsum(cnt) .- cnt; nz = Int(sum(cnt))
         colk = KA.zeros(device, Int, nz); valk = KA.zeros(device, Float64, nz)

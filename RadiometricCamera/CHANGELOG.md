@@ -32,6 +32,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   `refinement_structure` (`_refinement_lm`); and public as they are: `lm_route`, `LmRoute`, `PerViewRoute`, `PerTileRoute`,
   `gauge_center_value`, `GaussianDerivativeEdges`. VisualRadiometryToolkitCore's and VisualGeometryToolkitCore's names are no longer
   reached through `RadiometricCamera.` (their owners'). The same code.
+- **A pixel's footprint over a printed page's texture is RadiometricCamera's** (the kernel moves here from the paper project, which
+  built the kernels' internal `View`): `texture_footprints!(n, cols, vals, camera, pose, board, settings, texture_size, us, vs;
+  device)`, its slots `texture_footprint_slots(settings)` and the bilinear texels `texel_weights(𝐛, TW, TH)` (public). The same
+  kernel, bit for bit.
 - **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
   `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
   converge now says so in one line, as the parametric starts did).
