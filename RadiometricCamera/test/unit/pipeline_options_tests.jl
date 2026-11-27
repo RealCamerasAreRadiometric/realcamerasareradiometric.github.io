@@ -501,7 +501,7 @@ end
     none = Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none")))
     jrun, jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
     _, joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
-    @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.damping == jon.refinement.optimizer.damping && joff.refinement.radiometry isa RC.RadiometryBlockDescent
+    @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.optimizer === jon.refinement.optimizer && joff.refinement.radiometry isa RC.RadiometryBlockDescent
     @test RC.config_dict(jrun, jon, joff_stops)["sweep"]["joint"] == "on" && RC.config_dict(jrun, joff, joff_stops)["sweep"]["joint"] == "off"
     @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
     for (t, k) in switches

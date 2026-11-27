@@ -135,7 +135,7 @@ function gold_outputs()
     r = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
     out["perview_residual"] = res; out["perview_jacobian"] = jac_summary(J)
-    s2 = deepcopy(s); parts = all_parts(s2.f, s2.u0); _lm_radiometry!(s2.f, s2.u0, parts; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 20)); c = RCg.parts_cost(s2.f, s2.u0, parts)
+    s2 = deepcopy(s); parts = all_parts(s2.f, s2.u0); _lm_radiometry!(s2.f, s2.u0, parts; optimizer = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()), stops = VgtkCore.LmStops(; max_iter = 20)); c = RCg.parts_cost(s2.f, s2.u0, parts)
     out["radiometry_gn"] = (; cost = c, P = vec(Matrix(control_points(s2.u0.camera.vignetting))), a = vec(Matrix(coefficients(s2.u0.light))), μ = s2.u0.mat.diffuse_weight)
     # cost0: the start cost of the three iterations (golden_tests.jl bounds the final cost's rounding by eps·cost0)
     s3 = deepcopy(s); cost0 = cost(s3.f, s3.u0)[1]; _lm_views!(s3.f, s3.u0; stops = RCg._calibration_stops(; max_iter = 3, ftol = 1e-12, xtol = 1e-14), damping = VgtkCore.LevenbergDamping())

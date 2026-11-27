@@ -47,7 +47,7 @@
     # the JOINT closed-form radiometry (2026-10-13): from a flat V, a wrong grey light and a wrong μ the joint Levenberg–Marquardt on the
     # parts recovers V (up to the V × lighting gauge of the centre pin), the lighting and μ exactly — the block solves creep along V × light
     s = calibration_problem(board, st, with_vignetting(camera_t, TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2)), poses, with_diffuse_weight(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets; masks)
-    parts_j = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_j; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj = RC.parts_cost(s.f, s.u0, parts_j)
+    parts_j = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_j; optimizer = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()), stops = VgtkCore.LmStops(; max_iter = 80)); cj = RC.parts_cost(s.f, s.u0, parts_j)
     @test cj < 1e-16 * sum(sum(abs2, v) for v in s.f.ϕ)
     ratio_j = [s.u0.camera.vignetting(SVector(x, y)) / vig_t(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_j) / minimum(ratio_j) - 1 < 1e-6
@@ -165,7 +165,7 @@
     s = calibration_problem(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, mat_t, light_t, targets_r; masks)
     _update_vignetting!(s.f, s.u0); @test maximum(abs, Matrix(VrtkCore.control_points(s.u0.camera.vignetting)) - Matrix(VrtkCore.control_points(vig_r))) < 1e-6
     s = calibration_problem(board, st, with_vignetting(camera_t, RadialVignetting(5, 𝐜r, rmax_r)), poses, with_diffuse_weight(mat_t, 0.7), EnvironmentLight(SphericalHarmonicMap(0.5, 2), b, r_SH), targets_r; masks)
-    parts_r = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_r; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); cj_r = RC.parts_cost(s.f, s.u0, parts_r)
+    parts_r = all_parts(s.f, s.u0); _lm_radiometry!(s.f, s.u0, parts_r; optimizer = VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()), stops = VgtkCore.LmStops(; max_iter = 80)); cj_r = RC.parts_cost(s.f, s.u0, parts_r)
     @test cj_r < 1e-14 * sum(sum(abs2, v) for v in s.f.ϕ)
     ratio_r = [s.u0.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_r) / minimum(ratio_r) - 1 < 1e-5

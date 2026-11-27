@@ -259,7 +259,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     c0, rms0 = cost(f, θ)
     @printf("lighting solve; init cost %.4e rel-RMS %.4f\n", c0, rms0); flush(stdout)
     t1 = time()
-    _update_radiometry!(f, θ, _with_schedule(radiometry; sweeps = 1, vignetting_smoothness = smoothness_weight(settings.vignetting.smoothness), verbose = false),
+    _update_radiometry!(f, θ, _with_schedule(radiometry; vignetting_smoothness = smoothness_weight(settings.vignetting.smoothness), verbose = false),
                         (; light = true, vignetting = true, mu = !("material" in settings.fixed)); parts, gcv_record = meta.vignetting_gcv)
     parts = nothing; GC.gc()
     c1, rms1 = cost(f, θ); μ_lin = θ.mat.diffuse_weight

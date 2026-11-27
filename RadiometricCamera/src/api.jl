@@ -27,7 +27,7 @@ public CalibrationData, CalibrationParameters, flat_vignetting, center_constrain
        height_basis, height_nparams, sphere_radius, RadianceSampler, SampleKey, draws, key_hash, L_c, RadianceParts,
        radiance_parts, L_from_parts, RenderSettings, pixel_id, Φ_pixel, compute_mask, masked_pixels, render_view,
        masked_vector, n_views, set_surface!, set_vignetting!, set_pose!, render_all, photometric_residuals, PixelParts,
-       pixel_parts, RadiometryParts, all_parts, RadiometryBlocks, RadiometryBlockDescent, JointRadiometry,
+       pixel_parts, RadiometryParts, all_parts, RadiometryBlocks, RadiometryData, RadiometryBlockDescent, JointRadiometry,
        lens_free, lens_manifold, focus_block, ApertureVar, MaterialVar, LightingVar,
        PerViewResidual, build_problem, CalibrationBundle, read_back!, extract_variables, Θ̄_snapshot, tile_costs,
        build_problem_grid, extract_variables_grid, load_session, thin_lens_focus_distance,

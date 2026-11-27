@@ -44,7 +44,7 @@
             targets = [render_view(k, camera, poses[k], mat, light, board_, st_, masks[k]; backend = cpu) for k in 1:2]
             return calibration_problem(board_, st_, camera, poses, with_diffuse_weight(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
-        damping = RadiometricRefinement(CalibrationSettings()).optimizer.damping   # the algorithm's default
+        optimizer = RadiometricRefinement(CalibrationSettings()).optimizer   # the algorithm's default
         per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; kw...); first_block(prob, filter(c -> c isa PerViewResidual{9}, prob.blocks)))
         per_tile(p; kw...) = ((prob, _) = build_problem_grid(p.f, p.u0; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
 
@@ -53,8 +53,8 @@
         ds = pixel_camera(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)))
         p = problem(ds)
         parts = all_parts(p.f, p.u0)
-        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (p.f, p.u0, parts)), RadiometryBlockDescent())
-        VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (p.f, p.u0, parts)), JointRadiometry(; damping))
+        VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(p.f, parts), p.u0), RadiometryBlockDescent())
+        VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(p.f, parts), p.u0), JointRadiometry(optimizer))
         cost(p.f, p.u0); render_all(p.f, p.u0)
         per_view(p)
         per_view(problem(ds); height_degree = 1)

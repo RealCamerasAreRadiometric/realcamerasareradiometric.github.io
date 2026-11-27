@@ -13,7 +13,7 @@
 #     --alphas, --etas  the candidate values, comma lists (the defaults are the values of record)
 #     --limit           evaluate only the first n candidates (a timing probe)
 using RadiometricCamera, Printf, StaticArrays
-using RadiometricCamera: all_parts, cost, set_vignetting!, RadiometryBlocks, RadiometryBlockDescent
+using RadiometricCamera: all_parts, cost, set_vignetting!, RadiometryData, RadiometryBlockDescent
 using VisualRadiometryToolkitCore: Material, with_diffuse_weight
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
@@ -73,14 +73,15 @@ relrms(c) = sqrt(2c / ϕ²)
 """μ scanned over 0:0.1:1 with the closed-form lighting at each value (RadiometricCamera's closed-form blocks, the lighting alone),
 then the lighting and μ by block descent from the best μ (up to 100 sweeps, to a relative cost change of 1e-7); returns the cost."""
 function fit_light_mu!(s, parts)
-    lighting(s) = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false, mu = false)), RadiometryBlockDescent())
+    lighting(s) = VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(s.f, parts), s.u0, (; vignetting = false, mu = false)), RadiometryBlockDescent())
     best = (Inf, 0.5)
     for μ in 0.0:0.1:1.0
         s.u0.mat = with_diffuse_weight(s.u0.mat, μ); c = lighting(s).metadata.cost
         c < best[1] && (best = (c, μ))
     end
     s.u0.mat = with_diffuse_weight(s.u0.mat, best[2]); c = lighting(s).metadata.cost
-    r = VgtkCore.solve(VgtkCore.EstimationProblem(RadiometryBlocks, (s.f, s.u0, parts), (; vignetting = false)), RadiometryBlockDescent(; sweeps = 100, reltol = 1e-7))
+    r = VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(s.f, parts), s.u0, (; vignetting = false)), RadiometryBlockDescent();
+                       stops = VgtkCore.ToleranceStops(; max_iter = 100, rtol = 1e-7))
     return min(c, r.metadata.cost)
 end
 

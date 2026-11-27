@@ -48,10 +48,10 @@
     s4 = state(); RC._update_vignetting!(s4.f, s4.u0, parts; smoothness_weight = rec[1].β)
     @test s4.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P rtol = 1e-10
     # through the block sweep; the joint solve has no penalty
-    s5 = state(); r5 = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s5.f, s5.u0, parts), (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = GeneralizedCrossValidation()))
+    s5 = state(); r5 = VgtkCore.solve(VgtkCore.RefineProblem(RC.RadiometryData(s5.f, parts), s5.u0, (; light = false, mu = false)), RC.RadiometryBlockDescent(; vignetting_smoothness = GeneralizedCrossValidation()))
     rec2 = r5.metadata.gcv
     @test length(rec2) == 1 && s5.u0.camera.vignetting.P ≈ s3.u0.camera.vignetting.P && VgtkCore.successful_retcode(r5) && r5.u.vignetting === s5.u0.camera.vignetting
-    @test_throws ArgumentError RC._with_schedule(RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping()); vignetting_smoothness = 0.1)
+    @test_throws ArgumentError RC._with_schedule(RC.JointRadiometry(VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping())); vignetting_smoothness = 0.1)
     s6 = state()
     @test_throws ArgumentError RC._update_vignetting!(s6.f, s6.u0, parts; smoothness_weight = -1.0)
     @test_throws ArgumentError RC._update_vignetting!(s6.f, s6.u0, parts; smoothness_weight = :aic)

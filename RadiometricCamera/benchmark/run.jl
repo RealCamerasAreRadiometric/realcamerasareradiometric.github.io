@@ -160,9 +160,9 @@ function stages(c)
     # closed form
     add("parts", () -> (s = c.state(); () -> length(RC.all_parts(s.f, s.u0))))
     add("radiometry_normal_equations", () -> (s = c.state(); parts = RC.all_parts(s.f, s.u0); () -> RC.radiometry_normal_equations(s.f, s.u0, parts)))
-    radiometry(s, alg) = VgtkCore.solve(VgtkCore.EstimationProblem(RC.RadiometryBlocks, (s.f, s.u0, RC.all_parts(s.f, s.u0))), alg)
+    radiometry(s, alg) = VgtkCore.solve(VgtkCore.RefineProblem(RC.RadiometryData(s.f, RC.all_parts(s.f, s.u0)), s.u0), alg)
     add("linear_blocks", () -> () -> (s = c.state(); radiometry(s, RC.RadiometryBlockDescent()); cost(s.f, s.u0)[1]))
-    add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); cost(s.f, s.u0)[1]))
+    add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()))); cost(s.f, s.u0)[1]))
     # per view
     function view_setup()
         s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; height_degree = HEIGHT_DEGREE)
@@ -198,7 +198,7 @@ function stages(c)
     end)
     add("lm1_grid", () -> () -> (s = grid_state(); RC._lm_tiles!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
     # the whole
-    add("calibration", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); RC._lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
+    add("calibration", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(VgtkCore.LevenbergMarquardt(; damping = VgtkCore.LevenbergDamping()))); RC._lm_views!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE); cost(s.f, s.u0)[1]))
     return list
 end
 

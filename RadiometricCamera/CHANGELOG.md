@@ -5,6 +5,14 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **Breaking: the closed-form blocks are a REFINE (they start from the parameters' current blocks).** `RefineProblem(RadiometryData(f,
+  parts), θ[, (; light, vignetting, mu)])` (was `EstimationProblem(RadiometryBlocks, (f, θ, parts)[, blocks])`), its context read by
+  Core's `read_context` (a misspelt block refused); `RadiometryBlockDescent` and `JointRadiometry` are `RefineKind`. Their sweeps are
+  the solve's `stops`, Core's `ToleranceStops` (`max_iter` the sweeps, `rtol` the relative cost decrease; one sweep at 1e-4 by
+  default): `RadiometryBlockDescent(; vignetting_smoothness, verbose)` and `JointRadiometry(optimizer::LevenbergMarquardt; stops =
+  LmStops(; max_iter = 40, ftol = 1e-12), verbose)` lose their `sweeps`/`reltol` fields; `JointRadiometry` takes its optimizer as an
+  argument (was its `damping`) and its inner LM's stops as a field (were hard-wired). `RadiometricRefinement(settings; …,
+  radiometry_stops)` holds the stops of its sweeps between LM chunks (`[sweep] iterations`, as before). The same sweeps, bit for bit.
 - **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
   `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
   converge now says so in one line, as the parametric starts did).
