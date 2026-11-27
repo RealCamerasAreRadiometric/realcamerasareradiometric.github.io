@@ -51,7 +51,7 @@
     (gx1, gy1, _) = pin[1]; (gx3, gy3, c3) = pin[3]
     node(lens, gx, gy) = normalize(SVector{3, Float64}(VgtkCore.directions(VgtkCore.model(lens))[gy, gx]))
     roll = [node(sl.u0.camera.geometric, gx3, gy3)]; chief = [node(sl.u0.camera.geometric, gx1, gy1)]
-    _lm_tiles!(sl.f, sl.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:focus, :aperture, :vignetting, :lighting), iter_callback = (it, cost, camera, args...) -> (push!(roll, node(camera.geometric, gx3, gy3)); push!(chief, node(camera.geometric, gx1, gy1))))
+    _lm_tiles!(sl.f, sl.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:focus, :aperture, :vignetting, :lighting), callback = state -> (push!(roll, node(state.u.camera.geometric, gx3, gy3)); push!(chief, node(state.u.camera.geometric, gx1, gy1)); false))
     @test length(roll) == 4 && all(d -> norm(d - chief[1]) < 1e-14, chief)                       # the chief node: both coordinates held
     moves = [roll[k + 1] - roll[k] for k in 1:3]
     @test norm(roll[end] - roll[1]) > 0

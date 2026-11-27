@@ -5,6 +5,46 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **Breaking: the problem's structure is its data's, a run's I/O its driver's (coordinator ruling R1, audit finding N9).** No problem
+  carries a context (`p` is `NullParameters`):
+  - `CalibrationData` gains `calibration_settings` (the calibration's `CalibrationSettings`: the blocks held, the grid, the focus, the
+    masks, the rendering, the lighting, the material, the vignetting, the warping, the edge; its keyword, `CalibrationSettings()` by
+    default for bare data; `settings` stays the render settings, the kernels' and a `CalibratedCamera`'s). `CalibrationPhotographs(geometry,
+    photographs; run, settings, device = default_backend())` holds the run's start options (`run_options`, `start_options(run, settings)`),
+    the settings (`calibration_settings`) and the device; the calibration is `solve(EstimationProblem(CalibrationEstimate,
+    CalibrationPhotographs(g, files; run, settings, device)), alg; stops)` (was `…(g, files), (; run, device))`), the refinement
+    `solve(RefineProblem(f, u0), refinement; stops, callback)` (was `RefineProblem(f, u0, run)`; `load_calibration_start` returns it so).
+  - `RadiometricRefinement(; optimizer, radiometry, radiometry_stops, lm_chunk)` drops its `settings` (positional) and its `log`; the
+    check that a joint radiometry takes no vignetting smoothness moves to `init` (and `read_calibration`, which refuses it as before).
+    `read_calibration` returns `(run, settings, algorithm, stops)` (was `(run, algorithm, stops)`, the settings
+    `algorithm.refinement.settings`); `config_dict(run, settings, algorithm, stops)` and `write_pipeline_config(dir, run, settings,
+    algorithm, stops; header)` take them so; `save_calibration_start(dir, f, θ; run)` and `save_radiometric_calibration(f, θ, result;
+    run)` read the settings from `f` (their `settings` keyword is gone).
+  - The solve and `init` take `callback`, Core's LM contract `callback(state::LmIterationState) -> Bool` (`true` stops): `state.iteration`
+    the refinement's iteration across its LM chunks, `state.u` the iterate's estimate decoded, `(; camera, poses, mat, surface, light)`,
+    `state.linear_solves` and `state.elapsed` the refinement's so far. The internal LMs (`_lm_views!`, `_lm_tiles!`) take the same
+    `callback` (was `iter_callback(it, cost, camera, poses, mat, surface, light)` and `lm_log`).
+  - The checkpoints (`lens_ckpt.json` | `grid_ckpt.json` every 5 iterations; with `io.checkpoint_each` `*_it<N>.json`, `poses_it<N>.json`,
+    `state_it<N>.json`) and the LM's per-iteration log are a callback the driver builds, `calibration_checkpoints(prob, run)` (new,
+    public); the live monitor stays the refinement's printed output. bin/refine.jl hands it to the solve.
+  - A resume is a problem built from a finished state, `load_calibration_state(prob, path)` (new, public: the state loaded into
+    `u0`, the vignetting tied to its rule and gauged, the printed edge started; `f.start.resumed` records it); `resume.sweep` (and a
+    state whose vignetting is not the run's, left flat) is the driver's closed-form sweep before the refinement. **Numbering:**
+    `resume.iteration_offset` numbers the checkpoints and the LM log (`calibration_checkpoints`); the monitor's `it` lines and the
+    "sweep after it" lines of refine.log count the refinement's own iterations from 1 on a resumed run (they included the offset), and
+    the "resumed from" line no longer prints the offset. The LM log's first column is the refinement's iteration across its chunks,
+    with the offset (it restarted per chunk).
+  - The start writes nothing: `_start_state` no longer requires or creates `io.out` (the driver's, bin/refine.jl).
+  The same numbers, bit for bit (the golden scenes and tier).
+- **Breaking: configuration version 4: the optimizer's stops are `[levenberg_marquardt.stops]`** (VisualGeometryToolkitCore's table
+  of the host LM's stops, decision 11 / C16) and its log is `[io] optimizer_log` (a run's output, the driver's). `RC_CONFIG_VERSIONS`'
+  step 3 → 4 moves `[optimizer]`'s `max_iter`, `max_time`, `ftol`, `xtol_rel` and `log`, their values kept; `[optimizer]` holds `type`
+  alone; a current file holding a version-3 key is refused naming its new place. `REFINE_ONLY_KEYS` and `PIPELINE_OUTPUT_KEYS` name
+  the current keys (`levenberg_marquardt.stops.max_iter`, …, `io.optimizer_log`); `config_key` undoes every move into another table
+  (a key's too: `config_key(v1, "levenberg_marquardt.stops.max_iter") == "lm.max_iter"`), and `split_refine_only` splits a nested
+  table. Every stored config (version 1, 2 or 3) loads as it is on disk. configs/default.toml is version 4.
+- **The LM's record's minimized cost is `objective`** (Core 0.14, spec §7: `r.metadata.objective`, was `metadata.cost`); the radiometry
+  refines' own record keeps its `cost`.
 - **Breaking: `calibrate` is retired (one estimation verb).** It was a one-line synonym of the calibration's `solve`; it is refused by
   name. The data of a calibration from scratch are a type, `CalibrationPhotographs(geometry::StartGeometry, photographs)` (was the
   bare tuple `(geometry, photographs)`): `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(g, files), (; run,
@@ -48,7 +88,7 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     inplane)` return `(bundle, idx)`; they take no `damping` (the LM's: `LevenbergMarquardt`'s field, the optimizer's), and its blocks
     are `bundle.blocks` (`get(problem.problem.costs, T)` → `filter(c -> c isa T, bundle.blocks)`; `tile_costs(bundle)`);
   - `_lm_views!`, `_lm_tiles!` and the refinement's chunks return the LM's `FitResult` (`retcode`, `stop_rule`, `stats.nsteps`,
-    `metadata.cost` = ‖r‖²) in place of `(; code, rule, iterations, cost)`; `CalibrationMetadata.solver` holds it; `lm_termination`
+    `metadata.objective` = ‖r‖²) in place of `(; code, rule, iterations, cost)`; `CalibrationMetadata.solver` holds it; `lm_termination`
     reads `(r.retcode, r.stop_rule)`; the bundle's `block_result` assembles the estimate, `u = (; camera, poses, mat, surface, light)`
     (below);
   - the solve's blocks are evaluated in batches again (the concurrent window, the grid's view batches): the bundle's

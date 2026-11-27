@@ -770,7 +770,7 @@ The calibration LM of `bundle` on the data `f` at the parameters `θ` (`idx` its
 LevenbergMarquardt at the optimizer's `damping` under `stops` (`_lm_stops`: their residual resolution the data's), the solve with
 the bundle registered (`_with_registered`, the solver's variables `bundle.solver`), its estimate (`u`, the bundle's `block_result`)
 written into `θ` (`_read_back!`). The result is the LM's: its termination record, `stats.nsteps` the accepted iterations,
-`metadata.cost` ‖r‖² at the solution.
+`metadata.objective` ‖r‖² at the solution.
 """
 function _solve_bundle!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx; stops::VgtkCore.LmStops,
                         damping::VgtkCore.LmDamping, callback = nothing)
@@ -849,32 +849,26 @@ function _free_mask!(free::AbstractVector{Bool}, idx, fixed; lens_key::Symbol, l
 end
 
 """
-    _lm_callback(f, θ, idx, extract; trace, trace_meta, iter_callback, verbose, lm_log) -> callback
+    _lm_callback(f, θ, idx, extract; trace, trace_meta, callback, verbose) -> callback
 
 The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one; VisualGeometryToolkitCore's `callback = state ->
-Bool` of its LevenbergMarquardt, `state` an `LmIterationState`): with a `trace` or an `iter_callback`, after every iteration the
+Bool` of its LevenbergMarquardt, `state` an `LmIterationState`): with a `trace` or a `callback`, after every iteration the
 iterate's variables (`state.u`) read through `extract(s, vars, idx)` (the route's `_extract_variables` / `_extract_variables_grid`)
-into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace` (`trace_meta` merged, `phase = :lm`) and
-`iter_callback(it, cost, camera, poses, mat, surface, light)` called; else a print-out line per iteration (`verbose`, `_lm_print`)
-or none (`nothing`). Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none). It never stops the
-solve.
+into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace` (`trace_meta` merged, `phase = :lm`) and `callback` called
+with Core's state of the iteration, its `u` the decoded estimate `(; camera, poses, mat, surface, light)` (the one callback contract:
+Core's, the estimate RC's), its return stopping the solve; else a print-out line per iteration (`verbose`, `_lm_print`) or none
+(`nothing`).
 """
-function _lm_callback(f::CalibrationData, θ::CalibrationParameters, idx, extract; trace = nothing, trace_meta = (;), iter_callback = nothing, verbose::Bool = false,
-                      lm_log::AbstractString = "")
-    cb = if trace !== nothing || iter_callback !== nothing
-        it = Ref(0)
-        function (state)
-            camera, poses, mat, surface, light = extract(f, θ, state.u, idx)
-            it[] += 1
-            trace !== nothing && push!(trace, (; trace_meta..., phase = :lm, cost = state.cost, time = time(),
-                                               snap = Θ̄_snapshot(f, θ; camera, poses, mat, surface, light)))
-            iter_callback !== nothing && iter_callback(it[], state.cost, camera, poses, mat, surface, light)
-            return false
-        end
-    else
-        verbose ? _lm_print : nothing
+function _lm_callback(f::CalibrationData, θ::CalibrationParameters, idx, extract; trace = nothing, trace_meta = (;), callback = nothing, verbose::Bool = false)
+    trace === nothing && callback === nothing && return verbose ? _lm_print : nothing
+    return function (state)
+        camera, poses, mat, surface, light = extract(f, θ, state.u, idx)
+        trace !== nothing && push!(trace, (; trace_meta..., phase = :lm, cost = state.cost, time = time(),
+                                           snap = Θ̄_snapshot(f, θ; camera, poses, mat, surface, light)))
+        callback === nothing && return false
+        return callback(VgtkCore.LmIterationState(state.iteration, state.cost, state.best_cost, (; camera, poses, mat, surface, light),
+                                                  state.damping, state.linear_solves, state.scaling, state.trial_ready, state.elapsed))::Bool
     end
-    return _lm_log(cb, get(trace_meta, :ϕ², NaN), lm_log)
 end
 
 """
@@ -883,20 +877,19 @@ end
 Levenberg–Marquardt over all parameter blocks but those `fixed` names (of `(:poses, :distortion, :focus, :aperture, :material,
 :vignetting, :lighting)`), the surface parameters it names (`:height`, `:inplane`) and the lens block's parameters `fixed` names by
 Core's parameter names (`lens_free`; default none: every parameter but the skew is free; `:aspect` ties the focal lengths): one
-holding keyword (`build_problem`, with the model's structure `height_degree` and `inplane`). `iter_callback(it, cost, camera, poses,
-mat, surface, light)` sees the current best variables after every iteration and `trace` collects the per-iteration snapshots
-(`_lm_callback`, as `_lm_tiles!`); with a file `lm_log` (the algorithm's `log`) a line per iteration is appended to it (`_lm_log`). The solve is VisualGeometryToolkitCore's one LM, its `LevenbergMarquardt` on `build_problem`'s
+holding keyword (`build_problem`, with the model's structure `height_degree` and `inplane`). `callback(state)` (Core's contract,
+`state.u` the iterate's decoded estimate `(; camera, poses, mat, surface, light)`) sees every iteration and `trace` collects the
+per-iteration snapshots (`_lm_callback`, as `_lm_tiles!`). The solve is VisualGeometryToolkitCore's one LM, its `LevenbergMarquardt` on `build_problem`'s
 `CalibrationBundle` (`_solve_bundle!`) at the optimizer's `damping` under the solve's `stops` (Core's `LmStops`, their residual resolution the state's: `_lm_stops`) — the RELATIVE cost decrease `ftol`, the
 relative step test `xtol_rel` and the absolute step max-norm `xtol`; no absolute cost decrease test — the cost is in the photographs' squared units, dimensionless when the rows
 are whitened (a two-view 32 × 32 fixture starts at ≈ 2e-4), so an absolute threshold of 1e-12 stopped the solver with the aperture, μ and the lighting still drifting together
 along a flat direction. Returns the LM's `FitResult` (`retcode`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
-— or at a stationary point after the rejection cap; `stop_rule`, a `StopRule`; `stats.nsteps`; `metadata.cost`, ‖r‖² at the solution).
+— or at a stationary point after the rejection cap; `stop_rule`, a `StopRule`; `stats.nsteps`; `metadata.objective`, ‖r‖² at the solution).
 """
 function _lm_views!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, fixed = (), verbose::Bool = false,
-                    trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
-                    lm_log::AbstractString = "")
+                    trace = nothing, trace_meta = (;), callback = nothing, height_degree::Integer = 0, inplane::Bool = false)
     bundle, idx = build_problem(f, θ; fixed, height_degree, inplane)
-    callback = _lm_callback(f, θ, idx, _extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
+    callback = _lm_callback(f, θ, idx, _extract_variables; trace, trace_meta, callback, verbose)
     _reset_scrubbed!(f.run)
     try                                                    # (Core's stall postcondition runs inside, the views still concurrent)
         return _solve_bundle!(f, θ, bundle, idx; stops, damping, callback)
@@ -905,7 +898,7 @@ function _lm_views!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCo
     end
 end
 
-"""The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[optimizer]` key."""
+"""The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[levenberg_marquardt.stops]` key."""
 const CORE_LM_XTOL = VgtkCore.LmStops().xtol
 """The solve's stop settings `stops` (VisualGeometryToolkitCore's `LmStops`) of the calibration LM on the data `f`: as given, their
 residual resolution the norm the data resolve — the photographs' RAW quantisation in the cost's norm, never the noise level
@@ -917,30 +910,6 @@ _lm_stops(f::CalibrationData, stops::VgtkCore.LmStops) =
 _chunk_stops(stops::VgtkCore.LmStops, n::Integer, max_time::Real) =
     VgtkCore.LmStops(; max_iter = n, stops.ftol, stops.xtol, stops.xtol_rel, stops.stationarity_tol, max_time = Float64(max_time),
                      stops.residual_resolution)
-"""
-    _lm_log(cb, ϕ², path) -> callback
-
-With a `path` (the algorithm's `log`, the LMs' `lm_log` keyword; empty: `cb` itself) `cb` (`nothing`: none) followed by a per-iteration
-line (tab-separated) appended to that file, from the iteration's `LmIterationState`: iteration, cost, rel-RMS (√(2 cost / ϕ²)), the
-best cost before the iteration, λ after its update, the linear solves of the iteration (1 = accepted at once; each further solve is a
-rejected step that raised λ), and the DᵀD scaling's min / max / number of entries at its floor (1e-8 × max).
-"""
-function _lm_log(cb, ϕ², path::AbstractString)
-    isempty(path) && return cb
-    prev = Ref(0)
-    return function (state)
-        out = cb === nothing ? false : cb(state)
-        nsolves = state.linear_solves
-        sc = state.scaling
-        open(path, "a") do io
-            println(io, join((state.iteration, state.cost, sqrt(2 * state.cost / ϕ²), state.best_cost, state.damping, nsolves - prev[],
-                              sc === nothing ? "" : minimum(sc), sc === nothing ? "" : maximum(sc),
-                              sc === nothing ? "" : count(<=(1e-8 * maximum(sc) * (1 + 1e-12)), sc), time()), '\t'))
-        end
-        prev[] = nsolves
-        return out
-    end
-end
 """A calibration LM's print-out line per iteration (`_lm_callback` with `verbose`): the iteration, the cost, the best cost before it, λ
 and the time since the solve started (its `LmIterationState`)."""
 function _lm_print(state)

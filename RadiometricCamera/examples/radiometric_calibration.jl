@@ -125,9 +125,9 @@ end
 VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(prob.f, all_parts(prob.f, prob.u0)), prob.u0), RadiometryBlockDescent()); c1, rms1 = cost(prob.f, prob.u0)
 @printf("linear sweep (Θ_l, Θ_v, μ) → rel-RMS %.4f, μ %.3f, V at 0.4 W off the centre %.3f\n", rms1, prob.u0.mat.diffuse_weight, prob.u0.camera.vignetting(VgtkCore.center(prob.u0.camera.vignetting) + SVector(0.4W, 0.0)))
 trace = NamedTuple[]
-monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", it, cst,
-                                                               1e3 * camera.aperture_radius, mat.diffuse_weight, mat.roughness_paper, mat.roughness_ink)
-res = _lm_tiles!(prob.f, prob.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, iter_callback = monitor, verbose = false)
+monitor(state) = (@printf("  it %2d  cost %.4e  r %.3f mm  μ %.3f  α %.3f / %.3f\n", state.iteration, state.cost, 1e3 * state.u.camera.aperture_radius,
+                          state.u.mat.diffuse_weight, state.u.mat.roughness_paper, state.u.mat.roughness_ink); false)   # Core's callback: `false` continues
+res = _lm_tiles!(prob.f, prob.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, callback = monitor, verbose = false)
 c2, rms2 = cost(prob.f, prob.u0)
 @printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.stop_rule)
 

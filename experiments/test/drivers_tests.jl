@@ -164,7 +164,7 @@ end
         end
         # spot checks: the real-data budget of the runs of record (the 03.11 settings)
         rc = load_radiometric_refinement_config(experiment_config("radiometric_refinement"))
-        run, alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = (run, alg.refinement.settings)
+        run, settings, alg, stops = RadiometricCamera.read_calibration(rc["cases"]["si30_bc5_warped"]["pipeline"]); o = (run, settings)
         @test first(o).io.channel == "G" && last(o).masks.samples_per_view == 8192 && stops.max_iter == 25 && last(o).rendering.N == 16 && last(o).rendering.hammersley
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)
@@ -312,7 +312,7 @@ end
         @test ki(c2) == ki(db) && kc(c2) != kc(db)
         resolved = RadiometricCamera.config_dict(RadiometricCamera.read_calibration(db["cases"][c]["pipeline"])...)
         for k in RadiometricCamera.REFINE_ONLY_KEYS                              # every refine-only key, RadiometricCamera's declaration
-            ctb, ckey = split(k, '.'); v = resolved[ctb][ckey]                   # its resolved value (the current key)
+            v = foldl((t, p) -> t[p], split(k, '.'); init = resolved)            # its resolved value (the current key, a nested table's too)
             v isa AbstractString && continue                                     # optimizer.type: one optimizer, no other value to set
             tb, key = split(RadiometricCamera.config_key(db["cases"][c]["pipeline"], k), '.')   # the key as the case's version names it
             c2 = deepcopy(db); t = get!(c2["cases"][c]["pipeline"], tb, Dict{String, Any}())

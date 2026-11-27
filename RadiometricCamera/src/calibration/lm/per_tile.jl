@@ -442,15 +442,15 @@ end
 
 Joint LM over the per-tile grid problem (all blocks; `fixed` as in `_lm_views!` with `:grid` for the patch blocks in place of
 `:distortion`). `height_degree` and `smoothness` as in `build_problem_grid`, the problem and its held blocks
-its; `iter_callback(it, cost, camera, poses, mat, surface, light)` sees the current best variables after every iteration, and `lm_log` as `_lm_views!`'s. The solve
+its; `callback(state)` sees every iteration (its `u` the decoded estimate), as `_lm_views!`'s. The solve
 and its stopping tests and termination record as `_lm_views!`'s (VisualGeometryToolkitCore's `LevenbergMarquardt` under `_lm_stops`:
 `_solve_bundle!`).
 """
 function _lm_tiles!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH,
-                    fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), iter_callback = nothing,
-                    height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
+                    fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), callback = nothing,
+                    height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false)
     bundle, idx = build_problem_grid(f, θ; patch, fixed, height_degree, smoothness, inplane)
-    callback = _final_iteration_callback(_lm_callback(f, θ, idx, _extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), f, stops.max_iter)
+    callback = _final_iteration_callback(_lm_callback(f, θ, idx, _extract_variables_grid; trace, trace_meta, callback, verbose), f, stops.max_iter)
     _reset_scrubbed!(f.run)
     try                                                          # (Core's stall postcondition runs inside, the tiles still batched)
         return _solve_bundle!(f, θ, bundle, idx; stops, damping, callback)

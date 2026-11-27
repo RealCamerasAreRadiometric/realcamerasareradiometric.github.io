@@ -440,12 +440,28 @@ function override_variant(case::AbstractString, t::AbstractDict, v; unset = ())
     parts = sort([[(String(k), "$k=$(_override_label(x))") for (k, x) in v]; [(String(k), "$k=unset") for k in stated]]; by = first)
     return (String(case) * "__" * join(last.(parts), "__"), t2)
 end
-# the [pipeline] table `pipe` resolved (configs/default.toml ← `pipe`: its options, its optimizer and stops, `read_calibration`), its
-# tables named as `pipe`'s configuration version names them (`config_key`): an override's key is a key of the table it is set in
+# the [pipeline] table `pipe` resolved (configs/default.toml ← `pipe`: its options, its optimizer and stops, `read_calibration`), each
+# key at the place `pipe`'s configuration version names it (`config_key`, key by key: a version-1 `lm.max_iter` is the current
+# `levenberg_marquardt.stops.max_iter`): an override's key is a key of the table it is set in
 function _resolved_as_written(pipe::AbstractDict)
     d = RadiometricCamera.config_dict(RadiometricCamera.read_calibration(pipe)...)
     delete!(d, VgtkCore.CONFIG_VERSION_KEY)
-    return Dict{String, Any}(RadiometricCamera.config_key(pipe, k) => v for (k, v) in d)
+    out = Dict{String, Any}()
+    function put!(x, path)
+        if x isa AbstractDict && !isempty(x)                      # a table: its keys (an inline table's are kept in their table)
+            foreach(((k, v),) -> put!(v, [path; String(k)]), x)
+        else
+            p = split(RadiometricCamera.config_key(pipe, join(path, '.')), '.')
+            t = out
+            for q in p[1:(end - 1)]
+                t = get!(t, String(q), Dict{String, Any}())
+            end
+            t[String(p[end])] = x
+        end
+        return nothing
+    end
+    foreach(((k, v),) -> put!(v, [String(k)]), d)
+    return out
 end
 # whether the [pipeline] table `pipe` states the key `k` (`table.key` or a top-level key); the key deleted (its table dropped when emptied)
 _override_stated(pipe, k) = (p = split(k, '.'; limit = 2); length(p) == 1 ? haskey(pipe, k) : haskey(get(pipe, p[1], Dict()), p[2]))

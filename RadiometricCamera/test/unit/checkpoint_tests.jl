@@ -1,7 +1,8 @@
 # The per-iteration checkpoint (`io.checkpoint_each`): a refinement writes poses_it<N>.json and state_it<N>.json after every LM
 # iteration, the state through save_state with the run's observation model (RC 0.11.1 made it required; the monitor omitted it, and
 # every checkpointed refinement crashed at iteration 1 until 0.11.2). A small decoded scene through the calibration's `solve`, 2 LM iterations.
-# A small decoded scene through the calibration's `solve`: two 24 × 24 renders of a board through a grid camera, the start the rendering's own
+# A small decoded scene through the calibration's `init` (the start) and the refinement's `solve`, the checkpoints the driver's
+# `callback` (`calibration_checkpoints`): two 24 × 24 renders of a board through a grid camera, the start the rendering's own
 # geometry (`run_scene(dir, lm, tex, cam)`: the fit and the run's io.out under `dir`, `lm` the [lm] table).
 @testsetup module CheckpointScene
     using RadiometricCamera, StaticArrays, LinearAlgebra, PNGFiles, ImageCore
@@ -30,14 +31,16 @@
             PNGFiles.save(photos[k], [RGB{N0f16}(clamp.(imgs[k][i, j, :], 0, 1)...) for i in 1:H, j in 1:W])
         end
         out = joinpath(dir, "out")
-        run, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
+        run, settings, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => checkpoint, "channel" => "RGB"),
                                         "lm" => lm, "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
-        start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
-                                                                      (; run, device = RC.KernelAbstractions.CPU())), alg; stops).cache.prob
-        fit = VgtkCore.solve(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
-                                                        (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
+        data = RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos; run, settings,
+                                         device = RC.KernelAbstractions.CPU())
+        prob = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, data), alg; stops).cache.prob   # the start
+        start_only && return prob
+        # the refinement, the run's checkpoints its driver's callback (ruling R1: the run's I/O is never the algorithm's)
+        fit = VgtkCore.solve(prob, alg.refinement; stops, callback = RC.calibration_checkpoints(prob, run))
         return (; fit, out, photos)
     end
     export run_board

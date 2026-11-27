@@ -10,8 +10,9 @@
 
     # the tables of a run's TOML: the run's (RunOptions) and the calibration's (CalibrationSettings), each table in one, by name
     const OPTION_TABLES = Dict(f => fieldtype(H, f) for H in (RadiometricCamera.RunOptions, RadiometricCamera.CalibrationSettings) for f in fieldnames(H))
-    function haskey_path(path)           # `table.key` names a field of an options table (or of the optimizer's, `[optimizer]`); `fixed`, the top-level list
+    function haskey_path(path)           # `table.key` names a field of an options table (or of the algorithm's: `[optimizer]`, `[levenberg_marquardt.stops]`, `[sweep]`); `fixed`, the top-level list
         path == "fixed" && return haskey(OPTION_TABLES, :fixed)
+        startswith(path, "levenberg_marquardt.stops.") && return hasfield(RadiometricCamera.LevenbergMarquardtStopsTable, Symbol(last(split(path, '.'))))
         t, k = split(path, '.')
         t == "optimizer" && return hasfield(RadiometricCamera.OptimizerTable, Symbol(k))   # the algorithm's tables
         t == "sweep" && return hasfield(RadiometricCamera.SweepTable, Symbol(k))
@@ -36,9 +37,10 @@ end
     @test count("_option_default(", src) >= 75                                     # every table field's default reads the file
     # every key of the struct is in the file (the file documents them all)
     doc = TOML.parsefile(path)
-    @test Set(keys(doc)) == union(Set(String.(keys(OPTION_TABLES))), ["optimizer", "sweep", "config_version"])   # the algorithm's tables, the version
+    @test Set(keys(doc)) == union(Set(String.(keys(OPTION_TABLES))), ["optimizer", "levenberg_marquardt", "sweep", "config_version"])   # the algorithm's tables, the version
     @test doc["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
     @test Set(keys(doc["optimizer"])) == Set(String.(fieldnames(RC.OptimizerTable))) && Set(keys(doc["sweep"])) == Set(String.(fieldnames(RC.SweepTable)))
+    @test keys(doc["levenberg_marquardt"]) == Set(["stops"]) && Set(keys(doc["levenberg_marquardt"]["stops"])) == Set(String.(fieldnames(RC.LevenbergMarquardtStopsTable)))
     # but for the optional tables, absent by default, which the file documents in a comment
     optional = Dict("grid" => ["start_perturbation", "node_count"], "io" => ["lens_identity"])   # absent unless stated (no default)
     @test doc["fixed"] == [] && RC.CalibrationSettings().fixed == String[]                      # the top-level list of held blocks: none
@@ -80,8 +82,8 @@ end
         "RC_BOARD_HEIGHT" => ["warping.degree"], "RC_HEIGHT" => ["warping.heights_mm"],
         "RC_EDGE_SDF" => ["edge.sdf"], "RC_EDGE" => ["edge.ink_spread_mm", "edge.print_sigma_mm"],
         "RC_EDGE_FREE" => ["fixed"],   # the printed edge once held by "edge" in lm.fixed (edge.free retired 2026-11-11; "edge" refused, RC 0.11.0)
-        "RC_MAXITERS" => ["optimizer.max_iter"], "RC_MAXTIME" => ["optimizer.max_time"], "RC_FIX" => ["fixed"],   # [lm] until RC 0.4.0's [optimizer]
-        "RC_LM_LOG" => ["optimizer.log"],
+        "RC_MAXITERS" => ["levenberg_marquardt.stops.max_iter"], "RC_MAXTIME" => ["levenberg_marquardt.stops.max_time"], "RC_FIX" => ["fixed"],   # [lm], then [optimizer] (RC 0.4.0), then [levenberg_marquardt.stops] (configuration version 4)
+        "RC_LM_LOG" => ["io.optimizer_log"],                                                                                                     # [lm] log, then [optimizer] log, then [io] optimizer_log (version 4)
         "RC_SWEEP_EACH" => ["sweep.lm_chunk"], "RC_SWEEP_" * "PA" * "SSES" => ["sweep.iterations"], "RC_SWEEP_JOINT" => ["sweep.radiometry"],   # the second: its name spelled apart (check_naming R7); the third: version 2's sweep.joint (configuration version 3)
         "RC_RESUME_STATE" => ["resume.state"], "RC_IT_OFFSET" => ["resume.iteration_offset"], "RC_RESUME_SWEEP" => ["resume.sweep"],
         "RC_SELFCHECK_ONLY" => ["selfcheck.only"], "RC_SELFCHECK_POSES" => ["selfcheck.poses"],
@@ -114,19 +116,23 @@ end
                 "grid.lattice",                                                     # 2026-11-15: the lattice's mode (derived | node_count; RC 0.11.4)
                 "focus.support_min", "focus.lens_coverage_scale",                   # 2026-11-15: the focus nodes' support rule and rim margin
                 "masks.edge_detector",                                              # 2026-11-15: the samples' edge strength (gradient_bias: RC_MASK_EDGE's)
-                "optimizer.ftol", "optimizer.xtol_rel",                             # 2026-11-15: the LM's stop tolerances, the run's TOML (RC 0.11.4: xtol_rel, Core's relative step)
+                "levenberg_marquardt.stops.ftol", "levenberg_marquardt.stops.xtol_rel",   # 2026-11-15: the LM's stop tolerances, the run's TOML (RC 0.11.4: xtol_rel, Core's relative step; [levenberg_marquardt.stops] since version 4)
                 "optimizer.type",                                                   # 2026-11-26: the refinement's optimizer (RC 0.4.0's [optimizer], [lm] until then)
                 "masks.edge_fraction", "masks.addon_samples", "masks.addon_gradient_bias"]   # 2026-11-15: the draw's other modes (the sampling-strategy experiment, RC 0.11.5)
     # and every other key is one of them: no knob without a former variable, none forgotten
     keyset = union(Set(p for (_, ps) in FORMER_KNOBS for p in ps), NEW_KEYS)
     @test keyset == union(Set("$t.$k" for (t, T) in OPTION_TABLES if t !== :fixed for k in fieldnames(T)), ["fixed"],
-                          Set("optimizer.$k" for k in fieldnames(RC.OptimizerTable)), Set("sweep.$k" for k in fieldnames(RC.SweepTable)))
+                          Set("optimizer.$k" for k in fieldnames(RC.OptimizerTable)), Set("levenberg_marquardt.stops.$k" for k in fieldnames(RC.LevenbergMarquardtStopsTable)),
+                          Set("sweep.$k" for k in fieldnames(RC.SweepTable)))
 end
 
 @testitem "pipeline options (TOML): unknown tables, keys and values are refused" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: focus, material
     m = thrown_message(() -> RC.pipeline_options(Dict("lm" => Dict("fto" => 1))))
-    @test occursin("fto", m) && occursin("max_iter", m) && occursin("max_time", m) && occursin("[optimizer]", m)   # (version 1's [lm], read as the current table)
+    @test occursin("fto", m) && occursin("type", m) && occursin("[optimizer]", m)   # (version 1's [lm], read as the current table: the optimizer's, its stops moved)
+    m = thrown_message(() -> RC.pipeline_options(Dict("config_version" => 4, "levenberg_marquardt" => Dict("stops" => Dict("fto" => 1)))))
+    @test occursin("fto", m) && occursin("max_iter", m) && occursin("max_time", m) && occursin("levenberg_marquardt.stops", m)
+    @test occursin("unknown key", thrown_message(() -> RC.pipeline_options(Dict("config_version" => 4, "levenberg_marquardt" => Dict("stop" => Dict())))))
     m = thrown_message(() -> RC.pipeline_options(Dict("lmm" => Dict("max_iter" => 1))))
     @test occursin("lmm", m) && occursin("lm", m)
     @test occursin("grid.node_count", thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("node_count" => [1, 2, 3])))))
@@ -192,7 +198,7 @@ end
     # finding 10: prepare_refinement defaulted to the CPU)
     ssrc = read(joinpath(pkgdir(RadiometricCamera), "src", "start", "calibration_start.jl"), String)
     csrc = read(joinpath(pkgdir(RadiometricCamera), "src", "calibration", "calibrate.jl"), String)
-    @test occursin("_calibration_device(::NamedTuple{(:run,)}) = default_backend()", csrc)
+    @test occursin("function CalibrationPhotographs(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; run::RunOptions, settings::CalibrationSettings,\n                                device = default_backend())", ssrc)
     @test occursin("function load_calibration_start(dir::AbstractString; run::RunOptions, settings::CalibrationSettings, device = default_backend(),", ssrc)
     @test occursin("function measure_image_region(files::AbstractVector{<:AbstractString}; image::AbstractString, outlier_halfwidth_px::Real, seed::Integer,\n                              device = default_backend(),", psrc)
     @test !occursin("_lm_problem_kw", psrc) && count("if !getfield(blocks, k)", psrc) == 1                       # the held blocks: derived once
@@ -314,17 +320,17 @@ end
 @testitem "pipeline options (TOML): --set overrides" setup = [RCFixtures, PipelineOptionsHelpers] begin
     using RadiometricCamera: focus
     using TOML
-    run, alg, stops = RC.read_calibration(Dict{String, Any}("config_version" => 2);
+    run, settings, alg, stops = RC.read_calibration(Dict{String, Any}("config_version" => 2);
                                           set = ["optimizer.max_time=1e-10", "optimizer.max_iter=2", "io.out=/tmp/rc out", "frontend.type=schoeps",
                                                  "io.views=[\"V01.png\", \"V02.png\"]", "camera.lens_coverage=/data/image_region.json",
                                                  "grid.smoothness={type = \"bending\", weight = 0.1}", "focus.support_min=0.25"])
-    settings = alg.refinement.settings
     @test stops.max_time == 1e-10 && stops.max_iter == 2 && run.io.out == "/tmp/rc out" && run.frontend.type === RC.SchoepsFrontend
     @test run.io.views == ["V01.png", "V02.png"] && run.camera.lens_coverage == "/data/image_region.json"
     @test settings.grid.smoothness == RC.BendingSmoothness(0.1) && settings.focus.support_min == 0.25
     # an override replaces a file's value and is refused like a file's unknown key
     @test last(RC.read_calibration(Dict("lm" => Dict("max_iter" => 7)); set = ["lm.max_iter=3"])).max_iter == 3     # a version-1 table, its names
     @test last(RC.read_calibration(Dict("config_version" => 2, "optimizer" => Dict("max_iter" => 7)); set = ["optimizer.max_iter=3"])).max_iter == 3
+    @test last(RC.read_calibration(Dict("config_version" => 4); set = ["levenberg_marquardt.stops.max_iter=3"])).max_iter == 3      # the current table, its names
     @test occursin("fto", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["lm.fto=1"])))
     @test occursin("key.path=value", thrown_message(() -> RC.pipeline_options(Dict{String, Any}(); set = ["lm.max_iter"])))
     # one TOML value per override; a quoted string stays a string
@@ -346,13 +352,16 @@ end
     o = (run, settings)
     back = RC.pipeline_options(TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(o...)))))
     @test back == o
-    # the calibration (its settings, its optimizer), the run and its solve's stops round-trip too, the record a current version (`config_version`)
-    alg = RC.RadiometricCalibration(RC.RadiometricRefinement(settings; log = "lm.tsv")); stops = RC._calibration_stops(; max_iter = 2)
-    d = TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(run, alg, stops))))
-    @test d["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS) && d["optimizer"]["max_iter"] == 2 &&
-          d["optimizer"]["type"] == "levenberg_marquardt"
-    run2, alg2, stops2 = RC.read_calibration(d)
-    @test run2 == run && alg2.refinement.settings == settings && alg2.refinement.log == "lm.tsv" && alg2.refinement.optimizer == alg.refinement.optimizer && stops2 == stops
+    # the calibration (its optimizer), the run, the settings and its solve's stops round-trip too, the record a current version (`config_version`)
+    alg = RC.RadiometricCalibration(RC.RadiometricRefinement()); stops = RC._calibration_stops(; max_iter = 2)
+    logrun = RC.RunOptions(; io = RC.IOOptions(; images = "imgs", out = "out", views = ["a.png"], linearize = true, optimizer_log = "lm.tsv"),
+                           run.frontend, run.camera, run.compute)
+    d = TOML.parse(sprint(io -> TOML.print(io, RC.config_dict(logrun, settings, alg, stops))))
+    @test d["config_version"] == RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS) && d["levenberg_marquardt"]["stops"]["max_iter"] == 2 &&
+          d["optimizer"] == Dict("type" => "levenberg_marquardt") && d["io"]["optimizer_log"] == "lm.tsv"
+    run2, settings2, alg2, stops2 = RC.read_calibration(d)
+    @test run2 == logrun && settings2 == settings && run2.io.optimizer_log == "lm.tsv" && alg2.refinement.optimizer == alg.refinement.optimizer && stops2 == stops
+    @test fieldnames(RC.RadiometricRefinement) == (:optimizer, :radiometry, :radiometry_stops, :lm_chunk)   # ruling R1: no settings, no log
     @test RC.pipeline_options(RC.config_dict(RC.RunOptions(), RC.CalibrationSettings())) == (RC.RunOptions(), RC.CalibrationSettings())
     # the camera's in-focus blur is removed: its two keys are retired (RC 0.11.0), refused by name whatever their value
     @test_throws "`rendering.psf_sigma` is retired" RC.pipeline_options(Dict{String, Any}("rendering" => Dict{String, Any}("psf_sigma" => 0.0)))
@@ -499,14 +508,14 @@ end
     # and the algorithm's one, `sweep.joint` (read by read_calibration: the closed-form blocks jointly); the joint solve has no
     # vignetting smoothness, so its "on" is read beside a smoothness of none
     none = Dict{String, Any}("vignetting" => Dict{String, Any}("smoothness" => Dict{String, Any}("type" => "none")))
-    jrun, jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
-    _, joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
+    jrun, jset, jon, _ = RC.read_calibration(merge(none, Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "on"))))
+    _, _, joff, joff_stops = RC.read_calibration(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => "off")))
     @test jon.refinement.radiometry isa RC.JointRadiometry && jon.refinement.radiometry.optimizer === jon.refinement.optimizer && joff.refinement.radiometry isa RC.RadiometryBlockDescent
-    @test RC.config_dict(jrun, jon, joff_stops)["sweep"]["radiometry"] == "joint_radiometry" && RC.config_dict(jrun, joff, joff_stops)["sweep"]["radiometry"] == "radiometry_block_descent"
+    @test RC.config_dict(jrun, jset, jon, joff_stops)["sweep"]["radiometry"] == "joint_radiometry" && RC.config_dict(jrun, jset, joff, joff_stops)["sweep"]["radiometry"] == "radiometry_block_descent"
     # version 3 names the algorithm by its tag; version 2's switch is refused in a current file, naming its version
     cur = RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
-    @test cur == 3 && RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "vignetting" => none["vignetting"],
-                                                            "sweep" => Dict{String, Any}("radiometry" => "joint_radiometry")))[2].refinement.radiometry isa RC.JointRadiometry
+    @test cur == 4 && RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "vignetting" => none["vignetting"],
+                                                            "sweep" => Dict{String, Any}("radiometry" => "joint_radiometry")))[3].refinement.radiometry isa RC.JointRadiometry
     @test occursin("sweep.joint", thrown_message(() -> RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "sweep" => Dict{String, Any}("joint" => "on")))))
     @test_throws ArgumentError RC.read_calibration(Dict{String, Any}(RC.VgtkCore.CONFIG_VERSION_KEY => cur, "sweep" => Dict{String, Any}("radiometry" => "joint")))
     @test occursin("`sweep.joint = true` is retired", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("sweep" => Dict{String, Any}("joint" => true)))))
@@ -556,26 +565,42 @@ end
 @testitem "pipeline options (TOML): the configuration converter — version 1 ([lm], the old key spellings) reads as the current version" setup = [RCFixtures, PipelineOptionsHelpers] begin
     old = "sensor_characteris" * "ation"                                       # the British spelling, split (check_naming's banned word)
     cur = RC.VgtkCore.current_config_version(RC.RC_CONFIG_VERSIONS)
-    @test cur == 3
+    @test cur == 4
     # a version-1 file (no config_version): [lm] is the optimizer's table, the old key spelling the current key, values as stored
     v1 = Dict{String, Any}("lm" => Dict{String, Any}("max_iter" => 7, "log" => "x.tsv"), "camera" => Dict{String, Any}(old => "s.json"))
-    run, alg, stops = RC.read_calibration(v1)
-    @test stops.max_iter == 7 && alg.refinement.log == "x.tsv" && run.camera.sensor_characterization == "s.json"
-    @test RC.pipeline_options(v1) == (run, alg.refinement.settings)
+    run, settings, alg, stops = RC.read_calibration(v1)
+    @test stops.max_iter == 7 && run.io.optimizer_log == "x.tsv" && run.camera.sensor_characterization == "s.json"
+    @test RC.pipeline_options(v1) == (run, settings)
+    # version 3 → 4: the optimizer's stops are [levenberg_marquardt.stops] (Core's table, decision 11), its log `[io] optimizer_log`
+    v3 = Dict{String, Any}("config_version" => 3, "optimizer" => Dict{String, Any}("type" => "levenberg_marquardt", "max_iter" => 7, "ftol" => 1e-3,
+                                                                               "max_time" => 9.0, "xtol_rel" => 1e-6, "log" => "x.tsv"),
+                           "io" => Dict{String, Any}("out" => "o"))
+    r3 = RC.read_calibration(v3)
+    v4 = Dict{String, Any}("config_version" => 4, "optimizer" => Dict{String, Any}("type" => "levenberg_marquardt"),
+                           "levenberg_marquardt" => Dict{String, Any}("stops" => Dict{String, Any}("max_iter" => 7, "ftol" => 1e-3, "max_time" => 9.0, "xtol_rel" => 1e-6)),
+                           "io" => Dict{String, Any}("out" => "o", "optimizer_log" => "x.tsv"))
+    r4 = RC.read_calibration(v4)
+    @test r3[1] == r4[1] && r3[2] == r4[2] && r3[4] == r4[4] && r4[4].ftol == 1e-3 && r4[1].io.optimizer_log == "x.tsv"
+    @test occursin("levenberg_marquardt.stops", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 4, "optimizer" => Dict{String, Any}("max_iter" => 7)))))
     # a version-2 file names them as version 2 does: a version-1 name in it is refused, naming the current one
     @test occursin("optimizer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "lm" => Dict{String, Any}()))))
     @test occursin("sensor_characterization",
                    thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => 2, "camera" => Dict{String, Any}(old => "s.json")))))
     @test occursin("newer", thrown_message(() -> RC.pipeline_options(Dict{String, Any}("config_version" => cur + 1))))
     # the writer states the current version, and its record reads back
-    d = RC.config_dict(run, alg, stops)
-    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && (r2 = RC.read_calibration(d); r2[1] == run && r2[2].refinement.settings == alg.refinement.settings)
-    # a current key as a stored table names it: a table's rename undone, a key renamed inside its table kept
-    @test RC.config_key(v1, "optimizer.max_iter") == "lm.max_iter" && RC.config_key(d, "optimizer.max_iter") == "optimizer.max_iter"
+    d = RC.config_dict(run, settings, alg, stops)
+    @test d["config_version"] == cur && haskey(d, "optimizer") && !haskey(d, "lm") && (r2 = RC.read_calibration(d); r2[1] == run && r2[2] == settings)
+    # a current key as a stored table names it: a move into another table undone (a table's or a key's), a key renamed inside its table kept
+    @test RC.config_key(v1, "levenberg_marquardt.stops.max_iter") == "lm.max_iter" && RC.config_key(d, "levenberg_marquardt.stops.max_iter") == "levenberg_marquardt.stops.max_iter"
+    @test RC.config_key(v3, "levenberg_marquardt.stops.ftol") == "optimizer.ftol" && RC.config_key(v3, "io.optimizer_log") == "optimizer.log"
+    @test RC.config_key(v1, "io.optimizer_log") == "lm.log" && RC.config_key(v1, "optimizer.type") == "lm.type"
     @test RC.config_key(v1, "optimizer") == "lm" && RC.config_key(v1, "io.out") == "io.out"
     @test RC.config_key(v1, "camera.sensor_characterization") == "camera.sensor_characterization"
     # the split of a version-1 table is under its own names; of a version-2 table under the current ones
     @test last(RC.split_refine_only(Dict{String, Any}("lm" => Dict{String, Any}("max_iter" => 2)))) == Dict("lm" => Dict("max_iter" => 2))
     @test last(RC.split_refine_only(Dict{String, Any}("config_version" => 2, "optimizer" => Dict{String, Any}("max_iter" => 2)))) ==
           Dict("optimizer" => Dict("max_iter" => 2))
+    s4, f4 = RC.split_refine_only(Dict{String, Any}("config_version" => 4, "levenberg_marquardt" => Dict{String, Any}("stops" => Dict{String, Any}("max_iter" => 2)),
+                                                    "io" => Dict{String, Any}("out" => "o")))
+    @test f4 == Dict("levenberg_marquardt" => Dict("stops" => Dict("max_iter" => 2))) && s4 == Dict("config_version" => 4, "io" => Dict("out" => "o"))
 end

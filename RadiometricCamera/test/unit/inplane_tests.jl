@@ -240,7 +240,7 @@ end
         pk, ik = build_problem(s_p.f, s_p.u0; kw...)
         @test nmat(pk, ik.material) == 9 + (kw.height_degree > 0 ? HEIGHT_NFREE : 0) + (kw.inplane && !(:inplane in kw.fixed) ? INPLANE_NC : 0)
     end
-    for kw in ((; inplane_free = true), (; height_free = true), (; tie_f = true), (; callback = (a...) -> (a[1], 0)))
+    for kw in ((; inplane_free = true), (; height_free = true), (; tie_f = true), (; iter_callback = (a...) -> nothing), (; lm_log = "lm.tsv"))   # (the retired per-iteration keywords: `callback`, Core's contract)
         @test_throws MethodError _lm_views!(s_p.f, s_p.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), kw...)
     end
     pg_held, ig_held = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), inplane = true, height_degree = 2, fixed = (:inplane, :height))
@@ -250,7 +250,8 @@ end
     @test RC.NLLSsolver.nvars(collect(RC.NLLSsolver.getvars(RC.tile_costs(pg_str)[1], pg_str.variables))[8]) == 9
     pg_pose, ip_pose = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), fixed = ("poses",))
     @test !any(ip_pose.free[ip_pose.poses])                                       # "poses" holds the poses (and so no origin gauge)
-    for kw in ((; callback = (a...) -> (a[1], 0)), (; tie_f = true))
+    @test_throws TypeError _lm_views!(s_p.f, s_p.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), callback = state -> (state, 0))   # Core's contract: a Bool
+    for kw in ((; iter_callback = (a...) -> nothing), (; tie_f = true))
         @test_throws MethodError _lm_tiles!(s_i.f, s_i.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), kw...)
     end
     # the two routes' one per-iteration callback and one read-back (review finding 7: the grid route duplicated both)

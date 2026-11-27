@@ -4,9 +4,10 @@
 # [--set table.key=value ...]) states only what differs; an unknown table or key is refused.
 # A switch is the string "on" | "off" (RC 0.11.4, owner 2026-11-15): TOML true/false is refused, naming the new spelling.
 
-config_version = 3   # the configuration's version (RadiometricCamera's RC_CONFIG_VERSIONS): 1 (RC ≤ 0.3) named the optimizer's table [lm],
+config_version = 4   # the configuration's version (RadiometricCamera's RC_CONFIG_VERSIONS): 1 (RC ≤ 0.3) named the optimizer's table [lm],
                      #   read as [optimizer]; 2 picked the closed-form blocks' algorithm by the switch [sweep] joint, read as
-                     #   [sweep] radiometry; a config without the key is version 1
+                     #   [sweep] radiometry; 3 held the optimizer's stops and its log in [optimizer], read as
+                     #   [levenberg_marquardt.stops] and [io] optimizer_log; a config without the key is version 1
 fixed = []           # the blocks held at their start: poses, camera (the geometric camera's parameters), focus, aperture, material,
                      #   vignetting, lighting, inplane; none by default (RC 0.11.0: lm.fixed moved here, "grid" renamed "camera")
 
@@ -22,6 +23,8 @@ init = ""                # "grid:<record>" | "lens:<record>": replaces the front
 checkpoint_each = "off"  # write lens_it<N>.json | grid_it<N>.json, poses_it<N>.json, state_it<N>.json after every iteration
 render_init = "off"      # diagnostic: render the start state and return
 render_state = ""        # diagnostic: render the masked pixels with this state file (state.json) and return (the state's page_flip holds)
+optimizer_log = ""       # EXPERIMENT (nlls5): append a per-iteration line of the LM to this file (the driver's, `calibration_checkpoints`;
+                         #   version 3: [optimizer] log); empty = none
 raw = ""                 # blob front-end: the photographs' RAW files (each the image's stem, .cr2/.arw/.nef/.dng): the camera settings from EXIF
 # lens_identity = {make = "Sigma", model = "14mm F1.4 DG DN"}   # OPTIONAL (absent = EXIF's lens; make, model, serial, one at least):
 #                                                            # the lens, where EXIF misnames it (an adapted lens)
@@ -167,9 +170,12 @@ ink_spread_mm = 0.0                 # ink spread δ [mm], held
 print_sigma_mm = 0.028              # print blur σ_print [mm], the edge's width, held
 
 [optimizer]
-# The refinement's optimizer (RadiometricCamera's RadiometricCalibration: its `optimizer` and its solve's `stops`, Core's LmStops; read
-# by `read_calibration`). Version 1 named this table [lm].
+# The refinement's optimizer (RadiometricCamera's RadiometricRefinement: its `optimizer`; read by `read_calibration`). Version 1 named
+# this table [lm]; version 3 held its stops (now [levenberg_marquardt.stops]) and its log (now [io] optimizer_log) here.
 type = "levenberg_marquardt"   # VisualGeometryToolkitCore's LevenbergMarquardt, its damping Levenberg's λ·I (the algorithm's default)
+
+[levenberg_marquardt.stops]
+# The refinement's solve's stop settings (Core's LmStops, the `stops` of `solve`; Core's table name, configuration version 2's C16).
 max_iter = 50        # LM iterations at most: the safety cap (owner ruling 2026-11-11); a tolerance stop ends a converged run first
 max_time = 10800.0   # wall-clock budget of the LM [s]
 ftol = 5.0e-4        # Core's LmStops `ftol` (NLLSsolver reldcost): stop once an accepted step lowers the cost by less than ftol · F.
@@ -181,7 +187,6 @@ ftol = 5.0e-4        # Core's LmStops `ftol` (NLLSsolver reldcost): stop once an
 xtol_rel = 1.0e-8    # Core's LmStops `xtol_rel` (Core 0.10.11): Ceres' relative step test, stop once ‖Δx‖ ≤ xtol_rel · (‖x‖ + xtol_rel),
                      #   Euclidean norms of the step and of the free variables (owner 2026-11-15; the key Core's name, 2026-11-16). The
                      #   absolute step test (Core's `xtol`, NLLSsolver's dstep) is Core's of record: no key here
-log = ""             # EXPERIMENT (nlls5): append a per-iteration line of the LM to this file; empty = none
 
 [sweep]
 lm_chunk = 0         # LM iterations between closed-form (lighting, vignetting, μ) sweeps; 0 = no sweeps
@@ -191,7 +196,7 @@ radiometry = "radiometry_block_descent"   # the closed-form blocks' algorithm: "
 
 [resume]
 state = ""             # continue from this state file (state.json)
-iteration_offset = 0   # iteration numbering of the resumed run
+iteration_offset = 0   # iteration numbering of the resumed run (the checkpoints' and the optimizer log's, `calibration_checkpoints`)
 sweep = "off"          # closed-form sweep on the resumed state
 
 [selfcheck]

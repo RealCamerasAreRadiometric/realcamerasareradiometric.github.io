@@ -3,12 +3,12 @@
 # calibration's `CalibrationSettings` (the algorithm's typed settings), each table in one of them.
 #
 # A run is configured by a TOML file of tables (`[io]`, `[frontend]`, `[camera]`, `[grid]`, `[focus]`, `[masks]`, `[rendering]`,
-# `[lighting]`, `[material]`, `[vignetting]`, `[warping]`, `[edge]`, `[optimizer]` (version 1: `[lm]`), `[sweep]`, `[resume]`, `[selfcheck]`, `[compute]`), one struct per
+# `[lighting]`, `[material]`, `[vignetting]`, `[warping]`, `[edge]`, `[optimizer]` (version 1: `[lm]`), `[levenberg_marquardt.stops]` (version 3: in `[optimizer]`), `[sweep]`, `[resume]`, `[selfcheck]`, `[compute]`), one struct per
 # table. The defaults are stated ONCE, in configs/default.toml (every field's keyword default reads it, tables.jl); a key absent from a config takes it. An unknown table or
 # key is refused (`ArgumentError` naming it and the allowed keys), never ignored. An enumerated choice is a tag of a `TagRegistry`
 # (VisualGeometryToolkitCore's one tag → type map): `FRONTEND_TAGS`, `VIGNETTING_TAGS`, `BACKEND_TAGS`.
 #
-#   pipeline_options(path_or_dict; set = ["optimizer.max_iter=2", …]) -> (run, settings)  the reader (`set`: dotted-key overrides)
+#   pipeline_options(path_or_dict; set = ["levenberg_marquardt.stops.max_iter=2", …]) -> (run, settings)  the reader (`set`: dotted-key overrides)
 #   config_dict(run, settings) -> Dict{String, Any}                                     the writer (the run record; reads back equal)
 #   PIPELINE_PATH_KEYS, PIPELINE_OUTPUT_KEYS                                            the keys that name an input / an output path
 #
@@ -36,8 +36,9 @@ string, except `camera.lens_coverage = "sensor"` (`SENSOR_LENS_COVERAGE`: the wh
 """
 names_input_path(key::AbstractString, v) =
     key in PIPELINE_PATH_KEYS && v isa AbstractString && !isempty(v) && !(key == "camera.lens_coverage" && v == SENSOR_LENS_COVERAGE)
-"""The keys whose values name an OUTPUT: the run's directory `io.out`, the optimizer's log `optimizer.log` (version 1: `lm.log`)."""
-const PIPELINE_OUTPUT_KEYS = ("io.out", "optimizer.log")
+"""The keys whose values name an OUTPUT: the run's directory `io.out`, the optimizer's log `io.optimizer_log` (version 3:
+`optimizer.log`, version 1: `lm.log`) — the driver's (`calibration_checkpoints`)."""
+const PIPELINE_OUTPUT_KEYS = ("io.out", "io.optimizer_log")
 # the string options that are no path (a tag-like choice)
 const _NOT_PATH_KEYS = ("io.channel", "warping.inplane", "camera.sensor_model")
 
@@ -365,8 +366,8 @@ The options of a run from a TOML file (or its parsed table): `run` its [`RunOpti
 `settings` its [`CalibrationSettings`](@ref) (the calibration's), each table of the file in one of them. Every table and key is optional and takes its struct default when
 absent; an unknown table or key, a value of the wrong type or length, an unknown or retired tag and an unknown `fixed` block are
 refused with an `ArgumentError` that names them. `set` holds `key.path=value` overrides applied before reading (the `--set` of
-bin/refine.jl): `pipeline_options("run.toml"; set = ["optimizer.max_iter=2", "io.out=/tmp/x"])` (of a version-2 config). The
-`[optimizer]` table is checked here and read by [`read_calibration`](@ref).
+bin/refine.jl): `pipeline_options("run.toml"; set = ["levenberg_marquardt.stops.max_iter=2", "io.out=/tmp/x"])` (of a version-4
+config). The algorithm's tables (`[optimizer]`, `[levenberg_marquardt.stops]`, `[sweep]`) are checked here and read by [`read_calibration`](@ref).
 """
 pipeline_options(path::AbstractString; set = ()) = _read_config_file(pipeline_options, path, set)
 # a reader of a parsed config, `read(dict; set)`, of the file `path`: its refusals name the file and the overrides
@@ -381,7 +382,7 @@ end
 function pipeline_options(d::AbstractDict; set = ())
     d = _current_config(d, set)
     for T in _ALGORITHM_TABLES                         # the algorithm's tables, checked here, read by read_calibration
-        _read_table(T, get(d, _table_name(T), Dict{String, Any}()), _table_name(T)); delete!(d, _table_name(T))
+        _read_table(T, _pop_table!(d, _table_name(T)), _table_name(T))
     end
     allowed = reduce(vcat, allowed_keys(H) for H in _OPTION_HALVES)
     unknown = setdiff(collect(String, keys(d)), allowed)
@@ -405,29 +406,51 @@ function _current_config(d::AbstractDict, set)
     return d
 end
 
-"""The tables of a run's TOML that configure its algorithm (a [`RadiometricCalibration`](@ref)'s optimizer and sweeps), read by
-[`read_calibration`](@ref) and checked, not read, by [`pipeline_options`](@ref)."""
-const _ALGORITHM_TABLES = (OptimizerTable, SweepTable)
+"""The tables of a run's TOML that configure its algorithm (a [`RadiometricCalibration`](@ref)'s optimizer, its solve's stops and
+its sweeps), read by [`read_calibration`](@ref) and checked, not read, by [`pipeline_options`](@ref)."""
+const _ALGORITHM_TABLES = (OptimizerTable, LevenbergMarquardtStopsTable, SweepTable)
+
+# The table at the dotted path `path` of the migrated config `d` (an empty one when absent), removed from `d` with the parent tables
+# it empties; a parent's other key is refused (`[levenberg_marquardt]` holds its `stops` alone).
+function _pop_table!(d::AbstractDict, path::AbstractString)
+    segs = String.(split(path, '.'))
+    parents = Any[d]
+    for s in segs[1:(end - 1)]
+        t = get(last(parents), s, nothing)
+        t === nothing && return Dict{String, Any}()
+        t isa AbstractDict || throw(ArgumentError("[$(join(segs[1:length(parents)], '.'))] is a table (it holds [$path])"))
+        push!(parents, t)
+    end
+    t = pop!(last(parents), segs[end], Dict{String, Any}())
+    for k in (length(segs) - 1):-1:1
+        p = parents[k + 1]
+        isempty(p) || throw(ArgumentError("[$(join(segs[1:k], '.'))]: unknown key(s) $(sort(collect(String, keys(p)))) (it holds [$path] alone)"))
+        delete!(parents[k], segs[k])
+    end
+    return t
+end
 
 """
     config_key(table, key) -> String
 
 The dotted key `key` of the current configuration ([`RC_CONFIG_VERSIONS`](@ref)) as the configuration `table`'s version names it
-(its `config_version`, 1 when absent): the converter's table renames undone from the current version back to the table's, so
-`config_key(table, "optimizer.max_iter")` is `"lm.max_iter"` in a version-1 table. THE one map of a current key into a table as it is
+(its `config_version`, 1 when absent): the converter's moves of a table or a key into another table undone from the current version
+back to the table's, so `config_key(table, "levenberg_marquardt.stops.max_iter")` is `"optimizer.max_iter"` in a version-3 table and
+`"lm.max_iter"` in a version-1 one. THE one map of a current key into a table as it is
 written, read where a key is looked up in a stored table without reading it as options (`split_refine_only`; a driver's output keys);
 a table read as options is migrated whole (`migrate_config`).
 """
 function config_key(table::AbstractDict, key::AbstractString)
-    # a TABLE's renames only (a top-level path): a key renamed inside its table (`camera.sensor_characterization`) was already
-    # spelled so by version-1 files written after the rename, so its current name is the one a stored table states
+    # the moves into another table only (a table's rename, `lm` → `optimizer`; a key's, `optimizer.ftol` →
+    # `levenberg_marquardt.stops.ftol`): a key renamed inside its table (`camera.sensor_characterization`) was already spelled so by
+    # version-1 files written after the rename, so its current name is the one a stored table states
     ver = get(table, VgtkCore.CONFIG_VERSION_KEY, 1)
     cur = VgtkCore.current_config_version(RC_CONFIG_VERSIONS)
     ver isa Integer && 1 <= ver <= cur ||
         throw(ArgumentError("config_key: `$(VgtkCore.CONFIG_VERSION_KEY)` = $(repr(ver)) is not a version of RadiometricCamera's configuration (1–$cur)"))
     k = String(key)
-    for v in (cur - 1):-1:ver, (old, new) in RC_CONFIG_VERSIONS.migrations[v].renames
-        occursin('.', new) && continue
+    for v in (cur - 1):-1:ver, (old, new) in reverse(RC_CONFIG_VERSIONS.migrations[v].renames)
+        first(split(old, '.')) == first(split(new, '.')) && continue
         (k == new || startswith(k, new * ".")) && (k = old * k[(ncodeunits(new) + 1):end])
     end
     return k
@@ -435,7 +458,7 @@ end
 
 """
     config_dict(run::RunOptions, settings::CalibrationSettings) -> Dict{String, Any}
-    config_dict(run::RunOptions, algorithm::RadiometricCalibration, stops) -> Dict{String, Any}   (calibration/calibrate.jl)
+    config_dict(run::RunOptions, settings::CalibrationSettings, algorithm::RadiometricCalibration, stops) -> Dict{String, Any}   (calibration/calibrate.jl)
 
 The options as a TOML document, one table per field (tags as their tag strings): what a run writes as its record. An absent
 optional table (`grid.start_perturbation = nothing`) is not written, nor a key the run cannot use (`INAPPLICABLE_KEYS`).
@@ -456,9 +479,10 @@ const PIPELINE_CONFIG_FILE = "pipeline_config.toml"
 
 """
     write_pipeline_config(dir, run, settings; header = "") -> path
-    write_pipeline_config(dir, run, algorithm, stops; header = "") -> path
+    write_pipeline_config(dir, run, settings, algorithm, stops; header = "") -> path
 
-The options `run` and `settings` of a run (or its whole calibration, the `[optimizer]` table with them) as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
+The options `run` and `settings` of a run (or its whole calibration, the algorithm's `[optimizer]`, `[levenberg_marquardt.stops]` and
+`[sweep]` tables with them) as `dir/pipeline_config.toml` (`config_dict`, with `header` as its comment), its `io.out` written as an
 ABSOLUTE path (resolved against the writer's working directory, the one the run resolved it against): what bin/refine.jl and
 experiments/scripts/material_grid.jl write, so a record's regeneration hint can tell its own writer's options from another run's in a shared
 directory.

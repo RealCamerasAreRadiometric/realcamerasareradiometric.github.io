@@ -70,7 +70,7 @@
         end
         @test refused(identity) === nothing
         e = refused(c -> c["experiment"]["datset"] = "x");  @test e isa ArgumentError && occursin("datset", e.msg)
-        e = refused(c -> c["pipeline"]["lm"]["fto"] = 1);   @test e isa ArgumentError && occursin("fto", e.msg) && occursin("max_iter", e.msg)
+        e = refused(c -> c["pipeline"]["lm"]["fto"] = 1);   @test e isa ArgumentError && occursin("fto", e.msg) && occursin("type", e.msg)   # (version 1's [lm]: the optimizer's table, its stops moved)
         e = refused(c -> c["renderr"] = Dict("a" => 1));    @test e isa ArgumentError && occursin("renderr", e.msg)
         e = refused(c -> c["pipeline"]["io"]["out"] = "o"); @test e isa ArgumentError && occursin("io.out", e.msg)
         e = refused(c -> c["pipeline"]["io"]["save_init"] = "s.json"); @test e isa ArgumentError && occursin("io.save_init", e.msg)

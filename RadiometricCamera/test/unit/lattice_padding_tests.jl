@@ -113,5 +113,5 @@ end
     prob, idx = build_problem_grid(s.f, s.u0)                                      # the patch default: GRID_PATCH, which divides the padded lattice
     @test GRID_PATCH == (5, 5) && size(idx.patches) == (4, 4)
     out = _lm_tiles!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting))
-    @test out.stats.nsteps >= 1 && isfinite(out.metadata.cost)
+    @test out.stats.nsteps >= 1 && isfinite(out.metadata.objective)
 end

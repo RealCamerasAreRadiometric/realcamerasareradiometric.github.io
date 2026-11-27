@@ -131,19 +131,18 @@ end
             PNGFiles.save(photos[k], [RGB{N0f16}(clamp.(imgs[k][i, j, :], 0, 1)...) for i in 1:H, j in 1:W])
         end
         out = joinpath(dir, "out"); sdir = joinpath(dir, "start")
-        run, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => "on", "channel" => "RGB"),
+        run, settings, alg, stops = RC.read_calibration(Dict("io" => Dict("out" => out, "checkpoint_each" => "on", "channel" => "RGB"),
                                         "lm" => Dict("max_iter" => 2), "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2)))
-        settings = alg.refinement.settings
         obs = [detections(k) for k in 1:2]
         @test all(o -> length(o) > 20, obs)
         # the start's initialization region: the whole 24 × 24 image (a stored grid start is defined on its region; every detection inside)
         g = RC.StartGeometry(glens, poses, obs, board; names = basename.(photos), init_region = VgtkCore.Rect2{Float64}(0, 0, W, H))
         so = RC.start_options(run, settings)
-        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, photos), (; run, device = VgtkCore.KA.CPU())), alg; stops)
-        s = c.cache.prob                                                # the start (the start options, the run's io.out)
-        RC.save_calibration_start(sdir, s.f, s.u0; run, settings)                              # the start record: iteration 0
-        fit = VgtkCore.solve!(c)
+        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, photos; run, settings, device = VgtkCore.KA.CPU())), alg; stops)
+        s = c.cache.prob                                                # the start (its data's start options)
+        RC.save_calibration_start(sdir, s.f, s.u0; run)                                        # the start record: iteration 0
+        fit = VgtkCore.solve(s, alg.refinement; stops, callback = RC.calibration_checkpoints(s, run))   # the refinement, its checkpoints the run's callback
         n = fit.stats.nsteps
         @test n == 2
         its = convergence_iterations(out, 1)

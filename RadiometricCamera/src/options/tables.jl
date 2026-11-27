@@ -41,12 +41,14 @@ using VisualGeometryToolkitCore: toml_default, parse_defaults
     RC_CONFIG_VERSIONS
 
 RadiometricCamera's configuration converter (VisualGeometryToolkitCore's `ConfigVersions`): a run's TOML states `config_version`
-(configs/default.toml: the current one, 3). Version 1 (RC ≤ 0.3: the LM's settings in `[lm]`) is read at version 2 through
+(configs/default.toml: the current one, 4). Version 1 (RC ≤ 0.3: the LM's settings in `[lm]`) is read at version 2 through
 `migrate_config`: `[lm]` is the `[optimizer]` table, its keys kept, and the key `camera.sensor_characteris…ation` (the British
 spelling, before owner decision 11: American in identifiers) is `camera.sensor_characterization`, its value as it was. Version 2's
 `[sweep] joint` (a switch that picked the closed-form blocks' algorithm) is version 3's `[sweep] radiometry`, the algorithm's tag
-([`RADIOMETRY_TAGS`](@ref)): `"on"` → `"joint_radiometry"`, `"off"` → `"radiometry_block_descent"`. Every config of record of an
-earlier version loads as it is on disk.
+([`RADIOMETRY_TAGS`](@ref)): `"on"` → `"joint_radiometry"`, `"off"` → `"radiometry_block_descent"`. Version 3's `[optimizer]`
+stop settings (`max_iter`, `max_time`, `ftol`, `xtol_rel`) are version 4's `[levenberg_marquardt.stops]` (Core's table of the
+host LM's stops, decision 11) and its `log` is `[io] optimizer_log` (a run's output, the driver's: [`calibration_checkpoints`](@ref)),
+their values kept. Every config of record of an earlier version loads as it is on disk.
 """
 const RC_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera",
     VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
@@ -55,9 +57,16 @@ const RC_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera",
                                          "camera.sensor_characteris" * "ation" => "camera.sensor_characterization"]),   # (the old spelling split: check_naming's banned word)
     VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
                                          "vignetting", "warping", "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"],
-                              values = ["sweep.joint" => v -> ("sweep.radiometry" => _joint_radiometry_tag(v))]);
+                              values = ["sweep.joint" => v -> ("sweep.radiometry" => _joint_radiometry_tag(v))]),
+    VgtkCore.ConfigMigration(; tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material",
+                                         "vignetting", "warping", "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"],
+                              renames = ["optimizer.max_iter" => "levenberg_marquardt.stops.max_iter",
+                                         "optimizer.max_time" => "levenberg_marquardt.stops.max_time",
+                                         "optimizer.ftol" => "levenberg_marquardt.stops.ftol",
+                                         "optimizer.xtol_rel" => "levenberg_marquardt.stops.xtol_rel",
+                                         "optimizer.log" => "io.optimizer_log"]);
     tables = ["fixed", "io", "frontend", "camera", "grid", "focus", "masks", "rendering", "lighting", "material", "vignetting", "warping",
-              "edge", "optimizer", "sweep", "resume", "selfcheck", "compute"])
+              "edge", "optimizer", "levenberg_marquardt", "sweep", "resume", "selfcheck", "compute"])
 # version 2's `sweep.joint` switch as version 3's `sweep.radiometry` tag (a Bool refused as every switch's, `read_switch`)
 _joint_radiometry_tag(v) = read_switch(v, "sweep.joint") ? "joint_radiometry" : "radiometry_block_descent"
 # The parsed file: the package's own defaults (`pkgdir(RadiometricCamera, "configs", "default.toml")`), read through Core's one
@@ -91,7 +100,8 @@ Base.@kwdef struct IOOptions <: AbstractOptionsTable
                                                      #   photograph (by its file: `load_photo`) is read at the photosites of one colour filter: "R", "G" or "B"
     views::Vector{String} = _option_default(IOOptions, :views)                  # image names (a subset; empty = all)
     init::String = _option_default(IOOptions, :init)                                 # grid:<json> | lens:<json> replaces the front-end's start model
-    checkpoint_each::Bool = _option_default(IOOptions, :checkpoint_each)                     # per-iteration lens / poses / state files
+    checkpoint_each::Bool = _option_default(IOOptions, :checkpoint_each)                     # per-iteration lens / poses / state files (`calibration_checkpoints`)
+    optimizer_log::String = _option_default(IOOptions, :optimizer_log)                       # EXPERIMENT (nlls5): a per-iteration line of the LM appended to this file (`calibration_checkpoints`); empty = none
     render_init::Bool = _option_default(IOOptions, :render_init)                         # render the start state and return
     render_state::String = _option_default(IOOptions, :render_state)                         # render the masked pixels with this state file (state.json) and return
     raw::String = _option_default(IOOptions, :raw)                                  # the photographs' RAW files (blob front-end): the capture's camera settings from their EXIF
@@ -243,18 +253,25 @@ end
 """The optimizer registry: `optimizer.type` tag → the refinement's optimizer, VisualGeometryToolkitCore's `LevenbergMarquardt`."""
 const OPTIMIZER_TAGS = TagRegistry(:optimizer, "", "levenberg_marquardt" => VgtkCore.LevenbergMarquardt; paths = [r"optimizer\.type"])
 
-"""`[optimizer]` (version 1: `[lm]`): the refinement's optimizer (`type`, a tag of [`OPTIMIZER_TAGS`](@ref)), its stop settings (the
-solve's `stops`, VisualGeometryToolkitCore's `LmStops`) and its per-iteration log: the table [`read_calibration`](@ref) reads into a
-[`RadiometricCalibration`](@ref) and its stops. Not a table of [`CalibrationSettings`](@ref): the refinement's own fields."""
+"""`[optimizer]` (version 1: `[lm]`): the refinement's optimizer (`type`, a tag of [`OPTIMIZER_TAGS`](@ref)), the table
+[`read_calibration`](@ref) reads into a [`RadiometricRefinement`](@ref)'s `optimizer`. Not a table of [`CalibrationSettings`](@ref):
+the refinement's own field. Its stop settings are `LevenbergMarquardtStopsTable`'s (`[levenberg_marquardt.stops]`; version 3
+held them here, and its per-iteration log, now `[io] optimizer_log`)."""
 Base.@kwdef struct OptimizerTable <: AbstractOptionsTable
     type::Type = _option_default(OptimizerTable, :type)                                  # levenberg_marquardt
-    max_iter::Int = _option_default(OptimizerTable, :max_iter)                           # iterations at most (LmStops max_iter)
-    max_time::Float64 = _option_default(OptimizerTable, :max_time)                       # wall-clock budget [s] (LmStops max_time)
-    ftol::Float64 = _option_default(OptimizerTable, :ftol)                               # Core's LmStops ftol: a step's relative cost decrease below it stops (CostDecrease)
-    xtol_rel::Float64 = _option_default(OptimizerTable, :xtol_rel)                       # Core's LmStops xtol_rel: ‖Δx‖ ≤ xtol_rel·(‖x‖ + xtol_rel) stops (IncrementSize; Ceres' parameter tolerance)
-    log::String = _option_default(OptimizerTable, :log)                                  # EXPERIMENT (nlls5): a per-iteration line appended to this file (`_lm_log`); empty = none
 end
 _table_name(::Type{OptimizerTable}) = "optimizer"
+
+"""`[levenberg_marquardt.stops]` (VisualGeometryToolkitCore's table of the host LM's stops; version 3: in `[optimizer]`): the
+refinement's solve's stop settings, the `stops` [`read_calibration`](@ref) returns (Core's `LmStops`; its absolute step tolerance
+`xtol` and its stationarity test are Core's of record, no key)."""
+Base.@kwdef struct LevenbergMarquardtStopsTable <: AbstractOptionsTable
+    max_iter::Int = _option_default(LevenbergMarquardtStopsTable, :max_iter)             # iterations at most (LmStops max_iter)
+    max_time::Float64 = _option_default(LevenbergMarquardtStopsTable, :max_time)         # wall-clock budget [s] (LmStops max_time)
+    ftol::Float64 = _option_default(LevenbergMarquardtStopsTable, :ftol)                 # Core's LmStops ftol: a step's relative cost decrease below it stops (CostDecrease)
+    xtol_rel::Float64 = _option_default(LevenbergMarquardtStopsTable, :xtol_rel)         # Core's LmStops xtol_rel: ‖Δx‖ ≤ xtol_rel·(‖x‖ + xtol_rel) stops (IncrementSize; Ceres' parameter tolerance)
+end
+_table_name(::Type{LevenbergMarquardtStopsTable}) = "levenberg_marquardt.stops"
 
 """The tags of the closed-form blocks' algorithms (`sweep.radiometry`; a Core `TagRegistry`): [`RadiometryBlockDescent`](@ref) and
 [`JointRadiometry`](@ref)."""
@@ -298,8 +315,10 @@ end
 A run's data and its input/output, one table each (see the table structs for every key and its default; `configs/default.toml`
 lists them): where the photographs and the records are (`[io]`), the front end's geometric calibration (`[frontend]`), the capture's
 facts (`[camera]`: the sensor, the lens, the sensor characterization), resuming a finished run (`[resume]`), the bearing
-self-check (`[selfcheck]`) and the device (`[compute]`). The problem's `p` of a calibration: `EstimationProblem(CalibrationEstimate,
-CalibrationPhotographs(geometry, photographs), (; run, device))` and the refinement's `RefineProblem(f, u0, run)`. Read from TOML with the algorithm's
+self-check (`[selfcheck]`) and the device (`[compute]`). No problem's context (ruling R1): a calibration's start reads the run's
+start options from its data ([`CalibrationPhotographs`](@ref)`(geometry, photographs; run, settings, device)`), and its outputs
+(`io.out`, the checkpoints, `io.optimizer_log`, `resume.iteration_offset`) are the driver's ([`calibration_checkpoints`](@ref),
+[`save_radiometric_calibration`](@ref)), a resume the driver's [`load_calibration_state`](@ref). Read from TOML with the algorithm's
 settings by [`pipeline_options`](@ref), written for the run record with [`config_dict`](@ref). Required: `io.images`, `io.out` and
 the front end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`). A
 `selfcheck.only` run reads no photograph: it needs no `io.images`.
@@ -318,9 +337,10 @@ end
 
 The typed settings of a radiometric calibration, one table each (see the table structs; `configs/default.toml` lists them): the
 blocks held (`fixed`), the grid, the focus surface, the masks and their sample draw, the rendering quadrature, the lighting, the
-material, the vignetting, the board warping and the printed edge — what [`RadiometricRefinement`](@ref) holds (its `settings`) and
-[`RadiometricCalibration`](@ref)'s start reads. The optimizer's `[optimizer]` and the sweeps' `[sweep]` tables are the refinement's own
-fields ([`read_calibration`](@ref)). Read from TOML with the run's options by [`pipeline_options`](@ref), written by [`config_dict`](@ref).
+material, the vignetting, the board warping and the printed edge — the problem's structure, held by its data (ruling R1: the
+`calibration_settings` of [`CalibrationPhotographs`](@ref), which [`RadiometricCalibration`](@ref)'s start reads, and of the
+[`CalibrationData`](@ref) the [`RadiometricRefinement`](@ref) refines). The optimizer's `[optimizer]`, its stops'
+`[levenberg_marquardt.stops]` and the sweeps' `[sweep]` tables are the algorithm's ([`read_calibration`](@ref)). Read from TOML with the run's options by [`pipeline_options`](@ref), written by [`config_dict`](@ref).
 """
 Base.@kwdef struct CalibrationSettings
     fixed::Vector{String} = String.(toml_default(_TOML_DEFAULTS, "", "fixed"))   # the blocks held at their start (`FIXABLE_BLOCKS`); none by default

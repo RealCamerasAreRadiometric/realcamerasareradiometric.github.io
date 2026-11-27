@@ -1,7 +1,7 @@
 # A run's settings travel with its problem, never through module globals (the owner's rule, 2026-11-14: "These global constants
 # should not exist"): the material hold (`"material"` in `lm.fixed`: the problem's `fixed`, the MaterialVar's type), the μ bounds
-# (`material.mu_bounds`: the state's), the Jacobian chunk (`compute.jacobian_chunk`: the state's) and the LM log (`lm.log`: _lm_views!'s
-# keyword). A run that sets them leaves the next problem of the same session untouched.
+# (`material.mu_bounds`: the state's), the Jacobian chunk (`compute.jacobian_chunk`: the state's) and the LM log (`io.optimizer_log`,
+# version 1 `lm.log`: the run's `calibration_checkpoints` callback). A run that sets them leaves the next problem of the same session untouched.
 @testitem "run settings: no leak into the next problem" setup = [RCFixtures] begin
     using RadiometricCamera: build_problem, load_state, material, _lm_views!
     using StaticArrays, LinearAlgebra
@@ -23,20 +23,20 @@
 
     mktempdir() do dir
         log = joinpath(dir, "lm.tsv")
-        run, alg, stops = RC.read_calibration(Dict("fixed" => ["material"], "lm" => Dict("log" => log), "warping" => Dict("degree" => 1),
+        run, settings, alg, stops = RC.read_calibration(Dict("fixed" => ["material"], "lm" => Dict("log" => log), "warping" => Dict("degree" => 1),
                                         "material" => Dict("mu_bounds" => [0.6, 1.0]), "compute" => Dict("jacobian_chunk" => 7),
                                         "resume" => Dict("state" => joinpath(dir, "state.json")),
                                         "io" => Dict("out" => mkpath(joinpath(dir, "out")), "images" => dir),
                                         "selfcheck" => Dict("only" => "on")))
-        settings = alg.refinement.settings
+        @test run.io.optimizer_log == log                                                     # the version-1 `lm.log`, the run's output
         # a run of these settings, stopped after it took them in: the preparation (its resume state is absent) and the
-        # refinement (its resume reader)
+        # resume (its state reader)
         @test_throws Exception RC.start_geometry(run, settings)
         s = fresh()
         meta = (; names = ["a", "b"], W₀ = W, H₀ = H, fpx = 41.216, lens0 = s.u0.camera.geometric, views0 = nothing,
                 features = nothing, costs = (; linear = (0.0, 0.0)), grid_smoothness = nothing)
         s.f.start = meta
-        @test_throws "stop" RC._calibrate!(s.f, s.u0, run, alg.refinement, stops; load_state = _ -> error("stop"))
+        @test_throws "stop" RC.load_calibration_state(RC.VgtkCore.RefineProblem(s.f, s.u0), run.resume.state; load_state = _ -> error("stop"))
 
         # the next problem of the session: the material free, μ on (0, 1), no LM log
         s2 = fresh()
@@ -57,7 +57,9 @@
         s4 = fresh(); s4.f.mu_bounds = settings.material.mu_bounds
         mv4 = material_var(first(build_problem(s4.f, s4.u0)))
         @test NL.update(mv4, increment(mv4)).mat.diffuse_weight >= 0.6                                         # the chart's lower end, the run's 0.6
-        _lm_views!(s4.f, s4.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), lm_log = log)
+        s4.f.start = meta
+        _lm_views!(s4.f, s4.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(),
+                   callback = RC.calibration_checkpoints(RC.VgtkCore.RefineProblem(s4.f, s4.u0), run))   # the run's log: its driver's callback
         @test isfile(log) && length(readlines(log)) == 1
     end
     # the settings' globals are gone (deleted, not scoped)

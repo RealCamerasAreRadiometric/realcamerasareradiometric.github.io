@@ -31,17 +31,20 @@ _LmRun() = _LmRun(false, Dict{Symbol, Int}(), Dict{Symbol, Int}(:flux => 0, :jac
 """
     CalibrationData
 
-The data of a radiometric calibration, the `f` of its `RefineProblem(f, u0, run)` ([`RadiometricRefinement`](@ref)): what the
-refinement holds fixed — the board's design (`board`, a `TexturedTarget`: its page, texture, print outline and warping basis; its
+The data of a radiometric calibration, the `f` of its `RefineProblem(f, u0)` ([`RadiometricRefinement`](@ref)): what the
+refinement holds fixed — the problem's structure (`calibration_settings`, the calibration's [`CalibrationSettings`](@ref): the
+blocks held, the grid, the focus, the masks, the rendering, the lighting, the material, the vignetting, the warping and the printed
+edge; ruling R1: the data's, never the problem's context), the board's design (`board`, a `TexturedTarget`: its page, texture, print outline and warping basis; its
 `state` the start's surface, the estimate's is [`CalibrationParameters`](@ref)' `surface`: the kernels' board is
 `_board(f, θ)`), the render settings, the masks and their pixel lists, the photographs and their masked observations ϕ, the rows'
 weights, the vignetting's dependent-node rule, the compute backend and its device data, the measured channel, the focus's
 smoothness rows, the interval of μ, the RAW code steps, the photographs' sensor models and observation model, the record of its
 runs and the start it was lifted from (`start`, `_start_state`'s; `nothing` for bare data). The image size is the camera's.
 """
-mutable struct CalibrationData{SC <: TexturedTarget, ST <: RenderSettings}
+mutable struct CalibrationData{SC <: TexturedTarget, ST <: RenderSettings, CS}
     board::SC                                 # the board's design; its state the start's surface (the estimate's: θ.surface)
-    settings::ST
+    settings::ST                              # the render settings (the kernels', a CalibratedCamera's `settings`)
+    calibration_settings::CS                  # the calibration's CalibrationSettings (options/tables.jl, included after this file): the problem's structure
     masks::Vector{BitMatrix}
     px::Vector{Vector{Tuple{Int, Int}}}       # masked pixel lists
     targets::Vector{Array{Float64, 3}}        # observed images
@@ -65,7 +68,7 @@ end
 """
     CalibrationParameters
 
-The parameters Θ̄ of a radiometric calibration, the `u0` of its `RefineProblem(f, u0, run)` (refined in place by
+The parameters Θ̄ of a radiometric calibration, the `u0` of its `RefineProblem(f, u0)` (refined in place by
 [`RadiometricRefinement`](@ref)): the camera every view shares (`camera`, a `RadiometricCameraModel`: Θ_d, Θ_f, r and Θ_v), one pose
 per view (`poses`, camera → world: Θ_e), the material (Θ_m), the lighting (Θ_l) and the board's surface (`surface`, its
 `TargetState`: the warping h, the print's edge parameters and the in-plane print error).
@@ -106,7 +109,7 @@ _channel_rows(x::AbstractVector, c::Integer) = c == 0 ? x : x[c:3:end]
                     external_masks = nothing, support_min = 0, region = nothing, boundary_order = 2, backend = default_backend(), ϕ = nothing,
                     channel = 0, mu_bounds = (0.0, 1.0), jacobian_chunk = 4,
                     sensor_models = fill(SensorModel(), length(poses)), weights = Unweighted(), quanta = fill(nothing, length(poses)),
-                    sensor = NoSensorRecord(), photo_kind = Decoded(false))
+                    sensor = NoSensorRecord(), photo_kind = Decoded(false), calibration_settings = CalibrationSettings())
 
 The data of a calibration ([`CalibrationData`](@ref)); `camera` and `poses` the start's, which the masks are built from and
 whose vignetting field the dependent-node rule is of; the parameters are [`CalibrationParameters`](@ref)`(f, camera, poses, mat,
@@ -127,7 +130,9 @@ absent model, `SensorModel()`, by default: a decoded image, or a RAW photograph 
 the rows' weights (weighting.jl, `masked_observations`): `Unweighted()` (the default, rows as measured) or one 1/σ vector per view,
 each of its `ϕ`'s length (whitened rows: the residuals and the Jacobians divided by the measured values' σ). `quanta`: per view,
 each row's RAW code step in its units (`masked_observations`), or `nothing` (a decoded image): what the data resolve
-(`lm_abstol`).
+(`lm_abstol`). `calibration_settings`: the calibration's [`CalibrationSettings`](@ref), what a [`RadiometricRefinement`](@ref)
+reads of the problem's structure (the start's, `_start_state`'s; the defaults for bare data, whose LMs take their structure as
+keywords).
 
 The data of photographs of the `RadiometricCameraModel` `camera` (one camera: geometric camera, focus surface, aperture radius and vignetting)
 seen from `poses` (camera → world, one per photograph). `region` (the run's imaged region, pixels): a tensor vignetting surface's nodes outside it are dependent
@@ -145,7 +150,9 @@ function CalibrationData(board::TexturedTarget, settings::RenderSettings, camera
                          sensor_models = fill(VgtkCore.SensorModel(), length(poses)),
                          weights::Union{Unweighted, AbstractVector{<:AbstractVector{<:Real}}} = Unweighted(),
                          quanta = fill(nothing, length(poses)), sensor::SensorStatement = NoSensorRecord(),
-                         photo_kind::PhotoKind = Decoded(false))
+                         photo_kind::PhotoKind = Decoded(false), calibration_settings = CalibrationSettings())
+    calibration_settings isa CalibrationSettings ||
+        throw(ArgumentError("CalibrationData: calibration_settings is a CalibrationSettings, got $(typeof(calibration_settings))"))
     0 <= channel <= 3 || throw(ArgumentError("CalibrationData: channel = $channel (0: the three channels, 1–3: that channel alone)"))
     ObservationModel(sensor, photo_kind, _channel_symbol(channel))          # the three agree (a RAW photograph's photosites: one colour filter's, channel R, G or B)
     K = length(poses)
@@ -178,8 +185,8 @@ function CalibrationData(board::TexturedTarget, settings::RenderSettings, camera
                             "`with_vignetting(camera, flat_vignetting(geometric(camera)))` (the flat 4 × 4 start) or a `RadialVignetting`. " *
                             "A camera without vignetting renders as it is (`render_view`, `Φ_pixel`)"))
     rule = vignetting_rule(gauge_center_value(camera.vignetting), region, px; support_min, order = boundary_order)   # the gauged field's (CalibrationParameters')
-    return CalibrationData{typeof(board), typeof(settings)}(
-        board, settings, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), zeros(0, 0),
+    return CalibrationData{typeof(board), typeof(settings), typeof(calibration_settings)}(
+        board, settings, calibration_settings, masks, px, tg, ϕ, weights, rule, backend, Int(jacobian_chunk), nothing, Int(channel), zeros(0, 0),
         Float64.(Tuple(mu_bounds)), Union{Nothing, Vector{Float64}}[q === nothing ? nothing : Vector{Float64}(q) for q in quanta],
         collect(VgtkCore.SensorModel, sensor_models), sensor, photo_kind, _LmRun(), nothing)
 end
@@ -211,8 +218,8 @@ end
 The refinement problem of a calibration of photographs `targets` of `board` seen by `camera` from `poses`, started at `mat` and
 `light`: VisualGeometryToolkitCore's `RefineProblem(f, u0)` of the data `f = `[`CalibrationData`](@ref)`(board, settings,
 camera, poses, targets; kwargs...)` and the parameters `u0 = `[`CalibrationParameters`](@ref)`(f, camera, poses, mat, light)`: the
-blocks' and the closed forms' problem. [`RadiometricRefinement`](@ref) refines a started one in a run, `RefineProblem(f, u0, run)`
-(`run` its [`RunOptions`](@ref); [`RadiometricCalibration`](@ref)'s `init` and [`load_calibration_start`](@ref) build it).
+blocks' and the closed forms' problem. [`RadiometricRefinement`](@ref) refines a started one (its data's `start` set:
+[`RadiometricCalibration`](@ref)'s `init` and [`load_calibration_start`](@ref) build it).
 """
 function calibration_problem(board::TexturedTarget, settings::RenderSettings, camera::RadiometricCameraModel, poses::AbstractVector{<:EuclideanMap},
                              mat::Material, light::EnvironmentLight, targets::AbstractVector{<:AbstractArray{<:Real}}; kwargs...)

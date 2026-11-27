@@ -153,7 +153,7 @@ end
                               masks, backend = CUDABackend())
         c0 = cost(s2.f, s2.u0)[1]
         result = _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 20), damping = VgtkCore.LevenbergDamping())
-        @test result.metadata.cost / 2 < 1e-2 * c0                     # Float32 J (80 dual slots, all blocks free) stalls above the Float64 floor
+        @test result.metadata.objective / 2 < 1e-2 * c0                     # Float32 J (80 dual slots, all blocks free) stalls above the Float64 floor
         # the same parity for the 18-coordinate lens block of the 14-coefficient lens (3 dual chunks of 15 on the device path)
         cv_o = [-0.05, 0.01, 1e-3, -2e-3, 0.0, 0.02, 0.0, 0.0, 1e-3, 0.0, -1e-3, 0.0, 0.01, -0.005]            # cv2's coefficient order
         lens_o = cam(VgtkIO.opencv_lens(cv_o), 41.216, (16.32, 15.36), W, H)
@@ -184,7 +184,7 @@ end
         co0 = cost(so2.f, so2.u0)[1]
         ro = _lm_views!(so2.f, so2.u0; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping(), fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy))
-        @test ro.metadata.cost / 2 < 0.05 * co0 && has_lens(RC.geometric(so2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
+        @test ro.metadata.objective / 2 < 0.05 * co0 && has_lens(RC.geometric(so2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
         # radial vignetting profile on the device (2026-10-21): render parity, and the closed-form V solve from the DEVICE parts
         # (the parts kernel evaluates coefficient_jacobian / V of the radial type) recovers the profile
         vig_r = with_control_points(RadialVignetting(5, SVector(16.64, 15.04), 0.6 * W), [1.0, 1.0, 0.9, 0.75, 0.6])   # P_0 = P_1: the pole tie

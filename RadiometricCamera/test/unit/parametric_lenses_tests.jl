@@ -154,8 +154,8 @@
     c0 = cost(s2.f, s2.u0)[1]
     its = Int[]
     result = _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping(), fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
-                             :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy), iter_callback = (it, c, camera, poses, mat, surface, light) -> push!(its, it))
-    @test result.metadata.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
+                             :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy), callback = state -> (push!(its, state.iteration); false))
+    @test result.metadata.objective / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
     @test abs(pinhole_θ(RC.geometric(s2.u0))[1] - pinhole_θ(lens_t)[1]) < 0.24
 
     # Kannala–Brandt on Core's `KannalaBrandt(k…)` (Task 2 of the VisualGeometryToolkitCore port, fix round 1): equivalence against the

@@ -304,7 +304,7 @@ try
                                              rendering = RCP.RenderingOptions(; N = 4, n_rho = 2, n_phi = 6, n_p = 2))
             stops = RCP._calibration_stops(; max_iter = REFINE_ITERATIONS, max_time = Float64(max(1200, 600 * REFINE_ITERATIONS)))
             config = joinpath(WORK, "refine_smoke.toml")
-            open(io -> TOML.print(io, RCP.config_dict(run, RCP.RadiometricCalibration(RCP.RadiometricRefinement(settings)), stops)), config, "w")
+            open(io -> TOML.print(io, RCP.config_dict(run, settings, RCP.RadiometricCalibration(RCP.RadiometricRefinement()), stops)), config, "w")
             cmd = Cmd(addenv(`$(Base.julia_cmd()) --project=$HARNESS_ENV $(joinpath(RC_ROOT, "bin", "refine.jl")) --config=$config`,
                              "CUDA_VISIBLE_DEVICES" => get(ENV, "CUDA_VISIBLE_DEVICES", "1")))
             @test run_logged(cmd, log)

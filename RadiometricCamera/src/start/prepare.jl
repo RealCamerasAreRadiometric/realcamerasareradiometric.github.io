@@ -50,8 +50,6 @@ start_is_grid(run::RunOptions) = !startswith(run.io.init, "lens:")
 
 function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, run::RunOptions, settings::CalibrationSettings, start; backend, radiometry,
                       observations = nothing)
-    isempty(run.io.out) && error("io.out required")
-    mkpath(run.io.out)
     t_start = time()
     R0 = VgtkCore.ustrip(VgtkCore.m, _focal_length(run)) / (2 * run.camera.fnumber)
     height0 = _height_start(settings)
@@ -230,7 +228,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
                          masks, ϕ, backend, region, channel = ch,
                          sensor_models = sensor, sensor = om.sensor, photo_kind = om.kind, weights = _run_weights(ω), quanta = qs,
                          support_min = settings.vignetting.support_min, boundary_order = settings.vignetting.boundary_order,
-                         mu_bounds = settings.material.mu_bounds, jacobian_chunk = run.compute.jacobian_chunk)
+                         mu_bounds = settings.material.mu_bounds, jacobian_chunk = run.compute.jacobian_chunk, calibration_settings = settings)
     θ = CalibrationParameters(f, camera0, poses_start, material0, light0)
     f.vig_rule isa RadialSupportRule && @printf("vignetting support: %d of %d nodes are parameters — the pole pair and those carrying ≥ %g of the mean data weight (relative weights %s); the others continue them with a zero Δ^%d across the border (Core's BoundaryRule, vignetting.boundary_order)\n",
                                                 count(f.vig_rule.supported), length(f.vig_rule.supported), settings.vignetting.support_min,

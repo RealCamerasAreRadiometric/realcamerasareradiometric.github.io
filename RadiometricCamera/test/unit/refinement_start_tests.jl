@@ -12,10 +12,10 @@
     const RC = RCg
 
     @testset "start_options: exactly the refinement-only keys (and the outputs) at their defaults" begin
-        d0 = RC.config_dict(RC.RunOptions(), RC.RadiometricCalibration(RC.RadiometricRefinement(RC.CalibrationSettings())), RC._calibration_stops())   # the options, the optimizer's table
-        for k in RC.REFINE_ONLY_KEYS                                    # every key is an option of the pipeline
-            t, key = split(k, '.'; limit = 2)
-            @test haskey(d0, t) && haskey(d0[t], key)
+        d0 = RC.config_dict(RC.RunOptions(), RC.CalibrationSettings(), RC.RadiometricCalibration(RC.RadiometricRefinement()), RC._calibration_stops())   # the options, the algorithm's tables
+        for k in RC.REFINE_ONLY_KEYS                                    # every key is an option of the pipeline (a nested table's too)
+            path = split(k, '.')
+            @test foldl((t, p) -> t isa AbstractDict ? get(t, p, nothing) : nothing, path; init = d0) !== nothing
         end
         o = RC.pipeline_options(Dict("lm" => Dict("max_iter" => 50, "max_time" => 99.0), "fixed" => ["material"],
                                      "sweep" => Dict("lm_chunk" => 3, "iterations" => 2), "io" => Dict("out" => "/tmp/x", "checkpoint_each" => "on"),
@@ -30,7 +30,8 @@
         @test RC.start_options(RC.pipeline_options(Dict("lm" => Dict("max_iter" => 24)))...) == RC.start_options(RC.pipeline_options(Dict("lm" => Dict("max_iter" => 50)))...)
         # the LM's stop tolerances are the refinement's alone (RC 0.11.4, code review): a change never re-keys or refuses a start
         @test RC.start_options(RC.pipeline_options(Dict("lm" => Dict("ftol" => 1e-3, "xtol_rel" => 1e-6)))...) == RC.start_options(RC.RunOptions(), RC.CalibrationSettings())
-        @test all(k -> k in RC.REFINE_ONLY_KEYS, ("optimizer.ftol", "optimizer.xtol_rel", "optimizer.max_iter", "optimizer.max_time", "optimizer.type"))
+        @test all(k -> k in RC.REFINE_ONLY_KEYS, ("levenberg_marquardt.stops.ftol", "levenberg_marquardt.stops.xtol_rel", "levenberg_marquardt.stops.max_iter",
+                                                   "levenberg_marquardt.stops.max_time", "optimizer.type"))
         @test RC.start_options(RC.pipeline_options(Dict("grid" => Dict("lattice" => "node_count", "node_count" => 900)))...) != RC.start_options(RC.RunOptions(), RC.CalibrationSettings())
     end
 

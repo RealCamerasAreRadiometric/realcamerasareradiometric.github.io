@@ -31,13 +31,12 @@ function jacobian_parity(root, images, nviews = 2)
     end
     p["io"]["views"] = cfg["views"][t["views"]][1:nviews]; p["io"]["images"] = images
     p["io"]["out"] = mktempdir(); p["io"]["checkpoint_each"] = "off"
-    run, alg, stops = RC.read_calibration(p)                             # the run's options, the calibration (its settings and optimizer), its solve's stops
-    settings = alg.refinement.settings
+    run, settings, alg, stops = RC.read_calibration(p)                   # the run's options, the calibration's settings, the calibration (its optimizer), its solve's stops
     s = redirect_stdout(devnull) do
         g = RC.start_geometry(run, settings); dir = joinpath(run.io.out, "start")   # (the start reads its own options: `init`'s, the record's)
-        start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run, g.names)), (; run, device = CUDA.CUDABackend())),
+        start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run, g.names); run, settings, device = CUDA.CUDABackend())),
                               alg; stops).cache.prob
-        RC.save_calibration_start(dir, start.f, start.u0; run, settings)
+        RC.save_calibration_start(dir, start.f, start.u0; run)
         RC.load_calibration_start(dir; run, settings, device = CUDA.CUDABackend())
     end
     meta = s.f.start
@@ -87,7 +86,7 @@ function jacobian_parity(root, images, nviews = 2)
     check!("start")
     redirect_stdout(devnull) do
         VgtkCore.solve(s, alg.refinement;     # the refinement, three LM iterations
-                       stops = last(RC.read_calibration(p; set = [RC.config_key(p, "optimizer.max_iter") * "=3"])))
+                       stops = last(RC.read_calibration(p; set = [RC.config_key(p, "levenberg_marquardt.stops.max_iter") * "=3"])))
     end
     check!("lm3")
     return failed ? 1 : 0

@@ -48,8 +48,8 @@ end
         haskey(doc, "pipeline") && push!(runs, ("pipeline", doc["pipeline"], ""))
         for (header, p, kind) in runs
             ncases += 1
-            run, alg, stops = RC.read_calibration(p); o = (run, alg.refinement.settings)                   # resolves (a refusal is a failure of the lock)
-            resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(run, alg, stops)))   # keyed as the file's version names them
+            run, settings, alg, stops = RC.read_calibration(p); o = (run, settings)                       # resolves (a refusal is a failure of the lock)
+            resolved = Dict(RC.config_key(p, k) => v for (k, v) in leaves(RC.config_dict(run, settings, alg, stops)))   # keyed as the file's version names them
             for (k, v) in lock
                 haskey(resolved, k) || continue                                     # a key the run cannot use (INAPPLICABLE_KEYS): not written
                 # the in-plane start acts only with inplane = "aspect_skew": a heights-only case (inplane = "none", its commented override;
@@ -67,11 +67,14 @@ end
             end
             @test !haskey(get(p, "grid", Dict()), "lattice_spacing") && !haskey(get(p, "grid", Dict()), "size")
             # the configuration converter (RadiometricCamera's RC_CONFIG_VERSIONS, 0.4.0): a config of record stays version 1 on disk, its
-            # [lm] read whole as the current [optimizer]; its start and refinement settings split as written, the keys of version 1 —
-            # the split of record (before 0.4.0), so its products keep their keys
+            # [lm] read as the current tables — its stops [levenberg_marquardt.stops], its type [optimizer], its log [io] optimizer_log
+            # (version 4); its start and refinement settings split as written, the keys of version 1 — the split of record (before
+            # 0.4.0), so its products keep their keys
             @test !haskey(p, VgtkCore.CONFIG_VERSION_KEY)
             let m = VgtkCore.migrate_config(p, RC.RC_CONFIG_VERSIONS), old = "sensor_characteris" * "ation"   # (split: the banned spelling)
-                @test get(m, "optimizer", nothing) == get(p, "lm", nothing)
+                current(k) = k == "type" ? get(get(m, "optimizer", Dict()), k, nothing) : k == "log" ? get(get(m, "io", Dict()), "optimizer_log", nothing) :
+                             get(get(get(m, "levenberg_marquardt", Dict()), "stops", Dict()), k, nothing)
+                @test all(((k, v),) -> current(k) == v, get(p, "lm", Dict())) && isempty(get(m, "optimizer", Dict())) == !haskey(get(p, "lm", Dict()), "type")
                 @test get(get(m, "camera", Dict()), "sensor_characterization", nothing) ==
                       get(get(p, "camera", Dict()), "sensor_characterization", get(get(p, "camera", Dict()), old, nothing))
             end

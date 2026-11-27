@@ -27,7 +27,8 @@ time caps and its stop tolerances, the per-iteration checkpoints, the closed-for
 A start is computed from [`start_options`](@ref), which holds them at their defaults, so a change of one never changes (or
 recomputes) a start. `resume.state` is not among them: the front end reads its page frame.
 """
-const REFINE_ONLY_KEYS = ("optimizer.max_iter", "optimizer.max_time", "optimizer.ftol", "optimizer.xtol_rel", "optimizer.type", "io.checkpoint_each",
+const REFINE_ONLY_KEYS = ("levenberg_marquardt.stops.max_iter", "levenberg_marquardt.stops.max_time", "levenberg_marquardt.stops.ftol",
+                          "levenberg_marquardt.stops.xtol_rel", "optimizer.type", "io.checkpoint_each",
                           "sweep.iterations", "sweep.lm_chunk",
                           "resume.iteration_offset", "resume.sweep")
 
@@ -37,16 +38,28 @@ const REFINE_ONLY_KEYS = ("optimizer.max_iter", "optimizer.max_time", "optimizer
 A `[pipeline]` table (or `config_dict`) split in two: `start`, the table without `keys` (the tables they leave empty dropped), and
 `refine`, those of `keys` it states. THE split of a run's options into its start's and its refinement's: `start_options` and the
 paper project's drivers (the start's and the refinement's keys) read it. `keys` are current keys, looked up as the table's version
-names them ([`config_key`](@ref): a version-1 table, the configs of record, names the optimizer's table `[lm]`): the table is split as
+names them ([`config_key`](@ref): a version-1 table, the configs of record, names the optimizer's stops `[lm]`, a version-3 one `[optimizer]`): the table is split as
 it is written, so a driver's start and refinement keys of a version-1 table are the ones it always had.
 """
 function split_refine_only(table::AbstractDict; keys = REFINE_ONLY_KEYS)
     start = deepcopy(Dict{String, Any}(table)); refine = Dict{String, Any}()
     for k in keys
-        t, key = split(config_key(table, k), '.'; limit = 2)           # the key as the table's version names it
-        haskey(start, t) && start[t] isa AbstractDict && haskey(start[t], key) || continue
-        get!(refine, t, Dict{String, Any}())[key] = pop!(start[t], key)
-        isempty(start[t]) && delete!(start, t)
+        path = String.(split(config_key(table, k), '.'))                # the key as the table's version names it
+        tables = Any[start]
+        for t in path[1:(end - 1)]
+            x = get(last(tables), t, nothing)
+            x isa AbstractDict || break
+            push!(tables, x)
+        end
+        length(tables) == length(path) && haskey(last(tables), path[end]) || continue
+        dst = refine
+        for t in path[1:(end - 1)]
+            dst = get!(dst, t, Dict{String, Any}())
+        end
+        dst[path[end]] = pop!(last(tables), path[end])
+        for i in (length(path) - 1):-1:1                               # the tables it empties dropped
+            isempty(tables[i + 1]) && delete!(tables[i], path[i])
+        end
     end
     return start, refine
 end
@@ -55,7 +68,7 @@ end
     start_options(run, settings) -> (run, settings)
 
 The options a start is computed from and keyed by: the run's `run` and `settings` with [`REFINE_ONLY_KEYS`](@ref) and the output keys
-(`PIPELINE_OUTPUT_KEYS`: `io.out`, `optimizer.log`) at their defaults (`split_refine_only`).
+(`PIPELINE_OUTPUT_KEYS`: `io.out`, `io.optimizer_log`) at their defaults (`split_refine_only`).
 """
 start_options(run::RunOptions, settings::CalibrationSettings) = pipeline_options(start_pipeline_table(config_dict(run, settings)))
 
@@ -63,7 +76,7 @@ start_options(run::RunOptions, settings::CalibrationSettings) = pipeline_options
     start_pipeline_table(table) -> Dict
 
 The `[pipeline]` table `table` as its start reads it: without the refinement-only keys (`REFINE_ONLY_KEYS`) and the outputs
-(`PIPELINE_OUTPUT_KEYS`: `io.out`, `optimizer.log`) — THE definition of what a start reads, `start_options`' and a driver's start key's.
+(`PIPELINE_OUTPUT_KEYS`: `io.out`, `io.optimizer_log`) — THE definition of what a start reads, `start_options`' and a driver's start key's.
 """
 start_pipeline_table(table::AbstractDict) = first(split_refine_only(table; keys = (REFINE_ONLY_KEYS..., PIPELINE_OUTPUT_KEYS...)))
 

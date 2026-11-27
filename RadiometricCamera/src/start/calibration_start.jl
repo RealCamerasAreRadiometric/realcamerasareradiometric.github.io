@@ -43,21 +43,28 @@ function StartGeometry(camera, poses::AbstractVector, observations::AbstractVect
 end
 
 """
-    CalibrationPhotographs(geometry::StartGeometry, photographs)
+    CalibrationPhotographs(geometry::StartGeometry, photographs; run, settings, device = default_backend())
 
 The data of a radiometric calibration from scratch ([`RadiometricCalibration`](@ref)'s `EstimationProblem(CalibrationEstimate,
-CalibrationPhotographs(geometry, photographs), p)`): the geometric calibration it starts from (`geometry`, a [`StartGeometry`](@ref))
-and the photographs' files, `photographs[k]` the file of view `k` (a RAW photograph by its file, its green photosites, or a decoded
-image; [`start_photographs`](@ref) resolves a run's), one per photograph of the geometry (a `DimensionMismatch` otherwise).
+CalibrationPhotographs(geometry, photographs; run, settings))`, no context): the geometric calibration it starts from (`geometry`, a
+[`StartGeometry`](@ref)), the photographs' files, `photographs[k]` the file of view `k` (a RAW photograph by its file, its green
+photosites, or a decoded image; [`start_photographs`](@ref) resolves a run's), one per photograph of the geometry (a
+`DimensionMismatch` otherwise), the start options of the run `run` and the settings `settings` (`run_options` and
+`calibration_settings`, [`start_options`](@ref)`(run, settings)`: the capture's facts and the problem's structure, ruling R1 — no
+refinement-only key, no output) and the compute backend `device` ([`default_backend`](@ref) by default).
 """
-struct CalibrationPhotographs{G <: StartGeometry}
+struct CalibrationPhotographs{G <: StartGeometry, D}
     geometry::G
     photographs::Vector{String}
+    run_options::RunOptions
+    calibration_settings::CalibrationSettings
+    device::D
 end
-function CalibrationPhotographs(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString})
+function CalibrationPhotographs(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}; run::RunOptions, settings::CalibrationSettings,
+                                device = default_backend())
     length(photographs) == length(geometry.names) ||
         throw(DimensionMismatch("CalibrationPhotographs: $(length(geometry.names)) photographs in the geometry, $(length(photographs)) files"))
-    return CalibrationPhotographs(geometry, collect(String, photographs))
+    return CalibrationPhotographs(geometry, collect(String, photographs), start_options(run, settings)..., device)
 end
 
 """
@@ -78,20 +85,22 @@ function start_geometry(run::RunOptions, settings::CalibrationSettings; record =
 end
 
 """
-    save_calibration_start(dir, f, θ; run, settings) -> dir
+    save_calibration_start(dir, f, θ; run) -> dir
 
-The start — data `f` and parameters `θ` (the `init` of a [`RadiometricCalibration`](@ref) of the run `run` and the settings `settings`:
-its cache's `f` and `u0`) — as the start record `dir`: every value a refinement takes from its start (start/start_record.jl), so
-[`load_calibration_start`](@ref) rebuilds the start from the photographs and this record without computing it again.
+The start — data `f` and parameters `θ` (the `init` of a [`RadiometricCalibration`](@ref) of the run `run`: its cache's `f` and
+`u0`, the settings `f.calibration_settings`) — as the start record `dir`: every value a refinement takes from its start
+(start/start_record.jl), so [`load_calibration_start`](@ref) rebuilds the start from the photographs and this record without
+computing it again.
 """
-save_calibration_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters; run::RunOptions, settings::CalibrationSettings) =
-    (save_start(dir, f, θ, f.start, start_options(run, settings)...); dir)   # the record keys by the start options alone (no output: io.out, optimizer.log)
+save_calibration_start(dir::AbstractString, f::CalibrationData, θ::CalibrationParameters; run::RunOptions) =
+    (save_start(dir, f, θ, f.start, start_options(run, f.calibration_settings)...); dir)   # the record keys by the start options alone (no output: io.out, io.optimizer_log)
 
 """
     load_calibration_start(dir; run, settings, device = default_backend(), observations = nothing, photographs) -> RefineProblem
 
-The refinement's problem from the start record `dir`, `RefineProblem(f, u0, run)` of the data `f` ([`CalibrationData`](@ref)), the
-start's parameters `u0` ([`CalibrationParameters`](@ref)) and the run's options `run` (its context `p`), which [`RadiometricRefinement`](@ref) solves ([`save_calibration_start`](@ref); refused when its start options are not
+The refinement's problem from the start record `dir`, `RefineProblem(f, u0)` of the data `f` ([`CalibrationData`](@ref): `settings`
+its `calibration_settings`, on the backend `device`) and the start's parameters `u0` ([`CalibrationParameters`](@ref)), no context
+(ruling R1), which [`RadiometricRefinement`](@ref) solves ([`save_calibration_start`](@ref); refused when its start options are not
 `start_options(run, settings)`): the front end's target and observations, the record's camera, region and poses, the photographs streamed
 at the record's masks (or the start's own streamed `observations`, handed over in the process that computed it: no photograph read
 again), and the closed-form start's parameters, costs and GCV weights loaded — nothing of the start computed again. `photographs`: the
@@ -103,8 +112,8 @@ function load_calibration_start(dir::AbstractString; run::RunOptions, settings::
     check_start_options(record, run, settings)
     g = start_geometry(run, settings; record, load_state)
     files = photographs === nothing ? start_photographs(run, g.names) : photographs
-    f, θ = _start_state(g, files, run, settings, record; backend = device, observations, radiometry = nothing)   # a record's start: no closed-form solve, no LM
-    return VgtkCore.RefineProblem(f, θ, run)
+    f, θ = _start_state(g, files, start_options(run, settings)..., record; backend = device, observations, radiometry = nothing)   # a record's start: no closed-form solve, no LM
+    return VgtkCore.RefineProblem(f, θ)
 end
 
 """The photographs of the views `names` of the run `run` (`io.images`; a RAW file by its stem, `photo_file`)."""

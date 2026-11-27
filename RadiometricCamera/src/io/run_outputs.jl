@@ -37,28 +37,28 @@ end
 
 The termination record of the refinement's LM: `res` is the last chunk's result (VisualGeometryToolkitCore's `LevenbergMarquardt` on
 the chunk's `CalibrationBundle`: a `FitResult`, its `retcode` and `stop_rule`), decided at the point the chunk returned (VisualGeometryToolkitCore's rule): a cost-decrease or
-step-size tolerance stop (`[optimizer] ftol`, `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
+step-size tolerance stop (`[levenberg_marquardt.stops] ftol`, `xtol_rel`; Core's `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
 cap is `Success` only at a stationary point and `Stalled` otherwise; the iteration and time caps `MaxIters` / `MaxTime`. A run of chunks ends on one
 that did not iterate, at the final state. `nothing` (the LM did not run): `(ReturnCode.Default, NoRule)`.
 """
 lm_termination(res) = res === nothing ? (VgtkCore.ReturnCode.Default, VgtkCore.NoRule) : (res.retcode, res.stop_rule)
 
 """
-    save_radiometric_calibration(f, θ, result; run, settings)
+    save_radiometric_calibration(f, θ, result; run)
 
-The records of a radiometric calibration (a [`RadiometricCalibration`](@ref) solve's `result` of the data `f` and parameters `θ`, the run
-`run` and the calibration's `settings`) in the run's
-directory `io.out`, each through VisualGeometryToolkitIO:
+The records of a radiometric calibration (a [`RadiometricCalibration`](@ref) solve's `result` of the data `f` — the calibration's
+settings its `calibration_settings` — and parameters `θ`, the run `run`) in the run's directory `io.out` (the driver's: ruling R1),
+each through VisualGeometryToolkitIO:
 
 `grid.json` / `lens.json` (+ `grid_init.json` / `lens_init.json`; the model spec of the evaluation scripts is `grid:<file>` | `lens:<file>`),
 `state.json`, `radiometric_camera.json`, `radiometric_target.json`, `poses_{init,refined}.json` and `parameters.json` in `io.out`.
 """
 function save_radiometric_calibration(f::CalibrationData, θ::CalibrationParameters, result::VgtkCore.FitResult{<:CalibrationEstimate, <:CalibrationMetadata};
-                                      run::RunOptions, settings::CalibrationSettings)
+                                      run::RunOptions)
     m = result.metadata
     costs = (; linear = (m.linear_cost, m.linear_rms), final = (m.final_cost, m.final_rms), seconds = m.seconds,
                termination = (result.retcode, result.stop_rule), m.folds)
-    return _write_calibration(f, θ, f.start, run, settings, m.solver, m.trace, costs)
+    return _write_calibration(f, θ, f.start, run, f.calibration_settings, m.solver, m.trace, costs)
 end
 function _write_calibration(f::CalibrationData, θ::CalibrationParameters, meta, run::RunOptions, settings::CalibrationSettings, res, trace, costs)
     names = meta.names; K = length(names); W₀ = meta.W₀; H₀ = meta.H₀; lens0 = meta.lens0; views0 = meta.views0; route = lm_route(lens0)

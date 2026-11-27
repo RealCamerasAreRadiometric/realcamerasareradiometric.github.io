@@ -19,6 +19,7 @@ export RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_cal
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
        calibration_problem, CalibrationPhotographs, RadiometricCameraModel, RadiometricTarget, RunOptions, CalibrationSettings, pipeline_options, CalibratedCamera
 
+public load_calibration_state, calibration_checkpoints   # a run's resume and its outputs (the driver's: ruling R1)
 public CalibrationData, CalibrationParameters, flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
        coverage_region, check_coverage, calibrated_folds, grid_angular_error,
        load_start, schoeps_run_file, save_grid, load_grid, load_model, load_camera,
@@ -88,10 +89,10 @@ pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
     _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, board, settings)`")
 
 # ---- retired name (the solve interface: one estimation verb). `calibrate` was a one-line synonym of the calibration's `solve`.
-"""Retired: the calibration's `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run, device)), algorithm; stops)`."""
+"""Retired: the calibration's `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs; run, settings, device)), algorithm; stops)`."""
 calibrate(args...; kwargs...) = throw(ArgumentError(
-    "calibrate is retired: a calibration is one solve — `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), " *
-    "(; run, device)), algorithm; stops)` (`init` / `solve!` for the start, then the refinement)"))
+    "calibrate is retired: a calibration is one solve — `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs; " *
+    "run, settings, device)), algorithm; stops)` (`init` / `solve!` for the start, then the refinement)"))
 
 # ---- retired names (`lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
 # camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of calibration parameters, the replacer.

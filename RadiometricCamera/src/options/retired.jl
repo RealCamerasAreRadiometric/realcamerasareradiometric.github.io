@@ -60,7 +60,7 @@ const RETIRED_KEYS = (
     # ONE word for a spline's free values, "node", and ONE key for how many, `node_count`
     ("vignetting", "coefficients") => "renamed `[vignetting] node_count` (the stack's one word for a spline's free values, node): node_count = 16",
     ("focus", "nodes")   => _focus_ab_key_removed(" (the key was a direction chart's node count); delete the key"),
-    ("lm", "xtol")       => "renamed `[lm] xtol_rel` (VisualGeometryToolkitCore's relative step test, Ceres' parameter " *
+    ("lm", "xtol")       => "renamed `xtol_rel`, in `[levenberg_marquardt.stops]` (version 1: `[lm]`; VisualGeometryToolkitCore's relative step test, Ceres' parameter " *
                             "tolerance, under VisualGeometryToolkitCore's name; the absolute step test is VisualGeometryToolkitCore's of record, no key): xtol_rel = 1.0e-8",
     ("focus", "node_rho_max") => "renamed `[focus] lens_coverage_scale` (the same scaling of the lens coverage about its centre as " *
                             "`[masks] lens_coverage_scale`, `_scaled_coverage`): lens_coverage_scale = 0.9",

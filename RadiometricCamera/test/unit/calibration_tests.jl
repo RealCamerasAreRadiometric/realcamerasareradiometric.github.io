@@ -100,7 +100,7 @@
     # degenerate: with the absolute cost-decrease test at 1e-12 (the former default) the solver stopped at a cost of ≈ 2e-12 with r −8 %,
     # μ +0.09 and the light 3.5 % off, which looked like an identifiability limit and was the stopping test.
     result = _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 200, ftol = 1e-12), damping = VgtkCore.LevenbergDamping())
-    @test result.metadata.cost / 2 < 1e-20 * c0          # (Core's record: ‖r‖²; `cost` ½‖r‖²)
+    @test result.metadata.objective / 2 < 1e-20 * c0     # (Core's record: ‖r‖²; `cost` ½‖r‖²)
     @test aperture_radius(s2.u0) ≈ r_t rtol = 1e-9
     @test pinhole_θ(RC.geometric(s2.u0))[3] ≈ pinhole_θ(lens_t)[3] atol = 1e-9 * W      # (`lens` is shadowed by a test variable)
     @test pinhole_θ(RC.geometric(s2.u0))[4] ≈ pinhole_θ(lens_t)[4] atol = 1e-9 * H
