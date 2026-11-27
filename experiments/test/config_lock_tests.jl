@@ -89,3 +89,18 @@ end
     @test commented(lines, "cases.a.pipeline", "grid.smoothness.type") === true
     @test commented(lines, "cases.a.pipeline", "masks.seed") === nothing
 end
+
+# PanoramaStitching's `fit_vignetting(…; saturation_margin_px)` is required (the symmetric saturation mask): every sweep of record
+# states it in its [example.domain] as a commented literal, about 3 × that sweep's rotation-bundle RMS
+@testitem "config lock: every panorama sweep states its saturation margin" default_imports = false setup = [ConfigLock] begin
+    using Test, TOML, RadiometricCamera
+    dir = normpath(pkgdir(RadiometricCamera), "..", "experiments", "configs", "experiments")
+    files = filter(f -> startswith(f, "panorama_vignetting_") && endswith(f, ".toml"), readdir(dir))
+    @test length(files) == 3
+    for f in files
+        path = joinpath(dir, f)
+        d = TOML.parsefile(path)["example"]["domain"]
+        @test haskey(d, "saturation_margin_px") && d["saturation_margin_px"] isa Real && d["saturation_margin_px"] > 0
+        @test commented(readlines(path), "example", "domain.saturation_margin_px") === true
+    end
+end

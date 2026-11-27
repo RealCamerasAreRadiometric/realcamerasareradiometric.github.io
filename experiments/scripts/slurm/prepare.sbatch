@@ -16,7 +16,7 @@ source experiments/scripts/slurm/common.sh
 
 # =============================================================================
 # prepare.sbatch — the shared stages of a per-case experiment, once, before its array: `--stage=prepare,detect` of EXPERIMENT
-# (radiometric_refinement or radiometric_refinement_vignetting) on its config of record. prepare decodes the raw photographs of every [prepare.<set>]
+# (radiometric_refinement, radiometric_refinement_vignetting or radiometric_refinement_board_warping) on its config of record. prepare decodes the raw photographs of every [prepare.<set>]
 # (Features' load_raw, LibRaw_jll) into the set's keyed run; detect checks the
 # inputs of record. Every case of the array reads the same set, so the decode runs here once instead of racing in each task; the
 # array depends on this job (--dependency=afterok).
@@ -28,8 +28,8 @@ source experiments/scripts/slurm/common.sh
 # cpus_per_task, mem_per_cpu and gpu, the one source; a launcher submitted by hand states them on its sbatch line.
 # =============================================================================
 
-: "${EXPERIMENT:?set EXPERIMENT (radiometric_refinement or radiometric_refinement_vignetting)}"
-case $EXPERIMENT in radiometric_refinement|radiometric_refinement_vignetting) ;; *) echo "EXPERIMENT=$EXPERIMENT has no prepare stage here"; exit 2 ;; esac
+: "${EXPERIMENT:?set EXPERIMENT (radiometric_refinement, radiometric_refinement_vignetting or radiometric_refinement_board_warping)}"
+case $EXPERIMENT in radiometric_refinement|radiometric_refinement_vignetting|radiometric_refinement_board_warping) ;; *) echo "EXPERIMENT=$EXPERIMENT has no prepare stage here"; exit 2 ;; esac
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 
 echo "[$(date +%T)] $EXPERIMENT: prepare, detect  threads=$JULIA_NUM_THREADS  data=$VGTK_DATA_ROOT  results=$VGTK_RESULTS_ROOT  commit=$(git rev-parse HEAD)"

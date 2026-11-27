@@ -1,0 +1,79 @@
+# RATIONALE
+#   question:   does the calibration reconstruct a printed calibration board the same from every lens that photographed it — the
+#               whole offset it gives each point of the planar board, in the plane and along the normal?
+#   hypothesis: the board's offsets are a property of the board, so with the board in place the calibrations with three lenses
+#               learn the same offsets
+#   decides:    the paper's board-warping figure (fig:board-warping) and the measure its text cites: per board and pair of lenses
+#               the length of the difference between the board's offsets learned with the two lenses, nothing fitted or removed
+#   evidence:   the spline refinements of RC 0.11.5 on the session's six sets (2026-11-20):
+#               the whole difference is 0.53, 0.69 and 0.30 mm RMS on the AprilGrid and 0.62, 0.43 and 0.36 mm RMS on the
+#               Siemens stars (Sigma 14 mm − Tamron 20 mm, fisheye − Tamron 20 mm, Sigma 14 mm − fisheye), most of it in the plane
+#               (0.12 … 0.64 mm RMS); the heights alone differ by 0.06 … 0.18 mm RMS (0.19 … 0.63 mm at most) once the best-fit
+#               plane of their difference is removed, on surfaces that span −2.5 … +0.6 mm (AprilGrid) and −1.5 … +1.7 mm
+#               (Siemens stars)
+#   owner:      T. Harder
+#   date:       2026-11-21
+#
+# Config of record of the board warping across lenses (scripts/board_warping.jl with --config=<this>; src/board_warping.jl): both
+# printed calibration boards photographed with the three lenses in ONE session, each board in place for its three sets, and the offset
+# the radiometric refinement of each set gives every point of the planar board — along the normal the height of the page above its
+# plane, in the plane the print's aspect and skew. Nothing is estimated here: every case is a case of [upstream]
+# radiometric_refinement, as it is there, and the stage reads the calibrated target its refinement wrote (radiometric_target.json:
+# the page, the warping's 5 × 5 nodal heights, the in-plane aspect and skew). The surface between the nodes is the package's own
+# (VisualRadiometryToolkitCore's board_height). A supplement experiment: its products lie under
+# results_root()/supplement/board_warping/, beside those of configs/supplement/board_warping.toml (the same driver, keyed apart).
+#
+#   julia --project=experiments experiments/scripts/board_warping.jl --config=experiments/configs/supplement/board_warping_lenses.toml [--plan] [--stage=figures]
+
+[experiment]
+name = "board_warping"
+
+[inputs]
+# none of its own: the photographs, the starts and the targets are the upstream config's inputs
+
+[upstream]
+radiometric_refinement = "configs/experiments/radiometric_refinement_board_warping.toml"   # the session's six cases, as they are there (each refine product is read by its key)
+
+[heights]
+samples = 201                  # the surface is sampled at samples × samples page positions, the page's edges included: every 5 mm of a 1 m page (a surface's mesh takes every [figure] mesh_stride-th of them; the maps and the lenses' differences are taken on all of them)
+
+[sets]
+# The session's six capture sets, each with the case of [upstream] whose refinement is read: the central spline's, the paper's
+# camera model. A set's name is its surface's (board-warping-lenses/<set>.tex); its case is named <set>_<camera model>_warped, one
+# camera model for all sets (the drawing code finds a set's files by that name, and its caption names the model).
+bw_ag_14mm    = "bw_ag_14mm_spline_warped"      # Sigma 14 mm, AprilGrid
+bw_ag_fisheye = "bw_ag_fisheye_spline_warped"   # 8 mm fisheye, AprilGrid
+bw_ag_tamron  = "bw_ag_tamron_spline_warped"    # Tamron 20 mm, AprilGrid
+bw_si_14mm    = "bw_si_14mm_spline_warped"      # Sigma 14 mm, Siemens stars
+bw_si_fisheye = "bw_si_fisheye_spline_warped"   # 8 mm fisheye, Siemens stars
+bw_si_tamron  = "bw_si_tamron_spline_warped"    # Tamron 20 mm, Siemens stars
+
+[figure]
+drawing = "board-warping-offsets"   # the drawing code (src/paper_figures/board_warping_offsets.jl): per board its three surfaces — the planar board plus the board's offsets learned with each lens — and three maps of the difference between the offsets learned with two lenses; its tables state that difference per board and pair
+asset_dir = "board-warping-lenses"   # plotsdir("board-warping-lenses.tex", "board-warping-lenses/…"): the paper's fig/ layout — in the folder a surface <set>.tex per set, a map <set>-minus-<set>.tex with its .png per board and pair, the surfaces' key key.tex and the maps' key maps-key.tex
+columns = ["Sigma 14\\,mm lens", "Tamron 20\\,mm lens", "Fisheye lens"]   # the surfaces' columns, left to right: a column's header (LaTeX text)
+lenses = ["Sigma 14\\,mm", "Tamron 20\\,mm", "fisheye"]   # the columns' lenses in running text (the generated caption, the files' comments), one per column
+rows = [                       # the boards, top to bottom: a row's label (LaTeX text) and its sets, one per column; the tables compare the sets of a row (meta.toml [boards.<label, lower case, _ for a space>] and [offsets.<…>])
+    {label = "AprilGrid", sets = ["bw_ag_14mm", "bw_ag_tamron", "bw_ag_fisheye"]},
+    {label = "Siemens stars", sets = ["bw_si_14mm", "bw_si_tamron", "bw_si_fisheye"]},
+]
+pairs = [                      # the maps of a row, left to right, after its surfaces: the lens of the first column minus that of the second (columns counted from 1), and the two lines of the map's header (LaTeX text)
+    {columns = [1, 2], header = ["Sigma 14\\,mm $-$", "Tamron 20\\,mm"]},
+    {columns = [3, 2], header = ["Fisheye $-$", "Tamron 20\\,mm"]},
+    {columns = [1, 3], header = ["Sigma 14\\,mm $-$", "Fisheye"]},
+]
+# A surface draws its set's planar board plus the board's offsets learned with its lens, the whole offset vector (in the plane and
+# along the normal) enlarged: a mesh whose patches are coloured in bands of height. All surfaces share one box and one colour scale,
+# symmetric about zero.
+offset_enlargement = 50        # the offsets are drawn this many times as large as lengths on the page
+view_azimuth_elevation_deg = [20, 25]   # the orthographic view of a surface: its azimuth and elevation, each within 0 … 90 (the drawing code hands PGFPlots the angles that give exactly this view)
+mesh_stride = 10               # every mesh_stride-th sample of [heights] is a mesh point (201 samples: 21 × 21 points, 400 patches per surface)
+band_heights_mm = [0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0]   # the candidates of a height band, ascending: the first that needs at most max_bands bands on each side of zero for the largest |height| of all sets is taken (0.5 mm for the refinements of 2026-11-20), the last when none does
+max_bands = 8                  # the most height bands on each side of zero
+box_margin_rounding_mm = 0.5   # a surface's box is its page widened at all four sides by the largest in-plane offset (along x or y) of all sets, rounded up to a multiple of this, as it is drawn (1.5 mm, drawn as 75 mm of page, for the refinements of 2026-11-20)
+# A map draws, at every sample of the page, the length of the difference between the board's offsets learned with its two lenses, as
+# an image in bands from zero; under it the RMS and the largest value. All maps share one scale.
+map_band_heights_mm = [0.1, 0.2]   # the candidates of a map's band, ascending: the first that needs at most map_max_bands bands for the largest value of all maps is taken (0.2 mm for the refinements of 2026-11-20), the last when none does
+map_max_bands = 8              # the most bands of the maps' scale
+map_width_share = 0.40         # a map's width in units of a surface's; the gaps and the type around a map (its header, its two lines of numbers) are set for this share
+map_pixels_per_sample = 3      # a sample of a map is this many image pixels wide and high (no interpolation)

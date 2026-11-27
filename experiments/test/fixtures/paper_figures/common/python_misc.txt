@@ -1,0 +1,21 @@
+0.00012
+0.046
+1.5
+13
+1.2e+02
+1e+02
+1e-05
+0.1
+3
+0.00013000000000000002
+0.046
+1.5
+13.0
+130.0
+100.0
+9.999999999999999e-06
+0.11
+3.0
+{rgb,255:red,255;green,71;blue,174}
+\raisebox{\dimexpr-0.5\rcpanelht+1.5pt\relax}[0pt][0pt]{\tikz[baseline=(k.south)]\node[fill=white,inner sep=1.2pt](k){\usebox\rcflowkeybox\,{\scriptsize t}};}
+\raisebox{\dimexpr0.5\rcpanelht-1.5pt\relax}[0pt][0pt]{\tikz[baseline=(k.north)]\node[fill=white,inner sep=1.2pt,font=\scriptsize](k){h};}

@@ -43,9 +43,10 @@ using CairoMakie: Makie
 "The blur models compared: the calibration's camera as it is, and the chief ray alone."
 const TEXTURE_VARIANTS = ("learned", "pinhole")
 "The tables of a texture config of record (configs/experiments/texture_recovery_<set>.toml)."
-const TEXTURE_TABLES = ("experiment", "inputs", "prepare", "upstream", "poses", "texture", "report", "figures", "render", "folds", "compare")
-"The optional tables of a texture config: the rotation of the split (`[folds]`) and the comparison of page runs (`[compare]`)."
-const TEXTURE_OPTIONAL_TABLES = ("folds", "compare")
+const TEXTURE_TABLES = ("experiment", "inputs", "prepare", "upstream", "poses", "texture", "report", "figures", "render", "folds", "compare", "bands")
+"""The optional tables of a texture config: the rotation of the split (`[folds]`), the comparison of page runs (`[compare]`) and the
+paper's figure (`[bands]`: the driver's stage bands, which checks the table — scripts/texture_recovery.jl `check_bands_table`)."""
+const TEXTURE_OPTIONAL_TABLES = ("folds", "compare", "bands")
 "The keys of `[folds]`: the rotations of the split (`split_roles`' `fold` 0 … rotations − 1; 0 the split of record)."
 const TEXTURE_FOLDS_KEYS = ("rotations",)
 """The keys of `[compare]`: the page runs compared (`runs`: name → a refine key in this results root), the run whose texture the others'

@@ -9,18 +9,28 @@
     using DrWatson
 
     const DRIVERS = ("radiometric_refinement", "focus_surfaces", "texture_recovery", "frontends", "sensor_characterisation",
-                     "image_regions", "distance_maps", "timing")
+                     "image_regions", "distance_maps", "timing", "vignetting_figure", "board_warping", "detector_bias",
+                     "panorama_vignetting", "panorama_stitching", "panorama_figure",
+                     "teaser")
     const DRIVER_STAGE_NAMES = Dict(
-        "radiometric_refinement" => ("prepare", "detect", "start", "refine"),
-        "focus_surfaces" => ("figures",),
-        "texture_recovery" => ("prepare", "detect", "sheet", "init", "refine", "folds", "evaluate", "fold_report", "compare", "report", "figures"),
+        "radiometric_refinement" => ("prepare", "detect", "start", "material_grid_part", "material_grid", "refine"),
+        "focus_surfaces" => ("panels", "figures"),
+        "texture_recovery" => ("prepare", "detect", "sheet", "init", "refine", "folds", "evaluate", "fold_report", "compare", "report", "figures", "bands"),
         "frontends" => ("prepare", "detect", "init", "evaluate"),
         "sensor_characterisation" => ("evaluate",),
         "image_regions" => ("detect",),
         "distance_maps" => ("prepare",),
-        "timing" => ("start", "time", "record"))
+        "timing" => ("start", "time", "record"),
+        "vignetting_figure" => ("figures",),
+        "board_warping" => ("figures",),
+        "panorama_vignetting" => ("evaluate",),
+        "panorama_stitching" => ("refine", "evaluate", "rooftop", "panoramas"),
+        "panorama_figure" => ("figures",),
+        "teaser" => ("teaser",),
+        "detector_bias" => ("detect", "start", "refine", "evaluate", "figures"))
     experiment_config(d) = d == "texture_recovery" ? projectdir("configs", "experiments", "texture_recovery_14mm_small.toml") :
-                           d == "timing" ? projectdir("configs", "supplement", "timing.toml") : projectdir("configs", "experiments", "$d.toml")
+                           d in ("panorama_vignetting", "panorama_stitching") ? projectdir("configs", "experiments", "$(d)_fx3_14mm.toml") :
+                           d in ("timing", "board_warping", "panorama_figure") ? projectdir("configs", "supplement", "$d.toml") : projectdir("configs", "experiments", "$d.toml")
     const DRIVER_THREADS = "2,1"
 
     # A driver in a fresh process with both trees bound; (succeeded, output).
@@ -61,6 +71,26 @@ end
     end
 end
 
+@testitem "panorama driver: a config with a retired registration key is refused when the driver loads it, before any stage, writing nothing" default_imports = false setup = [DriverRuns] begin
+    using Test
+    using DrWatson
+    using TOML: TOML
+    using .DriverRuns: run_driver_script, tree_state
+    # the panorama_vignetting driver asked to run its evaluate stage, in a fresh process, on a copy of the 14 mm config of record with a
+    # retired PanoramaStitching key: the driver's config load (load_panorama_vignetting_config, at the script's top level) refuses it
+    # by name, its successor stated, so no stage is planned, keyed or run — the results tree, holding an earlier run's file, is left
+    # exactly as it was (what is tested: the load-time refusal through the real driver, not a stage body)
+    for (key, v) in (("near_duplicate_deg", 4.0), ("overlap_deg", 30.0))
+        cfg = TOML.parsefile(projectdir("configs", "experiments", "panorama_vignetting_fx3_14mm.toml")); cfg["example"]["registration"][key] = v
+        path = joinpath(mktempdir(), "panorama_vignetting_retired.toml"); open(io -> TOML.print(io, cfg), path, "w")
+        results = mktempdir(); mkpath(joinpath(results, "panorama_vignetting")); write(joinpath(results, "panorama_vignetting", "_provenance.toml"), "kept")
+        before = tree_state(results)
+        ok, out = run_driver_script("panorama_vignetting", "--stage=evaluate", "--force"; data = mktempdir(), results, config = path)
+        @test !ok && occursin("`$key` is retired", out)
+        @test tree_state(results) == before && read(joinpath(results, "panorama_vignetting", "_provenance.toml"), String) == "kept"
+    end
+end
+
 @testitem "experiment drivers" default_imports = false setup = [DriverRuns] begin
     using Test
     using DrWatson
@@ -77,6 +107,7 @@ end
     using JpegTurbo: jpeg_encode
     include(srcdir("experiments.jl"))
     include(srcdir("drivers.jl"))
+    include(srcdir("panorama_example.jl"))
     include(srcdir("evaluation.jl"))
     include(srcdir("radiometric_refinement.jl"))
     using .Evaluation: reprojection_vectors, truepose_vectors, truepose_scores
@@ -128,8 +159,9 @@ end
 
     @testset "the configs of record" begin
         # the paper's experiments: calibration accuracy (radiometric_refinement, its chrome evaluations chrome_evaluation_*, the figures
-        # focus_surfaces) and the f/4 refinements (radiometric_refinement_vignetting); the macro defocus (2026-11-14), the synthetic
-        # detector bias and the panorama chains (rc-0116, 2026-11-18) left the project with their configs
+        # focus_surfaces), the f/4 refinements (radiometric_refinement_vignetting), the panoramas (panorama_vignetting_* —
+        # PanoramaStitching's example chain on the sweeps —, panorama_stitching_*) and the detector bias on the rendered sets
+        # (detector_bias); the macro defocus (2026-11-14) and the detector bias's synthetic sets (rc-0116, 2026-11-18) left the project with their configs
         lenses = ("14mm", "fisheye", "tamron")
         @test sort(readdir(projectdir("configs", "experiments"))) ==
               sort(vcat(["radiometric_refinement.toml", "radiometric_refinement_vignetting.toml",
@@ -142,7 +174,12 @@ end
                          "image_regions.toml",   # the capture sets' image-region steps (scripts/image_regions.jl; 2026-11-15)
                          "distance_maps.toml",   # the printed boards' edge distance maps, read through [runs] (scripts/distance_maps.jl; 2026-11-16)
                          "convergence.toml",   # the bias of Schöps's method per LM iteration (scripts/convergence.jl; 2026-11-15)
+                         "vignetting_figure.toml",   # the paper's vignetting figure from the f/4 refinements and the diffuser photographs (scripts/vignetting_figure.jl)
+                         "radiometric_refinement_board_warping.toml",   # the board-warping session's refinements: two boards × three lenses, no chrome set (scripts/radiometric_refinement.jl)
+                         "teaser.toml",   # the paper's teaser from the Tamron sweep's panoramas and the learned-texture figure's tables (scripts/teaser.jl)
+                         "detector_bias.toml",   # the detector bias on the rendered sets and the paper's figure of it (scripts/detector_bias.jl)
                          ],
+                        ["panorama_vignetting_fx3_$l.toml" for l in lenses], ["panorama_stitching_fx3_$l.toml" for l in lenses],   # per lens its sweep's chain and its panoramas
                         # ONE chrome evaluation per chrome set, its models a list (2026-11-12; the 14 mm central_30cm's above)
                         ["chrome_evaluation_fx3_$s.toml" for s in ("fisheye_10cm_ag", "fisheye_2710_si", "tamron_17cm_si", "tamron_20261108_ag", "tamron_largeaperture", "zoom48_f10")]))
         # the studies (ideas tried, each with the decision it backed) and the supplement's own experiments: their groups (rc-0116)
@@ -150,9 +187,21 @@ end
               ["radiometric_refinement_ablation_lens_coverage_scale.toml", "radiometric_refinement_smoothness_si30fe.toml", "sampling_strategy.toml",
                "sampling_strategy_fe10_count.toml", "sampling_strategy_fe10_kb16384.toml", "sampling_strategy_kb_count.toml", "sampling_strategy_smoke.toml",
                "warping_ablation.toml"]
-        @test sort(readdir(projectdir("configs", "supplement"))) == ["timing.toml", "timing_smoke.toml"]
+        @test sort(readdir(projectdir("configs", "supplement"))) == ["board_warping.toml", "board_warping_lenses.toml", "panorama_figure.toml", "timing.toml", "timing_smoke.toml"]   # board_warping, board_warping_lenses: the supplement's board-warping figures (scripts/board_warping.jl); panorama_figure: its panoramas figure (scripts/panorama_figure.jl)
+        # panorama_vignetting's configs: a driver config of its own name, its inputs under data_root() in their tiers, and the example's
+        # tables less what the driver supplies (the inputs' paths and the frames' sensor record); the frames' gains stated
+        for l in lenses
+            pv = load_panorama_vignetting_config(projectdir("configs", "experiments", "panorama_vignetting_fx3_$l.toml"))
+            @test issubset(["lens", "raw", "sensor_characterisation"], keys(pv["inputs"])) && pv["example"]["vignetting"]["model"] == "radial"
+            @test setdiff(keys(pv["inputs"]), ["lens", "raw", "sensor_characterisation"]) ⊆ [t["input"] for t in values(get(pv, "image_regions", Dict()))]   # else: its image region's frames
+            @test !haskey(pv["example"], "output") && !haskey(pv["example"]["inputs"], "raw_dir") && !haskey(pv["example"]["inputs"], "lens")
+            @test !haskey(pv["example"]["decode"], "sensor_characterisation") && !haskey(pv["example"]["registration"], "sensor_characterisation")   # the driver's, from [inputs]
+            @test !haskey(pv["example"]["inputs"], "circle")      # the image circle is the camera's lens coverage: the sweep's image region (src/image_region.jl)
+            @test pv["example"]["vignetting"]["gain_correction"] in ("none", "frame", "channel")
+        end
+        @test isfile(PANORAMA_EXAMPLE)
         # every case's [pipeline] table reads as PipelineOptions, and its paths stay inside data_root()
-        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
+        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml", "radiometric_refinement_board_warping.toml")
             cfg = TOML.parsefile(projectdir("configs", "experiments", f))
             for (c, t) in get(cfg, "cases", Dict()), (tb, kv) in get(t, "pipeline", Dict()), (k, v) in kv
                 v isa AbstractString || continue
@@ -169,7 +218,7 @@ end
         # the LM cap of every refinement case (owner 2026-11-14): 50 for the fisheye cases (still improving at 25), 25 for the others
         # (the 14 mm flattened by ~15; was 48 / 50)
         isfisheye(n) = occursin(r"^(ag10fe_|si27fe_|si30fe_)|fisheye", n)   # si30fe: the fisheye 30 cm set (2026-11-16)
-        for x in ("radiometric_refinement", "radiometric_refinement_vignetting"), (n, t) in load_radiometric_refinement_config(experiment_config(x))["cases"]
+        for x in ("radiometric_refinement", "radiometric_refinement_vignetting", "radiometric_refinement_board_warping"), (n, t) in load_radiometric_refinement_config(experiment_config(x))["cases"]
             @test RadiometricCamera.pipeline_options(t["pipeline"]).lm.max_iter == (isfisheye(n) ? 50 : 25)
         end
         # the non-central spline is out of the paper (owner, 2026-11-11): no case, no chrome evaluation, no table row and no input of it
@@ -188,10 +237,14 @@ end
         # heights as each case states them. The former <base>_warped_print_error cases (radiometric_refinement_warping.toml) were
         # these cases verbatim once the in-plane block was on everywhere: deleted, no copy left.
         @test all(c -> endswith(c, "_warped"), keys(rc["cases"])) && all(c -> endswith(c, "_warped"), keys(rv["cases"]))
+        # the board-warping session's refinements (the supplement's board warping across lenses): the central spline on each of its six sets
+        rb = load_radiometric_refinement_config(projectdir("configs", "experiments", "radiometric_refinement_board_warping.toml"))
+        @test sort(collect(keys(rb["cases"]))) == sort(["bw_$(b)_$(l)_spline_warped" for b in ("ag", "si") for l in lenses])
+        @test all(t -> RadiometricCamera.pipeline_options(t["pipeline"]).camera.fnumber == 10.0, values(rb["cases"]))
         @test !isfile(projectdir("configs", "experiments", "radiometric_refinement_warping.toml"))
         # The global models of the refinements of record (kind = "lens") the heights alone (owner decision 2026-11-16: "heights only for
         # the global models", the warping ablation's `heights` mode): inplane "none", no inplane_start stated.
-        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml")
+        for f in ("radiometric_refinement.toml", "radiometric_refinement_vignetting.toml", "radiometric_refinement_board_warping.toml")
             for (n, t) in TOML.parsefile(projectdir("configs", "experiments", f))["cases"]
                 w = t["pipeline"]["warping"]
                 o = RadiometricCamera.pipeline_options(t["pipeline"])
@@ -240,7 +293,7 @@ end
         c2 = deepcopy(good); c2["prepare"]["fx3_14mm_siemens_central30cm"]["gain"] = 1.0   # its photographs' run moves, so does the case's
         @test k(c2) != k(good)
         # a run is keyed by the inputs its table reads, not by every input of the config
-        other = "aprilgrid400_14mm_ag400_green_bc5_fit_json"                 # ag30_bc5_warped's start, which si30_bc5_warped does not read
+        other = "aprilgrid400_14mm_ag_green_bc5_cv2_json"                    # ag30_bc5_warped's start, which si30_bc5_warped does not read
         c2 = deepcopy(good); c2["inputs"][other]["path"] = "elsewhere/bc5_fit.json"
         @test k(c2) == k(good) && refine_product(c2, "ag30_bc5_warped").key != refine_product(good, "ag30_bc5_warped").key
         # its front end's run (a [runs] entry of frontends.toml) keys it by that run's key: another Schöps run re-keys it
@@ -468,6 +521,8 @@ end
     # the configs of record state their selections: the Tamron 17 cm Siemens folder less its three stray 14 mm photographs (owner, 2026-11-14)
     rc = TOML.parsefile(projectdir("configs", "experiments", "radiometric_refinement.toml"))
     @test rc["inputs"]["raw_tamron_siemens_17cm"]["exclude"] == ["DSC08194.ARW", "DSC08195.ARW", "DSC08196.ARW"]
+    pv = TOML.parsefile(projectdir("configs", "experiments", "panorama_vignetting_fx3_tamron.toml"))                       # the Tamron sweep: all 35 frames
+    @test pv["inputs"]["raw"]["frames"] == ["DSC$(lpad(n, 5, '0')).ARW" for n in 5416:5450]
     # every raw-photo input of every config of record is a folder of the published set (paper-data/…)
     for f in readdir(projectdir("configs", "experiments"); join = true)
         for (id, t) in get(TOML.parsefile(f), "inputs", Dict{String, Any}())   # (an experiment of overrides: the base's inputs)
@@ -557,11 +612,11 @@ end
     files = [joinpath(d, f) for r in roots for (d, _, fs) in walkdir(r) for f in fs if endswith(f, ".jl")]
     offenders = [f for f in files if occursin(r":green_cells|LinearRaw\{:green_cells\}|mode = \"green\"", read(f, String))]
     @test isempty(offenders)
-    # bin2 (the cell grid) is no geometry image: its one consumer, the per-colour panorama vignetting (a documented deviation of 0.11.5),
-    # left the project with the panorama chains (rc-0116) — no config of record decodes it
+    # bin2 (the cell grid) is no geometry image: its one consumer is the per-colour panorama vignetting — exactly its three configs of
+    # record decode it, and no other config of record
     cfgs = [joinpath(d, f) for (d, _, fs) in walkdir(projectdir("configs")) for f in fs if endswith(f, ".toml")]
     bin2 = sort([basename(f) for f in cfgs if occursin(r"(?m)^mode\s*=\s*\"bin2\"", read(f, String))])
-    @test isempty(bin2)
+    @test bin2 == ["panorama_vignetting_fx3_14mm.toml", "panorama_vignetting_fx3_fisheye.toml", "panorama_vignetting_fx3_tamron.toml"]
 
     # the key is the config's statement: every case of the config of record states it, read with no default — a missing one is an
     # error naming the key, and another image (the decoded images' luma, the retired green cells) is refused

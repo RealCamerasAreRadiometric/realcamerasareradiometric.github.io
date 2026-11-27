@@ -19,38 +19,6 @@ lazy = true
     sha256 = "c52f7587d65a08e5bf86e2fd497bd3922bc533f23b4c78af65d67dae5ff2d344"
     url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_calibration_20261029.tar.gz"
 
-[rc_fx3_14mm_20261102]
-git-tree-sha1 = "337ccb5113321db051ff31d1344d658f20717303"
-lazy = true
-
-    [[rc_fx3_14mm_20261102.download]]
-    sha256 = "5d6c206598a8ddec96e7abc50ac445c4361ee3f63785860a8cb8bc82adf76e20"
-    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_fx3_14mm_20261102.tar.gz"
-
-[rc_raw_photos_20261029]
-git-tree-sha1 = "3daf0cc4be884533049186bd375b26bd03d549ba"
-lazy = true
-
-    [[rc_raw_photos_20261029.download]]
-    sha256 = "45fb4562825ace993c42eede09a6e183c2c741a9bc1bc1403c21243ea432f5aa"
-    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_raw_photos_20261029.tar.gz"
-
-[rc_synthetic_20261029]
-git-tree-sha1 = "487fba62e42f77f5601f2c4a60bae9e51733955e"
-lazy = true
-
-    [[rc_synthetic_20261029.download]]
-    sha256 = "5d97075085f42f28301f9d543e96d490e84e803929043454f5e0c70a90f1c6fe"
-    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_synthetic_20261029.tar.gz"
-
-[rc_thorlabs_20261029]
-git-tree-sha1 = "8ffd782872149e21334c6ae76b98ba147f9316c9"
-lazy = true
-
-    [[rc_thorlabs_20261029.download]]
-    sha256 = "c1d90732ab4aead7702a03a2c8c3179cf18ee7cbdfe707ee3b4e37a09384e18a"
-    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_thorlabs_20261029.tar.gz"
-
 [rc_container_schoeps_20261121]
 git-tree-sha1 = "16e701ed62b5e2ada1474d2371927f41cfb5cf3e"
 lazy = true
@@ -67,6 +35,14 @@ lazy = true
     sha256 = "4e5d25a5810a57eb1df1286c5b1d77ab9a612acf613445d309e85afda660becb"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_derived_20261121.tar.gz?download=1"
 
+[rc_derived_20261126]
+git-tree-sha1 = "d274b06b924ba4a015da0247682555d29bf99961"
+lazy = true
+
+    [[rc_derived_20261126.download]]
+    sha256 = "97b1f160aae4a56b73fee0b1a6765b07ec50793c1b16e06217f320c81790fbe4"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_derived_20261126.tar.gz?download=1"
+
 [rc_derived_fisheye2710_20261121]
 git-tree-sha1 = "c8497e34ee8cd445d9a534f122b55204eae169eb"
 lazy = true
@@ -75,6 +51,22 @@ lazy = true
     sha256 = "33e219165c72547645bb71a63cdafbda2b2984bc56ce43165514af16fcfb8016"
     url = "https://zenodo.org/records/ZENODO_RC_GA_B/files/rc_derived_fisheye2710_20261121.tar.gz?download=1"
 
+[rc_derived_supp_20261126]
+git-tree-sha1 = "29160feea370949921c3bab49c6c4cbea38c2aba"
+lazy = true
+
+    [[rc_derived_supp_20261126.download]]
+    sha256 = "e8f3df22222ce5099ba85259a087faccef5c6b1c1bba2b3220c18b843c48730f"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_derived_supp_20261126.tar.gz?download=1"
+
+[rc_fx3_14mm_20261102]
+git-tree-sha1 = "337ccb5113321db051ff31d1344d658f20717303"
+lazy = true
+
+    [[rc_fx3_14mm_20261102.download]]
+    sha256 = "5d6c206598a8ddec96e7abc50ac445c4361ee3f63785860a8cb8bc82adf76e20"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_fx3_14mm_20261102.tar.gz"
+
 [rc_golden_20261121]
 git-tree-sha1 = "71fd4f2c194d4c04c04779e8e5b794e6c3bdb128"
 lazy = true
@@ -82,6 +74,62 @@ lazy = true
     [[rc_golden_20261121.download]]
     sha256 = "fc47819bfc29ba08c1b1f0ee7e07f5a86dbd1b4a1a19c714863924a1822da4a5"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_golden_20261121.tar.gz?download=1"
+
+[rc_raw_board_warping_april_board_14mm_20261126]
+git-tree-sha1 = "341401bd0d1afbe7749061155a67b8ac5ef1e729"
+lazy = true
+
+    [[rc_raw_board_warping_april_board_14mm_20261126.download]]
+    sha256 = "cb481ee79feeb447b58f539b20d8a3710938d24c6b02e0c3b2e053c8b42d4ba3"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_april_board_14mm_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_april_board_fisheye_20261126]
+git-tree-sha1 = "3b94eda42cc8008e5fdd1e9019c4edd79d11f909"
+lazy = true
+
+    [[rc_raw_board_warping_april_board_fisheye_20261126.download]]
+    sha256 = "af120fc067d4927c1dbee5aae62bd6910f253bb09d753f03523857582b7aa0c5"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_april_board_fisheye_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_april_board_fisheye_same_names_20261126]
+git-tree-sha1 = "92ef2265c02f31eb1eb99a3a66f4c95e03216b13"
+lazy = true
+
+    [[rc_raw_board_warping_april_board_fisheye_same_names_20261126.download]]
+    sha256 = "2e6b409098806286b119143b259e5bde05de1108b9e69c0e1c4c04b93d878f4b"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_april_board_fisheye_same_names_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_april_board_tamron_20261126]
+git-tree-sha1 = "170769ca5547bf8327487f061e9a4a06dfdcedc8"
+lazy = true
+
+    [[rc_raw_board_warping_april_board_tamron_20261126.download]]
+    sha256 = "08c141ba1c43bdedcda3e12a84995d1c64521d5c01221c6198a1ec7c660db32a"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_april_board_tamron_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_siemens_board_14mm_20261126]
+git-tree-sha1 = "bc195287035e37ebebf4f653f1241d5c94bf8b4e"
+lazy = true
+
+    [[rc_raw_board_warping_siemens_board_14mm_20261126.download]]
+    sha256 = "852e5f20a269362afa9182bdf986a9229f7ac0452b92b7847087266c050abc31"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_siemens_board_14mm_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_siemens_board_fisheye_20261126]
+git-tree-sha1 = "83add30f0895cbd5d6a8da274c292db1a84d0408"
+lazy = true
+
+    [[rc_raw_board_warping_siemens_board_fisheye_20261126.download]]
+    sha256 = "9783fca294cfb4712b05d24afa64a3cb4b8af5a5825728b686e46b0b2d003b22"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_siemens_board_fisheye_20261126.tar.gz?download=1"
+
+[rc_raw_board_warping_siemens_board_tamron_20261126]
+git-tree-sha1 = "07b58d8ae9bda182a2080fd28ee5ef299d4046a2"
+lazy = true
+
+    [[rc_raw_board_warping_siemens_board_tamron_20261126.download]]
+    sha256 = "8989c6739bd53ed7feccb51c50abdb33e5986a283a9e82169fedd3bea17e9e08"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_board_warping_siemens_board_tamron_20261126.tar.gz?download=1"
 
 [rc_raw_defocus_14mm_calibration_20261121]
 git-tree-sha1 = "1f30aa5a8e0e6fc04f212d0e2e1db4ab17e3d941"
@@ -235,6 +283,14 @@ lazy = true
     sha256 = "0d90b564f0dc3cb281bcf412f15b553e292f27db097ae865cd25d1922c07442a"
     url = "https://zenodo.org/records/ZENODO_RC_GA_A/files/rc_raw_ga_tamron_siemens_stars_20261121.tar.gz?download=1"
 
+[rc_raw_photos_20261029]
+git-tree-sha1 = "3daf0cc4be884533049186bd375b26bd03d549ba"
+lazy = true
+
+    [[rc_raw_photos_20261029.download]]
+    sha256 = "45fb4562825ace993c42eede09a6e183c2c741a9bc1bc1403c21243ea432f5aa"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_raw_photos_20261029.tar.gz"
+
 [rc_raw_vignetting_14mm_diffuser_20261121]
 git-tree-sha1 = "5ad19bf7ba53889fc44e342ad67c2f22e2708e1f"
 lazy = true
@@ -242,6 +298,14 @@ lazy = true
     [[rc_raw_vignetting_14mm_diffuser_20261121.download]]
     sha256 = "82eed0c137f1f2c67a60087587199bc2badda570a45ac268d2b8286570338049"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_raw_vignetting_14mm_diffuser_20261121.tar.gz?download=1"
+
+[rc_raw_vignetting_14mm_panorama_20261126]
+git-tree-sha1 = "038f4b50c54f128d89a0bb3666edda5899b0e7e5"
+lazy = true
+
+    [[rc_raw_vignetting_14mm_panorama_20261126.download]]
+    sha256 = "9519cc034e6969a8a566e0c4e402b7af6dce6fa53f7de24df08cfe6c42470096"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_vignetting_14mm_panorama_20261126.tar.gz?download=1"
 
 [rc_raw_vignetting_14mm_siemens_stars_20261121]
 git-tree-sha1 = "4c463a6e2084b76d8204b359733144d582fb5c00"
@@ -251,6 +315,22 @@ lazy = true
     sha256 = "f170fe1db7d108c7b83647bee4f77f4e485267125875f66a20e5e770a3f95702"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_raw_vignetting_14mm_siemens_stars_20261121.tar.gz?download=1"
 
+[rc_raw_vignetting_fisheye_diffuser_20261126]
+git-tree-sha1 = "696f7d6ece9250e3041b67f29618d79932641c8d"
+lazy = true
+
+    [[rc_raw_vignetting_fisheye_diffuser_20261126.download]]
+    sha256 = "a22e09383ca0b4d7ee7ffecaac38f1cab145bfe8c1550c8c162642ca26d49779"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_vignetting_fisheye_diffuser_20261126.tar.gz?download=1"
+
+[rc_raw_vignetting_fisheye_panorama_20261126]
+git-tree-sha1 = "8e94bf55f1d9dad325420e27b1948f7451b1112e"
+lazy = true
+
+    [[rc_raw_vignetting_fisheye_panorama_20261126.download]]
+    sha256 = "7e7f727ec64ae8efa033b36c501796dfde9c3b92d53446e64cc155f89a985e17"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_vignetting_fisheye_panorama_20261126.tar.gz?download=1"
+
 [rc_raw_vignetting_fisheye_siemens_stars_20261121]
 git-tree-sha1 = "20036b4adc3153c2f00332f29e5e2fb4ff894209"
 lazy = true
@@ -258,6 +338,22 @@ lazy = true
     [[rc_raw_vignetting_fisheye_siemens_stars_20261121.download]]
     sha256 = "af6c38987eda53a2404115fbe2b8b4c10f856ef280acbc6908121e0a9693967b"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_raw_vignetting_fisheye_siemens_stars_20261121.tar.gz?download=1"
+
+[rc_raw_vignetting_tamron_diffuser_20261126]
+git-tree-sha1 = "e7298cefc9c04c9c9071730e558a2d15e24c6de9"
+lazy = true
+
+    [[rc_raw_vignetting_tamron_diffuser_20261126.download]]
+    sha256 = "71a70c648f252456b00f1a5b19f9e79f45a3fd43fbda9f44254dd24eb846c070"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_vignetting_tamron_diffuser_20261126.tar.gz?download=1"
+
+[rc_raw_vignetting_tamron_panorama_20261126]
+git-tree-sha1 = "5db7b39be6cff15a1b2e151b19d9a1ad9f522342"
+lazy = true
+
+    [[rc_raw_vignetting_tamron_panorama_20261126.download]]
+    sha256 = "e4b07c58a66e3dbbabf1e33e9fe61781f725de7d5757c7f99cad886b1f4a058a"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_raw_vignetting_tamron_panorama_20261126.tar.gz?download=1"
 
 [rc_raw_vignetting_tamron_siemens_stars_20261121]
 git-tree-sha1 = "d5d3af0c1bb8a1f96206fe8a41285847ec4021d8"
@@ -275,6 +371,14 @@ lazy = true
     sha256 = "5232b30b6b3a12c75d09ee2f4dec51f48cb7a55f57686222dcff7b2be1b77ce0"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_reference_20261121.tar.gz?download=1"
 
+[rc_sensor_frames_20261121]
+git-tree-sha1 = "4be53e0be63a9234799c068c0a3526ce3f5ac925"
+lazy = true
+
+    [[rc_sensor_frames_20261121.download]]
+    sha256 = "35d59cbdb0efee6f38e517f86b05a06465962c22d5d6c5ea469bb65a3cdf1a53"
+    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_sensor_frames_20261121.tar.gz?download=1"
+
 [rc_sensor_model_20261121]
 git-tree-sha1 = "8a5c8f87642b90ca96f0ee3787f5e81375e348ac"
 lazy = true
@@ -283,14 +387,21 @@ lazy = true
     sha256 = "907cc5a8fae93f1891ab92f5867656c5676c9a872ba2df0515bd82074f4375d0"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_sensor_model_20261121.tar.gz?download=1"
 
-
-[rc_thorlabs_target_20261121]
-git-tree-sha1 = "8cbf4f5ebe4869f715881eff9b96f0bc3dbd2a2f"
+[rc_synthetic_20261029]
+git-tree-sha1 = "487fba62e42f77f5601f2c4a60bae9e51733955e"
 lazy = true
 
-    [[rc_thorlabs_target_20261121.download]]
-    sha256 = "12c887cd6e58382849e3e32885272db63c35c3f76b68435856f5118e63ea70a0"
-    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_thorlabs_target_20261121.tar.gz?download=1"
+    [[rc_synthetic_20261029.download]]
+    sha256 = "5d97075085f42f28301f9d543e96d490e84e803929043454f5e0c70a90f1c6fe"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_synthetic_20261029.tar.gz"
+
+[rc_synthetic_detector_bias_20261126]
+git-tree-sha1 = "91c4bbba49846bdad018e4efaad07056e79e5eae"
+lazy = true
+
+    [[rc_synthetic_detector_bias_20261126.download]]
+    sha256 = "9ffda22ef560fc443876ad06c3d36a022b433f3ff112600634c03a12eead18dd"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_synthetic_detector_bias_20261126.tar.gz?download=1"
 
 [rc_targets_20261122]
 git-tree-sha1 = "8b08931014c046ec44d599fb5b118ae769911182"
@@ -300,10 +411,26 @@ lazy = true
     sha256 = "0f7389a3ebe2041d90e74b9871f0d275a478730449900a6dd074f95a64d84332"
     url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_targets_20261122.tar.gz?download=1"
 
-[rc_sensor_frames_20261121]
-git-tree-sha1 = "4be53e0be63a9234799c068c0a3526ce3f5ac925"
+[rc_targets_mitsuba_20261126]
+git-tree-sha1 = "44d05e8745de7287182d3e1f3dc1c05130e244a5"
 lazy = true
 
-    [[rc_sensor_frames_20261121.download]]
-    sha256 = "35d59cbdb0efee6f38e517f86b05a06465962c22d5d6c5ea469bb65a3cdf1a53"
-    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_sensor_frames_20261121.tar.gz?download=1"
+    [[rc_targets_mitsuba_20261126.download]]
+    sha256 = "88cd28e7a92e768b439c874c7bf506ff0ac30e66c8d27367e1b64ab59f611323"
+    url = "https://zenodo.org/records/ZENODO_RC_SUPP/files/rc_targets_mitsuba_20261126.tar.gz?download=1"
+
+[rc_thorlabs_20261029]
+git-tree-sha1 = "8ffd782872149e21334c6ae76b98ba147f9316c9"
+lazy = true
+
+    [[rc_thorlabs_20261029.download]]
+    sha256 = "c1d90732ab4aead7702a03a2c8c3179cf18ee7cbdfe707ee3b4e37a09384e18a"
+    url = "https://huggingface.co/datasets/radiometric-camera/radiometric-camera-data/resolve/a387eddcb21b0db8e70cdab8696578c05db53f41/rc_thorlabs_20261029.tar.gz"
+
+[rc_thorlabs_target_20261121]
+git-tree-sha1 = "8cbf4f5ebe4869f715881eff9b96f0bc3dbd2a2f"
+lazy = true
+
+    [[rc_thorlabs_target_20261121.download]]
+    sha256 = "12c887cd6e58382849e3e32885272db63c35c3f76b68435856f5118e63ea70a0"
+    url = "https://zenodo.org/records/ZENODO_RC_VIG_DERIVED/files/rc_thorlabs_target_20261121.tar.gz?download=1"

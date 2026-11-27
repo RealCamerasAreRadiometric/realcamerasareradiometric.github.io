@@ -47,7 +47,7 @@
 
     @testset "job names: ror-<driver>-<stage>[-<phase>]" begin
         @test ror_job_base(stage("radiometric_refinement_vignetting")) == "radiometric_refinement-vignetting"
-        @test ror_job_base(stage("radiometric_refinement")) == "radiometric_refinement-start+refine"
+        @test ror_job_base(stage("radiometric_refinement")) == "radiometric_refinement-start+material_grid+refine"
         @test ror_job_base(stage("chrome_evaluation_score")) == "chrome_evaluation-score"
         @test ror_job_base(stage("frontends_detect")) == "frontends-detect"
         @test ror_job_base(stage("setup")) == "env-setup" && ror_job_base(stage("results_branch")) == "paper-results_branch"

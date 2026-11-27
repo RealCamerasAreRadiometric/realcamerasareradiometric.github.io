@@ -1,0 +1,140 @@
+{
+ "sensor": [
+  4256,
+  2848
+ ],
+ "rows": [
+  {
+   "slug": "opencv-aprilgrid-ocv14",
+   "group": [
+    "OpenCV",
+    "AprilGrid"
+   ],
+   "model": "OpenCV-14",
+   "camera": "FOV",
+   "render": "opencv-aprilgrid-ocv14-render.jpg",
+   "panels": [
+    "bias",
+    "pose-geometric",
+    "pose-radiometric",
+    "camera-geometric",
+    "camera-radiometric"
+   ],
+   "bias_kind": "corners",
+   "facts": {
+    "bias": {
+     "images": 10000,
+     "features": 2212808,
+     "cut_px": null,
+     "gross_percent_all_corners": 0.784975470081453,
+     "error": {
+      "n": 2212808,
+      "median": 0.06369466065164725,
+      "mean": 0.16777193131533902,
+      "rms": 2.1288012624391097,
+      "max": 171.22723404287197
+     },
+     "mean_vector": [
+      1.801080094970438e-05,
+      0.0011730529306879628
+     ]
+    },
+    "last_iteration": 36,
+    "pose-geometric": {
+     "n": 44532,
+     "median": 0.02049019649560526,
+     "mean": 0.07279564287124372,
+     "rms": 0.18665166981328266,
+     "max": 3.5025260159186606
+    },
+    "pose-radiometric": {
+     "n": 44532,
+     "median": 0.012296026805094989,
+     "mean": 0.013692767128130218,
+     "rms": 0.016034765208508765,
+     "max": 0.08324680011890402
+    },
+    "camera-geometric": {
+     "n": 44532,
+     "median": 0.20259293147583102,
+     "mean": 0.21352681870017748,
+     "rms": 0.24011682703175094,
+     "max": 0.7025690806398938
+    },
+    "camera-radiometric": {
+     "n": 44532,
+     "median": 0.005127209788762592,
+     "mean": 0.005408298425558951,
+     "rms": 0.006044614888055909,
+     "max": 0.05006386420464513
+    }
+   }
+  },
+  {
+   "slug": "schops-siemensstars-spline-ds",
+   "group": [
+    "Sch\\\"ops",
+    "Siemens stars"
+   ],
+   "model": "Spline",
+   "camera": "Double Sphere",
+   "render": "schops-siemensstars-spline-ds-render.jpg",
+   "panels": [
+    "bias",
+    "pose-geometric",
+    "pose-radiometric",
+    "camera-geometric",
+    "camera-radiometric"
+   ],
+   "bias_kind": "stars",
+   "facts": {
+    "bias": {
+     "images": 5068,
+     "features": 3818865,
+     "cut_px": null,
+     "gross_percent_all_stars": 0.0008117595149344111,
+     "error": {
+      "n": 3818865,
+      "median": 0.02904167477760502,
+      "mean": 0.03179180208888201,
+      "rms": 0.04668190899808147,
+      "max": 23.449784071153697
+     },
+     "mean_vector": [
+      -0.0008689981485277747,
+      -0.00018751349542692894
+     ]
+    },
+    "last_iteration": 25,
+    "pose-geometric": {
+     "n": 145558,
+     "median": 0.0195171400974632,
+     "mean": 0.02180768424501227,
+     "rms": 0.025920740819018167,
+     "max": 0.20893404290123815
+    },
+    "pose-radiometric": {
+     "n": 145557,
+     "median": 0.0055832997026075215,
+     "mean": 0.007760468671519871,
+     "rms": 0.010600536639536933,
+     "max": 0.07431716943520032
+    },
+    "camera-geometric": {
+     "n": 145557,
+     "median": 0.011739275233622077,
+     "mean": 0.015128618651280819,
+     "rms": 0.020365614838433282,
+     "max": 0.20522419496492852
+    },
+    "camera-radiometric": {
+     "n": 145557,
+     "median": 0.011806670224673797,
+     "mean": 0.013226960332400147,
+     "rms": 0.015223015866812399,
+     "max": 0.07812989749869934
+    }
+   }
+  }
+ ]
+}

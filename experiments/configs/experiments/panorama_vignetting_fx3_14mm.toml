@@ -1,0 +1,157 @@
+# Config of record of the pure-rotation sweep of the Sony ILME-FX3 with the Sigma 14 mm F2.8 at f/4, an indoor sweep of 38 frames (the
+# whole folder), captured on 2026-10-29: scripts/panorama_vignetting.jl --config=configs/experiments/panorama_vignetting_fx3_14mm.toml.
+# Its camera is a parametric fit bounded by the sweep's lens coverage (lens_coverage, src/image_region.jl); its frames and rotations
+# are what configs/experiments/panorama_stitching_fx3_14mm.toml composes its panoramas from.
+# The chain is PanoramaStitching's example of record, examples/panorama_vignetting/run.jl (its `run_example`, called by the driver,
+# not copied): the RAW frames decoded by VisualGeometryToolkitFeatures' load_raw (bin2), the rotations (register_rotations), the
+# camera's vignetting from the frames alone, interpolation free (fit_vignetting: every pixel of every frame at its centre is
+# L(R_k·f)·V(u)), the seam scores before and after (score_seams) and the corrected and uncorrected panoramas (render_panorama).
+# [example] is that example's config less what the driver supplies from [inputs] below: the frames' folder, the camera and the
+# frames' sensor record (src/panorama_example.jl PANORAMA_EXAMPLE_INPUTS).
+#
+# Paths are relative to data_root() (VGTK_DATA_ROOT); each input's `tier` is a tier of configs/data_artifacts.toml.
+
+lens_coverage = "image_region:fx3_14mm_f4_20261028"   # the housing cuts the light inside the sensor: the capture session's measured image region ([image_regions]; src/image_region.jl)
+
+[experiment]
+name = "panorama_vignetting"
+
+# ---- the inputs (data_root()-relative), each with the stage that requires it and how it was made -------------------------------
+[inputs.raw]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/14mm/panorama"
+stage = "evaluate"
+provenance = "the 38 raw frames of the indoor pure-rotation sweep (Sony ILME-FX3, Sigma 14 mm lens — EXIF \"DT 14mm F2.8 SAM\" — at f/4, 14-bit ARW 4256 x 2848), captured on 2026-10-29; Hugging Face panorama_good/14mm"
+
+# The parametric lens, not the f/4 refinement's learned spline grid: predictions of a few rim tracks fall beyond the grid's domain,
+# where it has no ray (the image circle reaches beyond it).
+[inputs.lens]
+tier = "rc_baselines"
+path = "geometric_accuracy/records/2710/14mm_kb_fit.json"
+sha256 = "c487d6be5a58ecc00e3e6f8d2fb070ac419966413629ec19955146040ab7437c"
+stage = "evaluate"
+provenance = "the Kannala–Brandt fit of the FX3 + 14 mm to Schöps's Siemens-star detections of the set of 2026-10-27 (vgio/cameras), bounded by the sensor; the driver bounds it by the sweep's lens coverage (lens_coverage; src/panorama_example.jl panorama_lens)"
+
+[inputs.sensor_characterisation]
+tier = "unpublished"
+path = "sensor_characterisation/fx3.sensor_characterisation.gain-exifband-alldarks.json"
+sha256 = "add8fc120b83806d1e70ecf4252a3b0bcf64d9fe007f42886789212f8c155737"
+stage = "evaluate"
+provenance = "the Sony ILME-FX3's sensor characterisation at ISO 100 (vgio/sensor_characterisation), the record the refinements of record read their photographs under ([inputs.fx3_sensor_characterisation] of configs/experiments/radiometric_refinement.toml states how it was made): the sweep's frames are decoded under it — its black, its defects —, as scripts/panorama_stitching.jl requires of the frames the learned V corrects"
+
+[inputs.raw_14mm_diffuser_20261028]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/14mm/diffuser"
+stage = "evaluate"
+provenance = "the diffuser flat-field photographs of the Sigma 14 mm at f/4 in its housing, captured on 2026-10-28 (Hugging Face 28.10.26/14mm/Diffuser): the capture session's coverage frames, named also by radiometric_refinement_vignetting.toml ([image_regions.fx3_14mm_f4_20261028])"
+
+# The sweep's lens coverage (src/image_region.jl): the 14 mm's f/4 sets of 2026-10-28/29 (the vignetting Siemens set, this sweep, the
+# diffuser) were taken in the lens's housing; their coverage is measured once, on the session's diffuser flat DSC04161 — the image
+# region radiometric_refinement_vignetting.toml's f4_14mm case reads (the same frames and settings: the same key).
+[image_regions.fx3_14mm_f4_20261028]
+input = "raw_14mm_diffuser_20261028"
+frames = { "DSC04161.ARW" = "956240cd88fb050058fce081b662b8e0112239c05ae3cad83b344d0c3fc20e0a" }   # the frame's sha256
+image = "raw_green"            # the geometry image: the bilinear green on the raw grid at full resolution
+outlier_halfwidth_px = 1000.0  # raw px: the RANSAC ellipse fit's outlier half-width
+seed = 1                       # the RANSAC ellipse fit's StableRNG seed (radiometric_refinement_vignetting.toml's: the same image region)
+
+# ---- the example's chain (PanoramaStitching examples/panorama_vignetting/run.jl), every setting stated -----------------------------
+[example]
+name = "fx3_14mm_indoor"
+
+[example.inputs]
+raw_extension = ".ARW"
+lens_kind = "cameras"                              # "cameras": a parametric CameraModel store
+lens_camera = "cam"                                # the camera's name in the store
+
+[example.compute]
+device = "cuda"                                    # "cuda" (GPU 0: CUDA_VISIBLE_DEVICES=0) or "cpu": the same kernels
+
+[example.decode]
+mode = "bin2"                                      # Features' load_raw: 2 × 2 Bayer quads (R, mean G, B), the cell grid's map onto the raw ×2 (Features' raw_frame_map): the per-colour image of the sweep, never a geometry image
+gain = 1.0                                         # linear values, 1.0 = the white level
+cache = true                                       # the decoded-RAW cache of the example's set folder
+
+[example.registration]                             # register_rotations (every keyword stated)
+execution_provider = "cuda"                        # LoMa's ONNX Runtime provider: the GPU. "cuda" never falls back: an unavailable provider is an error (Features' resolve_execution_provider)
+tone_percentile = 99.5
+detector_margin_px = 30.0
+asift_tilts = "imas25"
+max_detections = 2048
+selection = "spread"                               # Features' spread_strongest: about max_detections spread over the frame
+detection_image = "tone"                           # sqrt(G / p) at tone_percentile of the decoded frames
+descriptor = "b"
+matcher = "b128"
+min_score = 0.0
+pairs = "all"
+min_inliers = 25
+seed = 1
+outlier_halfwidth_px = 2120.0                      # the pairs' RANSAC scorer is the Student-t + uniform: its outlier half-width, px
+local_optimization_strategy = { type = "irls", loss = "tls" }   # the pairs' RANSAC local optimization (Estimation's strategy table)
+max_trials = 10000
+min_trials = 100
+averaging_optimization_strategy = { type = "irls", loss = "huber", max_iter = 100 }   # the view graph's rotation averaging
+cycle_tol_deg = 2.0                                # the view-graph filters (Estimation's fit_filtered_rotation_averaging): a pair off a 3-cycle by more
+orientation_tol_deg = 5.0                          # than this removed, then a pair off the averaged rotations by more than this
+bundle_optimization_strategy = { type = "triggs", loss = "welsch", efficiency_constant = 2.5 }   # ONE LM run, Welsch at 2.5 × σ̂ (the pairs' pooled scale)
+bundle_max_iter = 300                              # the LM run's iteration cap: above what the sweeps' bundles need to stop on their tolerances (about a hundred iterations), so the cap does not end them
+bundle_ftol = 1.0e-10
+bundle_xtol = 1.0e-10
+near_duplicate_overlap = 0.90                      # a near-duplicate pair shares ≥ 90 % of the smaller footprint (Core's view_overlap); left out of the chaining
+check_tracks = true                                # after the bundle, observations beyond 3.035 σ̂ removed and re-solved, until none (cap 10)
+
+[example.domain]                                   # the pixels an observation may use (fit and seam score)
+saturation_margin_px = 4.5                         # the saturation masks' dilation (camera px) before they are made symmetric over the frames: about 3 × the sweep's rotation-bundle RMS (≈ 1.5 px)
+rim_margin_px = 120.0
+fov_deg = 89.0
+plane = 2                                          # the GREEN plane
+
+[example.vignetting]
+# radial: on an 11-frame run of the 14 mm sweep the free 2-D tensor V put its maximum 522 px from the principal point, was 32 %
+# asymmetric (the radial 8.8 %) and left the seams worse (1.4826·MAD 0.163 against the radial's 0.107; uncorrected 0.183), although
+# it fitted the rows slightly better: two rows of frames 14° apart are not enough pitch diversity
+model = "radial"
+radial_center = "circle_center"                    # the centre of the camera's image circle
+radial_radius = "domain"
+radial_controls = 16
+tensor_box = "domain"
+tensor_controls = [16, 12]
+compare_models = ["tensor_product"]                # also fitted and reported, not used for the renders
+chart_spacing_deg = 1.0
+penalty_order = 3
+penalty_weight = 0.01
+vignetting_penalty_weight = 1.0e-6
+gain_correction = "channel"                        # the frames' exposure gains (g₁ = 1): "none", "frame" (one gain per frame) or "channel" (per frame and colour plane)
+observation_noise = "none"                         # the value's noise alone
+observation_noise_iterations = 1                   # "position" only: its reweight-and-solve cycles after the first solve
+solver = "cg"
+cg_tolerance = 1.0e-9
+cg_max_iter = 40000
+
+[example.seams]
+projection = "equirectangular"
+deg_per_pixel = 0.1
+extent = "coverage"
+chunk = 200000
+
+[example.render]
+up = "level"
+exposure_percentile = 99.5
+white_balance = "daylight"
+cylindrical_deg_per_pixel = 0.08
+cylindrical_max_lat_deg = 60.0
+equal_area_deg_per_pixel = 0.1
+extent = "coverage"
+rectilinear_size = [1920, 1080]
+rectilinear_hfov_deg = 100.0
+
+# ---- the registration's expected rotation-bundle termination (it keys nothing: a statement checked against the run) -------------
+# Every config states it (no default). The evaluate stage compares the bundle's termination — the name of its VisualGeometryToolkitCore
+# ReturnCode, the registration's bundle_return_code — with it and FAILS on a mismatch (src/panorama_example.jl check_registration):
+#   "Success"          the bundle converged;
+#   "MaxIters"         its iteration cap; also [example.registration] bundle_max_iter = 0 (no solve: the start's rotations);
+#   any other ReturnCode name ("Stalled", …) an expected failure, with its reason.
+# scripts/panorama_stitching.jl checks it again on the run it reads ([upstream] panorama_vignetting).
+[expected]
+bundle = "Success"
+reason = "a parametric Kannala-Brandt lens: its domain is the whole image plane, so no start prediction falls outside it"

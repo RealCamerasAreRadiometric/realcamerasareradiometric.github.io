@@ -94,6 +94,26 @@ path = "paper-data/vignetting/14mm/diffuser"
 stage = "detect"
 provenance = "the diffuser flat-field photographs of the Sigma 14 mm at f/4 in its housing, captured on 2026-10-28 with the f/4 Siemens-star set (Hugging Face 28.10.26/14mm/Diffuser): the capture session's coverage frames ([image_regions.fx3_14mm_f4_20261028])"
 
+# the board-warping session of 2026-11-19 (radiometric_refinement_board_warping.toml): the 1 m Siemens-star board photographed with the
+# three lenses, the board in place; the starts of its Siemens cases are made here
+[inputs.raw_14mm_siemens_20261119]
+tier = "rc_raw_photos"
+path = "paper-data/board-warping/siemens-board/14mm"
+stage = "prepare"
+provenance = "the 214 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 14mm F2.8 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Sigma 14 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses"
+
+[inputs.raw_fisheye_siemens_20261119]
+tier = "rc_raw_photos"
+path = "paper-data/board-warping/siemens-board/fisheye"
+stage = "prepare"
+provenance = "the 204 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"DT 8mm F4 SAM\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the 8 mm fisheye, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses"
+
+[inputs.raw_tamron_siemens_20261119]
+tier = "rc_raw_photos"
+path = "paper-data/board-warping/siemens-board/tamron"
+stage = "prepare"
+provenance = "the 203 Siemens-star photographs (Sony ILME-FX3 ARW; EXIF lens \"E 20mm F2.8 F050\", f/10, 0.625 s, ISO 100) of the 1 m Siemens-star board with the Tamron 20 mm, captured on 2026-11-19 in the board-warping session: the board in place for the session's three lenses"
+
 [inputs.siemens_pattern]
 tier = "rc_calibration"
 path = "geometric_accuracy/data/target/siemens_1m/30x30/pattern_1m_30x30_segments_16_apriltag_9.yaml"
@@ -213,6 +233,36 @@ image = "raw_green"               # the geometry image (owner 2026-11-16): Featu
 sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
 gain = "auto"                     # the decode's 99.99th-percentile rule (decode_raw): the frozen 28.10 runs record no gain of their sRGB copies
 lens_coverage = "sensor"   # as radiometric_refinement_vignetting.toml states the set's
+
+# The board-warping session of 2026-11-19 (the lens coverage as radiometric_refinement_board_warping.toml states it: the fisheye's image
+# circle on five evenly spaced frames of the set, the same table, one step). Each set's decode is its lens's set of record's.
+[image_regions.fx3_fisheye_siemens_20261119]
+input = "raw_fisheye_siemens_20261119"
+frames = { "DSC05216.ARW" = "40daf166dded943dc920e9a266768673930ae56ff69a846dc4a2036bf49addfe", "DSC05267.ARW" = "127eca33264a78c06ae0264a1e483c6a868998fc630faa756ccd8bc3b8b4de92", "DSC05318.ARW" = "d18789fcdca7ac893465993d07cb47d8d96e7e03ab288388a24e9c1f21d57a57", "DSC05368.ARW" = "b1774d95bd107752e571cff3424879d8dd05b8a8c4c4748b6a1d384fe32a8f40", "DSC05421.ARW" = "24937b00555cc6540e73a4dab2424dab84aa589ab054b54b86fcad356337d5e1" }   # sha256sum of the share's files
+image = "raw_green"           # the geometry image: the bilinear green on the raw grid at full resolution, as every region of record
+outlier_halfwidth_px = 1000.0  # raw px, as every fisheye region of record
+seed = 1                       # as every region of record
+
+[cases.bw_14mm_siemens]
+raw = "raw_14mm_siemens_20261119"
+image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
+sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+gain = "auto"                     # as the 14 mm set of record, [cases.central30cm_14mm_siemens] (the decode's 99.99th-percentile rule)
+lens_coverage = "sensor"         # the lens lights the whole sensor, as the 14 mm set of record out of its housing
+
+[cases.bw_fisheye_siemens]
+raw = "raw_fisheye_siemens_20261119"
+image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
+sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+gain = "auto"                     # as the fisheye set of record, [cases.fisheye30cm_siemens]
+lens_coverage = "image_region:fx3_fisheye_siemens_20261119"   # the fisheye's image circle lies inside the sensor: the set's measured region
+
+[cases.bw_tamron_siemens]
+raw = "raw_tamron_siemens_20261119"
+image = "raw_green"               # the geometry image (owner 2026-11-16): Features' bilinear green on the raw grid at full resolution, the chrome detect's image
+sensor_characterisation = "fx3_sensor_characterisation"   # each frame read under its sensor model, as the chrome detect reads its photographs
+gain = "auto"                     # as the Tamron set of record, [cases.tamron17_siemens]
+lens_coverage = "sensor"         # the lens lights the whole sensor, as the Tamron's sets of record
 
 # ---- detect: Schöps's camera_calibration ----------------------------------------------------------------------------------------
 # args (the tool's command line, one string): frontends_history/drivers/fe_si7.sh:23 — `--model <its central generic model> --cell_length_in_pixels 150 --num_pyramid_levels 4
@@ -357,6 +407,54 @@ pattern = "siemens_pattern"
 board = "siemens_board"
 image = "schoeps_image"
 args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels 4 --feature_refinement_type gradients_xy --refinement_window_half_extent 10"   # window 10, the frozen default verbatim: no Thorlabs pair, and the Tamron's two geometric-accuracy sets disagree (f/8: 20 over 40; 17 cm: 80 over 40), so the tie-breaks decide on this set's own runs — coverage 98.1 % vs 95.4 % of the sensor at 10 vs 40 (139 vs 163 of 163 localised)
+
+# The board-warping session of 2026-11-19: no chrome set was photographed, so no held-out Thorlabs median chooses a window. Per lens two
+# windows were run on the set itself; the one that registers more photographs with ≥ 20 stars is the window of record, and within 2 %
+# of each other the one of the lower median reprojection error.
+# rationale (window)
+#   question    which refinement window gives the board-warping session's 14 mm start?
+#   hypothesis  the 14 mm's window of record (20 over the frozen default 10) carries over
+#   decides     [schoeps.bw_14mm_siemens_w20]
+#   evidence    this set's runs at 20 and 10 with RC 0.11.5's front end: 214 vs 201 of 214 photographs with ≥ 20 stars, reprojection median 0.209 vs 0.200 px
+#   owner       T. Harder
+#   date        2026-11-20
+#   discussion  the window of [schoeps.central30cm_14mm_siemens_w20], the same lens's start of record
+[schoeps.bw_14mm_siemens_w20]
+images = "bw_14mm_siemens"
+pattern = "siemens_pattern"
+board = "siemens_board"
+image = "schoeps_image"
+args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels 4 --feature_refinement_type gradients_xy --refinement_window_half_extent 20"   # window 20: 214 vs 201 of 214 photographs with ≥ 20 stars at 20 vs 10 (no Thorlabs pair)
+
+# rationale (window)
+#   question    which refinement window gives the board-warping session's fisheye start?
+#   hypothesis  the fisheye's window of record (30 over the default 10) carries over
+#   decides     [schoeps.bw_fisheye_siemens_w30]
+#   evidence    this set's runs at 30 and 10 with RC 0.11.5's front end: 102 vs 47 of 204 photographs with ≥ 20 stars, reprojection median 0.223 vs 0.102 px
+#   owner       T. Harder
+#   date        2026-11-20
+#   discussion  the window of [schoeps.fisheye30cm_siemens_w30], the same lens's start of record; half the photographs register (the fisheye 30 cm set: 162 of 301)
+[schoeps.bw_fisheye_siemens_w30]
+images = "bw_fisheye_siemens"
+pattern = "siemens_pattern"
+board = "siemens_board"
+image = "schoeps_image"
+args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels 4 --feature_refinement_type gradients_xy --refinement_window_half_extent 30"   # window 30: 102 vs 47 of 204 photographs with ≥ 20 stars at 30 vs 10 (no Thorlabs pair)
+
+# rationale (window)
+#   question    which refinement window gives the board-warping session's Tamron start?
+#   hypothesis  a Tamron window of record carries over
+#   decides     [schoeps.bw_tamron_siemens_w20]
+#   evidence    this set's runs at 20 and 40 with RC 0.11.5's front end: 199 vs 203 of 203 photographs with ≥ 20 stars (within 2 %), reprojection median 0.0639 vs 0.0642 px
+#   owner       T. Harder
+#   date        2026-11-20
+#   discussion  the Tamron's sets of record disagree (f/8: 20 over 40; 17 cm: 80 over 40; f/2.8: 10), so the set's own runs decide; 80 was not run
+[schoeps.bw_tamron_siemens_w20]
+images = "bw_tamron_siemens"
+pattern = "siemens_pattern"
+board = "siemens_board"
+image = "schoeps_image"
+args = "--model central_generic --cell_length_in_pixels 150 --num_pyramid_levels 4 --feature_refinement_type gradients_xy --refinement_window_half_extent 20"   # window 20: 199 vs 203 of 203 photographs with ≥ 20 stars at 20 vs 40, the medians 0.0639 vs 0.0642 px: the lower median (no Thorlabs pair)
 
 # ---- init: the index cameras (Estimation's fit; src/parametric_starts.jl fit_start) ----------------------------------------------
 # scoring and max_iter: the retired configs/inputs/parametric_starts.toml [fit] (the pose starts' scorer of record, 8 px; the joint LM's cap);

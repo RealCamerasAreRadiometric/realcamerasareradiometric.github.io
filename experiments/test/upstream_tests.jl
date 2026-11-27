@@ -47,6 +47,11 @@
                  ("src/drivers.jl", "idir = init_start_dir(cfg, _start_init(cfg, name), name; driver, config_path)"),       # start ← init start
                  ("src/drivers.jl", "idir = init_start_dir(cfg, _start_init(cfg, case), case; driver, config_path)"),       # refine ← init start
                  ("src/drivers.jl", "produce_upstream(r.product"),                                            # a [runs.<id>] input
+                 ("src/material_grid.jl", "produce_upstream(start_product(cfg, case)"),                       # material grid ← the case's start (GPU)
+                 ("src/material_grid.jl", "require_prepared(cfg, t, \"the material grid of case \$case\"; driver, config_path)"),   # material grid ← decode
+                 ("src/material_grid.jl", "produce_upstream(material_grid_product(cfg, case)"),               # the refinement's start record ← material grid (GPU)
+                 ("src/material_grid.jl", "produce_upstream(material_grid_part_product(cfg, case, k, parts)"),  # material grid ← the parts of its candidates (GPU)
+                 ("src/drivers.jl", "gdir = material_grid_dir(cfg, case; driver, config_path)"),              # refine ← material grid
                  ("scripts/calibrate.jl", "config_source(CFG, id) for id in table_runs(CFG[\"pipeline\"])"),     # golden case ← its distance map ([runs])
                  ("scripts/calibrate.jl", "resolved(table) = resolve_pipeline(CFG"),                          # its [pipeline]'s run:<id>, produced
                  ("src/chrome_evaluation.jl", "chrome_upstream(cfg, path, \"detect\""),                      # index ← detect
@@ -63,7 +68,20 @@
                  ("src/image_region.jl", "produce_upstream(image_region_product(cfg, n)"),                  # every lens_coverage consumer
                  ("scripts/chrome_evaluation.jl", "produce_upstream(prepare_product(CFG, DETECT.photos)"),   # detect ← decode
                  ("scripts/convergence.jl", "produce_upstream(convergence_product(CFG, case)"),               # figure ← record
-                 ("scripts/texture_recovery.jl", "produce_upstream(texture_product()")]                       # report ← the page solve
+                 ("scripts/texture_recovery.jl", "produce_upstream(texture_product()"),                       # report ← the page solve
+                 ("scripts/texture_recovery.jl", "produce_upstream(report_product()"),                        # the paper's bands ← the report
+                 ("scripts/texture_recovery.jl", "produce_upstream(poses_product()"),                         # the paper's bands ← the poses
+                 ("scripts/board_warping.jl", "refinement_upstream(RC_CFG, RC_PATH, case, \"refine\""),          # the board warping's figure ← the refinements
+                 ("scripts/panorama_stitching.jl", "refinement_upstream(REFINEMENT, REFINEMENT_PATH, CFG[\"maps\"][m][\"case\"], \"refine\""),   # the learned maps ← the refinements
+                 ("scripts/panorama_stitching.jl", "produce_upstream(rooftop_product()"),                     # the panoramas ← the sweep's run (GPU)
+                 ("scripts/panorama_stitching.jl", "produce_upstream(evaluate_product()"),                    # the panoramas ← the learned maps
+                 ("src/panorama_stitching.jl", "produce_upstream(panoramas_product(cfg, up)"),                # a figure ← a lens's panoramas
+                 ("scripts/panorama_figure.jl", "panoramas_upstream(SOURCES[k].config"),                      # the panoramas figure ← the lenses' panoramas
+                 ("scripts/teaser.jl", "panoramas_upstream(PANORAMAS.config"),                                # the teaser ← the lens's panoramas
+                 ("scripts/teaser.jl", "produce_upstream(BANDS.product"),                                     # the teaser ← the learned-texture figure's tables
+                 ("scripts/detector_bias.jl", "produce_upstream(start_product(CFG, c)"),                      # the detector bias's evaluation ← its start
+                 ("scripts/detector_bias.jl", "produce_upstream(refine_product(CFG, c)"),                     # ← its refinement (GPU)
+                 ("scripts/detector_bias.jl", "produce_upstream(detector_bias_evaluate_product(CFG, c)")]     # the detector bias's figure ← the evaluations
         for (f, call) in pairs
             @test occursin(call, src(f))
         end

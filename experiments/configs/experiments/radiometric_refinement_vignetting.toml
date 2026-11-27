@@ -17,6 +17,9 @@ name = "radiometric_refinement"
 [kinds]
 source = "configs/experiments/radiometric_refinement.toml"   # the samples per view of every spline case (owner 2026-11-16 23:30), stated there once
 
+[material_grid]
+source = "configs/experiments/radiometric_refinement.toml"   # the grid every case's material start is searched on (stage material_grid), stated there once
+
 
 [runs.siemens_1m_distance_map]
 config = "configs/experiments/distance_maps.toml"
@@ -229,6 +232,7 @@ type = "pspline"
 order = 3                         # the third differences Δ³ of the grid correction (the grid A/B's winner)
 weight = 0.1
 [cases.f4_fisheye_spline_warped.pipeline.masks]
+lens_coverage_scale = 0.95   # the photometric pixels are sampled inside the measured image circle scaled by 0.95 (T. Harder 2026-11-26; configs/default.toml's 1.0 on the other cases): fitted to the circle's rim, the radial V's outermost nodes zig-zag (a shelf at 0.85–0.92 of the radius, then a steep drop), which shows as arcs at the frames' rims in the panorama; with 0.95 they decline smoothly. Inside 0.8 of the radius V is equal to 0.01; inside the circle the rays agree to 0.14° (median 0.03°) and the focus distance to 1 %
 gradient_bias = 0.0          # α = 0, the uniform draw (owner 2026-11-16, the sampling-strategy record rc-results-0.11/sampling_strategy/record/952231f4538a4b78, uniform best on both cases and metrics: the 14 mm a1 − uniform texture at 1 mm +0.0099 [+0.0092, +0.0106], Thorlabs median +0.0046 [+0.0000, +0.0097]; the fisheye n.s. on the median, +0.040 px at p95)
 seed = 1
 [cases.f4_fisheye_spline_warped.pipeline.rendering]

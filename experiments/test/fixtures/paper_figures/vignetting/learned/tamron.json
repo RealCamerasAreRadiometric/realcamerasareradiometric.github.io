@@ -1,0 +1,57 @@
+{
+    "schema": "vgio/vignetting/v2.0",
+    "generator": {
+        "name": "VisualGeometryToolkitIO",
+        "version": "0.11.0"
+    },
+    "units": {
+        "length": "mm",
+        "time": "s",
+        "angle": "rad",
+        "pixel": "colmap",
+        "density": "dpi",
+        "radiance": "relative",
+        "length_roles": {}
+    },
+    "conventions": {
+        "rotation_encoding": "quaternion_wxyz_hamilton",
+        "transform_convention": "x_to = R * x_from + t",
+        "matrix_layout": "rows",
+        "grid_layout": "row_major",
+        "index_base": 1
+    },
+    "vignetting": {
+        "type": "radial",
+        "degree": 3,
+        "center": [
+            2148.024049752741,
+            1414.3321013787092
+        ],
+        "radius": 2582.520273270542,
+        "chart": "projective",
+        "control_points": [
+            1.0,
+            1.0,
+            0.9711037650061952,
+            0.9088411465491252,
+            0.8432652908694892,
+            0.772407697563931,
+            0.694972800606035,
+            0.6141612723812645,
+            0.5399029263248867,
+            0.4650064195022561,
+            0.3939681903024802,
+            0.32869387144688134,
+            0.2705564950192821,
+            0.22453012382321724,
+            0.17850375262715215,
+            0.1324773814310866,
+            0.08645101023502055,
+            0.04042463903895507,
+            -0.0056017321571104105
+        ]
+    },
+    "provenance": {
+        "source": "the learned vignetting of case f4_tamron_spline_warped: radiometric_camera.json of its refine product 0ca9c03ba11ff939, RadiometricCamera 0.11.5 (2026-11-16)"
+    }
+}

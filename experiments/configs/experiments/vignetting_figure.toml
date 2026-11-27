@@ -1,0 +1,84 @@
+# Config of record of the paper's vignetting figure (scripts/vignetting_figure.jl; src/vignetting_figure.jl): fig:vignetting. Per lens,
+# along the sensor's diagonal through the centre 𝔠 of the vignetting its large-aperture refinement learned, three curves, each over
+# its value at 𝔠: the flat field of a diffuser photograph, the learned vignetting, and the thin lens model's cos⁴α (tan α = distance
+# from 𝔠 / focal length). The stage writes the curves as tables and draws them as the paper's PGFPlots files
+# (src/paper_figures/vignetting.jl): vignetting.tex, vignetting/<panel>-diagonal.tex, vignetting-caption.tex ([figure] asset_dir,
+# [lenses.<lens>] panel).
+#
+# The learned vignetting, the sensor's size, the centre 𝔠 and the lens coverage that ends a diagonal are the refined camera's: read
+# from the camera record of each lens's refinement (its refine product), nothing of them is stated here. Nor is the thin lens
+# model's focal length: it is the refinement case's own (see [lenses]).
+#
+#   julia --project=experiments experiments/scripts/vignetting_figure.jl [--plan] [--force]
+#
+# Paths are relative to data_root() (VGTK_DATA_ROOT).
+
+[experiment]
+name = "vignetting_figure"
+
+# The flat fields: one diffuser photograph per lens, taken at the aperture of the lens's Siemens-star set. Each is read as its lens's
+# refinement read its photographs: the RAW green photosites under the learned camera's own sensor record (RadiometricCamera's
+# photo_set and observe) — no demosaic, no interpolation.
+[inputs.diffuser_14mm]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/14mm/diffuser"
+stage = "figures"
+provenance = "the diffuser flat-field photograph of the Sigma 14 mm F2.8 at f/4 in its housing (Sony FX3 ARW, DSC04161), captured on 2026-10-28 with the f/4 Siemens-star set; Hugging Face 28.10.26/14mm/Diffuser"
+
+[inputs.diffuser_fisheye]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/fisheye/diffuser"
+stage = "figures"
+provenance = "the diffuser flat-field photograph of the Sigma 8 mm F3.5 fisheye at f/4 (Sony FX3 ARW, DSC04166), captured on 2026-10-28 with the f/4 Siemens-star set; Hugging Face 28.10.26/fisheye/Diffuser"
+
+[inputs.diffuser_tamron]
+tier = "rc_raw_photos"
+path = "paper-data/vignetting/tamron/diffuser"
+stage = "figures"
+provenance = "the diffuser flat-field photograph of the Tamron 20 mm F2.8 at f/2.8 (Sony FX3 ARW, DSC04175), captured on 2026-10-28 with the f/2.8 Siemens-star set; Hugging Face 28.10.26/Tamron/Diffuser"
+
+# The lenses. `config` and `case` name the refinement whose camera record is read; `diffuser` the input that holds the lens's one
+# diffuser photograph. `label` is the lens's name over its panel and `caption_label` its name inside the caption's sentence (both
+# "<name>, f/<number>"; a name that is no proper noun starts in lower case inside the sentence). `panel` names the file of the
+# lens's panel, <asset_dir>/<panel>-diagonal.tex; the key of a lens names its table, <key>_diagonal.tsv.
+#
+# The focal length of the thin lens model's curve is the refinement case's own nominal focal length, `[cases.<case>.pipeline.camera]
+# f_mm` of the refinement config the lens names (14.6776, 7.8057 and 21.1975 mm), converted to pixels as the refinement itself
+# converts a focal length: over the pixel pitch of its run's sensor, the case's `sensor_mm` over the photographs' width (1754.7,
+# 933.2 and 2534.2 px). The submitted figure was drawn with 1755.0, 933.2 and 2484.1 px.
+[lenses.fourteen]
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+case = "f4_14mm_spline_warped"
+diffuser = "diffuser_14mm"
+label = "Sigma 14 mm lens, f/4"
+caption_label = "Sigma 14 mm lens, f/4"
+panel = "14mm"
+
+[lenses.fisheye]
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+case = "f4_fisheye_spline_warped"
+diffuser = "diffuser_fisheye"
+label = "Fisheye lens, f/4"
+caption_label = "fisheye lens, f/4"
+panel = "fisheye"
+
+[lenses.tamron]
+config = "configs/experiments/radiometric_refinement_vignetting.toml"
+case = "f4_tamron_spline_warped"
+diffuser = "diffuser_tamron"
+label = "Tamron 20 mm lens, f/2.8"
+caption_label = "Tamron 20 mm lens, f/2.8"
+panel = "tamron"
+
+# The samples along a diagonal.
+[diagonal]
+spacing_px = 2.0               # a sample every 2 px
+blur_px = 9                    # the flat field at a sample: the mean of the green photosites in the 9 × 9 px box about it
+centre_px = 60                 # the flat field's value at 𝔠: the mean of the green photosites within 60 px of 𝔠
+rim_px = 15                    # the diagonal ends 15 px inside the edge of the lens coverage (an image circle's rim is soft)
+
+[figure]
+asset_dir = "vignetting"       # plotsdir("vignetting.tex", "vignetting/<panel>-diagonal.tex", "vignetting-caption.tex"): the paper's src/fig/ layout
+order = ["fourteen", "fisheye", "tamron"]   # the lenses, left to right
+ymax = 1.08                    # the y axis is 0 … 1.08: the curves are 1 at 𝔠
+samples = 260                  # a curve is drawn through about 260 of its diagonal's samples, evenly spaced, the first and the last among them; the caption's agreement is over all of them

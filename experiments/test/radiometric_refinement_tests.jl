@@ -47,7 +47,7 @@
         @test o.io.checkpoint_each && o.io.channel == "G" && o.compute.jacobian_chunk == 4 && runs_on_gpu(t)
         # the inputs the case's table reads key its run, each a declared input; the photographs are the prepare run's (absolute)
         p = resolve_pipeline(rc, t; produce = false)                     # the paths alone: nothing produced (the run inputs are produced only by a run)
-        @test table_inputs(rc, p) == ["central30cm_14mm_central30cm_green_si_bc5_fit_json", "fx3_sensor_characterisation", "siemens_1m_board"]   # the FX3 record: keyed by its sha256
+        @test table_inputs(rc, p) == ["central30cm_14mm_si_green_bc5_cv2_json", "fx3_sensor_characterisation", "siemens_1m_board"]   # the FX3 record: keyed by its sha256
         @test table_runs(t["pipeline"]) == ["fx3_14mm_central30cm_schoeps_green",   # its Schöps start: the front ends' run (frontends.toml), keyed by its key
                                             "siemens_1m_distance_map"]               # its edge.sdf: the board's distance map (distance_maps.toml), keyed by its key
         # the photographs are the RAW input (a photosites set: its prepare run links the RAW files): RC reads them as RAW by their files
@@ -57,7 +57,7 @@
         t2 = deepcopy(t); t2["pipeline"]["io"]["channel"] = "RGB"
         @test resolve_pipeline(rc, t2; produce = false)["io"]["channel"] == "RGB"              # a stated channel is the case's (RC refuses it at the RAW photograph)
         @test all(t -> t["mode"] == "photosites" && !haskey(t, "gain") && !haskey(t, "srgb"), values(rc["prepare"]))
-        @test p["io"]["init"] == "lens:" * rc["inputs"]["central30cm_14mm_central30cm_green_si_bc5_fit_json"]["path"]
+        @test p["io"]["init"] == "lens:" * rc["inputs"]["central30cm_14mm_si_green_bc5_cv2_json"]["path"]
         @test rc["inputs"]["raw_14mm_siemens_central30cm"]["tier"] == "rc_raw_photos"
         @test length(rc["views"]["fx3_14mm_siemens_central30cm_si"]) == 132   # every view with ≥ 20 stars in its front end's start (frontends.toml [schoeps.central30cm_14mm_siemens], owner ruling 2026-11-13) …
         # … but the two the project's Schöps run gives 0 features (no start pose: RadiometricCamera.require_featured_views; owner 2026-11-14)
@@ -115,7 +115,7 @@
         @test length(s.models) == 20 && [m["label"] for m in s.models[1:2]] == ["si30_bc5_start", "si30_bc5_refined"]   # one config per set: every model of the set a row (20 since the pinhole control left, 2026-11-15)
         @test haskey(tc, "detect") && haskey(tc, "index")                                        # the set's own registration
         # the start model is the case's own start (one file, the same input path in both configs)
-        @test tc["inputs"]["bc5_si30"]["path"] == rc["inputs"]["central30cm_14mm_central30cm_green_si_bc5_fit_json"]["path"]
+        @test tc["inputs"]["bc5_si30"]["path"] == rc["inputs"]["central30cm_14mm_si_green_bc5_cv2_json"]["path"]
         # the set is one config: no per-model chrome config is left (2026-11-12)
         @test !any(f -> occursin(r"^chrome_evaluation_fx3_14mm_central30cm_", f), readdir(projectdir("configs", "experiments")))
         # the evaluation is keyed by the refinement's run and the inputs it reads
@@ -151,7 +151,7 @@
     end
 
     @testset "--plan of both drivers lists their stages" begin
-        for (script, config, stages) in (("radiometric_refinement", rpath, ("prepare", "detect", "start", "refine")),
+        for (script, config, stages) in (("radiometric_refinement", rpath, ("prepare", "detect", "start", "material_grid_part", "material_grid", "refine")),
                                          ("chrome_evaluation", tpath, ("detect", "index", "evaluate")))
             cmd = `$(Base.julia_cmd()) --project=$(projectdir()) $(projectdir("scripts", "$script.jl")) --config=$config --plan`
             out = IOBuffer()

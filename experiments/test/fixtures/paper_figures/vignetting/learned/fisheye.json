@@ -1,0 +1,57 @@
+{
+    "schema": "vgio/vignetting/v2.0",
+    "generator": {
+        "name": "VisualGeometryToolkitIO",
+        "version": "0.11.0"
+    },
+    "units": {
+        "length": "mm",
+        "time": "s",
+        "angle": "rad",
+        "pixel": "colmap",
+        "density": "dpi",
+        "radiance": "relative",
+        "length_roles": {}
+    },
+    "conventions": {
+        "rotation_encoding": "quaternion_wxyz_hamilton",
+        "transform_convention": "x_to = R * x_from + t",
+        "matrix_layout": "rows",
+        "grid_layout": "row_major",
+        "index_base": 1
+    },
+    "vignetting": {
+        "type": "radial",
+        "degree": 3,
+        "center": [
+            2129.142574455497,
+            1433.2598172749463
+        ],
+        "radius": 1089.231087305614,
+        "chart": "projective",
+        "control_points": [
+            1.0,
+            1.0,
+            0.9792860185256367,
+            1.019782233003042,
+            0.9932773138609563,
+            0.9393958344236524,
+            0.880436042579679,
+            0.8435849216429836,
+            0.7926000302404482,
+            0.7629902545529514,
+            0.6874212976289612,
+            0.6771619638419785,
+            0.5173322851636688,
+            0.5930554418912555,
+            0.1992563054573035,
+            -0.19454283097664835,
+            -0.588341967410601,
+            -0.9821411038445542,
+            -1.3759402402785075
+        ]
+    },
+    "provenance": {
+        "source": "the learned vignetting of case f4_fisheye_spline_warped: radiometric_camera.json of its refine product 350c8458977a2efb, RadiometricCamera 0.11.5 (2026-11-16)"
+    }
+}

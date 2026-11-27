@@ -49,13 +49,17 @@ for n in names: print(n, round(cases[n].get("pipeline", {}).get("lm", {}).get("m
 # selection (an environment variable, empty = the default):
 #   radiometric_refinement             CHROME_CASES  default: every case
 #   radiometric_refinement_vignetting  VIG_CASES     default: every case (scripts/radiometric_refinement.jl on its own config: the f/4 runs)
-experiment_driver() { case $1 in radiometric_refinement_vignetting) echo "experiments/scripts/radiometric_refinement.jl" ;; *) echo "experiments/scripts/$1.jl" ;; esac; }
+#   radiometric_refinement_board_warping  BW_CASES   default: every case (scripts/radiometric_refinement.jl on its own config: the board-warping session's six sets)
+#   detector_bias                      DETECTOR_BIAS_CASES  default: every case (the two rendered sets)
+experiment_driver() { case $1 in radiometric_refinement_vignetting|radiometric_refinement_board_warping) echo "experiments/scripts/radiometric_refinement.jl" ;; *) echo "experiments/scripts/$1.jl" ;; esac; }
 experiment_config() { echo "experiments/configs/experiments/$1.toml"; }
 experiment_cases() {
   case $1 in
     radiometric_refinement) config_cases "$(experiment_config "$1")" "${CHROME_CASES:-}" ;;
     radiometric_refinement_vignetting) config_cases "$(experiment_config "$1")" "${VIG_CASES:-}" ;;
+    radiometric_refinement_board_warping) config_cases "$(experiment_config "$1")" "${BW_CASES:-}" ;;
     convergence)       config_cases "$(experiment_config "$1")" "${CONVERGENCE_CASES:-}" ;;
+    detector_bias)     config_cases "$(experiment_config "$1")" "${DETECTOR_BIAS_CASES:-}" ;;
     *) echo "unknown per-case experiment $1" >&2; return 2 ;;
   esac
 }
@@ -95,5 +99,7 @@ print("\n".join(names))' "$1" "${WARP_MODES:-}"
 # The front ends' cases a launch runs (configs/experiments/frontends.toml [cases.<set>]): FE_SETS (comma-separated), else every case.
 frontends_cases() { config_cases experiments/configs/experiments/frontends.toml "${FE_SETS:-}"; }
 
+# The panorama-vignetting configs a launch runs: SETS (comma-separated <set> of configs/experiments/panorama_vignetting_<set>.toml).
+PANORAMA_SETS=${SETS:-fx3_14mm,fx3_fisheye,fx3_tamron}
 # The golden calibration cases (configs/calibration/<case>.toml; experiments/test/pipeline/golden/<case>/): GOLDEN_CASES, comma-separated.
 GOLDEN_CASES=${GOLDEN_CASES:-siemens_coarse_full}   # blob_kb and the non-central fisheye_nc_selfcheck are deleted (2026-11-14)

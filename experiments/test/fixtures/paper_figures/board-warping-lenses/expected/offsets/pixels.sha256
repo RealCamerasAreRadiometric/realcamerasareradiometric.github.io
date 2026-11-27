@@ -1,0 +1,7 @@
+# SHA-256 of the decoded pixels (8-bit RGB, row by row, three bytes per pixel), the size (width x height) and the path of each map's image
+d8f02a65847378d34497b998895b26fb464242f6b653be3e2b4ca75a3571f47a  123x123  board-warping-lenses/bw_ag_14mm-minus-bw_ag_tamron.png
+19167bb667ee89086ff205fbd55b242a0e777b85c0d9f4e8eebfbe421e7b1c16  123x123  board-warping-lenses/bw_ag_fisheye-minus-bw_ag_tamron.png
+3f93f3de71f6ff7d1708ef90ea8496fcca2b4039fb31208551c849f42f6c5ee6  123x123  board-warping-lenses/bw_ag_14mm-minus-bw_ag_fisheye.png
+5554d5691b0fd707f86b96cd4966c2d9e8111e351220fb17c477addba74f640b  123x123  board-warping-lenses/bw_si_14mm-minus-bw_si_tamron.png
+b7377c4c86edc2ccc3342b240fce67e6d33119b92b15eed3e4351b7211d94556  123x123  board-warping-lenses/bw_si_fisheye-minus-bw_si_tamron.png
+b7fd8ca4aa12af27a7a7f4458d05243e27d85917331f667ab9a040df925036b7  123x123  board-warping-lenses/bw_si_14mm-minus-bw_si_fisheye.png

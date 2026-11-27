@@ -154,16 +154,25 @@ end
     names = sort([r.name for r in values(regions)])
     # the classification (the coordinator's, job 18294): measured — the 14 mm's f/4 housing session, the fisheye sets; the sessions'
     # shared frames are one step each (the AprilGrid set and its chrome; the fisheye 30 cm front end and its chrome)
-    @test names == ["fx3_14mm_f4_20261028", "fx3_fisheye_aprilgrid_10cm", "fx3_fisheye_siemens_20261028", "fx3_fisheye_siemens_30cm"]
+    # (and the board-warping session's two fisheye sets, each on its own frames)
+    # and the Double Sphere renders of the detector bias (their image disc)
+    @test names == ["fx3_14mm_f4_20261028", "fx3_fisheye_aprilgrid_10cm", "fx3_fisheye_aprilgrid_20261119", "fx3_fisheye_panorama_20261029",
+                    "fx3_fisheye_siemens_20261028", "fx3_fisheye_siemens_20261119", "fx3_fisheye_siemens_30cm", "mitsuba_fisheye_disc"]
     vg = TOML.parsefile(projectdir("configs", "experiments", "radiometric_refinement_vignetting.toml"))
+    pv = TOML.parsefile(projectdir("configs", "experiments", "panorama_vignetting_fx3_14mm.toml"))                       # the 14 mm sweep: the session's step
+    @test image_region_product(pv, "fx3_14mm_f4_20261028").key == image_region_product(vg, "fx3_14mm_f4_20261028").key
+    @test TOML.parsefile(projectdir("configs", "experiments", "panorama_vignetting_fx3_tamron.toml"))["lens_coverage"] == "sensor"
     fe = TOML.parsefile(projectdir("configs", "experiments", "frontends.toml"))
     regions = Dict("fisheye30cm_siemens" => "fx3_fisheye_siemens_30cm", "vig14mm_f4_siemens" => "fx3_14mm_f4_20261028",
-                    "vigfisheye_f4_siemens" => "fx3_fisheye_siemens_20261028")             # the fisheye sets and the 14 mm housing: measured
+                    "vigfisheye_f4_siemens" => "fx3_fisheye_siemens_20261028",             # the fisheye sets and the 14 mm housing: measured
+                    "bw_fisheye_siemens" => "fx3_fisheye_siemens_20261119")
     @test all(((s, t),) -> t["lens_coverage"] == (haskey(regions, s) ? "image_region:" * regions[s] : "sensor"), fe["cases"])
     @test image_region_product(fe, "fx3_14mm_f4_20261028").key == image_region_product(vg, "fx3_14mm_f4_20261028").key       # the vignetting sets' own steps
     @test image_region_product(fe, "fx3_fisheye_siemens_20261028").key == image_region_product(vg, "fx3_fisheye_siemens_20261028").key
     ch = TOML.parsefile(projectdir("configs", "experiments", "chrome_evaluation_fx3_fisheye_30cm_si.toml"))
     @test image_region_product(fe, "fx3_fisheye_siemens_30cm").key == image_region_product(ch, "fx3_fisheye_siemens_30cm").key   # one step, the session's
+    bw = TOML.parsefile(projectdir("configs", "experiments", "radiometric_refinement_board_warping.toml"))
+    @test image_region_product(fe, "fx3_fisheye_siemens_20261119").key == image_region_product(bw, "fx3_fisheye_siemens_20261119").key   # the board-warping session's Siemens set: one step
     @test !isfile(projectdir("scripts", "make_panorama_cameras.jl")) && !isfile(projectdir("src", "panorama_cameras.jl")) &&
           !isfile(projectdir("configs", "inputs", "panorama_cameras.toml"))                                     # the typed-in circles' maker: retired
 end

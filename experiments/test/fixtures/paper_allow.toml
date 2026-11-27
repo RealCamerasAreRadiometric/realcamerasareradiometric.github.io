@@ -31,7 +31,7 @@ file = "../paper/fig/texture-learned.tex"
 match = "\\rcfigdir/texture-learned/"
 
 # A literal that equals a value numbers.tex defines without being that number: TikZ coordinates and scales (fig_model.tex), a weight
-# (calibration_pipeline.tex), a figure's layout (focus-surfaces.tex), the data set's counts (X_suppl.tex) and the supplement tables'
+# (calibration_pipeline.tex), the data set's counts (X_suppl.tex) and the supplement tables'
 # own numbers (typed by refinement_table.py; a table carries its numbers, never macros).
 [[allow]]
 rule = "macro_literal"
@@ -40,10 +40,6 @@ match = "re-types the generated macro"
 [[allow]]
 rule = "macro_literal"
 file = "../paper/sec/calibration_pipeline.tex"
-match = "re-types the generated macro"
-[[allow]]
-rule = "macro_literal"
-file = "../paper/fig/focus-surfaces.tex"
 match = "re-types the generated macro"
 [[allow]]
 rule = "macro_literal"
