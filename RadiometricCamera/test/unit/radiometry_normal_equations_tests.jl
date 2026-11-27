@@ -119,7 +119,7 @@ end
         # the block sweep and the joint solve on the device land where the CPU's do
         for (s_, p_) in ((sc, pc), (sg, pg)); RC.VgtkCore.solve(RC.VgtkCore.EstimationProblem(RadiometryBlocks, (s_.f, s_.u0, p_)), RadiometryBlockDescent(; sweeps = 2)); end
         @test relerr(Matrix(coefficients(sg.u0.light)), Matrix(coefficients(sc.u0.light))) < 1e-10 && abs(sg.u0.mat.diffuse_weight - sc.u0.mat.diffuse_weight) < 1e-10
-        rc = _lm_radiometry!(sc.f, sc.u0, pc; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg.f, sg.u0, pg; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 80))
+        rc = _lm_radiometry!(sc.f, sc.u0, pc; damping = RC.VgtkCore.LevenbergDamping(), stops = RC.VgtkCore.LmStops(; max_iter = 80)); rg = _lm_radiometry!(sg.f, sg.u0, pg; damping = RC.VgtkCore.LevenbergDamping(), stops = RC.VgtkCore.LmStops(; max_iter = 80))
         @test rc[1] == rg[1] == RC.VgtkCore.ReturnCode.Success
         @test relerr(vec(Matrix(control_points(sg.u0.camera.vignetting))), vec(Matrix(control_points(sc.u0.camera.vignetting)))) < 1e-8
     end
