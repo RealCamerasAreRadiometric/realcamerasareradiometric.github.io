@@ -789,7 +789,7 @@ differences, `difference_rows((TW, TH), 1)`, on its device): `main` the unregula
 texels and the operator's mean positive eigenvalue, so β is the stack's normalized weight), each the solve's `FitResult` as it comes back
 (`u` the texture on `op`'s device, `stats.nsteps` the iterations, `successful_retcode` the convergence, `metadata.relres`). `x0` the start; `stops` the solves' Core `ToleranceStops` ([`cgls_stops`](@ref): the config's `[cgls.stops]`; Core's stopping rule,
 relative to the normal equations' right-hand side). A regularised solve
-is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `diagonal`), the
+is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `CGLS(; preconditioner)`), the
 unregularised one never: without the penalty the problem is ill-posed in the texels the rows barely see, and the scaling moves those
 by 10²–10³ (where the unpreconditioned iteration leaves them at the start). The 1 + |weights|
 solves are independent and run at once, each on a worker of its own (RC's `_each_chunk`: on a device, its own stream), `op`'s arrays
@@ -801,7 +801,8 @@ function page_solves(op, b, x0; scale::Real, weights, stops::VgtkCore.ToleranceS
     dA, dD = column_sumsq(op.At; device = be), column_sumsq(op.Dt; device = be)   # diag(AᵀA), diag(DᵀD): the Jacobi diagonals' parts
     RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
     sols = RC._each_chunk(be, ws) do w
-        r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0, diagonal = w > 0 ? dA .+ w .* dD : nothing), VgtkCore.CGLS(); stops)
+        r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0),
+                           VgtkCore.CGLS(; preconditioner = w > 0 ? dA .+ w .* dD : nothing); stops)
         VgtkCore.KA.synchronize(be)                                    # the solution complete on this worker's stream before another task reads `u`
         r
     end

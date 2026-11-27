@@ -310,7 +310,7 @@ function region_layout(region, h::Integer)
     b = VgtkCore.Rect2(region)
     lo = floor.(Int, Tuple(b.origin)); hi = ceil.(Int, Tuple(b.origin) .+ Tuple(b.widths))
     w = hi .- lo
-    n = VgtkCore.Cameras._node_counts(w..., h)                    # Core's ONE node-count rule (FOLLOW-UP Core: public)
+    n = VgtkCore.default_spline_grid(w...; spacing = h)            # Core's ONE node-count rule (⌈wᵢ / h⌉ + 3 per axis, at least 4)
     return (; origin = lo .- ((n .- 3) .* h .- w) .÷ 2, grid_size = n)
 end
 
