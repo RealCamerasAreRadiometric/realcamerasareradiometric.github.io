@@ -1,5 +1,5 @@
-# The refinement LM's termination record (start/prepare.jl `lm_termination`, VisualGeometryToolkitCore's `lmsolve_chart!` on the LM's
-# `LmProblem`): Core 0.11.0 (owner ruling 2026-11-15) — a tolerance stop (the step size `xtol`, the cost decrease `ftol`) is `Success`,
+# The refinement LM's termination record (start/prepare.jl `lm_termination`, VisualGeometryToolkitCore's `LevenbergMarquardt` on the LM's
+# `CalibrationBundle`): Core 0.11.0 (owner ruling 2026-11-15) — a tolerance stop (the step size `xtol`, the cost decrease `ftol`) is `Success`,
 # converged by definition, with no stationarity postcondition; the caps are not converged (one uniform convergence record, Core's).
 @testitem "refinement termination: a step-size stop is Success (Core 0.11.0: a tolerance stop is converged)" setup = [RCFixtures] begin
     using RadiometricCamera: compute_mask, cost, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,
@@ -36,7 +36,7 @@
     # config's question, never the record's), and only one iteration ran
     sa = perturbed()
     ra = _lm_views!(sa.f, sa.u0; stops = RC._calibration_stops(; max_iter = 50, xtol = 1.0e3), damping = VgtkCore.LevenbergDamping(), fixed = only_poses)
-    @test RC.lm_termination(ra) == (VgtkCore.ReturnCode.Success, VgtkCore.IncrementSize) && ra.iterations == 1
+    @test RC.lm_termination(ra) == (VgtkCore.ReturnCode.Success, VgtkCore.IncrementSize) && ra.stats.nsteps == 1
 
     # the control: the LM run to its minimum is Success; the same step-size stop RESTARTED there is the step-size rule
     # (IncrementSize), Success, and leaves the cost where the minimum put it (never higher)
@@ -49,15 +49,11 @@
     @test (code_b, rule_b) == (VgtkCore.ReturnCode.Success, VgtkCore.IncrementSize)
     @test cost(sb.f, sb.u0)[1] <= c_min
 
-    # the problem's kept NLLSsolver cache is built for the damping the solve runs (the optimizer's, λ·I), so it is reused across solves, never
-    # rebuilt per call (RC 0.9.0 review, finding 1): the cache of `LmProblem(…; damping)`, not of Core's default
-    pb, _ = let p = perturbed(); RC.build_problem(p.f, p.u0; damping = VgtkCore.LevenbergDamping(), fixed = only_poses) end
-    @test same_cache_type(pb, VgtkCore.LevenbergDamping()) && !same_cache_type(pb, VgtkCore.MarquardtDamping())
     # no LM iteration: no record (Default, NoRule); the iteration cap is MaxIters
     @test RC.lm_termination(nothing) == (VgtkCore.ReturnCode.Default, VgtkCore.NoRule)
     rc = let p = perturbed(); _lm_views!(p.f, p.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = only_poses) end
     @test_throws MethodError let p = perturbed(); _lm_views!(p.f, p.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), unfixed = (; poses = true)) end            # the retired keyword: no such keyword
-    @test RC.lm_termination(rc) == (VgtkCore.ReturnCode.MaxIters, VgtkCore.IterationCap) && rc.iterations == 1
+    @test RC.lm_termination(rc) == (VgtkCore.ReturnCode.MaxIters, VgtkCore.IterationCap) && rc.stats.nsteps == 1
 end
 
 # The RAW path's LM (Core 0.10.4's downstream run: no RC test ran an LM whose stops carry a residual_resolution > 0): photographs read

@@ -8,7 +8,7 @@ _focus_ab_key_removed(note::AbstractString) =
 const RETIRED_KEYS = (
     ("io", "photosites") => "a RAW photograph is read as one by its file (`load_photo`: VisualGeometryToolkitCore's RawMosaic, its green photosites; " *
                             "`io.channel = \"G\"`), a decoded image as one — never by a flag; delete the key",
-    ("lm", "iterator")   => "the LM is VisualGeometryToolkitCore's one (`lmsolve_chart!`), its damping the algorithm's (`RadiometricCalibration`'s optimizer, Levenberg's λ·I by default); " *
+    ("lm", "iterator")   => "the LM is VisualGeometryToolkitCore's one (its `LevenbergMarquardt`), its damping the algorithm's (`RadiometricCalibration`'s optimizer, Levenberg's λ·I by default); " *
                             "delete the key",
     ("io", "save_init")  => "the start is a step of its own: `bin/refine.jl --stage=start` writes the start record (start.json, state.json, " *
                             "grid.json | lens.json, masks/; a `RadiometricCalibration` start), `--start=<dir>` refines from it; delete the key",
@@ -33,7 +33,7 @@ const RETIRED_KEYS = (
     ("camera", "image_circle_min_hole_area_px") => "the image circle is measured on the rim's log-polar profiles (VisualGeometryToolkitFeatures' " *
                             "`detect_image_circle`), with no dark-region hull and no hole to drop; delete the key",
     ("camera", "image_circle_frames") => "the image region is a step of its own, per capture set: its record " *
-                            "(`measure_image_region` → `save_image_region`, rc/image_region/v1.0) is named by `camera.lens_coverage`, or the " *
+                            "(`measure_image_region` → `save_image_region`, rc/image_region/v2.0) is named by `camera.lens_coverage`, or the " *
                             "lens lights the whole sensor: `camera.lens_coverage = \"sensor\"`",
     ("camera", "image_circle_outlier_halfwidth_px") => "a setting of the image-region step (`measure_image_region`'s `outlier_halfwidth_px`), " *
                             "not of a run: the run reads the step's record through `camera.lens_coverage`; delete the key",

@@ -40,7 +40,7 @@
 
         # the next problem of the session: the material free, μ on (0, 1), no LM log
         s2 = fresh()
-        mv = material_var(first(build_problem(s2.f, s2.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1)))
+        mv = material_var(first(build_problem(s2.f, s2.u0; height_degree = 1)))
         m2 = NL.update(mv, increment(mv))
         @test RC.Θ_m_nonlinear(m2.mat) != RC.Θ_m_nonlinear(mv.mat)                           # Θ_m moves
         @test m2.mat.diffuse_weight < 0.5                                                                 # μ's chart is (0, 1), not the run's (0.6, 1)
@@ -49,13 +49,13 @@
         # … and the run's own problem has them: Θ_m held inside the riding block, μ on the run's bounds
         lp = RC._refinement_lm(settings, RC.PerViewRoute())
         s3 = fresh()
-        prob3, idx3 = build_problem(s3.f, s3.u0; damping = alg.refinement.optimizer.damping, lp.kw...)
+        prob3, idx3 = build_problem(s3.f, s3.u0; lp.kw...)
         mv3 = material_var(prob3)
         @test idx3.free[idx3.material]                                                       # the block stays variable (the warping rides)
         m3 = NL.update(mv3, increment(mv3))
         @test RC.Θ_m_nonlinear(m3.mat) == RC.Θ_m_nonlinear(mv3.mat) && m3.mat.diffuse_weight == mv3.mat.diffuse_weight && m3.surface.h != mv3.surface.h
         s4 = fresh(); s4.f.mu_bounds = settings.material.mu_bounds
-        mv4 = material_var(first(build_problem(s4.f, s4.u0; damping = VgtkCore.LevenbergDamping())))
+        mv4 = material_var(first(build_problem(s4.f, s4.u0)))
         @test NL.update(mv4, increment(mv4)).mat.diffuse_weight >= 0.6                                         # the chart's lower end, the run's 0.6
         _lm_views!(s4.f, s4.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), lm_log = log)
         @test isfile(log) && length(readlines(log)) == 1

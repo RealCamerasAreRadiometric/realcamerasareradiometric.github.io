@@ -45,8 +45,8 @@
             return calibration_problem(board_, st_, camera, poses, with_μ(mat, 0.5), light, targets; masks, backend = cpu, kw...)
         end
         damping = RadiometricRefinement(CalibrationSettings()).optimizer.damping   # the algorithm's default
-        per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; damping, kw...); first_block(prob, get(prob.problem.costs, PerViewResidual{9})))
-        per_tile(p; kw...) = ((prob, _) = build_problem_grid(p.f, p.u0; damping, patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
+        per_view(p; kw...) = ((prob, _) = build_problem(p.f, p.u0; kw...); first_block(prob, filter(c -> c isa PerViewResidual{9}, prob.blocks)))
+        per_tile(p; kw...) = ((prob, _) = build_problem_grid(p.f, p.u0; patch = GRID_PATCH, kw...); first_block(prob, tile_costs(prob)))
 
         # the closed-form radiometry and the parametric (per-view) blocks on Core's lenses: the double sphere (a free board
         # warping), Kannala–Brandt, OpenCV's 14 coefficients, the division lens and a fixed lens

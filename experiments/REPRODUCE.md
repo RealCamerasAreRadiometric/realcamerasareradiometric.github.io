@@ -256,7 +256,7 @@ config of record states it per set, `lens_coverage = "sensor"` (the lens lights 
 `"image_region:<name>"`, its `[image_regions.<name>]` the set's own frames (each pinned by its sha256) and the detector's settings.
 `scripts/image_regions.jl` (`configs/experiments/image_regions.toml`, stage `image_regions` of the stage graph) measures them —
 RadiometricCamera's `measure_image_region`, Features' `detect_image_circle` on the device — into `image_region/detect/<key>/image_region.json`
-(rc/image_region/v1.0); the refinements, the front ends and the chrome evaluations only read the records.
+(rc/image_region/v2.0); the refinements, the front ends and the chrome evaluations only read the records.
 
 **The distance maps.** The printed boards' edge distance maps (RadiometricCamera's `edge.sdf`) are derived files, never inputs of record (owner 2026-11-16): `scripts/distance_maps.jl`
 (`configs/experiments/distance_maps.toml`, stage `distance_maps` of the stage graph) converts each board generator's `sdf.f32` + `sdf.json`

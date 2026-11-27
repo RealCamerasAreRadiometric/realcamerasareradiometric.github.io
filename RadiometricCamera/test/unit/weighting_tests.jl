@@ -22,8 +22,8 @@
     @test RC.cost(sw.f, sw.u0)[1] ≈ sum(sum(abs2, wts[k] .* RC.photometric_residuals(su.f, su.u0)[k]) for k in 1:2) / 2 rtol = 1e-14
     @test RC.data_norm2(sw.f) ≈ sum(sum(abs2, wts[k] .* su.f.ϕ[k]) for k in 1:2) rtol = 1e-14
     # the per-view route: the host residual and the row kernel's Jacobian, each row times its weight
-    pu, _ = RC.build_problem(su.f, su.u0; damping = RC.VgtkCore.LevenbergDamping()); pw, _ = RC.build_problem(sw.f, sw.u0; damping = RC.VgtkCore.LevenbergDamping())
-    cu = get(pu.problem.costs, RC.PerViewResidual{9}); cw = get(pw.problem.costs, RC.PerViewResidual{9})
+    pu, _ = RC.build_problem(su.f, su.u0); pw, _ = RC.build_problem(sw.f, sw.u0)
+    cu = filter(c -> c isa RC.PerViewResidual{9}, pu.blocks); cw = filter(c -> c isa RC.PerViewResidual{9}, pw.blocks)
     for k in 1:2
         vu = NL.getvars(cu[k], pu.variables); vw = NL.getvars(cw[k], pw.variables)
         ru = NL.computeresidual(cu[k], vu...); rw = NL.computeresidual(cw[k], vw...)
@@ -66,7 +66,7 @@ end
     su = RC.calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
     wts = [1.0 .+ 0.5 .* sin.(1:length(p)) for p in su.f.ϕ]
     sw = RC.calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks, weights = wts)
-    pu, _ = build_problem_grid(su.f, su.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); pw, _ = build_problem_grid(sw.f, sw.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    pu, _ = build_problem_grid(su.f, su.u0; patch = (5, 5)); pw, _ = build_problem_grid(sw.f, sw.u0; patch = (5, 5))
     for (tu, tw) in zip(RC.tile_costs(pu), RC.tile_costs(pw))
         w3 = [wts[tw.k][3 * (i - 1) + c] for i in tw.pix for c in 1:3]               # a colour state: three rows per pixel, the view's
         vu = NL.getvars(tu, pu.variables); vw = NL.getvars(tw, pw.variables)
@@ -133,9 +133,9 @@ end
         S = NEScene.SCENE
         state(be) = RC.calibration_problem(S.sc, S.st, RC.with_vignetting(S.camera, su.u0.camera.vignetting), copy(S.poses), su.u0.mat, su.u0.light, S.targets; S.masks, weights = wts, backend = be)
         sc = state(RC.KernelAbstractions.CPU()); sg = state(CUDA.CUDABackend())
-        pc, _ = RC.build_problem(sc.f, sc.u0; damping = RC.VgtkCore.LevenbergDamping()); pg, _ = RC.build_problem(sg.f, sg.u0; damping = RC.VgtkCore.LevenbergDamping())
+        pc, _ = RC.build_problem(sc.f, sc.u0); pg, _ = RC.build_problem(sg.f, sg.u0)
         for k in 1:2
-            rc = get(pc.problem.costs, RC.PerViewResidual{9})[k]; rg = get(pg.problem.costs, RC.PerViewResidual{9})[k]
+            rc = filter(c -> c isa RC.PerViewResidual{9}, pc.blocks)[k]; rg = filter(c -> c isa RC.PerViewResidual{9}, pg.blocks)[k]
             r1, J1 = NL.computeresjac(RC.static(1023), rc, NL.getvars(rc, pc.variables)...)
             r2, J2 = NL.computeresjac(RC.static(1023), rg, NL.getvars(rg, pg.variables)...)
             @test maximum(abs, r1 .- r2) < 2e-3 * max(1.0, maximum(abs, r1)) && norm(J1 - J2) < 2e-3 * norm(J1)

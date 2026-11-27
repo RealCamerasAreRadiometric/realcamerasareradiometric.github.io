@@ -39,7 +39,7 @@ match after their chain-rule factor, and the three LM iterations.
   at the start's μ = 0.55; measured on every summary (Σ, Σ|·|, Σ², the four rows) of all four Jacobians to ≤ 4.1e-14 relative.
 - the non-central r(𝐩) spline on the log chart: the non-central tile's 25 r(𝐩) columns are the old ones times the
   node radii r_i = 0.0386 (1 + 0.05 sin(i + j)) (≤ 2.3e-15).
-- the hard vignetting pin (the default `CalibrationState(…; hard_pin = true)`): one vignetting column fewer in every
+- the hard vignetting pin (then the state constructor's default `hard_pin = true`): one vignetting column fewer in every
   Jacobian (per-view 76 → 75, tiles 290 → 289, 272 → 271, 492 → 491). A pinned state is normalised to V(𝐜) = 1 when it is built,
   so the targets now render V/V(𝐜) (V(𝐜) = 0.9833) and the start's 1.05 × V is the same field, a pure gauge move: the residuals
   carry the μ and lighting offsets only (they move by 0.34 of their scale), and the joint radiometry returns the truth's lighting

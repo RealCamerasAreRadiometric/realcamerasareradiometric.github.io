@@ -5,6 +5,38 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **Breaking: the calibration LMs on Core's block contract (R22: `LmProblem` and `lmsolve_chart!` are Core-internal).** The two LM
+  problems are a `CalibrationBundle` (public: `variables`, `blocks`, the free mask `free`), a `VgtkCore.AbstractBlockProblem` of the
+  block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary), solved by
+  `init(RefineProblem(bundle, bundle.variables), LevenbergMarquardt(; damping); stops, callback)` and `solve!` (`_solve_bundle!`):
+  - `build_problem(f, u0; fixed, height_degree, inplane)` and `build_problem_grid(f, u0; patch, fixed, height_degree, smoothness,
+    inplane)` return `(bundle, idx)`; they take no `damping` (the LM's: `LevenbergMarquardt`'s field, the optimizer's), and its blocks
+    are `bundle.blocks` (`get(problem.problem.costs, T)` → `filter(c -> c isa T, bundle.blocks)`; `tile_costs(bundle)`);
+  - `_lm_views!`, `_lm_tiles!` and the refinement's chunks return the LM's `FitResult` (`retcode`, `stop_rule`, `stats.nsteps`,
+    `metadata.cost` = ‖r‖²) in place of `(; code, rule, iterations, cost)`; `CalibrationMetadata.solver` holds it; `lm_termination`
+    reads `(r.retcode, r.stop_rule)`; `read_back!(f, u0, vars, idx, extract)` takes the solution's variable vector (`r.u`);
+  - the per-iteration callback is Core's `callback = state -> Bool` on an `LmIterationState` (the iterate `state.u`, `cost`,
+    `best_cost`, `damping`, `linear_solves`, `scaling`, `trial_ready`): the trace, the monitor, the `log` lines and the final
+    iteration's mark read the same values from it; `verbose` prints RC's own line per iteration (`_lm_print`, was NLLSsolver's);
+  - the closed-form blocks' joint LM (`JointRadiometry`) is a row problem, `_RadiometryLm{N} <: VgtkCore.AbstractRowProblem{N}`
+    (`chart_size = (1, Val(N))`: its rows stay on the device), solved by `solve(RefineProblem(lm, zero(SVector{N})),
+    LevenbergMarquardt(; damping); stops)`.
+  No number moves: Core builds the same NLLSsolver problem from the same variables and blocks (the golden replay, every leaf `===`).
+- **Breaking: American in identifiers, wave 2 (decision 11; VisualGeometryToolkitCore 0.14, VisualGeometryToolkitIO 0.12).** Core's
+  `pixel_centers` (was `pixel_centres`) and `is_inside_texel_centers`, IO's `meters` (was `metres`), with no alias. The region kinds
+  embed IO's region body, whose polygon now stores its star centre under `"center"`: **`rc/initialization_region/v2.0`** and
+  **`rc/image_region/v2.0`**, each with a v1.0 → v2.0 version step calling IO's `migrate_region` (every other key as stored). A v1.0
+  record reads through it, in place (never rewritten): checked on the 236 published `rc/initialization_region/v1.0` records and the
+  12 `rc/image_region/v1.0` records of the paper's capture sets (each value `===` its v1.0 body's, each file's bytes unchanged), and
+  tested on v1.0 records of a rect, a polygon intersection (its `"centre"`) and an ellipse.
+- **The experiments on the breaking set.** The chrome evaluation's board refit is a row problem (`BoardRows{N} <:
+  AbstractRowProblem{N}`, `solve(RefineProblem(rows, 0), LevenbergMarquardt())`, Core's `LmStops()` as before); the texture solves
+  are `solve(PenalizedLeastSquaresProblem(op, b; w, u0, diagonal), CGLS(); stops = ToleranceStops(; rtol, max_iter))` (was Core's
+  `cgls`), their records unchanged; a `CountedLO` call record is a `FitResult` (`stats.nsteps`); the project's residual statistics
+  are `residual_statistics` (was `residual_summary`, the name of Core's block-contract hook; `src/residual_statistics.jl`); and a
+  table row's legacy retcode spelling (`"converged"`, …: a record before Core 0.14) reads through IO's `termination_from_legacy`
+  (it was refused). The chrome evaluation's tests are a contract test of the grid-pose problem's refit step (`refine!`).
+
 - **Breaking: American in identifiers (owner decision 11).** Core's `SensorCharacterisation` is `SensorCharacterization` and its
   `ModelReason` `NoCharacterisation` is `NoCharacterization`; RC follows, with no alias:
   - the camera option `camera.sensor_characterisation` → `camera.sensor_characterization` (`CameraOptions.sensor_characterization`);

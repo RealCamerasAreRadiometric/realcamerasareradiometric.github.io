@@ -21,7 +21,3 @@ block `j` (`updated_vars` at ±`u`), per unit of `‖u‖`: the reference of an 
 central_difference(res, vars, j, u) =
     (RadiometricCamera.NLLSsolver.computeresidual(res, updated_vars(vars, j, u)...) -
      RadiometricCamera.NLLSsolver.computeresidual(res, updated_vars(vars, j, -u)...)) / (2 * RadiometricCamera.LinearAlgebra.norm(u))
-"""`same_cache_type(p, damping)`: whether the LM problem `p`'s kept NLLSsolver cache is the one an `LmProblem` of its variables and
-blocks builds for `damping` (its cache type is the damping's)."""
-same_cache_type(p, damping) =
-    typeof(VgtkCore.LmProblem(p.problem.variables, p.blocks; fixed = findall(!, p.free), damping).cache) == typeof(p.cache)

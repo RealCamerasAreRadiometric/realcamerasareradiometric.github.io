@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "run.jl"))
 using RadiometricCamera: VgtkCore
 
 function linearization()
-    c = benchmark_board(); s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+    c = benchmark_board(); s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; height_degree = HEIGHT_DEGREE)
     r, vars, flags = first_block(problem, view_blocks(problem))
     pose, dist, foc, ap, m, vg, lt = vars
     dc = RC._ensure_device!(s.f, s.u0); be = s.f.backend; F = VgtkCore.kernel_float(be); G = RC.HIGH_FLOAT

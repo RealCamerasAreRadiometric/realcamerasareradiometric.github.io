@@ -137,8 +137,8 @@ end
         s_gpu = calibration_problem(f.board, f.st, f.camera_t, f.poses, f.mat_t, light_κ, [p[1] for p in ph]; masks, channel = 2,
                                  backend = CUDABackend(; always_inline = true))
         @test s_gpu.f.px == s_cpu.f.px                                                         # the same green photosites
-        prob_c, _ = build_problem(s_cpu.f, s_cpu.u0; damping = VgtkCore.LevenbergDamping()); prob_g, _ = build_problem(s_gpu.f, s_gpu.u0; damping = VgtkCore.LevenbergDamping())
-        rc = get(prob_c.problem.costs, PerViewResidual{9})[1]; rg = get(prob_g.problem.costs, PerViewResidual{9})[1]
+        prob_c, _ = build_problem(s_cpu.f, s_cpu.u0); prob_g, _ = build_problem(s_gpu.f, s_gpu.u0)
+        rc = filter(c -> c isa PerViewResidual{9}, prob_c.blocks)[1]; rg = filter(c -> c isa PerViewResidual{9}, prob_g.blocks)[1]
         r_c = RC.NLLSsolver.computeresidual(rc, RC.NLLSsolver.getvars(rc, prob_c.variables)...)
         r_g = RC.NLLSsolver.computeresidual(rg, RC.NLLSsolver.getvars(rg, prob_g.variables)...)
         @test length(r_c) == length(r_g) == length(s_cpu.f.px[1]) && maximum(abs, r_c .- r_g) < 2e-3 * max(1.0, maximum(abs, r_c))

@@ -172,13 +172,14 @@ end
 """
     _RadiometryLm
 
-The linearization state of the closed-form blocks for Core's chart LM (`lmsolve_chart!`, NLLSsolver): the parts and the measured
+The linearization state of the closed-form blocks, a row problem of `N` unknowns (VisualGeometryToolkitCore's `AbstractRowProblem{N}`: the host
+LevenbergMarquardt solves it, `solve(RefineProblem(lm, zero(SVector{N})), LevenbergMarquardt(; damping); stops)`): the parts and the measured
 values on the device, the base vignetting `vig`, SH coefficients `a` and μ, the vignetting's free directions `Z` (an `NV × NF`
 device matrix: `vec(P) = vec(P₀) + Z y`, the gauge's centre direction absent), the measured channels `chs`, the layout `lay` of the
 chart vector `x = [y; δa; w_μ]` and the work items' partial sums. Its two reductions (`residual_cost!`, `residual_normal_equations!`)
 keep every row on the device; only the `N × N` system reaches the host.
 """
-struct _RadiometryLm{P, R, W, G, A, Z, C, L, B}
+struct _RadiometryLm{N, P, R, W, G, A, Z, C, L, B} <: VgtkCore.AbstractRowProblem{N}
     parts::P
     ϕ::R
     w::W
@@ -190,6 +191,11 @@ struct _RadiometryLm{P, R, W, G, A, Z, C, L, B}
     lay::L
     partials::B
 end
+_RadiometryLm{N}(parts::P, ϕ::R, w::W, vig::G, a::A, μ::Real, Z::Y, chs::C, lay::L, partials::B) where {N, P, R, W, G, A, Y, C, L, B} =
+    _RadiometryLm{N, P, R, W, G, A, Y, C, L, B}(parts, ϕ, w, vig, a, Float64(μ), Z, chs, lay, partials)
+# The workspace holds no rows: the reductions keep them on the state's device (one placeholder row, NLLSsolver's problem needs one), as
+# Estimation's camera-regression refine.
+VgtkCore.chart_size(::_RadiometryLm{N}) where {N} = (1, Val(N))
 
 """
     _radiometry_layout(nv, J, nc; light, mu, chart, mu_bounds) -> NamedTuple
@@ -307,7 +313,7 @@ end
 function _radiometry_lm(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts, lay)
     be = f.backend
     Z = adapt(be, Matrix{Float64}(vignetting_basis(f, θ)))
-    return _RadiometryLm(parts.parts, parts.ϕ, parts.w, VgtkCore.convert_eltype(Float64, θ.camera.vignetting),
+    return _RadiometryLm{lay.N}(parts.parts, parts.ϕ, parts.w, VgtkCore.convert_eltype(Float64, θ.camera.vignetting),
                          SMatrix{3, sh_count(max_degree(θ.light)), Float64}(coefficients(θ.light)), Float64(θ.mat.diffuse_weight), Z, residual_channels(f), lay,
                          VgtkCore.device_zeros(Float64, be, 1 + lay.N + lay.N^2, VgtkCore.reduction_work_items(length(parts))))
 end
@@ -476,7 +482,7 @@ end
                          verbose = false) -> (ReturnCode.T, StopRule)
 
 JOINT least squares over the closed-form blocks — lighting `Θ_l`, vignetting `Θ_v` (on the null space of the gauge V(𝐜) = 1, always
-held) and μ — by the stack's Levenberg–Marquardt, Core's chart LM (`lmsolve_chart!`: NLLSsolver, at the optimizer's `damping`), on the
+held) and μ — by the stack's Levenberg–Marquardt (VisualGeometryToolkitCore's `LevenbergMarquardt` on the row problem `_RadiometryLm`, at the optimizer's `damping`), on the
 precomputed `parts` (no re-rendering). Its normal equations are one reduction kernel on the state's backend
 (`_radiometry_normal_row!`; the precedent of Estimation's camera-regression refine): only the `N × N` step is the host's.
 The flux is BILINEAR in (`Θ_v`, `Θ_l`) and affine in μ, so block coordinate descent ([`RadiometryBlockDescent`](@ref)) creeps
@@ -495,7 +501,7 @@ function _lm_radiometry!(f::CalibrationData, θ::CalibrationParameters, parts::R
     lay = _radiometry_layout(vignetting ? size(Z, 2) : 0, sh_count(max_degree(θ.light)), n_channels(f); light, mu, chart = true, f.mu_bounds)
     lay.N == 0 && return (VgtkCore.ReturnCode.Success, VgtkCore.ClosedForm)
     lm = _radiometry_lm(f, θ, parts, lay)
-    x, iterations, record = _radiometry_chart_lm(lm, Val(lay.N), _lm_stops(f, stops), damping)
+    x, iterations, record = _radiometry_chart_lm(lm, _lm_stops(f, stops), damping)
     # the solution onto the state, as the kernels' trial: V's nodes P₀ + Z y, the measured channels' SH coefficients (the
     # others follow them), μ on its chart
     vignetting && set_vignetting!(θ, with_control_points(θ.camera.vignetting, vec(Matrix{Float64}(control_points(θ.camera.vignetting))) + Z * x[1:lay.nv]))
@@ -508,13 +514,11 @@ function _lm_radiometry!(f::CalibrationData, θ::CalibrationParameters, parts::R
                        Int(mu), iterations, record[1], record[2])
     return record
 end
-# The chart LM at N unknowns — a function barrier static in N, at the stops (their residual resolution the state's, `_lm_stops`)
-# and the damping. The workspace holds no rows: the state's reductions keep them on its device (one placeholder row, NLLSsolver's
-# problem needs one), as Estimation's camera-regression refine.
-function _radiometry_chart_lm(lm::_RadiometryLm, ::Val{N}, stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping) where {N}
-    ews = VgtkCore.ManifoldLmWorkspace(1, Val(N))
-    x, _, _, iterations, record = VgtkCore.lmsolve_chart!(ews, lm, stops, damping)
-    return x, iterations, record
+# The LM of the row problem at N unknowns from the chart origin — a function barrier static in N, at the stops (their residual
+# resolution the state's, `_lm_stops`) and the damping: the solution chart vector, the accepted iterations and the termination record.
+function _radiometry_chart_lm(lm::_RadiometryLm{N}, stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping) where {N}
+    r = VgtkCore.solve(VgtkCore.RefineProblem(lm, zero(SVector{N, Float64})), VgtkCore.LevenbergMarquardt(; damping); stops)
+    return r.u, r.stats.nsteps, (r.retcode, r.stop_rule)
 end
 
 """

@@ -39,7 +39,7 @@ end
     @test coverage_region(st.camera) == sensor ∩ VgtkCore.lens_coverage(src)
     @test sensor ⊆ VgtkCore.valid_domain(VgtkCore.model(st.camera))
     @test check_coverage(st.camera, sensor; who = "test") == sensor
-    px = VgtkCore.pixel_centres(sensor, 1:W, 1:H)
+    px = VgtkCore.pixel_centers(sensor, 1:W, 1:H)
     @test all(r -> all(isfinite, r), VgtkCore.backproject(VgtkCore.model(st.camera), px; device = CPU()))
     circle = VgtkCore.Ellipse(VgtkCore.Point2(320.0, 240.0), 300.0, 260.0, 0.0)
     sc = _exact_start(src; coverage = circle)
@@ -139,7 +139,7 @@ end
     @test host.resample.max_px < 1e-6
     @test dev.resample.max_px < 1e-6                                           # the device's resample, by the host tests' bound
     sensor = VgtkCore.Rect(0.0, 0.0, Float64(W), Float64(H))
-    px = VgtkCore.pixel_centres(sensor, 1:4:W, 1:4:H)
+    px = VgtkCore.pixel_centers(sensor, 1:4:W, 1:4:H)
     rh = VgtkCore.backproject(VgtkCore.model(host.lens), px; device = CPU())
     rd = VgtkCore.backproject(VgtkCore.model(dev.lens), px; device = CPU())   # the device's start, its rays evaluated on the host
     @test all(r -> all(isfinite, r), rd)

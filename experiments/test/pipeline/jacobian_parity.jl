@@ -42,7 +42,7 @@ function jacobian_parity(root, images, nviews = 2)
     meta = s.f.start
     # the problem as the RadiometricCalibration solve builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
     lp = RC._refinement_lm(settings, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
-    problem(st) = RC.build_problem_grid(st.f, st.u0; damping = alg.refinement.optimizer.damping, kw...)
+    problem(st) = RC.build_problem_grid(st.f, st.u0; kw...)
     host(st) = (h = typeof(st.f)(ntuple(i -> getfield(st.f, i), fieldcount(typeof(st.f)))...); h.backend = RC.KernelAbstractions.CPU(); h.device_cache = nothing;
                 VgtkCore.RefineProblem(h, st.u0))   # the data on the host, the same parameters
 

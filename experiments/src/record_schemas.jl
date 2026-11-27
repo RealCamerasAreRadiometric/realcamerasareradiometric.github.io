@@ -2,7 +2,7 @@
 # src/record_schemas.jl — the schemas of the experiments' own result records, ONE table (as RadiometricCamera's RECORD_SCHEMAS):
 # VisualGeometryToolkitIO 0.10's `write_record` requires each record's `schema` ("<owner>/<kind>/v<major>.<minor>") and writes
 # the envelope (generator, units, conventions) itself. Included by the prelude (src/experiments.jl) and by the modules that write a
-# record (src/evaluation.jl), as src/residual_summary.jl is.
+# record (src/evaluation.jl), as src/residual_statistics.jl is.
 # =============================================================================
 const EXPERIMENT_RECORD_SCHEMAS = (
     chrome_evaluation = "experiments/chrome_evaluation/v2.0",

@@ -19,7 +19,7 @@
 # reads — the frames (the folder's tier and path, each frame's sha256), the detector's settings and the code of the packages it runs
 # (`IMAGE_REGION_CODE`) — never by the config or the region's name: two configs naming the same frames read the one step.
 # scripts/image_regions.jl measures every region its config's configs name (RadiometricCamera's `measure_image_region`: Features'
-# detect_image_circle on the device), writing the rc/image_region/v1.0 record (RadiometricCamera's `save_image_region`, through
+# detect_image_circle on the device), writing the rc/image_region/v2.0 record (RadiometricCamera's `save_image_region`, through
 # IO); every consumer only reads it (`lens_coverage_record`, `lens_coverage_region`), and one whose record is missing fails, naming
 # the stage to run. Included at the end of src/drivers.jl.
 # =============================================================================
@@ -30,7 +30,7 @@ import StaticArrays
 const IMAGE_REGION_KEYS = ("input", "frames", "image", "outlier_halfwidth_px", "seed")
 "A `lens_coverage` naming a measured image region of the config: `image_region:<name>`."
 const IMAGE_REGION_REF = r"^image_region:([A-Za-z0-9_]+)$"
-"The record a measured image region's step writes (rc/image_region/v1.0), the file every consumer reads."
+"The record a measured image region's step writes (rc/image_region/v2.0), the file every consumer reads."
 const IMAGE_REGION_FILE = "image_region.json"
 "The driver that measures every image region, and its config of record (what an on-demand measurement records as its producer)."
 const IMAGE_REGIONS_DRIVER = "scripts/image_regions.jl"

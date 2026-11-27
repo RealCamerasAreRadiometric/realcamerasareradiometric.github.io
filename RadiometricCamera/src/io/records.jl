@@ -6,7 +6,8 @@
 #   rc/radiometric_camera/v3.1   a CalibratedCamera         {<VisualGeometryToolkitIO's envelope>, <camera body>, "observation_model", "settings"}
 #   rc/radiometric_target/v2.0   a RadiometricTarget        {<VisualGeometryToolkitIO's envelope>, <target body>}
 #   rc/run_parameters/v4.0       a refinement's run         {<VisualGeometryToolkitIO's envelope; units.length "m">, <what the run was given and measured>}
-#   rc/initialization_region/v1.0  the grids' start region  {<VisualGeometryToolkitIO's envelope>, "initialization_region" VisualGeometryToolkitIO's region body} (initialization_region.json)
+#   rc/initialization_region/v2.0  the grids' start region  {<VisualGeometryToolkitIO's envelope>, "initialization_region" VisualGeometryToolkitIO's region body} (initialization_region.json)
+#   rc/image_region/v2.0         a capture set's measured image region  {<VisualGeometryToolkitIO's envelope>, "lens_coverage" VisualGeometryToolkitIO's region body, …} (image_region.json)
 #   rc/calibration_state/v3.1    a refinement's state       {<VisualGeometryToolkitIO's envelope>, "camera", "target", "poses", "light", "settings", "observation_model"[, "page_flip"]}
 #
 # VisualGeometryToolkitIO's envelope (`write_record(path, record; style)`): the `schema`, the `generator`, ONE `units` object
@@ -47,14 +48,14 @@ earlier version (an earlier release's, on an earlier envelope) is refused by nam
 const RECORD_SCHEMAS = (radiometric_camera = "rc/radiometric_camera/v3.1", radiometric_target = "rc/radiometric_target/v2.0",
                         calibration_state = "rc/calibration_state/v3.1", run_parameters = "rc/run_parameters/v4.0",
                         # the initialization region of the grid cameras in a directory (initialization_region.json): their start's region
-                        initialization_region = "rc/initialization_region/v1.0",
+                        initialization_region = "rc/initialization_region/v2.0",
                         # the run's reports (VisualGeometryToolkitIO's `write_record` states every file's schema): the self-check's summary and per-view
                         # vectors (selfcheck.json, selfcheck_vectors.json)
                         selfcheck = "rc/selfcheck/v1.0", selfcheck_vectors = "rc/selfcheck_vectors/v1.0",
                         # the start of a refinement (start.json of a start record: start/start_record.jl)
                         refinement_start = "rc/refinement_start/v1.0",
                         # the measured image region of a capture set (its keyed step: start/image_region.jl; camera.lens_coverage)
-                        image_region = "rc/image_region/v1.0")
+                        image_region = "rc/image_region/v2.0")
 
 # the pixel frame RC's models are in (frames rule 1), `PixelFrame{:colmap}`: every record declares it
 # The style of an RC record with lengths in `u`: its `units` object (VisualGeometryToolkitIO's envelope) declares `u` and the COLMAP pixel frame.
@@ -125,7 +126,7 @@ end
 
 function _camera_from_body(s::VgtkIO.VgioStyle, r)
     lens = _lens_from_body(s, r.camera, r.aperture)
-    return RadiometricCameraModel(lens, _focus_from_body(r.focus), VgtkIO.metres(r.aperture.radius, s.length_unit),
+    return RadiometricCameraModel(lens, _focus_from_body(r.focus), VgtkIO.meters(r.aperture.radius, s.length_unit),
                                   JSON.lift(s, AbstractVignetting, r.vignetting))
 end
 
@@ -171,7 +172,7 @@ function JSON.lift(s::VgtkIO.VgioStyle, ::Type{RadiometricTarget}, b)
     target = haskey(b, :target) ? JSON.lift(s, VgtkCore.AbstractTarget, b.target) : nothing
     rad = TargetRadiometry(_material_from_body(b.material), VgtkIO.read_length(b.ink_spread::Real, u),
                            _print_blur(s, b.print_blur))   # (on the board's plane: m² quantities back)
-    h = SVector{HEIGHT_NC}(Float64[VgtkIO.metres(x, u) for x in b.warping::Vector{Any}])
+    h = SVector{HEIGHT_NC}(Float64[VgtkIO.meters(x, u) for x in b.warping::Vector{Any}])
     aspect = haskey(b, :warping_aspect) ? Float64(b.warping_aspect::Real) : nothing   # (a warped target without one: an ArgumentError)
     inplane = haskey(b, :inplane_print_error) ? _inplane_from_body(s, b.inplane_print_error) : zero(SVector{INPLANE_NC, Float64})
     return RadiometricTarget(target, h, aspect, rad; inplane)
@@ -336,6 +337,17 @@ function _run_parameters_v4(t::AbstractDict)
     return t
 end
 VgtkIO.migrate_schema(::Val{Symbol("rc/run_parameters/v3.0")}, t::AbstractDict) = _run_parameters_v4(t)
+# ---- the version step of the region bodies (owner decision 11, VisualGeometryToolkitIO 0.12): rc/initialization_region and rc/image_region v1.0 → v2.0 ----
+# The two kinds embed VisualGeometryToolkitIO's region body, whose polygon stores its star centre under "center" (it was "centre"):
+# VisualGeometryToolkitIO's `migrate_region`, the one step body of an embedding kind, renames it through every intersection's parts.
+# Every other key and value as stored (a rect, an ellipse, a circle: unchanged), so a v1.0 record reads as it did.
+function _region_v2(t::AbstractDict, kind::Symbol, key::String)
+    t = Dict{String, Any}(t); t["schema"] = RECORD_SCHEMAS[kind]
+    t[key] = VgtkIO.migrate_region(t[key])
+    return t
+end
+VgtkIO.migrate_schema(::Val{Symbol("rc/initialization_region/v1.0")}, t::AbstractDict) = _region_v2(t, :initialization_region, "initialization_region")
+VgtkIO.migrate_schema(::Val{Symbol("rc/image_region/v1.0")}, t::AbstractDict) = _region_v2(t, :image_region, "lens_coverage")
 # The removed kind rc/focus_ab (the focus A/B experiment's report, focus_ab.json) is refused by name wherever a record is read
 # through its version step (`VgtkIO.read_record`): the experiment is decided and the report is no longer written or read.
 _refuse_focus_ab() = throw(ArgumentError(
@@ -353,7 +365,7 @@ const INITIALIZATION_REGION_FILE = "initialization_region.json"
 
 The initialization region `region` (any of VisualGeometryToolkitCore's regions, in pixels: a `Rect2`, an `Ellipse`, a `Circle`, their `RegionIntersection`
 or the `WholePlane`) of the grid cameras the pipeline writes in `dir` — the start's, where every one of them is defined as a start — as
-`dir/initialization_region.json`, an `rc/initialization_region/v1.0` record (VisualGeometryToolkitIO's region body). Written beside every grid the
+`dir/initialization_region.json`, an `rc/initialization_region/v2.0` record (VisualGeometryToolkitIO's region body). Written beside every grid the
 pipeline writes (the saved initialization, the checkpoints, the result), so each is a valid start ([`load_start`](@ref)).
 """
 function save_initialization_region(dir::AbstractString, region)
@@ -366,7 +378,8 @@ end
 """
     stored_initialization_region(grid_path) -> region
 
-The initialization region of the grid camera record `grid_path`: the `rc/initialization_region/v1.0` record beside it
+The initialization region of the grid camera record `grid_path`: the `rc/initialization_region/v2.0` record beside it (a v1.0 record
+reads through its version step)
 (`initialization_region.json`, [`save_initialization_region`](@ref)), any of VisualGeometryToolkitCore's regions. A grid without one (a run from a
 parametric start, defined by its own valid domain, records none) is an `ArgumentError` — a stored grid start never falls back to the
 whole sensor.
@@ -376,7 +389,7 @@ function stored_initialization_region(grid_path::AbstractString)
     if !isfile(f)
         again = _regenerate_hint(grid_path, "re-run the start that wrote it (its options' bin/refine.jl --stage=start)")
         throw(ArgumentError("$grid_path: no $INITIALIZATION_REGION_FILE beside it — a stored grid start is defined only on its run's " *
-                            "initialization region (rc/initialization_region/v1.0), never the sensor by default; a grid of an earlier run " *
+                            "initialization region (rc/initialization_region), never the sensor by default; a grid of an earlier run " *
                             "(of an earlier release, the region in its parameters.json) is regenerated: $again; a run from a parametric start " *
                             "records none"))
     end
@@ -387,7 +400,7 @@ end
 """
     save_image_region(path, m; provenance = (;))
 
-The measured image region `m` of a capture set ([`measure_image_region`](@ref)'s result) as an `rc/image_region/v1.0` record
+The measured image region `m` of a capture set ([`measure_image_region`](@ref)'s result) as an `rc/image_region/v2.0` record
 (VisualGeometryToolkitIO's `write_record`): `lens_coverage` the region (VisualGeometryToolkitIO's region body, a leaf: the measured `Ellipse`, COLMAP pixels of the raw grid),
 `extent` the photographs' `[W, H]`, `frames` the photographs it was measured on and the detector's diagnostics (`center_scale`,
 `axes_scale` px, `inliers` of `candidates` rim candidates, the largest `rim_gap` rad, `cut` by the frame). Read by
@@ -406,7 +419,7 @@ end
 """
     load_image_region(path) -> (; lens_coverage, extent, frames, record)
 
-The `rc/image_region/v1.0` record `path` ([`save_image_region`](@ref)): its measured lens coverage (an `Ellipse` or a `Circle`,
+The `rc/image_region/v2.0` record `path` ([`save_image_region`](@ref); a v1.0 record reads through its version step): its measured lens coverage (an `Ellipse` or a `Circle`,
 COLMAP pixels), the photographs' `(W, H)`, the frames it was measured on, and the record as read. Another schema is an
 `ArgumentError` naming it.
 """

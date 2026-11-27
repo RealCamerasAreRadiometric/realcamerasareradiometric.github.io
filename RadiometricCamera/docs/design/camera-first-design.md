@@ -38,7 +38,7 @@ Contents: 1 architecture map · 2 building a camera · 3 findings · 4 the textu
 | `EnvironmentLight` | spherical harmonics on a sphere | Core | yes | `T` |
 | `Scene` | board + image size + surface | RC | adapted | `T` |
 | `RenderSettings` | sensor rule, aperture rule, radiance sampler | RC | yes | `T` |
-| `CalibrationState` | mutable: scene, settings, ONE camera, the poses, material, light, masks, measured vectors ϕ, weights, backend, device cache, run record | RC | no | Float64 |
+| `CalibrationData` + `CalibrationParameters` (was one state) | mutable: scene, settings, ONE camera, the poses, material, light, masks, measured vectors ϕ, weights, backend, device cache, run record | RC | no | Float64 |
 | `RadianceJac{T}` | a ray's record `[L | ∂L/∂ℓ | 𝐱 | 𝐧]` (33 numbers) | RC | yes | kernel float |
 | `PixelParts` | a pixel's light responses per sensor sample (the linear blocks' rows) | RC | yes | kernel float |
 
@@ -76,7 +76,7 @@ One linearization of a block (a view; in the grid route a view's batch, then its
   nodes; one `PerTileResidual` per image tile (10 blocks: pose, 4 patches, focus, r, material, V, light). A view's
   kernels run once for the whole view (`_view_batch!`, memoized by the variables' identity); each tile then runs the row
   kernel on its pixels and its own products.
-- **LM**: Core's `lmsolve_chart!` on NLLSsolver (Levenberg λ·I). NLLSsolver linearizes at the first trial of each
+- **LM**: Core's `LevenbergMarquardt` on NLLSsolver (Levenberg λ·I), the problem a `CalibrationBundle` (the block contract). NLLSsolver linearizes at the first trial of each
   iteration (cost, gradient and Hessian in one call), so an accepted iteration is ONE linearization per block and
   nothing else; a rejected trial is a flux kernel.
 - **Closed form** (`RadiometryBlocks`: `RadiometryBlockDescent`, `JointRadiometry`): `all_parts` renders every pixel's parts once (Float64 on every backend);
@@ -200,7 +200,7 @@ Ranked by measured gain. "Done" items are commits on the branch; the rest are re
 | 4 | The material's 8 slots are linear in the recorded radiance partials: ∂Φ/∂α_ink = Σ w V G_α · ∂α/∂α_ink, likewise η | derivation; chunks 5 F32 launches of 4 slots | emit the 12 material sums from the record kernel (the same accumulation as the flux, a wider "L"); and ONE t̂ slot instead of one per sensor sample | device chunks 7 → 4 launches; small after A–B (chunks are now ~10 % of a view) | low-medium | none |
 | 5 | Closed form on a device downloads the design matrices for QR (398 MB of host allocation per closed-form solve at 228 k px) | benchmark `linear_blocks` bytes | solve Θ_l, Θ_v from the reduction kernel's normal equations with a rank-revealing factorization of the `N × N` system (the joint solve already does) | host memory; time small | medium: the QR's handling of unsupported V nodes must be reproduced; goldens of the closed form would move | none |
 | 6 | Host allocation per linearization: the record buffer is allocated and zeroed per view per call (CPU: 2.3 GB per full view) | benchmark `view_jacobian` bytes | reuse per-task buffers as the Jacobian's already do (`_jacobian_buffers`) | GC pressure; a few % | low | none |
-| 7 | `CalibrationState.backend::Any`, `device_cache::Any` (a NamedTuple grown by `merge`), `start::Any` | `cost(state)` infers `Tuple{Any, Any}`, `all_parts(state)` an abstract `RadiometryParts` | a type parameter for the backend; a small mutable `DeviceCache` struct with typed optional fields | none measurable (function barriers hold); clarity, fewer locks around `merge` | low | none (internal fields) |
+| 7 | `CalibrationData.backend::Any`, `device_cache::Any` (a NamedTuple grown by `merge`), `start::Any` | `cost(state)` infers `Tuple{Any, Any}`, `all_parts(state)` an abstract `RadiometryParts` | a type parameter for the backend; a small mutable `DeviceCache` struct with typed optional fields | none measurable (function barriers hold); clarity, fewer locks around `merge` | low | none (internal fields) |
 | 8 | `Φ_pixel` allocates 4.4 kB per call on the cluster's Julia 1.13.3 (0 B on 1.13.4 locally) | benchmark `pixel` bytes | investigate when 1.13.4 is on the cluster; likely an escape-analysis difference in `View(pose, camera)` | host-only path | — | none |
 | 9 | `src/experiments/` (focus-ab) lives inside the package's hot path: `t̂(camera, 𝐩)` branches on `focus.kind` per sensor sample | code | when the experiment is decided, make the chart a type parameter of `Focus` (dispatch, no branch) or remove kinds 1–2 | small; simplicity | done: kinds 1–2 and `src/experiments/` removed (section 6, decision 5) | internal |
 | 10 | `closed_form.jl` holds `pixel_parts`/`_linear_rows` (image formation) beside the solves | layout | move the parts to `image_formation/parts.jl` | none; layout | trivial | none |

@@ -382,7 +382,7 @@ function arrow_wheel_figure(rows; size, cells_x::Integer, len_cells_x::Integer, 
             La = hypot.(dx, dy)
             sub = @sprintf("%d of %d shown (one per %.0f-px cell) · all: |v| median %.3g, p95 %.3g, max %.3g %s%s", length(X), length(dx), c,
                            median(La), quantile(La, 0.95), maximum(La), unit, view == "zoom" ? @sprintf(" · zoomed ×%.2g", 1 / zf) : "")
-            push!(stats, (; label, shown = length(X), residual_summary(La)...))
+            push!(stats, (; label, shown = length(X), residual_statistics(La)...))
             tk = view == "zoom" ? _round_ticks(lim[1], lim[2]) : [0, W ÷ 2, W]
             tky = view == "zoom" ? _round_ticks(lim[3], lim[4]) : [0, H ÷ 2, H]
             ax = Axis(fig[r, k]; title = label, titlesize = 8.5 * pt, titlefont = :regular, titlegap = 12 * pt / 2,
@@ -524,8 +524,8 @@ in_sample_retcode(r) = _in_sample(r) === nothing ? "" : String(_in_sample(r)["re
 
 # recorded_retcode: the ReturnCode a run record names (src/return_codes.jl)
 include("return_codes.jl")
-# residual_summary: the one summary of a residual vector (src/residual_summary.jl, shared with the prelude)
-include("residual_summary.jl")
+# residual_statistics: the one summary of a residual vector (src/residual_statistics.jl, shared with the prelude)
+include("residual_statistics.jl")
 # a chrome evaluation's summary table read back (src/summary_table.jl, shared with the prelude)
 include("summary_table.jl")
 

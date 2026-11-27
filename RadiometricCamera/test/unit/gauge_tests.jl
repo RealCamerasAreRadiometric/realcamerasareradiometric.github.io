@@ -10,7 +10,7 @@
     # pose (left: the camera frame turns, ξ = (ω, 0)) leaves the tile residuals all but unchanged (only the aperture disc and the
     # focus, fixed in the camera frame, do not turn with it)
     sp = calibration_problem(board, st, camera_p, copy(poses_p), mat_t, light_t, targets; masks)
-    prob0, idx0 = build_problem_grid(sp.f, sp.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), rotation_gauge = false)
+    prob0, idx0 = build_problem_grid(sp.f, sp.u0; patch = (5, 5), rotation_gauge = false)
     pin = RC.rotation_gauge_coordinates(glens_p, nothing)
     @test length(pin) == 3 && pin[1][1:2] == pin[2][1:2] && pin[1][3] == 1 && pin[2][3] == 2 && pin[3][1:2] != pin[1][1:2]
     # transversal: the three held coordinates of the rotation's field are a nonsingular map of ω (a slice of the gauge orbit)
@@ -19,12 +19,11 @@
     M = [held_coord(SVector{3}(I[1:3, j]), p) for p in pin, j in 1:3]
     @test cond(M) < 1e3
     # with the gauge held: every tile's and the smoothness's columns of the held coordinates are exactly zero
-    prob1, idx1 = build_problem_grid(sp.f, sp.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
-    # its kept NLLSsolver cache is built for the solve's damping (the optimizer's, λ·I), so it is reused, never rebuilt per solve (RC 0.9.0 review, finding 1)
-    @test same_cache_type(prob1, VgtkCore.LevenbergDamping()) && !same_cache_type(prob1, VgtkCore.MarquardtDamping())
+    prob1, idx1 = build_problem_grid(sp.f, sp.u0; patch = (5, 5), smoothness = RC.grid_smoothness(RC.PSplineSmoothness(3, 0.1), glens_p, 1.0, trues(10, 10)))
     G_x = size(D, 2)
     px_n = 5
-    for T in keys(prob1.problem.costs), c in get(prob1.problem.costs, T)
+    for c in prob1.blocks
+        T = typeof(c)
         (T <: RC.PerTileResidual || T <: RC.GridSmoothnessResidual) || continue
         vi = RC.NLLSsolver.varindices(c); vars = RC.NLLSsolver.getvars(c, prob1.variables)
         flags = 0; for k in eachindex(vi); flags |= 1 << (k - 1); end

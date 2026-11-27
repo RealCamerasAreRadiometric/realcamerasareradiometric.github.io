@@ -85,7 +85,7 @@ function load_calibration_start(dir::AbstractString; run::RunOptions, settings::
     check_start_options(record, run, settings)
     g = start_geometry(run, settings; record, load_state)
     files = photographs === nothing ? start_photographs(run, g.names) : photographs
-    f, θ = _start_state(g, files, run, settings, record; backend = device, observations, damping = nothing, radiometry = nothing)   # a record's start: no closed-form solve, no LM
+    f, θ = _start_state(g, files, run, settings, record; backend = device, observations, radiometry = nothing)   # a record's start: no closed-form solve, no LM
     return VgtkCore.RefineProblem(f, θ, run)
 end
 

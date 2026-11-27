@@ -34,7 +34,7 @@
         # no padded node is free, under either rule of grid.nodes: the free set is the resample's own
         @test !any(grid_present(st.camera; nodes = :interior) .& .!P) && grid_present(st.camera; nodes = :all) == P
         # no region pixel's window reads a padded node: every region pixel is imaged (finite) through absent padded nodes
-        px = VgtkCore.pixel_centres(region, 1:W, 1:H)
+        px = VgtkCore.pixel_centers(region, 1:W, 1:H)
         @test all(r -> all(isfinite, r), VgtkCore.backproject(VgtkCore.model(st.camera), px; device = CPU()))
         # the region's folds unchanged by the padding (the resample's report), and the padded call's own report recorded
         f = VgtkCore.folded_pixels(st.camera, region)
@@ -58,7 +58,7 @@
         all(>(0), p.nodes) && (ring[G0[2] + 1, G0[1] + 1] = true)
         @test P[1:G0[2], 1:G0[1]] == VgtkCore.present_nodes(VgtkCore.model(c0))
         @test P .& .!((axes(P, 1) .<= G0[2]) .& (axes(P, 2) .<= G0[1])') == ring                      # the ring alone of the padded nodes
-        px = VgtkCore.pixel_centres(region, 1:W, 1:H)
+        px = VgtkCore.pixel_centers(region, 1:W, 1:H)
         r0 = Array(VgtkCore.backproject(VgtkCore.model(c0), px; device = CPU()))
         @test all(r -> all(isfinite, r), r0) && Array(VgtkCore.backproject(VgtkCore.model(p.camera), px; device = CPU())) == r0
         # no region pixel's window reads a padded node: the ring made absent too, every pixel the same bits
@@ -110,8 +110,8 @@ end
     masks = [compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
     s = calibration_problem(board, rs, camera, copy(poses), mat, light, targets; masks)
-    prob, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping())                                      # the patch default: GRID_PATCH, which divides the padded lattice
+    prob, idx = build_problem_grid(s.f, s.u0)                                      # the patch default: GRID_PATCH, which divides the padded lattice
     @test GRID_PATCH == (5, 5) && size(idx.patches) == (4, 4)
     out = _lm_tiles!(s.f, s.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), fixed = (:focus, :aperture, :vignetting, :lighting))
-    @test out.iterations >= 1 && isfinite(out.cost)
+    @test out.stats.nsteps >= 1 && isfinite(out.metadata.cost)
 end

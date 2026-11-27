@@ -1,7 +1,7 @@
 # ---- the imaged region: the one support of a run ---------------------------------------------------------------------------
 # The lens coverage of a capture set (where light falls on the sensor) is ONE keyed step of the set, never a number carried by
 # hand (owner ruling 2026-11-15): `measure_image_region` measures it on the set's own photographs (Features' `detect_image_circle`,
-# on the device), `save_image_region` writes the `rc/image_region/v1.0` record (records.jl, IO's region body) and every consumer
+# on the device), `save_image_region` writes the `rc/image_region/v2.0` record (records.jl, IO's region body) and every consumer
 # reads that record — a run through `camera.lens_coverage` (`run_lens_coverage`). A set whose lens lights the whole sensor states
 # `camera.lens_coverage = "sensor"`: no record, the detector never runs (it fits spurious ellipses on fully lit board sets).
 """The sensor of a run: Core's `Sensor` of the `W × H` image whose pitch is the sensor width `camera.sensor_mm` over `W` pixels."""
@@ -63,7 +63,7 @@ end
 
 The lens coverage of a run on `W × H` photographs, as its options state it (`camera.lens_coverage`): `nothing` for `"sensor"` (the
 sensor's rectangle, Core's default: the lens lights the whole sensor; nothing measured), else the measured image region of the
-`rc/image_region/v1.0` record the option names ([`load_image_region`](@ref): the capture set's keyed step) — refused when the record
+`rc/image_region/v2.0` record the option names ([`load_image_region`](@ref): the capture set's keyed step) — refused when the record
 is missing or of other photographs (its extent not `W × H`). No other source: a grid start's stored coverage is not read.
 """
 function run_lens_coverage(run::RunOptions, W::Integer, H::Integer)

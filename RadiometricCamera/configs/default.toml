@@ -43,7 +43,7 @@ sensor_mm = 22.3     # sensor width [mm]
 f_mm = 17.0          # nominal focal length [mm] (the nominal pinhole of a grid start; the aperture start)
 fnumber = 8.0        # f-number N of the aperture start r₀ = f / (2N)
 lens_coverage = "sensor"   # where light falls on the sensor: "sensor" = the lens lights the whole sensor (its rectangle; nothing is
-                           #   measured), else the path of the capture set's measured image region (an rc/image_region/v1.0 record:
+                           #   measured), else the path of the capture set's measured image region (an rc/image_region/v2.0 record:
                            #   its keyed step, Features' detect_image_circle on the set's own frames; owner ruling 2026-11-15)
 sensor_characterization = ""   # the body's sensor characterisation (a vgio/sensor_characterization record): each RAW photograph's sensor
                                #   model (black, noise, defects) resolved from it by its EXIF; empty = none named (a named path that

@@ -104,7 +104,7 @@
         sf = _schoeps_start(pf, W, H)
         @test rect(sf.init_region) ≈ SVector(0.0, 0.0, 640.0, 480.0)
         @test rect(sf.init_region) ≈ rect(VgtkCore.Rect2(VgtkCore.imaged_region(sf.lens)))                # the same as the lattice's
-        # stored beside the grid (rc/initialization_region/v1.0, IO's Rect2 body) and restored with a reloaded grid start
+        # stored beside the grid (rc/initialization_region/v2.0, IO's Rect2 body) and restored with a reloaded grid start
         dir = mktempdir()
         save_grid(joinpath(dir, "grid.json"), st.lens); save_initialization_region(dir, st.init_region)
         @test stored_initialization_region(joinpath(dir, "grid.json")) == st.init_region
@@ -191,4 +191,34 @@
         @test occursin("load_grid: $rec holds a non-central model", VgtkCore.thrown_message(() -> load_grid(rec)))
         @test occursin("holds a non-central model", VgtkCore.thrown_message(() -> load_model("schoeps:" * dir, W, H)))   # a run's imported camera.json
     end
+end
+
+# The region kinds' version step (decision 11, VisualGeometryToolkitIO 0.12): a v1.0 record — the 236 published
+# rc/initialization_region/v1.0 files of the paper's runs, the rc/image_region/v1.0 records of its capture sets — reads through
+# its migrate_schema step (VisualGeometryToolkitIO's `migrate_region`: a polygon's "centre" is "center"), to the value it held.
+@testitem "records: the region kinds' v1.0 → v2.0 step" setup = [RCFixtures] begin
+    using RadiometricCamera: save_initialization_region, stored_initialization_region, save_image_region, load_image_region, RECORD_SCHEMAS
+    @test RECORD_SCHEMAS.initialization_region == "rc/initialization_region/v2.0" && RECORD_SCHEMAS.image_region == "rc/image_region/v2.0"
+    # a record as v1.0 wrote it: the current one with its schema and (a polygon's) key as they were
+    as_v1(path, kind) = write(path, replace(read(path, String), "\"$(RECORD_SCHEMAS[kind])\"" => "\"rc/$(kind)/v1.0\"", "\"center\"" => "\"centre\""))
+    rect = VgtkCore.Rect2{Float64}(1048.0, 159.00000000000023, 2328.0, 2583.0)          # a published record's (its rect)
+    poly = VgtkCore.PolygonRegion([VgtkCore.Point2(1360.0, 600.0), VgtkCore.Point2(960.0, 1000.0), VgtkCore.Point2(560.0, 200.0),
+                                   VgtkCore.Point2(1160.0, 100.0)], VgtkCore.Point2(960.25, 600.5))
+    for region in (rect, VgtkCore.RegionIntersection(rect, poly))
+        dir = mktempdir(); save_initialization_region(dir, region)
+        f = joinpath(dir, RC.INITIALIZATION_REGION_FILE)
+        @test occursin("rc/initialization_region/v2.0", read(f, String))
+        as_v1(f, :initialization_region)
+        s = read(f, String)
+        @test occursin("rc/initialization_region/v1.0", s) && (region isa VgtkCore.Rect2 || occursin("\"centre\"", s))
+        @test stored_initialization_region(joinpath(dir, "grid.json")) == region
+        @test read(f, String) == s                                                       # read in place, never rewritten
+    end
+    e = VgtkCore.Ellipse(VgtkCore.Point2{Float64}(2140.640692472857, 1445.2758216353518), 1316.6577194620318, 1310.9341888900694, 2.526149171533689)
+    path = tempname() * ".json"
+    save_image_region(path, (; lens_coverage = e, extent = (4256, 2848), frames = ["a.ARW"], center_scale = [1.0, 1.0],
+                             axes_scale = [1.0, 1.0], inliers = 10, candidates = 12, rim_gap = 0.1, cut = false))
+    as_v1(path, :image_region)
+    r = load_image_region(path)
+    @test r.lens_coverage === e && r.extent == (4256, 2848) && r.frames == ["a.ARW"] && r.record.schema == "rc/image_region/v2.0"
 end

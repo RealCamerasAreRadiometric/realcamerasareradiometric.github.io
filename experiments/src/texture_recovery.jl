@@ -329,8 +329,8 @@ function write_poses(path::AbstractString, views, allr, XY, nan; W::Integer, H::
     per = [Dict{String, Any}("view" => v.view, "R_world_to_camera" => collect(vec(Matrix(v.R))), "t_world_to_camera" => collect(v.t),
                              "blobs" => v.blobs, "median_px" => v.median_px, "rms_px" => v.rms_px, "bearing_median_mrad" => v.bearing_median_mrad,
                              "bearing_p90_mrad" => v.bearing_p90_mrad, "camera_distance_m" => v.camera_distance_m) for v in views]
-    VgtkIO.write_record(path, Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.texture_poses, "label" => label, "views" => length(views), "all" => residual_summary(allr), "centre" => residual_summary(allr[ρ .< centre_rho]),
-                                       "edge" => residual_summary(allr[ρ .> edge_rho]), "centre_rho" => centre_rho, "edge_rho" => edge_rho,
+    VgtkIO.write_record(path, Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.texture_poses, "label" => label, "views" => length(views), "all" => residual_statistics(allr), "centre" => residual_statistics(allr[ρ .< centre_rho]),
+                                       "edge" => residual_statistics(allr[ρ .> edge_rho]), "centre_rho" => centre_rho, "edge_rho" => edge_rho,
                                        "not_projected" => nan, "per_view" => per); allownan = true)
     return path
 end
@@ -519,7 +519,7 @@ texel centres' grid, `nothing` otherwise (Core's clamp would extend the edge; a 
 """
 @inline function texel_weights(𝐛, TW::Integer, TH::Integer)
     uv = SVector(𝐛[1], 𝐛[2])
-    VgtkCore.is_inside_texel_centres(uv, (TW, TH)) || return nothing
+    VgtkCore.is_inside_texel_centers(uv, (TW, TH)) || return nothing
     i, j, fx, fy = VgtkCore.bilinear_weights(uv, (TW, TH))
     tid(a, b) = (b - 1) * TW + a
     return ((tid(i, j), (1 - fx) * (1 - fy)), (tid(i + 1, j), fx * (1 - fy)), (tid(i, j + 1), (1 - fx) * fy), (tid(i + 1, j + 1), fx * fy))
@@ -768,11 +768,11 @@ end
 """
     page_solves(op, b, x0; scale, weights, rtol, maxit) -> (; main, reg)
 
-The page's textures by Core's `cgls` on the penalized operator `op` (Core's `PenalizedOperator` of the fit rows and the first
+The page's textures by Core's `CGLS()` on the penalized least squares of the operator `op` (Core's `PenalizedOperator` of the fit rows and the first
 differences, `difference_rows((TW, TH), 1)`, on its device): `main` the unregularised one (penalty weight 0) and `reg[k]` the one of
 `min ‖A x − b‖² + λ_k ‖∇x‖²` for every β of `weights`, `λ_k = β_k · scale` (`scale` Core's `penalty_scale` of the fit rows' energy, the
 texels and the operator's mean positive eigenvalue, so β is the stack's normalized weight), each `(; x, iterations, converged, relres)`
-with `x` on the host. `x0` the start; Core's stopping rule (relative to the normal equations' right-hand side). A regularised solve
+with `x` on the host (the solve's `u`, `stats.nsteps`, `successful_retcode` and `metadata.relres`). `x0` the start; Core's stopping rule (relative to the normal equations' right-hand side). A regularised solve
 is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `diagonal`), the
 unregularised one never: without the penalty the problem is ill-posed in the texels the rows barely see, and the scaling moves those
 by 10²–10³ (where the unpreconditioned iteration leaves them at the start). The 1 + |weights|
@@ -785,8 +785,9 @@ function page_solves(op, b, x0; scale::Real, weights, rtol::Real, maxit::Integer
     dA, dD = column_sumsq(op.At; device = be), column_sumsq(op.Dt; device = be)   # diag(AᵀA), diag(DᵀD): the Jacobi diagonals' parts
     RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
     sols = RC._each_chunk(be, ws) do w
-        s = VgtkCore.cgls(op, b; w, x0, rtol, max_iter = maxit, diagonal = w > 0 ? dA .+ w .* dD : nothing)
-        merge(s, (; x = Array(s.x)))
+        r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0, diagonal = w > 0 ? dA .+ w .* dD : nothing), VgtkCore.CGLS();
+                           stops = VgtkCore.ToleranceStops(; rtol, max_iter = maxit))
+        (; x = Array(r.u), iterations = r.stats.nsteps, converged = VgtkCore.successful_retcode(r), relres = r.metadata.relres)
     end
     return (; main = sols[1], reg = sols[2:end])
 end

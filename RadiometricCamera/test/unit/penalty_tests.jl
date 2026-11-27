@@ -90,16 +90,16 @@ end
     @test RC.grid_smoothness_cost(pr, glens_t) == 0.0
     @test length(RC.grid_smoothness(RC.PSplineSmoothness(3, 0.5), glens_t, 7.0, all10).rows) == 2 * 10 * 7
     # in a problem: rows on the present nodes only, zero at the start
-    prob_p, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
-    @test sum(c -> length(c.terms), [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]) == length(pr.rows)
+    prob_p, _ = build_problem_grid(s.f, s.u0; patch = (5, 5), smoothness = pr)
+    @test sum(c -> length(c.terms), [c for c in prob_p.blocks if c isa RC.GridSmoothnessResidual]) == length(pr.rows)
     # the weight by GCV on the linearization at a perturbed start: the smoothness of that weight, the selection recorded
     sp = calibration_problem(board, st, camera_p, poses_p, mat_t, light_t, targets; masks)
     held_p = RC.interior_nodes(RC.grid_present(glens_p))
-    smooth, sel = RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, GeneralizedCrossValidation()), held_p; damping = VgtkCore.LevenbergDamping())
+    smooth, sel = RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.PSplineSmoothness(3, GeneralizedCrossValidation()), held_p)
     @test smooth.type === :pspline && smooth.β == sel.β && sel.kind === :pspline && isfinite(sel.gcv) && sel.n_columns == 4 * 50
     @test sel.n_observations == 3 * sum(length, sp.f.px) && 0 < sel.dof <= sel.n_columns
     @test 1e-8 <= sel.β <= 1e4
-    @test RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.NoSmoothness(), held_p; damping = VgtkCore.LevenbergDamping()) == (nothing, nothing)
+    @test RC.select_grid_smoothness_weight(sp.f, sp.u0, RC.NoSmoothness(), held_p) == (nothing, nothing)
     # the nodes held: Core's footprint rule; :all every node the lens holds
     @test RC.grid_present(glens_t) == VgtkCore.node_mask(VgtkCore.model(glens_t), VgtkCore.imaged_region(glens_t))
     @test RC.grid_present(glens_t; nodes = :all) == trues(10, 10)

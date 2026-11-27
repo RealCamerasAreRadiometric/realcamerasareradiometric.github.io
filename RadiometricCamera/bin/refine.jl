@@ -125,8 +125,8 @@ function _print_free_parameters(s, alg)
         println("PARAMETERS route=$(nameof(typeof(route)))"); flush(stdout); return nothing
     end
     lp = RC._refinement_lm(settings, route; smoothness = meta.grid_smoothness)
-    problem, idx = RC.build_problem_grid(s.f, s.u0; damping = alg.refinement.optimizer.damping, lp.kw...)
-    vars = problem.problem.variables
+    problem, idx = RC.build_problem_grid(s.f, s.u0; lp.kw...)
+    vars = problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)
     present = count(VgtkCore.present_nodes(VgtkCore.model(s.u0.camera.geometric)))
     gauge = lp.blocks.poses ? 3 : 0                                        # the rotation gauge: three direction coordinates held while the poses are free

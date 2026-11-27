@@ -101,13 +101,13 @@ end
     # ---------------------------------------------------------------------------------------------------------------
     # 4. the tile problem on the distance-map board: the printed edge is no parameter of it (the material block: Θ_m and μ)
     s_e = edge_state(edge_s, targets_e)
-    prob_e, idx_e = build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob_e, idx_e = build_problem_grid(s_e.f, s_e.u0; patch = (5, 5))
     tiles_e = RC.tile_costs(prob_e)
     r_e = tiles_e[argmax([length(t.pix) for t in tiles_e])]
     vars_e = collect(RC.NLLSsolver.getvars(r_e, prob_e.variables))
     @test RC.NLLSsolver.nvars(vars_e[8]) == 9 && !any(n -> isdefined(RC, n), (:EDGE_NFREE, :n_fd, :n_edge, :EDGE_FD_H_MM))
-    @test_throws MethodError build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), edge_block = true)   # no such keyword
-    @test_throws ArgumentError build_problem_grid(s_e.f, s_e.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = (:edge,))  # nothing of that name to hold
+    @test_throws MethodError build_problem_grid(s_e.f, s_e.u0; patch = (5, 5), edge_block = true)   # no such keyword
+    @test_throws ArgumentError build_problem_grid(s_e.f, s_e.u0; patch = (5, 5), fixed = (:edge,))  # nothing of that name to hold
     res_e, J_e = RC.NLLSsolver.computeresjac(RC.static(1023), r_e, vars_e...)
     @test size(J_e) == (3 * length(r_e.pix), 6 + 200 + 9 + 1 + 9 + 15 + 27)   # 15 vignetting columns (the hard pin)
     @test res_e ≈ RC.NLLSsolver.computeresidual(r_e, vars_e...) atol = 1e-10
@@ -118,7 +118,7 @@ end
     @test all(isnan, RC.NLLSsolver.computeresidual(r_e, updated_vars(vars_e, 8, unit_increment(9, 9, NaN))...))
     let vars = copy(prob_e.variables)
         vars[idx_e.material] = RC.NLLSsolver.update(vars[idx_e.material], unit_increment(9, 9, NaN))
-        @test isnan(RC.NLLSsolver.cost(vars, prob_e.problem.costs))
+        @test any(c -> any(isnan, RC.NLLSsolver.computeresidual(c, RC.NLLSsolver.getvars(c, vars)...)), prob_e.blocks)
     end
     for j in 1:6                                                           # pose columns (AD through the distance map) vs central differences
         fd = fde(1, unit_increment(6, j, 1e-7))
@@ -151,11 +151,11 @@ end
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
         s_g = edge_state(edge_s, targets_e; backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         s_c = edge_state(edge_s, targets_e)
-        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; patch = (5, 5))
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
         varsg = RC.NLLSsolver.getvars(rg, prob_g.variables)

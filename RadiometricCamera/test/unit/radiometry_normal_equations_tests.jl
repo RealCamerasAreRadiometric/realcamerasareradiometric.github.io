@@ -3,6 +3,7 @@
 # cost kernel, and the same kernels on KA.CPU() and on the GPU (the :gpu item). The reduction against the hand-written host normal
 # equations it replaced agreed to ≤ 2.3e-15 relative on this scene (cost, Jᵀr, JᵀJ; colour and single-channel states, RC 0.8.0
 # report); the joint solve's recovery of the truth is the "calibration" item's.
+# R22: contract test — the row protocol (residual_cost!, residual_normal_equations!) of the closed-form blocks' row problem, _RadiometryLm
 
 @testsetup module NEScene
     using RadiometricCamera: compute_mask, Focus, FocusSpline, Material, TexturedTarget, render_view, RenderSettings,

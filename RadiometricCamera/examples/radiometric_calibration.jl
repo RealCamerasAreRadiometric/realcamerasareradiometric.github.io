@@ -129,7 +129,7 @@ monitor(it, cst, camera, poses, mat, surface, light) = @printf("  it %2d  cost %
                                                                1e3 * camera.aperture_radius, mat.diffuse_weight, mat.roughness_paper, mat.roughness_ink)
 res = _lm_tiles!(prob.f, prob.u0; stops = RC._calibration_stops(; max_iter = 3), damping = VgtkCore.LevenbergDamping(), trace, iter_callback = monitor, verbose = false)
 c2, rms2 = cost(prob.f, prob.u0)
-@printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.rule)
+@printf("joint LM: %d iterations, rel-RMS %.4f → %.4f; stopped: %s\n", length(trace), rms1, rms2, res.stop_rule)
 
 # The loss curve and the refined lens. `save_grid` stores the grid as VisualGeometryToolkitIO's camera record for the
 # evaluation scripts (`grid:<file>` model spec).

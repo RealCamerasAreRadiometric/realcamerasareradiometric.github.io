@@ -1,7 +1,7 @@
 # =============================================================================
 # src/summary_table.jl — a run's summary table, read back: VisualGeometryToolkitEval's tab-separated table (`Render.write_tsv`
 # writes it, `read_tsv` reads it as text) with each cell as its value. Included by src/chrome_evaluation.jl and by the module of
-# src/figures.jl (as src/residual_summary.jl is).
+# src/figures.jl (as src/residual_statistics.jl is).
 # =============================================================================
 using VisualGeometryToolkitEval.Render: write_tsv, read_tsv
 

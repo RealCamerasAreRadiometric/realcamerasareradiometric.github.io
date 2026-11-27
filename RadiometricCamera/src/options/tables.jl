@@ -113,7 +113,7 @@ Base.@kwdef struct CameraOptions <: AbstractOptionsTable
     fnumber::Float64 = _option_default(CameraOptions, :fnumber)                            # r₀ = f / (2N)
     lens_coverage::String = _option_default(CameraOptions, :lens_coverage)              # where light falls: "sensor" (the whole sensor, nothing
                                                      #   measured) or the path of the capture set's measured image region (an
-                                                     #   rc/image_region/v1.0 record: `run_lens_coverage`)
+                                                     #   rc/image_region/v2.0 record: `run_lens_coverage`)
     sensor_characterization::String = _option_default(CameraOptions, :sensor_characterization)              # the body's sensor characterisation (an IO `vgio/sensor_characterization` record, Core's
                                                      #   `SensorCharacterization`), each RAW photograph's `SensorModel` resolved from it by its
                                                      #   EXIF capture settings (`photo_set`); empty = none named (a path that does not exist is

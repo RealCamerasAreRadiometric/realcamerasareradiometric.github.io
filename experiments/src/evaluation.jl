@@ -26,8 +26,8 @@ import RadiometricCamera as RC
 import VisualGeometryToolkitCore as VgtkCore
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: angle_between
-# residual_summary: the one summary of a residual vector (src/residual_summary.jl, shared with the prelude)
-include("residual_summary.jl")
+# residual_statistics: the one summary of a residual vector (src/residual_statistics.jl, shared with the prelude)
+include("residual_statistics.jl")
 include("record_schemas.jl")                  # the result records' schemas (one table, shared with the prelude)
 using RadiometricCamera: load_lens, load_model, load_state
 
@@ -119,7 +119,7 @@ _board_points(J) = Dict(Int(c.id) => SVector{3, Float64}(c.X_m...) for c in J.bo
 THE REPROJECTION ERROR WITH THE GIVEN POSES, no refit: every TRUE board point of `gt` projected through `lens` (spec) under the pose
 of `poses` (a trajectory record: world → camera per image) by `_forward`; vector = predicted − true pixel at the true pixel. Pooled
 over the views present in the poses record → `out` = `{label, lens, poses, n_views, x, y, dx, dy, view, id}` and the
-`residual_summary` of the errors (a wheel-map `scatter` panel). Returns that summary with `n_views`.
+`residual_statistics` of the errors (a wheel-map `scatter` panel). Returns that summary with `n_views`.
 """
 function reprojection_vectors(gt::AbstractString, lens::AbstractString, poses::AbstractString, out::AbstractString; label::AbstractString = lens)
     J = _readjson(gt)
@@ -136,9 +136,9 @@ function reprojection_vectors(gt::AbstractString, lens::AbstractString, poses::A
         end
     end
     e = hypot.(dxs, dys)
-    stats = merge(residual_summary(e), (; n_views = nv))
+    stats = merge(residual_statistics(e), (; n_views = nv))
     mkpath(dirname(out))
-    VgtkIO.write_record(out, (; schema = EXPERIMENT_RECORD_SCHEMAS.residual_vectors, label, lens, poses, n_views = nv, x = xs, y = ys, dx = dxs, dy = dys, view = vid, id = ids, residual_summary(e)...))
+    VgtkIO.write_record(out, (; schema = EXPERIMENT_RECORD_SCHEMAS.residual_vectors, label, lens, poses, n_views = nv, x = xs, y = ys, dx = dxs, dy = dys, view = vid, id = ids, residual_statistics(e)...))
     return stats
 end
 
@@ -149,7 +149,7 @@ THE REPROJECTION ERROR WITH THE TRUE POSES: every true board point of `gt` proje
 (the ground truth's trajectory record), after removing ONE global rotation shared by all views (the frame gauge of a generic lens;
 Kabsch between the lens's bearings of the true pixels and the true bearings; `gauge = false` keeps the raw frame) — the lens error
 alone, as pixel vectors at the true pixels → `out` (a wheel-map `scatter` panel, with `gauge_mrad`). Returns its
-`residual_summary` with `n_views` and `gauge_mrad`.
+`residual_statistics` with `n_views` and `gauge_mrad`.
 """
 function truepose_vectors(gt::AbstractString, lens::AbstractString, out::AbstractString; label::AbstractString = lens, gauge::Bool = true)
     J = _readjson(gt)
@@ -173,10 +173,10 @@ function truepose_vectors(gt::AbstractString, lens::AbstractString, out::Abstrac
         u, w = p; push!(xs, pxs[i][1]); push!(ys, pxs[i][2]); push!(dxs, u - pxs[i][1]); push!(dys, w - pxs[i][2]); push!(vids, vid[i]); push!(idd, ids[i])
     end
     e = hypot.(dxs, dys)
-    stats = merge(residual_summary(e), (; n_views = nv, gauge_mrad = rot_mrad))
+    stats = merge(residual_statistics(e), (; n_views = nv, gauge_mrad = rot_mrad))
     mkpath(dirname(out))
     VgtkIO.write_record(out, (; schema = EXPERIMENT_RECORD_SCHEMAS.residual_vectors, label, lens, poses = "true poses" * (gauge ? " (one global rotation removed)" : ""), n_views = nv,
-                              x = xs, y = ys, dx = dxs, dy = dys, view = vids, id = idd, residual_summary(e)..., gauge_mrad = rot_mrad))
+                              x = xs, y = ys, dx = dxs, dy = dys, view = vids, id = idd, residual_statistics(e)..., gauge_mrad = rot_mrad))
     return stats
 end
 

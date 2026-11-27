@@ -135,7 +135,7 @@ poses(p) = produce(p; product_records(DRIVER, CFG_PATH)...) do dir
     isempty(views) && error("poses: no photograph got a pose")
     write_poses(joinpath(dir, "poses.json"), views, allr, XY, nan; W, H, centre_rho = Float64(CFG["texture"]["centre_rho"]), edge_rho = Float64(CFG["texture"]["edge_rho"]),
                 label = "$(CFG["experiment"]["name"]): case $CASE held fixed")
-    S = residual_summary(allr)
+    S = residual_statistics(allr)
     say(@sprintf("RESULT: %d photographs with a pose, %d blobs (%d not projected): reprojection median %.4f / mean %.4f / RMS %.4f / p95 %.4f / max %.3f px",
                  length(views), S.n, nan, S.median_px, S.mean_px, S.rms_px, S.p95_px, S.max_px))
     Produced(; inputs = [inputs; state; mine; theirs])

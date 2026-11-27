@@ -108,13 +108,13 @@
     @test all(count(m) > 100 for m in masks)
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     s = calibration_problem(board, st, camera_t, poses, mat_t, light_t, targets; masks)
-    prob, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
+    prob, idx = build_problem(s.f, s.u0)
     dv = prob.variables[idx.distortion]
     @test dv isa VgtkCore.SubsetManifold && Int(RC.NLLSsolver.nvars(dv)) == 18 && free_names(dv) == filter(!=(:skew), VgtkCore.parameter_names(VgtkCore.model(lens_t)))
-    @test_throws ArgumentError build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed = (:k7,))
+    @test_throws ArgumentError build_problem(s.f, s.u0; fixed = (:k7,))
     lay = RC._jacobian_layout(RC.static(127), 9, 4, 15, 16, 9, 18)                 # 15 free vignetting directions of 16 nodes (the hard pin)
     @test lay.off_d == 6 && lay.off_f == 24 && lay.off_m == 28 && lay.off_r == 36 && lay.P == 37 && lay.ncol == 6 + 18 + 9 + 1 + 9 + 15 + 27
-    res = get(prob.problem.costs, PerViewResidual{9})[1]
+    res = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0 = RC.NLLSsolver.computeresidual(res, vars...)
     @test maximum(abs, r0) < 1e-12
@@ -142,7 +142,7 @@
     end
     # a restricted block and the aspect held (`:aspect` in `fixed`: f_x and f_y move together at their ratio); a few LM iterations from a perturbed lens
     # lower the cost
-    probm, _ = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed = (:cx, :cy, :tx, :ty, :k3, :d, :p, :sx, :sy, :aspect))
+    probm, _ = build_problem(s.f, s.u0; fixed = (:cx, :cy, :tx, :ty, :k3, :d, :p, :sx, :sy, :aspect))
     dm = probm.variables[idx.distortion]; @test free_names(dm) == (:f, :k1, :k2) && Int(RC.NLLSsolver.nvars(dm)) == 3
     l0, l1 = pinhole_θ(block_camera(dm, lens_t)), pinhole_θ(block_camera(RC.NLLSsolver.update(dm, [1e-3, 0.0, 0.0]), lens_t))
     @test l1[1] ≈ l0[1] * exp(1e-3) && l1[2] / l1[1] ≈ l0[2] / l0[1] && l1[3] == l0[3]
@@ -155,7 +155,7 @@
     its = Int[]
     result = _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 4), damping = VgtkCore.LevenbergDamping(), fixed = (:poses, :focus, :aperture, :material, :vignetting, :lighting,
                              :cx, :cy, :tx, :ty, :k2, :k3, :d, :p, :sx, :sy), iter_callback = (it, c, camera, poses, mat, surface, light) -> push!(its, it))
-    @test result.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
+    @test result.metadata.cost / 2 < 0.05 * c0 && length(its) >= 1 && has_lens(RC.geometric(s2.u0), typeof(VgtkIO.opencv_lens(zeros(14))))
     @test abs(pinhole_θ(RC.geometric(s2.u0))[1] - pinhole_θ(lens_t)[1]) < 0.24
 
     # Kannala–Brandt on Core's `KannalaBrandt(k…)` (Task 2 of the VisualGeometryToolkitCore port, fix round 1): equivalence against the

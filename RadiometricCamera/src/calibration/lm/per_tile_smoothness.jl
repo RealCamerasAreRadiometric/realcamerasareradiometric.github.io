@@ -208,25 +208,23 @@ function select_grid_smoothness_weight(f::CalibrationData, θ::CalibrationParame
     G = zeros(ncol, ncol); h = zeros(ncol); Q = zeros(ncol, ncol); q = zeros(ncol); rr = 0.0; n = 0
     # the tiles of a view are evaluated in one batch, as _lm_tiles! does (bitwise the per-tile path's values)
     _with_registered(f, θ, problem, idx; concurrent = false) do       # the tiles of a view in its batch; one at a time
-        for T in keys(problem.problem.costs)
-            data = T <: PerTileResidual
-            (data || T <: GridSmoothnessResidual) || continue
-            for c in get(problem.problem.costs, T)
-                vi = NLLSsolver.varindices(c); vars = NLLSsolver.getvars(c, problem.variables)
-                flags = 0; cols = Int[]
-                for (k, v) in enumerate(vi)
-                    haskey(off, v) || continue
-                    flags |= 1 << (k - 1); append!(cols, off[v] .+ (1:Int(NLLSsolver.nvars(vars[k]))))
-                end
-                res, J = flags == 0 ? (NLLSsolver.computeresidual(c, vars...), zeros(0, 0)) : NLLSsolver.computeresjac(flags, c, vars...)
-                if data                                      # min ‖J δ − (−res)‖²: the data's linearization
-                    n += length(res); rr += sum(abs2, res)
-                    flags == 0 && continue
-                    G[cols, cols] .+= J' * J; h[cols] .-= J' * res
-                else                                         # ‖J_p δ − (−res_p)‖²: the unit-weight smoothness's
-                    flags == 0 && continue
-                    Q[cols, cols] .+= J' * J; q[cols] .-= J' * res
-                end
+        for c in _visit_order(problem)                                # in the LM's order of its blocks (each accumulation's order)
+            data = c isa PerTileResidual
+            (data || c isa GridSmoothnessResidual) || continue
+            vi = NLLSsolver.varindices(c); vars = NLLSsolver.getvars(c, problem.variables)
+            flags = 0; cols = Int[]
+            for (k, v) in enumerate(vi)
+                haskey(off, v) || continue
+                flags |= 1 << (k - 1); append!(cols, off[v] .+ (1:Int(NLLSsolver.nvars(vars[k]))))
+            end
+            res, J = flags == 0 ? (NLLSsolver.computeresidual(c, vars...), zeros(0, 0)) : NLLSsolver.computeresjac(flags, c, vars...)
+            if data                                      # min ‖J δ − (−res)‖²: the data's linearization
+                n += length(res); rr += sum(abs2, res)
+                flags == 0 && continue
+                G[cols, cols] .+= J' * J; h[cols] .-= J' * res
+            else                                         # ‖J_p δ − (−res_p)‖²: the unit-weight smoothness's
+                flags == 0 && continue
+                Q[cols, cols] .+= J' * J; q[cols] .-= J' * res
             end
         end
     end

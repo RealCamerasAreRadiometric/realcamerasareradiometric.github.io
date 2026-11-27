@@ -130,7 +130,7 @@ camera against its target point's under the state's poses), and the number of de
 function bearing_divergence(g, st)
     b = rad2deg.(RadiometricCamera.state_bearings(g, st))
     isempty(b) && throw(ArgumentError("bearing_divergence: the state's camera images none of the detections"))
-    s = residual_summary(b)                                              # THE project's summary of a residual vector (its p95 the 0.95 quantile)
+    s = residual_statistics(b)                                              # THE project's summary of a residual vector (its p95 the 0.95 quantile)
     return (; median_deg = s.median_px, p95_deg = s.p95_px, n = s.n)    # (its `_px` names; here degrees)
 end
 

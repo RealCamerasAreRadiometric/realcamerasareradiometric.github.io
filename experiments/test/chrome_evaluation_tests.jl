@@ -1,3 +1,4 @@
+# R22: contract test — the grid-pose problem's refit step (`refine!`, the local-optimization contract): the LO's step on the scorer's matches
 # The chrome evaluation driver (scripts/chrome_evaluation.jl) on its test configs (test/fixtures/thorlabs/: the HX400V prototype
 # chrome_evaluation.toml and the FX3 green-photosite decode of 2026-11-02, retired as experiments and kept for the
 # driver's generic stages; the paper's configs are configs/experiments/chrome_evaluation_fx3_*.toml): the config loads with every detect_foerstner keyword stated, its inputs are the tier
@@ -684,7 +685,7 @@
             xyk = [SVector{2,Float64}(VgtkCore.project(camera, Rk * (SVector(n[1] * 0.005, n[2] * 0.005, 0.0) - c) + d)) + 0.05 * randn(rngm, SVector{2,Float64}) for n in grid.nodes]
             regk = register_grid(camera, grid, xyk, s; name = "p$k")
             write_registration(dir, "p$k", "p$k.JPG", regk, [VgtkCore.Uncertain(p, VgtkCore.CovMat(SMatrix{2,2}(0.0025, 0.0, 0.0, 0.0025))) for p in xyk], s, id)
-            rs = residual_summary(collect(values(regk.residuals))); rms, mx = rs.rms_px, rs.max_px
+            rs = residual_statistics(collect(values(regk.residuals))); rms, mx = rs.rms_px, rs.max_px
             push!(summary, ("p$k.JPG", length(xyk), regk.inliers, length(regk.assignment), 0, regk.trials, rms, mx))
         end
         write_tsv(joinpath(dir, "summary.tsv"), INDEX_SUMMARY_COLUMNS, summary)
@@ -1266,8 +1267,8 @@ end
     for (g, r) in enumerate(PAIRED_REGIONS)
         ps = paired_photos(sc["motion"]["a"], sc["motion"]["b"], cd, r == "all" ? (ρ -> true) : r == "centre" ? (ρ -> ρ < 0.4) : (ρ -> ρ > 0.6))
         for st in PAIRED_STATS
-            d = q -> Float64(residual_summary(reduce(vcat, [p.model for p in q]))[Symbol(st)]) -
-                     Float64(residual_summary(reduce(vcat, [p.reference for p in q]))[Symbol(st)])
+            d = q -> Float64(residual_statistics(reduce(vcat, [p.model for p in q]))[Symbol(st)]) -
+                     Float64(residual_statistics(reduce(vcat, [p.reference for p in q]))[Symbol(st)])
             lo, hi = bootstrap_ci(d, StableRNG(7 + g), ps; n_resamples = 2000, alpha = 0.05)
             p = only(x for x in P if x.region == r && x.stat == st)
             @test (p.lo, p.hi) == (lo, hi) && p.difference == d(ps)

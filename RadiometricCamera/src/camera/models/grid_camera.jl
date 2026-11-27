@@ -144,7 +144,7 @@ function check_coverage(camera::BoundedCamera, region; who::AbstractString, devi
     m = VgtkCore.model(camera)
     VgtkCore.check_region_support(m, region; who)                 # a RegionIntersection ⊆ Rect holds by its parts' intersection
     W, H = Tuple(VgtkCore.extent(camera))
-    px = VgtkCore.pixel_centres(region, 1:Int(W), 1:Int(H))
+    px = VgtkCore.pixel_centers(region, 1:Int(W), 1:Int(H))
     rays = Array(VgtkCore.backproject(m, px; device))
     n = count(r -> !all(isfinite, r), rays)
     n == 0 || throw(ArgumentError("$who: $n of the $(length(px)) pixels of the coverage region $(region) are not imaged (NaN rays): " *

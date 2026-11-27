@@ -92,7 +92,9 @@ end
     @test !row_converged(merge(tr[1], (; refinement_retcode = "MaxTime")))            # a refinement that did not converge: its row recorded not converged
     @test row_converged(merge(tr[1], (; refinement_retcode = "Terminated")))          # Core's successful_retcode, not a name match
     @test !row_converged(merge(tr[1], (; refinement_retcode = "unrecorded")))         # no record: not converged
-    @test_throws ArgumentError row_converged(merge(tr[1], (; refinement_retcode = "converged")))   # a retcode Symbol before Core's §14: refused
+    @test row_converged(merge(tr[1], (; refinement_retcode = "converged")))           # a legacy spelling (before Core 0.14): IO's termination_from_legacy
+    @test !row_converged(merge(tr[1], (; refinement_retcode = "max_iterations")))
+    @test_throws ArgumentError row_converged(merge(tr[1], (; refinement_retcode = "no_model")))   # no ReturnCode, no legacy spelling: refused
     long = summary_table(tr)
     @test length(long) == 8 && [t.stat for t in long[1:4]] == collect(SUMMARY_STATS)
     @test long[4].start == 0.8 && long[4].refined == 0.4 && long[4].change_pct ≈ -50 && long[4].photos_start == 40 && long[4].photos_refined == 42 && long[4].dots_refined == 11500 &&

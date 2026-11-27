@@ -55,8 +55,8 @@
     # Jacobian of the per-view residual vs finite differences (the pin V(𝐜) = 1 held exactly: the centre's direction is no column)
     # (the state's V is the truth's normalized to V(𝐜) = 1, the gauge: the truth's lighting carries the V(𝐜), so the residual vanishes)
     s = calibration_problem(board, st, camera_t, poses, mat_t, with_coefficients(light_t, coefficients(light_t) .* vig_t(center(vig_t))), targets; masks)
-    prob, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
-    res = get(prob.problem.costs, PerViewResidual{9})[1]
+    prob, idx = build_problem(s.f, s.u0)
+    res = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0 = RC.NLLSsolver.computeresidual(res, vars...)
     @test maximum(abs, r0) < 1e-12                                     # at the truth the residual vanishes
@@ -80,10 +80,10 @@
     sh = calibration_problem(board, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !hasfield(typeof(sh.f), :pin_center) && !hasfield(typeof(sh.u0), :pin_center)   # always held: no switch
     @test sh.u0.camera.vignetting(center(sh.u0.camera.vignetting)) ≈ 1 atol = 1e-12
-    prob_h, idx_h = build_problem(sh.f, sh.u0; damping = VgtkCore.LevenbergDamping()); vv_h = prob_h.variables[idx_h.vignetting]
+    prob_h, idx_h = build_problem(sh.f, sh.u0); vv_h = prob_h.variables[idx_h.vignetting]
     @test Int(RC.NLLSsolver.nvars(vv_h)) == 15
     @test VgtkCore.model(RC.NLLSsolver.update(vv_h, randn(15)))(center(sh.u0.camera.vignetting)) ≈ 1 atol = 1e-12
-    res_h = get(prob_h.problem.costs, PerViewResidual{9})[1]; vars_h = RC.NLLSsolver.getvars(res_h, prob_h.variables)
+    res_h = filter(c -> c isa PerViewResidual{9}, prob_h.blocks)[1]; vars_h = RC.NLLSsolver.getvars(res_h, prob_h.variables)
     _, Jh = RC.NLLSsolver.computeresjac(RC.static(127), res_h, vars_h...); @test size(Jh, 2) == 6 + 6 + 9 + 1 + 9 + 15 + 27
     fdh = (RC.NLLSsolver.computeresidual(res_h, vars_h[1:5]..., RC.NLLSsolver.update(vars_h[6], unit_increment(15, 2, 1e-6)), vars_h[7]) -
            RC.NLLSsolver.computeresidual(res_h, vars_h[1:5]..., RC.NLLSsolver.update(vars_h[6], unit_increment(15, 2, -1e-6)), vars_h[7])) / 2e-6
@@ -100,7 +100,7 @@
     # degenerate: with the absolute cost-decrease test at 1e-12 (the former default) the solver stopped at a cost of ≈ 2e-12 with r −8 %,
     # μ +0.09 and the light 3.5 % off, which looked like an identifiability limit and was the stopping test.
     result = _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 200, ftol = 1e-12), damping = VgtkCore.LevenbergDamping())
-    @test result.cost / 2 < 1e-20 * c0          # (Core's record: ‖r‖²; `cost` ½‖r‖²)
+    @test result.metadata.cost / 2 < 1e-20 * c0          # (Core's record: ‖r‖²; `cost` ½‖r‖²)
     @test aperture_radius(s2.u0) ≈ r_t rtol = 1e-9
     @test pinhole_θ(RC.geometric(s2.u0))[3] ≈ pinhole_θ(lens_t)[3] atol = 1e-9 * W      # (`lens` is shadowed by a test variable)
     @test pinhole_θ(RC.geometric(s2.u0))[4] ≈ pinhole_θ(lens_t)[4] atol = 1e-9 * H
@@ -139,8 +139,8 @@
     @test θ2[3] == θ0[3] && θ2[4] == θ0[4]                                                        # fixed
     ξ0, α0 = VgtkCore.parameter_vector(VgtkCore.lens(lens_t)); ξ2, α2 = VgtkCore.parameter_vector(VgtkCore.lens(l2))
     @test ξ2 ≈ -1 + (ξ0 + 1) * exp(0.02) && α2 ≈ α0 - 0.03                                    # α's ends are closed: the plain chart (a mirror at 0 and 1)
-    probm, idxm = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed = (:cx, :cy, :aspect))
-    resm = get(probm.problem.costs, PerViewResidual{9})[1]
+    probm, idxm = build_problem(s.f, s.u0; fixed = (:cx, :cy, :aspect))
+    resm = filter(c -> c isa PerViewResidual{9}, probm.blocks)[1]
     varsm = RC.NLLSsolver.getvars(resm, probm.variables)
     _, Jm = RC.NLLSsolver.computeresjac(RC.static(31), resm, varsm...)
     @test size(Jm, 2) == 6 + 3 + 9 + 1 + 9 && !any(iszero, [norm(Jm[:, 6 + j]) for j in 1:3])    # three lens columns, all moving the flux
@@ -170,10 +170,10 @@
     ratio_r = [s.u0.camera.vignetting(SVector(x, y)) / vig_r(SVector(x, y)) for x in 1.2:3.6:22.8 for y in 1.2:3.6:22.8]
     @test maximum(ratio_r) / minimum(ratio_r) - 1 < 1e-5
     @test s.u0.mat.diffuse_weight ≈ 0.4 atol = 1e-5
-    prob_r, idx_r = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
+    prob_r, idx_r = build_problem(s.f, s.u0)
     vv_r = prob_r.variables[idx_r.vignetting]; @test Int(RC.NLLSsolver.nvars(vv_r)) == 3                # 5 coefficients, the first two tied and, under the hard pin, not a column (V(𝐜) = P_0 = 1)
     @test s.u0.camera.vignetting(𝐜r) ≈ 1 atol = 1e-12
-    res_r = get(prob_r.problem.costs, PerViewResidual{9})[1]; vars_r = RC.NLLSsolver.getvars(res_r, prob_r.variables)
+    res_r = filter(c -> c isa PerViewResidual{9}, prob_r.blocks)[1]; vars_r = RC.NLLSsolver.getvars(res_r, prob_r.variables)
     @test maximum(abs, RC.NLLSsolver.computeresidual(res_r, vars_r...)) < 1e-5
 end
 
@@ -214,10 +214,10 @@ end
 
     s = calibration_problem(board_0, st, camera_t, poses, mat_t, light_t, targets; masks)
     @test !height_on(board_surface(s.u0))
-    prob, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1)
+    prob, idx = build_problem(s.f, s.u0; height_degree = 1)
     mv0 = prob.variables[idx.material]
     @test Int(RC.NLLSsolver.nvars(mv0)) == 9 + HEIGHT_NFREE && RC.n_height(mv0) == HEIGHT_NC
-    res = get(prob.problem.costs, PerViewResidual{9})[1]
+    res = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0 = RC.NLLSsolver.computeresidual(res, vars...)
     @test maximum(abs, r0) > 1e-6                                                     # the flat start misses the warped truth
@@ -246,9 +246,9 @@ end
     @test mv.basis == RC.height_basis(board)
     @test v_up.surface.h ≈ mv.surface.h + 1e-3 * mv.basis[:, 1] && v_up.mat == mv.mat && maximum(abs, Aff * (v_up.surface.h - mv.surface.h)) < 1e-12
     # without the flag nothing changes: the material block has 9 columns and the Jacobian its former width
-    prob0, idx0 = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
+    prob0, idx0 = build_problem(s.f, s.u0)
     @test Int(RC.NLLSsolver.nvars(prob0.variables[idx0.material])) == 9
-    res0 = get(prob0.problem.costs, PerViewResidual{9})[1]
+    res0 = filter(c -> c isa PerViewResidual{9}, prob0.blocks)[1]
     @test size(RC.NLLSsolver.computeresjac(RC.static(127), res0, RC.NLLSsolver.getvars(res0, prob0.variables)...)[2], 2) == c0 + 15 + 27
     # a few LM iterations from the flat start (poses + material block free, the rest held) lower the cost and bend the board towards the truth
     s2 = calibration_problem(board_0, st, camera_t, poses, mat_t, light_t, targets; masks)

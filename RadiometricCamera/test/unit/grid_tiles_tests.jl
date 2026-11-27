@@ -36,7 +36,7 @@
     masks = [compute_mask(camera_t, p, board, st; δ = 0.02, backend = RadiometricCamera.KernelAbstractions.CPU()) for p in poses]
     targets = [render_view(k, camera_t, poses[k], mat_t, light_t, board, st, masks[k]) for k in 1:2]
     s = calibration_problem(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks)
-    prob, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob, idx = build_problem_grid(s.f, s.u0; patch = (5, 5))
     tiles = RC.tile_costs(prob)
     # LM smoke: perturb the grid (small direction rotations) + a pose nudge; joint LM must recover sharply
     G_p = copy(VgtkCore.directions(VgtkCore.model(glens_t)))   # Core's layout [gy, gx]
@@ -153,7 +153,7 @@ end
     @test VgtkCore.present_nodes(VgtkCore.model(lens_m)) == held && all(v -> all(isnan, v), D(lens_m)[.!held])
     camera_m = RadiometricCameraModel(lens_m, focus_t, r_t, vig_t)
     s_all = calibration_problem(board, st, camera_m, copy(poses), mat_t, light_t, targets; masks)
-    @test_throws ArgumentError build_problem_grid(s_all.f, s_all.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    @test_throws ArgumentError build_problem_grid(s_all.f, s_all.u0; patch = (5, 5))
     reads_held(u, v) = all(p -> all(isfinite, VgtkCore.backproject(lens_m, first(p))), RC.sensor_samples(st.sensor, u, v))
     masks_m = [BitMatrix([mk[v, u] && reads_held(u, v) for v in axes(mk, 1), u in axes(mk, 2)]) for mk in masks]
     @test all(k -> 0 < count(masks_m[k]) < count(masks[k]), 1:2)
@@ -162,9 +162,9 @@ end
     # in a problem: zero cost at the start, the rows' Jacobian against central differences through the patch blocks' retraction,
     # no column for an absent node; a patch block with no present node is not a variable of the solve
     for pr in (pr2, prp)
-        prob_p, idx_p = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), smoothness = pr)
+        prob_p, idx_p = build_problem_grid(s.f, s.u0; patch = (5, 5), smoothness = pr)
         @test idx_p.dependent_patches == [idx_p.patches[1, 1]]
-        costs = [c for T in keys(prob_p.problem.costs) if T <: RC.GridSmoothnessResidual for c in get(prob_p.problem.costs, T)]
+        costs = [c for c in prob_p.blocks if c isa RC.GridSmoothnessResidual]
         @test sum(c -> length(c.terms), costs) == length(pr.rows)
         @test RC.grid_smoothness_cost(pr, glens_t) == 0.0
         for c in costs
@@ -193,7 +193,7 @@ end
         end
     end
     # the absent nodes have no tile column either, and every residual is finite (none reads a NaN slot)
-    prob_f, idx_f = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob_f, idx_f = build_problem_grid(s.f, s.u0; patch = (5, 5))
     for r in RC.tile_costs(prob_f)
         res, J = RC.NLLSsolver.computeresjac(RC.static(1023), r, RC.NLLSsolver.getvars(r, prob_f.variables)...)
         @test all(isfinite, res) && all(isfinite, J)
@@ -219,7 +219,7 @@ end
     require_gpu()                                  # errors with the reason when the GPU the runner chose is not usable here
     if RC_GPU_TESTS
         s_g = calibration_problem(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5))
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         rc = tiles[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles)]

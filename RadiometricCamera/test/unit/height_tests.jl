@@ -109,7 +109,7 @@ end
     # 3. Jacobian columns of the free height parameters (material block: HEIGHT_NFREE AD columns after the 9 BRDF parameters; h = h₀ + B y) vs differences of the tile
     #    residual through `update`; the pose columns still match (duals flow through the surface intersection)
     s_h = calibration_problem(board_hh(0.5 * height_true), st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h)
-    prob_h, idx_h = build_problem_grid(s_h.f, s_h.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
+    prob_h, idx_h = build_problem_grid(s_h.f, s_h.u0; patch = (5, 5), height_degree = 2)
     tiles_h = RC.tile_costs(prob_h)
     r_h = tiles_h[argmax([length(t.pix) for t in tiles_h])]
     vars_h = collect(RC.NLLSsolver.getvars(r_h, prob_h.variables))
@@ -163,11 +163,11 @@ end
     if RC_GPU_TESTS
         board_hg = board_hh(0.5 * height_true)
         s_g = calibration_problem(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         s_c = calibration_problem(board_hg, st_h, camera_h, poses_h, mat_h, light_h, targets_h; masks = masks_h, backend = RadiometricCamera.KernelAbstractions.CPU())
-        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
+        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; patch = (5, 5), height_degree = 2)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
         varsg = RC.NLLSsolver.getvars(rg, prob_g.variables)
@@ -230,8 +230,8 @@ end
         s_g = calibration_problem(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = CUDA.CUDABackend())
         s_c = calibration_problem(board_t, st_h, camera_h, poses_h, mat_h, light_h, targets_t; masks = masks_t, backend = RadiometricCamera.KernelAbstractions.CPU())
         @test maximum(maximum(abs, a .- b) for (a, b) in zip(render_all(s_g.f, s_g.u0), render_all(s_c.f, s_c.u0))) < 2e-3 * maximum(maximum, render_all(s_c.f, s_c.u0))
-        prob_g, _ = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
-        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2)
+        prob_g, _ = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5), height_degree = 2)
+        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; patch = (5, 5), height_degree = 2)
         tiles_g = RC.tile_costs(prob_g); tiles_c = RC.tile_costs(prob_c)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]

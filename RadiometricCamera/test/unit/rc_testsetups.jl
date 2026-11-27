@@ -18,7 +18,7 @@
     """`block_camera(block, bound)`: the pixel camera of a lens block (its model), bounded like `bound`."""
     block_camera(block, bound) = VgtkCore.with_model(bound, VgtkCore.model(block))
     using VisualRadiometryToolkitCore: EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count   # the light (VisualRadiometryToolkitCore's)
-    export RC, VgtkCore, VrtkCore, VgtkIO, FIXTURE_DIR, FIXTURE_BASE, fixture_paths, fixture_board, cam, camera_of, pinhole_θ, updated_vars, unit_increment, central_difference, same_cache_type, has_lens, free_names, block_camera,
+    export RC, VgtkCore, VrtkCore, VgtkIO, FIXTURE_DIR, FIXTURE_BASE, fixture_paths, fixture_board, cam, camera_of, pinhole_θ, updated_vars, unit_increment, central_difference, has_lens, free_names, block_camera,
            EnvironmentLight, SphericalHarmonicMap, coefficients, with_coefficients, max_degree, sh_count
 end
 

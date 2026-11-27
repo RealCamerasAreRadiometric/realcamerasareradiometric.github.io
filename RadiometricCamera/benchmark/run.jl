@@ -142,7 +142,7 @@ function first_block(problem, blocks)
     vars = NLLSsolver.getvars(r, problem.variables)
     return r, vars, 2^length(vars) - 1
 end
-view_blocks(problem) = (T = only(T for T in keys(problem.problem.costs) if T <: RC.PerViewResidual); get(problem.problem.costs, T))
+view_blocks(problem) = [c for c in problem.blocks if c isa RC.PerViewResidual]
 
 function stages(c)
     k = 1; u, v = W ÷ 2, H ÷ 3
@@ -165,7 +165,7 @@ function stages(c)
     add("linear_joint", () -> () -> (s = c.state(); radiometry(s, RC.JointRadiometry(; damping = VgtkCore.LevenbergDamping())); cost(s.f, s.u0)[1]))
     # per view
     function view_setup()
-        s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = c.state(); problem, _ = RC.build_problem(s.f, s.u0; height_degree = HEIGHT_DEGREE)
         r, vars, flags = first_block(problem, view_blocks(problem))
         return s, r, vars, flags
     end
@@ -179,7 +179,7 @@ function stages(c)
     grid = Ref{Any}(nothing)
     grid_state() = (grid[] === nothing && (grid[] = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, c.lens), RC.GridStart(; lattice = RC.ImageLattice(GRID...))).u); c.state(grid[]))
     add("tile_normal_equations", () -> begin
-        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         () -> RC._with_registered(s.f, s.u0, problem, idx) do
@@ -187,7 +187,7 @@ function stages(c)
         end
     end)
     add("tile_rows_products", () -> begin           # the same tiles again within one registration: the view's batch is its memoized one
-        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), height_degree = HEIGHT_DEGREE)
+        s = grid_state(); problem, idx = RC.build_problem_grid(s.f, s.u0; height_degree = HEIGHT_DEGREE)
         tiles = [t for t in RC.tile_costs(problem) if t.k == k]
         flags = 2^10 - 1
         sweep() = sum(t -> RC._block_normal_equations(flags, t, NLLSsolver.getvars(t, problem.variables))[1], tiles)
@@ -214,7 +214,7 @@ function inferred_types(c)
         "_FluxAt(id)" => inferred(flux, UInt32(1)),
         "render_view" => inferred(RC.render_view, k, c.camera, c.poses[k], c.mat, c.light, c.board, c.settings, c.masks[k]),
         "world_ray" => inferred(RC.world_ray, c.camera, c.poses[k], SVector(1.0, 1.0), SVector(0.0, 0.0, 0.0)),
-        "CalibrationState" => (; type = string(typeof(s)), concrete = isconcretetype(typeof(s))),
+        "calibration data" => (; type = string(typeof(s)), concrete = isconcretetype(typeof(s))),
         "cost(state)" => inferred(cost, s),
         "all_parts(state)" => inferred(RC.all_parts, s),
         "view_of(state, k)" => inferred(RC.view_of, s, k),

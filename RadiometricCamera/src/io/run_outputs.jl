@@ -35,13 +35,13 @@ end
 """
     lm_termination(res) -> (ReturnCode.T, StopRule)
 
-The termination record of the refinement's LM: `res` is the last chunk's record (VisualGeometryToolkitCore's `lmsolve_chart!` on the
-LM's `LmProblem`: `(; code, rule, iterations, cost)`), decided at the point the chunk returned (VisualGeometryToolkitCore's rule): a cost-decrease or
+The termination record of the refinement's LM: `res` is the last chunk's result (VisualGeometryToolkitCore's `LevenbergMarquardt` on
+the chunk's `CalibrationBundle`: a `FitResult`, its `retcode` and `stop_rule`), decided at the point the chunk returned (VisualGeometryToolkitCore's rule): a cost-decrease or
 step-size tolerance stop (`[optimizer] ftol`, `xtol`) is `Success` — converged by definition, no stationarity postcondition; the rejection
 cap is `Success` only at a stationary point and `Stalled` otherwise; the iteration and time caps `MaxIters` / `MaxTime`. A run of chunks ends on one
 that did not iterate, at the final state. `nothing` (the LM did not run): `(ReturnCode.Default, NoRule)`.
 """
-lm_termination(res) = res === nothing ? (VgtkCore.ReturnCode.Default, VgtkCore.NoRule) : (res.code, res.rule)
+lm_termination(res) = res === nothing ? (VgtkCore.ReturnCode.Default, VgtkCore.NoRule) : (res.retcode, res.stop_rule)
 
 """
     save_radiometric_calibration(f, θ, result; run, settings)
@@ -142,7 +142,7 @@ function _run_parameters(run, settings, meta, f::CalibrationData, θ::Calibratio
         sensor_characterization = run.camera.sensor_characterization, sensor_models = sensor_record(meta.names, f.sensor_models),
         sensor_model = hasproperty(meta, :sensor_model) ? meta.sensor_model : nothing,   # mode, used, the record present (`sensor_model_record`): "off" + present = a record not used
         camera_moved = moved_m, iterations = length(trace), seconds = round(costs.seconds),
-        stopped = res === nothing ? "no LM iteration" : string(res.rule),
+        stopped = res === nothing ? "no LM iteration" : string(res.stop_rule),
         retcode = string(costs.termination[1]), stop_rule = string(costs.termination[2]),        # the termination record (Core's §14): the LM's, or the fold check's
         calibrated_folds = costs.folds === nothing ? nothing :                                    # the calibrated camera's folds over its coverage (`calibrated_folds`)
             (; folded = length(costs.folds.folded), samples = costs.folds.samples, unimaged = costs.folds.unimaged))

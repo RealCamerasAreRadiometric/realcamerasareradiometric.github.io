@@ -213,6 +213,6 @@ end
         @test_throws sha_b RC.prediction_observation(off, om_a, b)
         @test_throws "no file" RC.prediction_observation(off, om_a, joinpath(dir, "typo.json"))
         # a state estimated under record a continues an "off" run reading the same photographs without it; under "auto" refused
-        @test RC._continues(off, om_a, om_0) && !RC._continues(auto, om_a, om_0) && !RC._continues(off, om_a, RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :G))
+        @test RC._state_continues(off, om_a, om_0) && !RC._state_continues(auto, om_a, om_0) && !RC._state_continues(off, om_a, RC.ObservationModel(RC.NoSensorRecord(), RC.Decoded(false), :G))
     end
 end

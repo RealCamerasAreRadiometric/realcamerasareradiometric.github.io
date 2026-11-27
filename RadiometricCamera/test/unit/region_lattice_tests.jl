@@ -35,7 +35,7 @@
         P = VgtkCore.present_nodes(m)
         @test count(P[1:L.grid_size[2], 1:L.grid_size[1]]) == st.supported && count(P) >= st.supported
         # the camera images every region pixel, the source's rays to the fit's accuracy
-        px = VgtkCore.pixel_centres(region, 1:W, 1:H)
+        px = VgtkCore.pixel_centers(region, 1:W, 1:H)
         r1 = rays(st.camera, px); r0 = rays(kb, px)
         @test all(r -> all(isfinite, r), r1) && maximum(acos(clamp(dot(normalize(a), normalize(b)), -1, 1)) for (a, b) in zip(r1, r0)) < 1e-4
     end
@@ -66,7 +66,7 @@ end
         @test all(lo .<= 0) && all(lo .> -st.spacing)
         # every node of the unpadded lattice is supported (a rectangle the lattice covers): the count is its node count
         @test st.supported == prod(RC.region_layout(sensor, st.spacing).grid_size) && abs(st.supported - N) / N < 0.15
-        px = VgtkCore.pixel_centres(sensor, 1:W, 1:H)
+        px = VgtkCore.pixel_centers(sensor, 1:W, 1:H)
         @test all(r -> all(isfinite, r), Array(VgtkCore.backproject(m, px; device = CPU())))
     end
     # N = 7875 on the FX3 sensor (configs/default.toml's derivation of the example count): the 41 px cell, 107 × 73 = 7811 nodes, padded to 110 × 75

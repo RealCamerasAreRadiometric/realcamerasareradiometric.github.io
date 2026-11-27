@@ -15,7 +15,7 @@ or predicts, only photographs read as it was estimated on — another is refused
 [`OffSensorModel`](@ref)`()` (`camera.sensor_model = "off"`) a state estimated under a sensor record continues a run that reads the
 same photographs without it (the run's resolution warned, `observation_model`'s `stated`)."""
 function load_state_into!(f::CalibrationData, θ::CalibrationParameters, sst, names; sensor_model::SensorModelMode = AutoSensorModel())
-    _continues(sensor_model, sst.observation, observation_model(f)) ||
+    _state_continues(sensor_model, sst.observation, observation_model(f)) ||
         throw(ArgumentError("state: estimated under the observation model $(observation_line(sst.observation)), the run reads its photographs " *
                             "under $(observation_line(observation_model(f))): a state continues or predicts only photographs read as it was estimated on"))
     idx = [findfirst(==(n), sst.names) for n in names]
@@ -38,8 +38,8 @@ function load_state_into!(f::CalibrationData, θ::CalibrationParameters, sst, na
 end
 
 # whether a state estimated under `a` continues a run reading under `b`: the same observation model; "off" also a record not used
-_continues(::SensorModelMode, a::ObservationModel, b::ObservationModel) = a == b
-_continues(::OffSensorModel, a::ObservationModel{SensorRecord}, b::ObservationModel{NoSensorRecord}) = a.kind == b.kind && a.channel === b.channel
+_state_continues(::SensorModelMode, a::ObservationModel, b::ObservationModel) = a == b
+_state_continues(::OffSensorModel, a::ObservationModel{SensorRecord}, b::ObservationModel{NoSensorRecord}) = a.kind == b.kind && a.channel === b.channel
 # The state's vignetting field is the run's only when its geometry is (2026-10-30: a 16-node profile over the whole sensor,
 # r_max 2560 px, was taken for the 16-node profile over a measured image circle, r_max 1592 px, by its size alone): the same
 # type, number of nodes, degree and knots, and for a radial profile the same centre and r_max.

@@ -499,41 +499,40 @@ others run, so the estimate is an upper bound."""
 const WINDOW_MEMORY_FOOTPRINT = 0.4
 
 """
-    _register_window!(f, θ, problem, select; width = nothing)
+    _register_window!(f, θ, bundle, select; width = nothing, vectors = bundle)
 
-Enable the concurrent evaluation (`_windowed`) of the residual blocks of `problem` whose type `select` accepts (in the problem's order,
-as NLLSsolver visits them): `width` blocks ahead of each request, or (`nothing`) `_window_width`'s, derived after the first block.
-`_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall postcondition register their problem and unregister it on exit
-(`_unregister_window!`).
+Enable the concurrent evaluation (`_windowed`) of the residual blocks of `bundle` (a [`CalibrationBundle`](@ref)) whose type `select`
+accepts (in NLLSsolver's visit order, `_visit_order`): `width` blocks ahead of each request, or (`nothing`)
+`_window_width`'s, derived after the first block. `vectors` is where the requests' variables live (`_trial_vectors`): the bundle's own
+variables, or the solver's (`_solver_vectors`) while it solves. `_lm_views!` (the views), `_lm_tiles!` (the tiles) and the stall
+postcondition register their problem and unregister it on exit (`_unregister_window!`).
 """
-_register_window!(f::CalibrationData, θ::CalibrationParameters, p::VgtkCore.LmProblem, select; width::Union{Nothing, Integer} = nothing) =
-    _register_window!(f, θ, p.problem, select; width)                           # an LM problem: its NLLSsolver problem's blocks
-function _register_window!(f::CalibrationData, θ::CalibrationParameters, problem, select; width::Union{Nothing, Integer} = nothing)
+function _register_window!(f::CalibrationData, θ::CalibrationParameters, bundle, select; width::Union{Nothing, Integer} = nothing, vectors = bundle)
     _unregister_window!(f)
     _ensure_device!(f, θ); _height_board(f, θ); _view_phi(f, θ, 1)        # the device cache's lazy entries, built before workers read it
-    list = [c for T in keys(problem.costs) if select(T) for c in get(problem.costs, T)]
+    problem = vectors
+    list = [c for c in _visit_order(bundle) if select(typeof(c))]
     pos = IdDict{Any, Int}(c => i for (i, c) in enumerate(list))
     f.device_cache = merge(f.device_cache, (; window = (; problem, list, pos, width = Ref(width === nothing ? 0 : Int(width)),
                                                          pending = Vector{Any}(nothing, length(list)), block_bytes = Threads.Atomic{Int}(0),
                                                          buffers = IdDict{Task, Any}(), buffers_lock = ReentrantLock())))
     return nothing
 end
-"""The views of a per-view problem concurrently (`_register_window!`)."""
-_register_view_problem!(f::CalibrationData, θ::CalibrationParameters, problem; width = nothing) = _register_window!(f, θ, problem, T -> T <: PerViewResidual; width)
-
 """
-    _with_registered(work, f, θ, problem, idx = nothing; concurrent = true) -> work()
+    _with_registered(work, f, θ, bundle, idx = nothing; concurrent = true, vectors = bundle) -> work()
 
-`work()` with the LM problem `problem` registered on the data `f` (at the parameters `θ`), and unregistered on exit whatever `work` does — the one teardown of
-`_lm_views!`, `_lm_tiles!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view
-batches (`_register_grid_problem!`); with `concurrent` its blocks in the window (`_register_window!`: the views of a per-view
-problem, the tiles of a grid problem).
+`work()` with the calibration problem `bundle` (a [`CalibrationBundle`](@ref), its variables in `vectors`: `_register_window!`)
+registered on the data `f` (at the parameters `θ`), and unregistered on exit whatever `work` does — the one teardown of `_lm_views!`,
+`_lm_tiles!` and the grid smoothness's weight selection. A grid problem (`idx`, `build_problem_grid`'s indices) its view batches
+(`_register_grid_problem!`); with `concurrent` its blocks in the window (`_register_window!`: the views of a per-view problem, the tiles
+of a grid problem). `vectors = nothing` registers nothing: every block evaluates on its own (the same values, bit for bit).
 """
-function _with_registered(work, f::CalibrationData, θ::CalibrationParameters, problem, idx = nothing; concurrent::Bool = true)
+function _with_registered(work, f::CalibrationData, θ::CalibrationParameters, bundle, idx = nothing; concurrent::Bool = true, vectors = bundle)
+    vectors === nothing && return work()
     grid = idx !== nothing && hasproperty(idx, :patches)
-    grid && _register_grid_problem!(f, θ, problem, idx)
+    grid && _register_grid_problem!(f, θ, bundle, idx; vectors)
     try
-        concurrent && _register_window!(f, θ, problem, grid ? (T -> T <: PerTileResidual) : (T -> T <: PerViewResidual))
+        concurrent && _register_window!(f, θ, bundle, grid ? (T -> T <: PerTileResidual) : (T -> T <: PerViewResidual); vectors)
         return work()
     finally
         concurrent && _unregister_window!(f)            # (its jobs read the grid batch: first)
@@ -690,9 +689,10 @@ _hold_material(blocks_held, rides::Bool) =
     :material in blocks_held && rides ? ((:material,), Tuple(k for k in blocks_held if k !== :material)) : ((), Tuple(blocks_held))
 
 """
-    build_problem(f::CalibrationData, θ::CalibrationParameters; damping, fixed = (), height_degree = 0, inplane = false) -> (problem::LmProblem, idx)
+    build_problem(f::CalibrationData, θ::CalibrationParameters; fixed = (), height_degree = 0, inplane = false) -> (problem::CalibrationBundle, idx)
 
-The per-view LM problem at the state `s`: VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`) with one pose
+The per-view LM problem at the state `s`: a [`CalibrationBundle`](@ref) (VisualGeometryToolkitCore's block contract, solved by its
+`LevenbergMarquardt`) with one pose
 variable (`VgtkCore.LeftRigidManifold6{Float64}`) per view, the shared distortion / focus / aperture / material / vignetting / lighting variables and one
 `PerViewResidual` per view. `fixed` is the one holding keyword: the blocks it names (of `(:poses, :distortion, :focus, :aperture,
 :material, :vignetting, :lighting)`) are held — the problem's `fixed` variables, `idx.free` the free mask; `:material` holds Θ_m alone
@@ -703,10 +703,9 @@ Core's names in the lens block (`lens_free`; `(:cx, :cy, :k3)`, `:aspect` the as
 `ArgumentError`. A lens with no free parameter is held. The model's structure (as the grid route's `build_problem_grid`): with
 `height_degree > 0` the material block carries the board warping's `HEIGHT_NC` nodal heights (`MaterialVar{Float64, HEIGHT_NC}`:
 HEIGHT_NFREE free parameters, h = h₀ + B y with `B = height_basis(f.board)`); with `inplane` the in-plane print error `(a, u)` of
-the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it. `damping` the LM's (its optimizer's,
-VisualGeometryToolkitCore's `LmDamping`: the `LmProblem`'s).
+the surface (Core's `Aspect ∘ Skew`, two dual-number columns) — each unless `fixed` holds it.
 """
-function build_problem(f::CalibrationData, θ::CalibrationParameters{N}; damping::VgtkCore.LmDamping, fixed = (), height_degree::Integer = 0,
+function build_problem(f::CalibrationData, θ::CalibrationParameters{N}; fixed = (), height_degree::Integer = 0,
                        inplane::Bool = false) where {N}
     K = n_views(θ)
     vv = VgtkCore.restrict(VgtkCore.ParameterManifold(θ.camera.vignetting), vignetting_basis(f, θ))   # Θ_v: Core's LinearSubspaceManifold
@@ -727,8 +726,61 @@ function build_problem(f::CalibrationData, θ::CalibrationParameters{N}; damping
     free = trues(length(variables))
     last(lens_free(geometric(θ); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
     _free_mask!(free, idx, blocks_held; lens_key = :distortion, lens_idx = i_d)
-    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free), damping), (; idx..., free)
+    return CalibrationBundle(variables, blocks, free), (; idx..., free)
 end
+
+"""
+    CalibrationBundle(variables, blocks, free)
+
+A calibration LM's problem — `build_problem`'s (per view) and `build_problem_grid`'s (per tile): its NLLSsolver variables (the poses,
+the lens or the grid's patches, focus, aperture, material, vignetting, lighting), its residual blocks (a view's or a tile's, the
+smoothness rows) and the free mask `free` over the variables (a held block: NLLSsolver's unfixed mask). A bundle of
+VisualGeometryToolkitCore's block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary: the
+result is the LM's own, `u` its variables), solved by `init(RefineProblem(bundle, bundle.variables), LevenbergMarquardt(; damping);
+stops, callback)` and `solve!` (`_solve_bundle!`).
+"""
+struct CalibrationBundle <: VgtkCore.AbstractBlockProblem
+    variables::Vector{Any}
+    blocks::Vector{Any}
+    free::BitVector
+end
+VgtkCore.block_structure(b::CalibrationBundle, _u0) = (b.variables, b.blocks, nothing)
+VgtkCore.fixed_variables(b::CalibrationBundle) = findall(!, b.free)
+VgtkCore.default_optimization_strategy(::CalibrationBundle) = nothing    # plain least squares: the rows are whitened at the data
+VgtkCore.residual_summary(::CalibrationBundle) = nothing                 # the result reads no row: nothing swept at the solution
+VgtkCore.block_result(::CalibrationBundle, _u0, r::VgtkCore.FitResult, _summary) = r
+
+"""
+    _solve_bundle!(f, θ, bundle, idx, extract; stops, damping, callback) -> FitResult
+
+The calibration LM of `bundle` on the data `f` at the parameters `θ` (`idx` its indices): VisualGeometryToolkitCore's
+LevenbergMarquardt at the optimizer's `damping` under `stops` (`_lm_stops`: their residual resolution the data's), the solve with
+the bundle registered (`_with_registered`, the solver's variables `_solver_vectors`), the solution read back into `θ` through the
+route's `extract` (`read_back!`). The result is the LM's: its termination record, `stats.nsteps` the accepted iterations,
+`metadata.cost` ‖r‖² at the solution.
+"""
+function _solve_bundle!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx, extract; stops::VgtkCore.LmStops,
+                        damping::VgtkCore.LmDamping, callback = nothing)
+    c = VgtkCore.init(VgtkCore.RefineProblem(bundle, bundle.variables), VgtkCore.LevenbergMarquardt(; damping); stops = _lm_stops(f, stops), callback)
+    r = _with_registered(() -> VgtkCore.solve!(c), f, θ, bundle, idx; vectors = _solver_vectors(c))
+    read_back!(f, θ, r.u, idx, extract)
+    return r
+end
+"""The residual blocks of `b` in the order the LM visits them — NLLSsolver's: by type, in the order of the blocks' `Union` (the problem
+VisualGeometryToolkitCore builds holds them in a repository of that union), then as added."""
+function _visit_order(b::CalibrationBundle)
+    U = Union{unique(typeof.(b.blocks))...}
+    return Any[c for T in _union_types(U) for c in b.blocks if typeof(c) === T]
+end
+_union_types(U::Union) = (_union_types(U.a)..., _union_types(U.b)...)
+_union_types(T::Type) = (T,)
+"""Where a solve's requests find their variables (`_register_window!`): the solver's own vectors while `solve!(c)` runs; none
+(`nothing`: each block evaluated on its own) until VisualGeometryToolkitCore states them."""
+_solver_vectors(_c) = nothing
+"""The variable vectors a request's variables are located in (`_locate_vars`): a bundle's own, or a solver problem's variables and
+trial (NLLSsolver's `variables`, `varnext`)."""
+_trial_vectors(b::CalibrationBundle) = (b.variables,)
+_trial_vectors(p) = (p.variables, p.varnext)
 
 """
     extract_variables(f, θ, vars, idx) -> (camera, poses, mat, surface, light)
@@ -745,10 +797,11 @@ function extract_variables(f::CalibrationData, θ::CalibrationParameters, vars::
     return camera, poses, mv.mat, mv.surface, (vars[idx.lighting]::LightingVar).light
 end
 
-"""`read_back!(f, θ, problem, idx, extract = extract_variables)`: write the optimised variables of `problem` back into the state, read
-through the route's `extract` (`extract_variables` per view, `extract_variables_grid` per tile): the one read-back of both LMs."""
-function read_back!(f::CalibrationData, θ::CalibrationParameters, problem, idx, extract = extract_variables)
-    camera, poses, mat, surface, light = extract(f, θ, problem.variables, idx)
+"""`read_back!(f, θ, vars, idx, extract = extract_variables)`: write the variable vector `vars` (an LM's solution: its result's `u`) back
+into the state, read through the route's `extract` (`extract_variables` per view, `extract_variables_grid` per tile): the one read-back
+of both LMs."""
+function read_back!(f::CalibrationData, θ::CalibrationParameters, vars::AbstractVector, idx, extract = extract_variables)
+    camera, poses, mat, surface, light = extract(f, θ, vars, idx)
     θ.camera = camera; θ.poses .= poses
     θ.mat = mat; θ.light = light
     set_surface!(θ, surface)
@@ -789,61 +842,58 @@ end
 """
     _lm_callback(f, θ, idx, extract; trace, trace_meta, iter_callback, verbose, lm_log) -> callback
 
-The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one): with a `trace` or an `iter_callback`, after
-every iteration the current best variables (`varnext` once allocated, else `variables`) read through `extract(s, vars, idx)` (the
-route's `extract_variables` / `extract_variables_grid`) into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace`
-(`trace_meta` merged, `phase = :lm`) and `iter_callback(it, cost, camera, poses, mat, surface, light)` called; else NLLSsolver's
-print-out (`verbose`) or null callback. Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none).
+The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one; VisualGeometryToolkitCore's `callback = state ->
+Bool` of its LevenbergMarquardt, `state` an `LmIterationState`): with a `trace` or an `iter_callback`, after every iteration the
+iterate's variables (`state.u`) read through `extract(s, vars, idx)` (the route's `extract_variables` / `extract_variables_grid`)
+into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace` (`trace_meta` merged, `phase = :lm`) and
+`iter_callback(it, cost, camera, poses, mat, surface, light)` called; else a print-out line per iteration (`verbose`, `_lm_print`)
+or none (`nothing`). Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none). It never stops the
+solve.
 """
 function _lm_callback(f::CalibrationData, θ::CalibrationParameters, idx, extract; trace = nothing, trace_meta = (;), iter_callback = nothing, verbose::Bool = false,
                       lm_log::AbstractString = "")
     cb = if trace !== nothing || iter_callback !== nothing
         it = Ref(0)
-        function (cost, problem_, data, iterdata)
-            vars = length(problem_.varnext) == length(problem_.variables) ? problem_.varnext : problem_.variables
-            camera, poses, mat, surface, light = extract(f, θ, vars, idx)
+        function (state)
+            camera, poses, mat, surface, light = extract(f, θ, state.u, idx)
             it[] += 1
-            trace !== nothing && push!(trace, (; trace_meta..., phase = :lm, cost = Float64(cost), time = time(),
+            trace !== nothing && push!(trace, (; trace_meta..., phase = :lm, cost = state.cost, time = time(),
                                                snap = Θ̄_snapshot(f, θ; camera, poses, mat, surface, light)))
-            iter_callback !== nothing && iter_callback(it[], Float64(cost), camera, poses, mat, surface, light)
-            return cost, 0
+            iter_callback !== nothing && iter_callback(it[], state.cost, camera, poses, mat, surface, light)
+            return false
         end
     else
-        verbose ? NLLSsolver.printoutcallback : NLLSsolver.nullcallback
+        verbose ? _lm_print : nothing
     end
     return _lm_log(cb, get(trace_meta, :ϕ², NaN), lm_log)
 end
 
 """
-    _lm_views!(f, θ; stops, damping, fixed = (), height_degree = 0, inplane = false, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_views!(f, θ; stops, damping, fixed = (), height_degree = 0, inplane = false, kwargs...) -> FitResult
 
 Levenberg–Marquardt over all parameter blocks but those `fixed` names (of `(:poses, :distortion, :focus, :aperture, :material,
 :vignetting, :lighting)`), the surface parameters it names (`:height`, `:inplane`) and the lens block's parameters `fixed` names by
 Core's parameter names (`lens_free`; default none: every parameter but the skew is free; `:aspect` ties the focal lengths): one
 holding keyword (`build_problem`, with the model's structure `height_degree` and `inplane`). `iter_callback(it, cost, camera, poses,
 mat, surface, light)` sees the current best variables after every iteration and `trace` collects the per-iteration snapshots
-(`_lm_callback`, as `_lm_tiles!`); with a file `lm_log` (the algorithm's `log`) a line per iteration is appended to it (`_lm_log`). The solve is VisualGeometryToolkitCore's one LM, `lmsolve_chart!` on `build_problem`'s
-`LmProblem` at the optimizer's `damping` under the solve's `stops` (Core's `LmStops`, their residual resolution the state's: `_lm_stops`) — the RELATIVE cost decrease `ftol`, the
+(`_lm_callback`, as `_lm_tiles!`); with a file `lm_log` (the algorithm's `log`) a line per iteration is appended to it (`_lm_log`). The solve is VisualGeometryToolkitCore's one LM, its `LevenbergMarquardt` on `build_problem`'s
+`CalibrationBundle` (`_solve_bundle!`) at the optimizer's `damping` under the solve's `stops` (Core's `LmStops`, their residual resolution the state's: `_lm_stops`) — the RELATIVE cost decrease `ftol`, the
 relative step test `xtol_rel` and the absolute step max-norm `xtol`; no absolute cost decrease test — the cost is in the photographs' squared units, dimensionless when the rows
 are whitened (a two-view 32 × 32 fixture starts at ≈ 2e-4), so an absolute threshold of 1e-12 stopped the solver with the aperture, μ and the lighting still drifting together
-along a flat direction. Returns VisualGeometryToolkitCore's termination record (`code`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
-— or at a stationary point after the rejection cap; `rule`, a `StopRule`; `iterations`; `cost`, ‖r‖² at the solution).
+along a flat direction. Returns the LM's `FitResult` (`retcode`, a `ReturnCode`: `Success` at a tolerance stop — converged by definition
+— or at a stationary point after the rejection cap; `stop_rule`, a `StopRule`; `stats.nsteps`; `metadata.cost`, ‖r‖² at the solution).
 """
 function _lm_views!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, fixed = (), verbose::Bool = false,
                     trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
                     lm_log::AbstractString = "")
-    problem, idx = build_problem(f, θ; damping, fixed, height_degree, inplane)
+    bundle, idx = build_problem(f, θ; fixed, height_degree, inplane)
     callback = _lm_callback(f, θ, idx, extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
     _reset_scrubbed!(f.run)
-    result = try                                           # (Core's stall postcondition runs inside, the views still concurrent)
-        _with_registered(f, θ, problem) do
-            VgtkCore.lmsolve_chart!(problem, _lm_stops(f, stops); callback)
-        end
+    try                                                    # (Core's stall postcondition runs inside, the views still concurrent)
+        return _solve_bundle!(f, θ, bundle, idx, extract_variables; stops, damping, callback)
     finally
         _report_scrubbed(f.run, "_lm_views!")
     end
-    read_back!(f, θ, problem, idx)
-    return result
 end
 
 """The absolute step tolerance of every LM of RC: Core's of record (`LmStops()`'s `xtol`, NLLSsolver's dstep); no `[optimizer]` key."""
@@ -861,24 +911,30 @@ _chunk_stops(stops::VgtkCore.LmStops, n::Integer, max_time::Real) =
 """
     _lm_log(cb, ϕ², path) -> callback
 
-With a `path` (the algorithm's `log`, the LMs' `lm_log` keyword; empty: `cb` itself) `cb` followed by a per-iteration line (tab-separated) appended
-to that file: iteration, cost, rel-RMS (√(2 cost / ϕ²)), the best cost before the iteration, λ after its update, the linear solves of
-the iteration (1 = accepted at once; each further solve is a rejected step that raised λ), and the DᵀD scaling's min / max / number
-of entries at its floor (1e-8 × max).
+With a `path` (the algorithm's `log`, the LMs' `lm_log` keyword; empty: `cb` itself) `cb` (`nothing`: none) followed by a per-iteration
+line (tab-separated) appended to that file, from the iteration's `LmIterationState`: iteration, cost, rel-RMS (√(2 cost / ϕ²)), the
+best cost before the iteration, λ after its update, the linear solves of the iteration (1 = accepted at once; each further solve is a
+rejected step that raised λ), and the DᵀD scaling's min / max / number of entries at its floor (1e-8 × max).
 """
 function _lm_log(cb, ϕ², path::AbstractString)
     isempty(path) && return cb
     prev = Ref(0)
-    return function (cost, problem, data, iterdata)
-        out = cb(cost, problem, data, iterdata)
-        nsolves = data.solves.count
-        sc = hasproperty(iterdata, :scaling) ? iterdata.scaling : nothing
+    return function (state)
+        out = cb === nothing ? false : cb(state)
+        nsolves = state.linear_solves
+        sc = state.scaling
         open(path, "a") do io
-            println(io, join((data.iternum, Float64(cost), sqrt(2 * Float64(cost) / ϕ²), data.bestcost, iterdata.lambda, nsolves - prev[],
+            println(io, join((state.iteration, state.cost, sqrt(2 * state.cost / ϕ²), state.best_cost, state.damping, nsolves - prev[],
                               sc === nothing ? "" : minimum(sc), sc === nothing ? "" : maximum(sc),
                               sc === nothing ? "" : count(<=(1e-8 * maximum(sc) * (1 + 1e-12)), sc), time()), '\t'))
         end
         prev[] = nsolves
         return out
     end
+end
+"""A calibration LM's print-out line per iteration (`_lm_callback` with `verbose`): the iteration, the cost, the best cost before it, λ
+and the time since the solve started (its `LmIterationState`)."""
+function _lm_print(state)
+    @printf("iter %4d: cost %.6e (best %.6e), λ %.3e, %.1f s\n", state.iteration, state.cost, state.best_cost, state.damping, state.elapsed)
+    return false
 end

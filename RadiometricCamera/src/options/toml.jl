@@ -237,7 +237,7 @@ end
 # The checks a single field's type cannot state.
 function _check_options(run::RunOptions, settings::CalibrationSettings)
     isempty(run.camera.lens_coverage) && throw(ArgumentError("`camera.lens_coverage` = \"\": state it — \"sensor\" (the lens lights the whole sensor) " *
-                                                              "or the path of the capture set's measured image region (rc/image_region/v1.0)"))
+                                                              "or the path of the capture set's measured image region (rc/image_region/v2.0)"))
     run.camera.sensor_characterization == NO_SENSOR_CHARACTERIZATION &&
         throw(ArgumentError("`camera.sensor_characterization = \"none\"` is retired: a run that does not use a sensor record present " *
                             "states `camera.sensor_model = \"off\"`; a run that names none leaves `camera.sensor_characterization` empty"))

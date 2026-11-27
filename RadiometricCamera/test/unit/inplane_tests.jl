@@ -157,7 +157,7 @@ end
     #    parameters when the warping is free); the columns match central differences of the tile residual through `update`; the pose
     #    columns still match (the duals flow through the surface and the texture lookup)
     s_i = calibration_problem(board_iθ(0.5 * θ_true), st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i)
-    prob_i, idx_i = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), inplane = true)
+    prob_i, idx_i = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), inplane = true)
     tiles_i = RC.tile_costs(prob_i)
     r_i = tiles_i[argmax([length(t.pix) for t in tiles_i])]
     vars_i = collect(RC.NLLSsolver.getvars(r_i, prob_i.variables))
@@ -186,7 +186,7 @@ end
     @test v_up2.surface.inplane == mv.surface.inplane + SVector(0.0, -2e-3)
     @test !RC.NLLSsolver.update(mv, unit_increment(9 + INPLANE_NC, 9 + 1, NaN)).valid              # a non-finite step is an invalid block (the LM rejects it)
     # with the warping free too, the in-plane columns follow the height columns
-    prob_hi, _ = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 2, inplane = true)
+    prob_hi, _ = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), height_degree = 2, inplane = true)
     tiles_hi = RC.tile_costs(prob_hi)
     r_hi = tiles_hi[findfirst(t -> t.k == r_i.k && t.P0 == r_i.P0 && length(t.pix) == length(r_i.pix), tiles_hi)]
     vars_hi = collect(RC.NLLSsolver.getvars(r_hi, prob_hi.variables))
@@ -209,24 +209,24 @@ end
     v_hup = RC.NLLSsolver.update(vars_hi[8], unit_increment(9 + HEIGHT_NFREE + INPLANE_NC, 9 + HEIGHT_NFREE + 2, 1e-3))
     @test v_hup.surface.inplane == vars_hi[8].surface.inplane + SVector(0.0, 1e-3) && v_hup.surface.h == vars_hi[8].surface.h
     # without the flag nothing changes: 9 material columns, the former width
-    prob_0, _ = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob_0, _ = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5))
     @test RC.NLLSsolver.nvars(collect(RC.NLLSsolver.getvars(RC.tile_costs(prob_0)[1], prob_0.variables))[8]) == 9
 
     # ---------------------------------------------------------------------------------------------------------------
-    # 2. the per-view route (a parametric lens): `build_problem(; damping = VgtkCore.LevenbergDamping(), inplane)` — the same two columns after the material block
+    # 2. the per-view route (a parametric lens): `build_problem(; inplane)` — the same two columns after the material block
     s_p = calibration_problem(board_iθ(0.5 * θ_true), st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i)
-    prob_p, idx_p = build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), inplane = true)
+    prob_p, idx_p = build_problem(s_p.f, s_p.u0; inplane = true)
     mvp = prob_p.variables[idx_p.material]
     @test Int(RC.NLLSsolver.nvars(mvp)) == 9 + INPLANE_NC && RC.n_inplane(mvp) == INPLANE_NC && RC.n_height(mvp) == 0
     # a hold is `fixed`, never a boolean (review finding 8): `:inplane` / `:height` in `fixed` leave the material block without their
     # columns, on both routes, as the model without them; the boolean hold keywords are gone
     nmat(prob, i) = Int(RC.NLLSsolver.nvars(prob.variables[i]))
-    @test nmat(first(build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), inplane = true, fixed = (:inplane,))), idx_p.material) == 9
-    @test nmat(first(build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1, fixed = (:height,))), idx_p.material) == 9
-    @test nmat(first(build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), height_degree = 1, inplane = true)), idx_p.material) == 9 + HEIGHT_NFREE + INPLANE_NC
+    @test nmat(first(build_problem(s_p.f, s_p.u0; inplane = true, fixed = (:inplane,))), idx_p.material) == 9
+    @test nmat(first(build_problem(s_p.f, s_p.u0; height_degree = 1, fixed = (:height,))), idx_p.material) == 9
+    @test nmat(first(build_problem(s_p.f, s_p.u0; height_degree = 1, inplane = true)), idx_p.material) == 9 + HEIGHT_NFREE + INPLANE_NC
     # the printed edge is never a parameter: no hold of the LM ("edge" in the options' `fixed` refused, RC 0.11.0), so the cases build
     # their problem without it (review round 2, finding 1: every parametric run must build), and `:edge` in a builder's `fixed` names nothing
-    @test_throws ArgumentError build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), fixed = (:edge,))
+    @test_throws ArgumentError build_problem(s_p.f, s_p.u0; fixed = (:edge,))
     # (the package's own options, the shapes of the paper's parametric cases: a printed edge, the warping free or not, the print error
     # free or held — the configs of record are the paper project's, experiments/test reads them: owner D15)
     for d in (Dict("edge" => Dict("sdf" => "distance_map.json"), "warping" => Dict("degree" => 1, "inplane" => "aspect_skew")),
@@ -237,27 +237,28 @@ end
         @test !isempty(last(o).edge.sdf) && !("edge" in last(o).fixed)
         kw = RC._refinement_lm(last(o), RC.PerViewRoute()).kw
         @test !(:edge in kw.fixed)
-        pk, ik = build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping(), kw...)
+        pk, ik = build_problem(s_p.f, s_p.u0; kw...)
         @test nmat(pk, ik.material) == 9 + (kw.height_degree > 0 ? HEIGHT_NFREE : 0) + (kw.inplane && !(:inplane in kw.fixed) ? INPLANE_NC : 0)
     end
     for kw in ((; inplane_free = true), (; height_free = true), (; tie_f = true), (; callback = (a...) -> (a[1], 0)))
         @test_throws MethodError _lm_views!(s_p.f, s_p.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), kw...)
     end
-    pg_held, ig_held = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), inplane = true, height_degree = 2, fixed = (:inplane, :height))
+    pg_held, ig_held = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), inplane = true, height_degree = 2, fixed = (:inplane, :height))
     @test RC.NLLSsolver.nvars(collect(RC.NLLSsolver.getvars(RC.tile_costs(pg_held)[1], pg_held.variables))[8]) == 9
     # the holds by name: a config's strings are the Symbols (review round 2, finding 8: the grid route compared them raw)
-    pg_str, _ = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), inplane = true, height_degree = 2, fixed = ("inplane", "height"))
+    pg_str, _ = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), inplane = true, height_degree = 2, fixed = ("inplane", "height"))
     @test RC.NLLSsolver.nvars(collect(RC.NLLSsolver.getvars(RC.tile_costs(pg_str)[1], pg_str.variables))[8]) == 9
-    pg_pose, ip_pose = build_problem_grid(s_i.f, s_i.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), fixed = ("poses",))
+    pg_pose, ip_pose = build_problem_grid(s_i.f, s_i.u0; patch = (5, 5), fixed = ("poses",))
     @test !any(ip_pose.free[ip_pose.poses])                                       # "poses" holds the poses (and so no origin gauge)
     for kw in ((; callback = (a...) -> (a[1], 0)), (; tie_f = true))
         @test_throws MethodError _lm_tiles!(s_i.f, s_i.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), patch = (5, 5), kw...)
     end
     # the two routes' one per-iteration callback and one read-back (review finding 7: the grid route duplicated both)
     srcs = [read(joinpath(pkgdir(RadiometricCamera), "src", "calibration", "lm", f), String) for f in ("per_view.jl", "per_tile.jl")]
-    @test all(t -> occursin("_lm_callback(f, θ, idx, extract_variables", t), srcs) && occursin("read_back!(f, θ, problem, idx, extract_variables_grid)", srcs[2])
-    @test !any(t -> occursin("problem_.varnext", t), [srcs[2]]) && count("problem_.varnext", srcs[1]) == 2   # the varnext read: once, in _lm_callback
-    res_p = get(prob_p.problem.costs, PerViewResidual{9})[1]
+    @test all(t -> occursin("_lm_callback(f, θ, idx, extract_variables", t), srcs) && occursin("_solve_bundle!(f, θ, bundle, idx, extract_variables_grid;", srcs[2])
+    @test !occursin("read_back!(", srcs[2]) && count("read_back!(f, θ, r.u, idx, extract)", srcs[1]) == 1   # the one read-back, in _solve_bundle!
+    @test !occursin("state.u", srcs[2]) && count("extract(f, θ, state.u, idx)", srcs[1]) == 1                                  # the iterate read: once, in _lm_callback
+    res_p = filter(c -> c isa PerViewResidual{9}, prob_p.blocks)[1]
     vars_p = RC.NLLSsolver.getvars(res_p, prob_p.variables)
     r0 = RC.NLLSsolver.computeresidual(res_p, vars_p...)
     @test maximum(abs, r0) > 1e-6                                                      # half the error misses the truth
@@ -279,7 +280,7 @@ end
         fd = (RC.NLLSsolver.computeresidual(res_p, setter(1e-6)...) - RC.NLLSsolver.computeresidual(res_p, setter(-1e-6)...)) / 2e-6
         @test norm(J_p[:, col] - fd) / norm(fd) < 2e-3
     end
-    prob_p0, idx_p0 = build_problem(s_p.f, s_p.u0; damping = VgtkCore.LevenbergDamping())
+    prob_p0, idx_p0 = build_problem(s_p.f, s_p.u0)
     @test Int(RC.NLLSsolver.nvars(prob_p0.variables[idx_p0.material])) == 9
 
     # ---------------------------------------------------------------------------------------------------------------
@@ -311,11 +312,11 @@ end
     if RC_GPU_TESTS
         board_g = board_iθ(0.5 * θ_true)
         s_g = calibration_problem(board_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i, backend = CUDA.CUDABackend())
-        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), inplane = true)
+        prob_g, idx_g = build_problem_grid(s_g.f, s_g.u0; patch = (5, 5), inplane = true)
         tiles_g = RC.tile_costs(prob_g)
         rg = tiles_g[argmax([length(t.pix) for t in tiles_g])]
         s_c = calibration_problem(board_g, st_i, camera_i, poses_i, mat_i, light_i, targets_i; masks = masks_i, backend = RadiometricCamera.KernelAbstractions.CPU())
-        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), inplane = true)
+        prob_c, _ = build_problem_grid(s_c.f, s_c.u0; patch = (5, 5), inplane = true)
         tiles_c = RC.tile_costs(prob_c)
         rc = tiles_c[findfirst(t -> t.k == rg.k && t.P0 == rg.P0 && length(t.pix) == length(rg.pix), tiles_c)]
         varsg = RC.NLLSsolver.getvars(rg, prob_g.variables)
@@ -336,8 +337,8 @@ end
         # the per-view route on the device (a parametric lens)
         s_pg = calibration_problem(board_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = CUDA.CUDABackend())
         s_pc = calibration_problem(board_g, st_i, camera_param_i, poses_i, mat_i, light_i, targets_param_i; masks = masks_i, backend = RadiometricCamera.KernelAbstractions.CPU())
-        prob_pg, _ = build_problem(s_pg.f, s_pg.u0; damping = VgtkCore.LevenbergDamping(), inplane = true); prob_pc, idx_pc = build_problem(s_pc.f, s_pc.u0; damping = VgtkCore.LevenbergDamping(), inplane = true)
-        res_pg = get(prob_pg.problem.costs, PerViewResidual{9})[1]; res_pc = get(prob_pc.problem.costs, PerViewResidual{9})[1]
+        prob_pg, _ = build_problem(s_pg.f, s_pg.u0; inplane = true); prob_pc, idx_pc = build_problem(s_pc.f, s_pc.u0; inplane = true)
+        res_pg = filter(c -> c isa PerViewResidual{9}, prob_pg.blocks)[1]; res_pc = filter(c -> c isa PerViewResidual{9}, prob_pc.blocks)[1]
         rpg, Jpg = RC.NLLSsolver.computeresjac(RC.static(127), res_pg, RC.NLLSsolver.getvars(res_pg, prob_pg.variables)...)
         rpc, Jpc = RC.NLLSsolver.computeresjac(RC.static(127), res_pc, RC.NLLSsolver.getvars(res_pc, prob_pc.variables)...)
         @test maximum(abs, rpg - rpc) < 2e-3

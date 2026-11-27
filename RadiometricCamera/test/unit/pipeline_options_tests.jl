@@ -173,7 +173,7 @@ end
     @test count("_refinement_lm(settings, ", psrc) == 3                                                    # docstring; the GCV, refine!
     # the grid smoothness's GCV builds the refinement's problem from the same keywords (RC 0.9.0 review, finding 4: prepare_refinement
     # left a module-global hold set; there is none now)
-    @test count("select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; damping, lp.kw...)", psrc) == 1
+    @test count("select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; lp.kw...)", psrc) == 1
     # the grid smoothness's weight by GCV with the grid held: refused at load (finding 5: GCV linearized the held patches)
     m = thrown_message(() -> RC.pipeline_options(Dict("grid" => Dict("smoothness" => Dict("type" => "pspline", "order" => 3, "weight" => "gcv")), "fixed" => ["camera"])))
     @test occursin("`grid.smoothness.weight = \"gcv\"` with \"camera\" in `fixed`", m)

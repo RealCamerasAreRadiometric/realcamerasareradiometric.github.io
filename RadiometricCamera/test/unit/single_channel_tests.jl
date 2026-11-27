@@ -51,10 +51,10 @@ end
     @test cost(one.f, one.u0)[1] ≈ cost(ref.f, ref.u0)[1] / 3 rtol = 1e-12
     @test cost(one.f, one.u0)[2] ≈ cost(ref.f, ref.u0)[2] rtol = 1e-12                                       # the relative RMS is the same
     # the residual and Jacobian of the per-view block: the reference's channel rows; the columns of the single-channel blocks
-    p1, i1 = build_problem(one.f, one.u0; damping = VgtkCore.LevenbergDamping()); p0, i0 = build_problem(ref.f, ref.u0; damping = VgtkCore.LevenbergDamping())
+    p1, i1 = build_problem(one.f, one.u0); p0, i0 = build_problem(ref.f, ref.u0)
     @test Int(RC.NLLSsolver.nvars(p1.variables[i1.lighting])) == 9 && Int(RC.NLLSsolver.nvars(p0.variables[i0.lighting])) == 27
     @test Int(RC.NLLSsolver.nvars(p1.variables[i1.material])) == 5 && Int(RC.NLLSsolver.nvars(p0.variables[i0.material])) == 9
-    r1 = get(p1.problem.costs, PerViewResidual{9})[1]; r0 = get(p0.problem.costs, PerViewResidual{9})[1]
+    r1 = filter(c -> c isa PerViewResidual{9}, p1.blocks)[1]; r0 = filter(c -> c isa PerViewResidual{9}, p0.blocks)[1]
     v1 = RC.NLLSsolver.getvars(r1, p1.variables); v0 = RC.NLLSsolver.getvars(r0, p0.variables)
     @test RC.NLLSsolver.nres(r1) == length(one.f.px[1]) && RC.NLLSsolver.nres(r0) == 3 * length(one.f.px[1])
     e1, J1 = RC.NLLSsolver.computeresjac(RC.static(127), r1, v1...)
@@ -91,7 +91,7 @@ end
     copied = [repeat(t[:, :, c:c], 1, 1, 3) for t in targets]
     ref = calibration_problem(board, st, camera_t, copy(poses), RC.tie_channels(mat_t, c), RC.tie_channels(light_t, c), copied; masks)
     one = calibration_problem(board, st, camera_t, copy(poses), mat_t, light_t, targets; masks, channel = c)
-    p0, _ = build_problem_grid(ref.f, ref.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5)); p1, _ = build_problem_grid(one.f, one.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    p0, _ = build_problem_grid(ref.f, ref.u0; patch = (5, 5)); p1, _ = build_problem_grid(one.f, one.u0; patch = (5, 5))
     t0 = RC.tile_costs(p0); t1 = RC.tile_costs(p1)
     @test length(t0) == length(t1)
     for (a, b) in zip(t0, t1)
@@ -113,8 +113,8 @@ end
     if RC_GPU_TESTS
         cpu = single_channel_board().one
         gpu = single_channel_board(; backend = CUDABackend(; always_inline = true)).one
-        pc, ic = build_problem(cpu.f, cpu.u0; damping = VgtkCore.LevenbergDamping()); pg, ig = build_problem(gpu.f, gpu.u0; damping = VgtkCore.LevenbergDamping())
-        rc = get(pc.problem.costs, PerViewResidual{9})[1]; rg = get(pg.problem.costs, PerViewResidual{9})[1]
+        pc, ic = build_problem(cpu.f, cpu.u0); pg, ig = build_problem(gpu.f, gpu.u0)
+        rc = filter(c -> c isa PerViewResidual{9}, pc.blocks)[1]; rg = filter(c -> c isa PerViewResidual{9}, pg.blocks)[1]
         vc = RC.NLLSsolver.getvars(rc, pc.variables); vg = RC.NLLSsolver.getvars(rg, pg.variables)
         ec, Jc = RC.NLLSsolver.computeresjac(RC.static(127), rc, vc...)
         eg, Jg = RC.NLLSsolver.computeresjac(RC.static(127), rg, vg...)

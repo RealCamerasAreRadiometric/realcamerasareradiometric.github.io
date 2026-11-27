@@ -286,10 +286,11 @@ _patch_nodes(lens0, rows, cols) = [SVector{3, Float64}(_direction_node(lens0, gx
 _aperture_var(::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, θ::CalibrationParameters) = ApertureVar(aperture_radius(θ))
 
 """
-    build_problem_grid(f, θ; damping, patch = GRID_PATCH, fixed = (), height_degree = 0,
-                       smoothness = nothing, inplane = false) -> (problem::LmProblem, idx)
+    build_problem_grid(f, θ; patch = GRID_PATCH, fixed = (), height_degree = 0,
+                       smoothness = nothing, inplane = false) -> (problem::CalibrationBundle, idx)
 
-The per-tile LM problem over the grid-lens state, VisualGeometryToolkitCore's `LmProblem` (the stack's one LM, `lmsolve_chart!`):
+The per-tile LM problem over the grid-lens state, a [`CalibrationBundle`](@ref) (VisualGeometryToolkitCore's block contract, solved
+by its `LevenbergMarquardt`):
 pose variables per view, one patch block per grid patch, the shared focus/aperture/material/vignetting/lighting blocks,
 and one `PerTileResidual` per non-empty image tile (ndeps = 10 = NLLSsolver's MAX_ARGS). Held (the problem's `fixed` variables,
 `idx.free` the free mask): the dependent patches and the blocks `fixed` names (of `(:poses, :grid, :focus, :aperture, :material,
@@ -314,7 +315,7 @@ The parameters are the nodes the lens holds (Core's `present_nodes`; `with_prese
 an absent node is an `ArgumentError` (no residual reads an absent node), and a patch block with no present node is no variable.
 * `smoothness` (a `GridSmoothness`, `grid_smoothness`; `nothing` = none): its rows, one cost block per patch block or pair of them.
 """
-function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
+function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; patch::Tuple{Int, Int} = GRID_PATCH, fixed = (),
                             height_degree::Integer = 0,
                             smoothness = nothing, rotation_gauge::Bool = !(:poses in Symbol.(fixed)),
                             inplane::Bool = false) where {N}
@@ -391,7 +392,7 @@ function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; da
     free_vars = trues(length(variables))
     free_vars[dependent_patches] .= false                # a patch block without a present node is no variable of the solve
     _free_mask!(free_vars, idx, Tuple(k for k in blocks_held if !(k in SURFACE_HOLDS)); lens_key = :grid, lens_idx = vec(ip))
-    return VgtkCore.LmProblem(variables, blocks; fixed = findall(!, free_vars), damping), (; idx..., free = free_vars)
+    return CalibrationBundle(variables, blocks, free_vars), (; idx..., free = free_vars)
 end
 
 """No residual reads an absent node: every sensor sample of pixel `(u, v)` (view `k`) has its whole 4 × 4 window of present nodes
@@ -409,10 +410,10 @@ end
 
 """Full grid lens of a trial variable vector: the patch blocks' directions."""
 function _assemble_lens(lens0::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, vec, patches)
-    return VgtkCore.with_directions(lens0, _assembled(directions(VgtkCore.model(lens0)), vec, patches))
+    return VgtkCore.with_directions(lens0, _assembled_directions(directions(VgtkCore.model(lens0)), vec, patches))
 end
 """The `[gy, gx]` controls `G0` with the patch blocks' direction controls (`[g_x, g_y]` per patch) written in."""
-function _assembled(G0, vec, patches)
+function _assembled_directions(G0, vec, patches)
     G = copy(G0)
     for PJ in axes(patches, 2), PI in axes(patches, 1)
         d = _patch_dirs(vec[patches[PI, PJ]]::_Patch)
@@ -437,27 +438,26 @@ function extract_variables_grid(f::CalibrationData, θ::CalibrationParameters, v
 end
 
 """
-    _lm_tiles!(f, θ; stops, damping, patch = GRID_PATCH, kwargs...) -> (; code, rule, iterations, cost)
+    _lm_tiles!(f, θ; stops, damping, patch = GRID_PATCH, kwargs...) -> FitResult
 
 Joint LM over the per-tile grid problem (all blocks; `fixed` as in `_lm_views!` with `:grid` for the patch blocks in place of
 `:distortion`). `height_degree` and `smoothness` as in `build_problem_grid`, the problem and its held blocks
 its; `iter_callback(it, cost, camera, poses, mat, surface, light)` sees the current best variables after every iteration, and `lm_log` as `_lm_views!`'s. The solve
-and its stopping tests and termination record as `_lm_views!`'s (VisualGeometryToolkitCore's `lmsolve_chart!` under `_lm_stops`).
+and its stopping tests and termination record as `_lm_views!`'s (VisualGeometryToolkitCore's `LevenbergMarquardt` under `_lm_stops`:
+`_solve_bundle!`).
 """
 function _lm_tiles!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCore.LmStops, damping::VgtkCore.LmDamping, patch::Tuple{Int, Int} = GRID_PATCH,
                     fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), iter_callback = nothing,
                     height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
-    problem, idx = build_problem_grid(f, θ; damping, patch, fixed, height_degree, smoothness, inplane)
+    bundle, idx = build_problem_grid(f, θ; patch, fixed, height_degree, smoothness, inplane)
     callback = _final_iteration_callback(_lm_callback(f, θ, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), f, stops.max_iter)
     _reset_scrubbed!(f.run)
-    result = try                                                 # (Core's stall postcondition runs inside, the tiles still batched)
-        _with_registered(() -> VgtkCore.lmsolve_chart!(problem, _lm_stops(f, stops); callback), f, θ, problem, idx)
+    try                                                          # (Core's stall postcondition runs inside, the tiles still batched)
+        return _solve_bundle!(f, θ, bundle, idx, extract_variables_grid; stops, damping, callback)
     finally
         f.run.final_iteration = false
         _report_scrubbed(f.run, "_lm_tiles!")
     end
-    read_back!(f, θ, problem, idx, extract_variables_grid)
-    return result
 end
 
 # ---------------------------------------------------------------------------
@@ -542,13 +542,13 @@ end
 """Enable batched per-view evaluation for a grid problem (call before optimizing; see _lm_tiles!). `next[k]`: a tile of the view
 whose tiles follow view `k`'s in the cost order (`nothing` after the last), the one the next view's batch is prefetched for;
 `pending[k]`: view `k`'s batch in flight, `(; key, need_jac, fut)` (`_batch_future!`); `lock`: held while they change."""
-_register_grid_problem!(f::CalibrationData, θ::CalibrationParameters, p::VgtkCore.LmProblem, idx) = _register_grid_problem!(f, θ, p.problem, idx)
-function _register_grid_problem!(f::CalibrationData, θ::CalibrationParameters, problem, idx)
+function _register_grid_problem!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx; vectors = bundle)
     dc = _ensure_device!(f, θ)
     _unregister_grid_problem!(f)
     K = n_views(θ)
     next = Vector{Any}(nothing, K)
-    tiles = tile_costs(problem)
+    tiles = tile_costs(bundle)
+    problem = vectors
     for i in 2:length(tiles)
         k = tiles[i - 1].k
         tiles[i].k != k && next[k] === nothing && (next[k] = tiles[i])
@@ -573,9 +573,10 @@ function _unregister_grid_problem!(f::CalibrationData)
 end
 _grid_batch(f::CalibrationData) = _device_entry(f, :grid)
 
-"""The variable vector (variables or varnext) that holds exactly the objects given to the cost `r` (a tile's or a view's)."""
+"""The variable vector of `problem` (`_trial_vectors`: a bundle's own, or the solver's variables or varnext) that holds exactly the
+objects given to the cost `r` (a tile's or a view's)."""
 function _locate_vars(problem, r, given)
-    for vec in (problem.variables, problem.varnext)
+    for vec in _trial_vectors(problem)
         length(vec) >= maximum(r.idx) || continue
         ok = true
         for i in eachindex(r.idx)
@@ -817,11 +818,12 @@ end
 # that linear system). The mark is set only when the iterator already holds the next linearization (`trialready`: the previous
 # trial was accepted), so the linearization the last iteration starts from is never one of them. A stop by another criterion
 # (cost or step tolerance, time) cannot be foreseen and keeps the extra Jacobian.
-"""`cb`, and after iteration `maxiters - 1` the data `f` marked (`f.run.final_iteration`, unmarked by `_lm_tiles!` on exit)."""
+"""`cb` (`nothing`: none), and after iteration `maxiters - 1` the data `f` marked (`f.run.final_iteration`, unmarked by `_lm_tiles!` on
+exit): its `LmIterationState`'s `iteration` and `trial_ready`."""
 function _final_iteration_callback(cb, f::CalibrationData, maxiters::Integer)
-    return function (cost, problem, data, iterdata)
-        out = cb(cost, problem, data, iterdata)
-        data.iternum + 1 >= maxiters && hasproperty(iterdata, :trialready) && iterdata.trialready && (f.run.final_iteration = true)
+    return function (state)
+        out = cb === nothing ? false : cb(state)
+        state.iteration + 1 >= maxiters && state.trial_ready && (f.run.final_iteration = true)
         return out
     end
 end
@@ -862,10 +864,9 @@ end
 _block_jacobian(varflags, r::PerTileResidual, vars) = _tile_jacobian_at(varflags, r, vars...)
 _cost_rows(t, r::PerTileResidual) = _tile_residual(t.flux, r, t.ivs)
 
-"""All per-tile cost blocks of a grid problem (whatever their patch / aperture block types)."""
-tile_costs(problem::VgtkCore.LmProblem) = tile_costs(problem.problem)
-function tile_costs(problem)
-    ts = [T for T in keys(problem.costs) if T <: PerTileResidual]
+"""All per-tile cost blocks of a grid problem (a [`CalibrationBundle`](@ref)), in its order: a vector of their one concrete type."""
+function tile_costs(b::CalibrationBundle)
+    ts = unique(typeof(c) for c in b.blocks if c isa PerTileResidual)
     isempty(ts) && return PerTileResidual[]
-    return get(problem.costs, only(ts))
+    return only(ts)[c for c in b.blocks if c isa PerTileResidual]
 end

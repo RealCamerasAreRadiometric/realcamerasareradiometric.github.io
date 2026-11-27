@@ -48,7 +48,7 @@ the start takes it (and refuses a front end whose start disagrees); its start re
 """
 start_is_grid(run::RunOptions) = !startswith(run.io.init, "lens:")
 
-function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, run::RunOptions, settings::CalibrationSettings, start; backend, damping, radiometry,
+function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractString}, run::RunOptions, settings::CalibrationSettings, start; backend, radiometry,
                       observations = nothing)
     isempty(run.io.out) && error("io.out required")
     mkpath(run.io.out)
@@ -271,7 +271,7 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     if grid_gcv                                                 # the grid smoothness's weight by GCV, on the linearization at this start
         tg = time()
         lp = _refinement_lm(settings, route)                          # the refinement's problem (its blocks and holds, Θ_m's among them)
-        grid_sm, sel = select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; damping, lp.kw...)
+        grid_sm, sel = select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; lp.kw...)
         @printf("grid smoothness %s: weight %.4g by GCV (%.0f s; minimum %.6g, %.1f effective parameters of %d columns, %d observations%s)\n",
                 smoothness_line(with_weight(settings.grid.smoothness, sel.β)), sel.β, time() - tg, sel.gcv, sel.dof, sel.n_columns, sel.n_observations,
                 sel.at_bracket_end ? "; AT THE END of the bracket" : ""); flush(stdout)

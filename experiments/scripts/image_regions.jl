@@ -12,7 +12,7 @@
 #
 # STAGES (each step keyed by its frames, its settings and the code it runs; <results>/image_region/detect/<key>/)
 #   detect   RadiometricCamera's measure_image_region (VisualGeometryToolkitFeatures' detect_image_circle on the region's geometry image, raw_green: the bilinear green on the raw grid,
-#            on the device) → image_region.json (rc/image_region/v1.0, through IO: the ellipse, the photographs' size, the frames
+#            on the device) → image_region.json (rc/image_region/v2.0, through IO: the ellipse, the photographs' size, the frames
 #            and the fit's diagnostics)
 #
 #   julia --project=experiments experiments/scripts/image_regions.jl [--config=<toml>] [--plan] [--stage=detect] [--force]

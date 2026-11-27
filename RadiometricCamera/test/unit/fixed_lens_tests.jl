@@ -66,8 +66,8 @@
     targets = [render_view(k, camera_k, poses[k], mat_k, light_k, board, st, masks[k]) for k in 1:2]
     s = calibration_problem(board, st, camera_k, copy(poses), mat_k, light_k, targets; masks)
     fixed = VgtkCore.parameter_names(VgtkCore.model(lk))   # every parameter held
-    prob, idx = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), fixed)
-    res = get(prob.problem.costs, PerViewResidual{9})[1]
+    prob, idx = build_problem(s.f, s.u0; fixed)
+    res = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     vars = RC.NLLSsolver.getvars(res, prob.variables)
     r0, J = RC.NLLSsolver.computeresjac(RC.static(125), res, vars...)                 # the LM's flags: every block but the fixed lens
     @test maximum(abs, r0) < 1e-12 && size(J, 2) == 6 + 0 + 9 + 1 + 9 + 15 + 27        # the fixed lens has no columns; 15 vignetting columns (the hard pin)

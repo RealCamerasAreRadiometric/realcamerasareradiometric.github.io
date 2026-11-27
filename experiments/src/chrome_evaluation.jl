@@ -741,16 +741,19 @@ end
 """
     BoardRows(ch, problem, pairs, sqrtw)
 
-The linearization state of `board_refit`'s chart LM (Core's `lmsolve_chart!` protocol): the chart `ch` at the pose, the points and
+The linearization state of `board_refit`'s LM, a row problem of the chart's `N` coordinates (Core's `AbstractRowProblem{N}`, the row
+protocol): the chart `ch` at the pose, the points and
 nodes `pairs`, each point's √weight. Its rows (`residual_rows!`, Core's ForwardDiff Jacobian) are each point's board-plane residual
 (board point − node, mm) under the pose `retract(ch, δ)`, × √w; a ray that misses the board at Core's `OUT_OF_FIELD_RESIDUAL`.
 """
-struct BoardRows{C, P}
+struct BoardRows{N, C, P} <: VgtkCore.AbstractRowProblem{N}
     ch::C
     problem::P
     pairs::Vector{Pair{Int, SVector{2, Int}}}
     sqrtw::Vector{Float64}
 end
+BoardRows(ch, problem, pairs, sqrtw) = BoardRows{VgtkCore.tangent_size(ch), typeof(ch), typeof(problem)}(ch, problem, pairs, sqrtw)
+VgtkCore.chart_size(lm::BoardRows{N}) where {N} = (2 * length(lm.pairs), Val(N))
 function residual_rows!(r, lm::BoardRows, δ)
     p = lm.problem
     pose = VgtkCore.retract(lm.ch, δ)
@@ -765,17 +768,19 @@ end
 """
     board_refit(p, pose, pairs, w) -> pose or nothing
 
-The pose refined from `pose` on the correspondences `pairs` (point => node) at the weights `w`: Core's chart LM (`lmsolve_chart!`,
-its stop settings `LmStops()`) on the pose's chart (`minimal_manifold`) over the weighted board-plane residuals (`BoardRows`, mm).
+The pose refined from `pose` on the correspondences `pairs` (point => node) at the weights `w`: Core's LevenbergMarquardt (its stop
+settings `LmStops()`) from the origin of the pose's chart (`minimal_manifold`) over the weighted board-plane residuals (`BoardRows`, mm).
 `nothing` when the LM goes non-finite.
 """
 function board_refit(p::GridPoseProblem, pose, pairs, w::AbstractVector)
     ch = VgtkCore.minimal_manifold(pose)
-    ews = VgtkCore.ManifoldLmWorkspace(2 * length(pairs), VgtkCore.tangent_size(ch))
-    x = first(VgtkCore.lmsolve_chart!(ews, BoardRows(ch, p, collect(pairs), sqrt.(w))))
+    x = _board_lm(BoardRows(ch, p, collect(pairs), sqrt.(w)))
     any(!isfinite, x) && return nothing
     return convert(typeof(pose), VgtkCore.retract(ch, x))
 end
+
+# The LM of the rows from the chart origin (a function barrier static in the chart's size): the solution chart vector.
+_board_lm(lm::BoardRows{N}) where {N} = VgtkCore.solve(VgtkCore.RefineProblem(lm, zero(SVector{N, Float64})), VgtkCore.LevenbergMarquardt()).u
 
 """
     index_scoring(p, table) -> AbstractScoring
@@ -1101,7 +1106,7 @@ function _register_photos(cfg::AbstractDict, path::AbstractString, dir::Abstract
         stem = splitext(photo)[1]
         lo = d.lo; (; u, reg, err, seconds) = d.r
         wall += seconds
-        calls = [[c.iterations, string(c.retcode)] for c in lo.call_records]      # each LO call: its iterations, its ReturnCode by name
+        calls = [[c.stats.nsteps, string(c.retcode)] for c in lo.call_records]   # each LO call (a FitResult): its iterations, its ReturnCode by name
         n_u = length(u)
         if reg === nothing                                        # a photograph that does not register is recorded, not fatal (its row NaN)
             push!(summary, (photo, n_u, 0, 0, n_u, 0, NaN, NaN))   # INDEX_SUMMARY_COLUMNS: no inliers, nothing matched
@@ -1110,7 +1115,7 @@ function _register_photos(cfg::AbstractDict, path::AbstractString, dir::Abstract
             continue
         end
         write_registration(dir, stem, photo, reg, u, I, rig_id)
-        rs = residual_summary(collect(values(reg.residuals)))
+        rs = residual_statistics(collect(values(reg.residuals)))
         n = length(reg.assignment)
         push!(summary, (photo, n_u, reg.inliers, n, n_u - n, reg.trials, Float64(rs.rms_px), Float64(rs.max_px)))
         push!(rows, Dict{String, Any}("photo" => photo, "n" => n_u, "ok" => true, "inliers" => reg.inliers, "matched" => n, "trials" => reg.trials,
@@ -2029,7 +2034,7 @@ function evaluate_grid_models(index_dir::AbstractString, g::ThorlabsGrid, s, out
                         median_px = count(b) > 0 ? median(allpx[b]) : nothing, mean_px = count(b) > 0 ? mean(allpx[b]) : nothing)) for j in 1:s.profile_bins]   # empty bin: null
             map_ = [(b = (xs .>= (i - 1) * W / 8) .& (xs .< i * W / 8) .& (ys .>= (j - 1) * H / 6) .& (ys .< j * H / 6);
                      (; i, j, n = count(b), median_px = count(b) > 0 ? median(allpx[b]) : nothing)) for i in 1:8 for j in 1:6]
-            per_photo = [(; photo = data[k].name, residual_summary(px[k])..., distance_m = v.extra.distance_m[j]) for (j, k) in enumerate(kept)]
+            per_photo = [(; photo = data[k].name, residual_statistics(px[k])..., distance_m = v.extra.distance_m[j]) for (j, k) in enumerate(kept)]
             # the model on all of its own dots (the head-to-head on the common dots follows, once every model is scored)
             summary = (; variant, dot_summary(scores[variant][label], keys(scores[variant][label]), s)..., photos = length(kept), unprojected_at_estimate, v.extra...)
             rec[variant] = (; summary, per_photo, profile, map = map_)
@@ -2151,7 +2156,7 @@ const PAIRED_COLUMNS = ("model", "reference", "variant", "region", "stat", "diff
                         "resamples", "seed")
 "The regions of a paired difference: every common dot, the centre (ρ < centre_rho) and the edge out to the rim (ρ > edge_rho)."
 const PAIRED_REGIONS = ("all", "centre", "edge")
-"The statistics of a paired difference (Core's residual summary's: `residual_summary`)."
+"The statistics of a paired difference (the project's residual statistics: `residual_statistics`)."
 const PAIRED_STATS = ("median_px", "mean_px", "p95_px", "rms_px")
 
 """
@@ -2174,7 +2179,7 @@ end
 """
     paired_difference(photos, stats; resamples, rng, alpha) -> Vector{(; difference, lo, hi)}
 
-The differences `stat(model) − stat(reference)` of every `stat` of `stats` (fields of `residual_summary`) of `photos`
+The differences `stat(model) − stat(reference)` of every `stat` of `stats` (fields of `residual_statistics`) of `photos`
 (`paired_photos`) pooled, and their `1 − alpha` intervals by VisualGeometryToolkitEval's `bootstrap_ci` (Stats: the BCa interval,
 `resamples` draws) over the PHOTOGRAPHS: each draw takes photographs with replacement and computes the statistics of both models on
 the same drawn photographs' same dots — a paired difference, never a dot-level resample. One replicate set for every statistic (RC
@@ -2189,7 +2194,7 @@ function paired_difference(photos, stats; resamples::Integer, rng::AbstractRNG, 
         get!(memo, [p.photo for p in ps]) do
             a = cat_([p.model for p in ps]); b = cat_([p.reference for p in ps])
             isempty(a) && return fill(NaN, length(stats))
-            sa, sb = residual_summary(a), residual_summary(b)
+            sa, sb = residual_statistics(a), residual_statistics(b)
             return [Float64(sa[st]) - Float64(sb[st]) for st in stats]
         end
     end
@@ -2236,7 +2241,7 @@ common_dots(scores) = sort!(collect(reduce(intersect!, (Set(keys(sc)) for sc in 
 """
     dot_summary(score, dots, s) -> NamedTuple
 
-The statistics of a model's `score` (`DotScores`) on the dots `dots` (each one it scores): Core's residual summary (`residual_summary`:
+The statistics of a model's `score` (`DotScores`) on the dots `dots` (each one it scores): the project's residual statistics (`residual_statistics`:
 `n`, `median_px`, `mean_px`, `rms_px`, `p95_px`, `max_px`), `photos` (the photographs holding them), `median_mrad`, and the median and
 mean in the centre (ρ < `s.centre_rho`) and edge (ρ > `s.edge_rho`) regions, `nothing` for a region without a dot. The dots are
 read in sorted order (the statistics' sums are reproducible).
@@ -2246,7 +2251,7 @@ function dot_summary(score::DotScores, dots, s)
     px = [score[k][1] for k in ks]; mrad = [score[k][2] for k in ks]; ρ = [score[k][3] for k in ks]
     reg(f, b) = any(b) ? f(px[b]) : nothing
     cen, edg = ρ .< s.centre_rho, ρ .> s.edge_rho
-    return (; residual_summary(px)..., photos = length(unique(first.(ks))), median_mrad = isempty(mrad) ? nothing : median(mrad),
+    return (; residual_statistics(px)..., photos = length(unique(first.(ks))), median_mrad = isempty(mrad) ? nothing : median(mrad),
             centre_median_px = reg(median, cen), centre_mean_px = reg(mean, cen), edge_median_px = reg(median, edg), edge_mean_px = reg(mean, edg))
 end
 

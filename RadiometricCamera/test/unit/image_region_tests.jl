@@ -1,5 +1,5 @@
 # The run's support is Core's imaged region of a camera whose lens coverage is the capture set's image region: MEASURED on the set's
-# own photographs by its keyed step (`measure_image_region`: detect_image_circle; its rc/image_region/v1.0 record, read by
+# own photographs by its keyed step (`measure_image_region`: detect_image_circle; its rc/image_region/v2.0 record, read by
 # `run_lens_coverage` through `camera.lens_coverage`) or the sensor, never predicted from a lens (a lens's fold says where the MODEL is
 # valid, not where light falls): the grid's lens coverage, the masks, the focus nodes' support and the vignetting's radius all read it.
 
@@ -108,7 +108,7 @@
     @test occursin("photographs, the run's are", thrown_message(() -> RC.run_lens_coverage(RC.RunOptions(; camera = RC.CameraOptions(; lens_coverage = rec)), W + 2, H)))
     @test occursin("no image-region record", thrown_message(() -> RC.run_lens_coverage(RC.RunOptions(; camera = RC.CameraOptions(; lens_coverage = rec * ".missing")), W, H)))
     RC.save_initialization_region(dirname(rec), circle)
-    @test occursin("rc/image_region/v1.0", thrown_message(() -> RC.load_image_region(joinpath(dirname(rec), RC.INITIALIZATION_REGION_FILE))))
+    @test occursin("rc/image_region/v2.0", thrown_message(() -> RC.load_image_region(joinpath(dirname(rec), RC.INITIALIZATION_REGION_FILE))))
     # opt-in: a set stating the sensor is the sensor's rectangle, nothing measured — never a grid start's stored region (no fallback)
     @test RC.run_lens_coverage(RC.RunOptions(), W, H) === nothing && RC.RunOptions().camera.lens_coverage == "sensor"
     @test VgtkCore.lens_coverage(VgtkCore.with_lens_coverage(g, RC.run_lens_coverage(RC.RunOptions(), W, H))) == VgtkCore.Rect2{Float64}(0, 0, W, H)

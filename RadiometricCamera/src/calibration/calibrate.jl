@@ -26,8 +26,8 @@ end
 
 A radiometric calibration's diagnostics (a Core `FitResult`'s `metadata`): the LM's `trace` (one entry per LM iteration and per
 closed-form sweep), the cost and relative RMS of the start (`linear_cost`, `linear_rms`: after the closed-form start) and at the end
-(`final_cost`, `final_rms`), the LM's wall time (`seconds`), the last LM chunk's record (`solver`: Core's `lmsolve_chart!`'s
-`(; code, rule, iterations, cost)`, `nothing` without an iteration), the non-finite Jacobian entries replaced, by block
+(`final_cost`, `final_rms`), the LM's wall time (`seconds`), the last LM chunk's result (`solver`: Core's `LevenbergMarquardt`'s
+`FitResult` — its termination record, `stats.nsteps`, `metadata.cost` — `nothing` without an iteration), the non-finite Jacobian entries replaced, by block
 (`scrubbed`), and the calibrated camera's folds (`folds`: Core's `folded_pixels` over its coverage, [`calibrated_folds`](@ref);
 `nothing` for a parametric camera), and the focus nodes of the run's support that ran away (`focus_runaway`: t̂ ≤ 0 or non-finite,
 `focus_runaway`; empty when none).
@@ -162,7 +162,7 @@ function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <
     run = prob.p.run
     refinement = alg.refinement
     f, θ = _start_state(geometry, photographs, _start_run_options(run, refinement.settings)..., nothing; backend = _calibration_device(prob.p),
-                        damping = refinement.optimizer.damping, refinement.radiometry)
+                        refinement.radiometry)
     return VgtkCore.init(VgtkCore.RefineProblem(f, θ, run), refinement; stops)   # the refinement stage through the front end (spec §9 G-l)
 end
 VgtkCore.__init(prob::VgtkCore.RefineProblem{<:CalibrationData, <:CalibrationParameters, RunOptions}, alg::RadiometricRefinement;
@@ -373,7 +373,7 @@ function _run_refinement!(f::CalibrationData, θ::CalibrationParameters, meta, r
     end
     c2, rms2 = cost(f, θ)
     @printf("%s LM: %.0f s, %d its%s; rel-RMS %.4f → %.4f; stopped: %s\n", _route_label(route), time() - t2, count(t -> t.phase == :lm, trace),
-            alg.lm_chunk > 0 ? @sprintf(" + %d sweeps", count(t -> t.phase == :sweep, trace)) : "", rms1, rms2, res === nothing ? "no LM iteration" : string(res.code, " (", res.rule, ")")); flush(stdout)
+            alg.lm_chunk > 0 ? @sprintf(" + %d sweeps", count(t -> t.phase == :sweep, trace)) : "", rms1, rms2, res === nothing ? "no LM iteration" : string(res.retcode, " (", res.stop_rule, ")")); flush(stdout)
     length(trace) >= 3 && @printf("steady-state ≈ %.1f s/it\n", median(diff([t.time for t in trace])[2:end]))
     termination = lm_termination(res)
     return res, trace, (; linear = (c1, rms1), final = (c2, rms2), seconds = time() - t2, termination)

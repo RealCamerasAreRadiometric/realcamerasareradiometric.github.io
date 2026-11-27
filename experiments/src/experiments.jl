@@ -14,8 +14,8 @@ using VisualGeometryToolkitEval.Experiments: Stage, run_stages, require_input, r
 using VisualGeometryToolkitEval.Render: HOUSE_AXIS_COMMON, HOUSE_LINE_WIDTH, HOUSE_MARK_SIZE
 import VisualGeometryToolkitIO as VgtkIO
 
-# residual_summary: the one summary of a residual vector (src/residual_summary.jl, shared with src/figures.jl's module)
-include("residual_summary.jl")
+# residual_statistics: the one summary of a residual vector (src/residual_statistics.jl, shared with src/figures.jl's module)
+include("residual_statistics.jl")
 # the schemas of the experiments' own result records, one table (src/record_schemas.jl; IO 0.10's write_record requires each)
 include("record_schemas.jl")
 # the run summaries' tables: VisualGeometryToolkitEval's tab-separated tables read back as values (src/summary_table.jl)

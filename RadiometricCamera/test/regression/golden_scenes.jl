@@ -131,8 +131,8 @@ function gold_outputs()
     # 2. per-view problem (KB on the warped board): residual + Jacobian, closed-form joint radiometry, 3 LM iterations
     board, m = gold_board(W, H; h = gold_h())
     s = gold_state(board, m, kb)
-    prob, _ = build_problem(s.f, s.u0; damping = VgtkCore.LevenbergDamping())
-    r = get(prob.problem.costs, PerViewResidual{9})[1]
+    prob, _ = build_problem(s.f, s.u0)
+    r = filter(c -> c isa PerViewResidual{9}, prob.blocks)[1]
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(127), r, RCg.NLLSsolver.getvars(r, prob.variables)...)
     out["perview_residual"] = res; out["perview_jacobian"] = jac_summary(J)
     s2 = deepcopy(s); parts = all_parts(s2.f, s2.u0); _lm_radiometry!(s2.f, s2.u0, parts; damping = VgtkCore.LevenbergDamping(), stops = VgtkCore.LmStops(; max_iter = 20)); c = RCg.parts_cost(s2.f, s2.u0, parts)
@@ -143,7 +143,7 @@ function gold_outputs()
                   poses = [vcat(vec(p.R), collect(p.t)) for p in s3.u0.poses], mat = collect(RCg.Θ_m_nonlinear(s3.u0.mat)), μ = s3.u0.mat.diffuse_weight)
     # 3. per-tile problem (grid model, warping free): the largest tile
     s = gold_state(gold_board(W, H; h = 0.5 .* gold_h())..., glens)
-    prob, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+    prob, _ = build_problem_grid(s.f, s.u0; patch = (5, 5), height_degree = 1)
     t = largest_tile(prob)
     vars = RCg.NLLSsolver.getvars(t, prob.variables)
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(1023), t, vars...)
@@ -165,7 +165,7 @@ function gold_outputs()
     # the print's edge (δ, σ_print) on the surface (σ_print 3 mm, about one pixel on the board: before 2026-11-14 the edge's width was the
     # camera's in-focus blur, σ_cam 0.9 px, with σ_print 0.3 mm)
     s = gold_state(gold_board(W, H; edge = SVector(0.3, 3.0), sdf)..., glens)
-    prob, _ = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5))
+    prob, _ = build_problem_grid(s.f, s.u0; patch = (5, 5))
     t = largest_tile(prob)
     res, J = RCg.NLLSsolver.computeresjac(RCg.static(1023), t, RCg.NLLSsolver.getvars(t, prob.variables)...)
     out["tile_edge_residual"] = res; out["tile_edge_jacobian"] = jac_summary(J)

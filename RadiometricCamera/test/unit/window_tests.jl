@@ -6,7 +6,7 @@
 @testitem "the concurrent blocks: the same Gauss–Newton blocks at any window width" setup = [RCFixtures, EdgeScene] begin
     using RadiometricCamera: build_problem_grid
     s = edge_state(edge_s, targets_e)
-    prob, idx = build_problem_grid(s.f, s.u0; damping = VgtkCore.LevenbergDamping(), patch = (5, 5), height_degree = 1)
+    prob, idx = build_problem_grid(s.f, s.u0; patch = (5, 5), height_degree = 1)
     tiles = RC.tile_costs(prob)
     blocks() = [RC.NLLSsolver.computecostgradhess(RC.static(1023), t, RC.NLLSsolver.getvars(t, prob.variables)...) for t in tiles]
     function at_width(w)
