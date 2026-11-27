@@ -268,7 +268,7 @@ end
     W, H = 240, 180
     cam0 = VgtkCore.BoundedCamera(VgtkCore.CameraModel(VgtkCore.LogicalIntrinsics(VgtkCore.CameraCalibrationMat(SMatrix{3, 3}(600.0, 0, 0, 0, 600.0, 0, 120.0, 90.0, 1))),
                                                        VgtkCore.Lens(VgtkCore.DoubleSphere(0.2, 0.3))), VgtkCore.Size2(W, H))
-    focus0 = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
+    focus0 = VrtkCore.Focus(VrtkCore.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 0.45, 9))
     vig = VrtkCore.TensorProductVignetting((3, 3), VgtkCore.Rect(0, 0, W, H); degree = 2)
     camera = RC.RadiometricCameraModel(cam0, focus0, 0.004, vig)
     sett = RC.RenderSettings(; n_𝐩 = 1, n_ρ = 2, n_φ = 6)
@@ -279,8 +279,8 @@ end
     PNGFiles.save(joinpath(sheetdir, "texture.png"), [RGB{N0f16}(design[i, j], design[i, j], design[i, j]) for j in 1:TH, i in 1:TW])
     save_sheet_target(sheetdir; page_mm = (60.0, 84.0), blobs_mm = Dict(1 => SVector(5.0, 5.0)))
     sheet = read_sheet(sheetdir)
-    rad = RC.TargetRadiometry(RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), RC.TargetState(; edge = [0.021, 0.034]))
-    target = RC.RadiometricTarget(nothing, zero(SVector{RC.HEIGHT_NC, Float64}), 1.0, rad)
+    rad = RC.TargetRadiometry(VrtkCore.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4), VrtkCore.TargetState(; edge = [0.021, 0.034]))
+    target = RC.RadiometricTarget(nothing, zero(SVector{VrtkCore.HEIGHT_NC, Float64}), 1.0, rad)
     # five photographs (roles val, fit, fit, fit, test) of the sheet from 0.30–0.42 m (the sheet ≈ 100–130 px wide, defocused: the focus
     # is at 0.45 m), the camera on the printed side; world → camera
     Rx(a) = SMatrix{3, 3}(1.0, 0, 0, 0, cos(a), sin(a), 0, -sin(a), cos(a)); Ry(a) = SMatrix{3, 3}(cos(a), 0, -sin(a), 0, 1.0, 0, sin(a), 0, cos(a))
@@ -315,11 +315,11 @@ end
     @test 0.2 * s1.masked < length(s2.px) < 0.4 * s1.masked
     # the footprint (one row of page_rows, the KernelAbstractions kernel on the CPU backend): the pinhole's is the chief ray's bilinear
     # texels times V (the pixel-centre quadrature); the learned one spreads, sums to V
-    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.camera.vignetting(RC.sensor_position(u, v))
+    u, v = Int.(s1.px[length(s1.px) ÷ 2][1:2]); Vuv = ctx.camera.vignetting(VrtkCore.sensor_position(u, v))
     row(camera) = (R = page_rows(ctx, [(1, u, v)], camera, (; all = [true]), Dict(1 => [1]); device = VgtkCore.KA.CPU()); (R.kept[1], R.blocks.all.A[1, :]))
     okp, rp = row(variant_camera(ctx, "pinhole"; pinhole_r = 1e-9))
-    o, d = RC.world_ray(ctx.camera, ctx.poses[1], RC.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = RC.intersect_board(ctx.rays, o, d)
-    tw = Dict(texel_weights(RC.chart(ctx.bd, 𝐱), TW, TH))
+    o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[1], VrtkCore.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
+    tw = Dict(texel_weights(VgtkCore.chart(ctx.bd, 𝐱), TW, TH))
     @test okp && sum(rp) ≈ Vuv && all(isapprox(Vuv * get(tw, t, 0.0), rp[t]; atol = 1e-9) for t in findall(!iszero, rp))
     okl, rl = row(variant_camera(ctx, "learned"; pinhole_r = 1e-9))
     @test okl && sum(rl) ≈ Vuv && nnz(rl) > nnz(rp)
@@ -336,7 +336,7 @@ end
     P = page_footprints(ctx, rows_px, ctx.camera, rows_by_photograph(rows_px); device = VgtkCore.KA.CPU())
     Fsel = findall(isodd, eachindex(rows_px)); wsel = [1.0 + 0.1 * (q % 7) for q in Fsel]; Dp = VgtkCore.difference_rows((TW, TH), 1)
     same(a, b) = size(a) == size(b) && a.rowptr == b.rowptr && a.colval == b.colval && a.nzval == b.nzval
-    for (w, Ah) in ((wsel, RC._whiten(wsel, A[Fsel, :])), (RC.Unweighted(), A[Fsel, :]))
+    for (w, Ah) in ((wsel, RC.weighted_rows(wsel, A[Fsel, :])), (RC.Unweighted(), A[Fsel, :]))
         opd = texture_operator(P.A, Fsel, w, Dp; device = VgtkCore.KA.CPU()); oph = VgtkCore.PenalizedOperator(Ah, Dp; device = VgtkCore.KA.CPU())
         @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
     end
@@ -466,7 +466,7 @@ end
     dev = gpu.device; sel = findall(q -> q % 3 != 0, 1:size(A, 1)); w = [1.0 + 0.01 * (q % 11) for q in sel]
     same(a, b) = size(a) == size(b) && Array(a.rowptr) == Array(b.rowptr) && Array(a.colval) == Array(b.colval) && Array(a.nzval) == Array(b.nzval)
     @test same(csr_transpose(gpu.A; device = dev), gpu.At) && same(csr_rows(gpu.A, sel; device = dev), VgtkCore.CSRMatrix(A[sel, :]; device = dev))
-    opd = texture_operator(gpu.A, sel, w, D; device = dev); oph = VgtkCore.PenalizedOperator(RadiometricCamera._whiten(w, A[sel, :]), D; device = dev)
+    opd = texture_operator(gpu.A, sel, w, D; device = dev); oph = VgtkCore.PenalizedOperator(RadiometricCamera.weighted_rows(w, A[sel, :]), D; device = dev)
     @test same(opd.A, oph.A) && same(opd.At, oph.At) && same(opd.D, oph.D) && same(opd.Dt, oph.Dt)
     @test host_sparse(csr_rows(gpu.A, reverse(sel); device = dev)) == A[reverse(sel), :]
     @test TextureGPU.gpu_name() isa String

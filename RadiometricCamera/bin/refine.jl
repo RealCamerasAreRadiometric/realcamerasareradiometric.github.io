@@ -112,7 +112,7 @@ end
     _print_free_parameters(s, alg)
 
 A timing measurement's context (`--repeat`): the free parameters of the refinement's LM over the loaded start `s` (its `RefineProblem`), per block of THE
-problem the refinement builds (`_refinement_lm`, the per-tile route's `build_problem_grid`; the coordinates of its free variables), as
+problem the refinement builds (`refinement_structure`, the per-tile route's `build_problem_grid`; the coordinates of its free variables), as
 one `PARAMETERS key=value …` line. The grid lens's are its present direction controls' 2 tangent coordinates each, less the 3 that hold
 the common rotation with the poses (`rotation_gauge_coordinates`); its patch blocks' solver coordinates (`lens_solver_coordinates`, which
 also carry the absent nodes of a partly present patch) beside them. A parametric (per-view) start prints its route alone.
@@ -124,7 +124,7 @@ function _print_free_parameters(s, alg)
     if !(route isa RC.PerTileRoute)
         println("PARAMETERS route=$(nameof(typeof(route)))"); flush(stdout); return nothing
     end
-    lp = RC._refinement_lm(settings, route; smoothness = meta.grid_smoothness)
+    lp = RC.refinement_structure(settings, route; smoothness = meta.grid_smoothness)
     problem, idx = RC.build_problem_grid(s.f, s.u0; lp.kw...)
     vars = problem.variables
     n(is) = sum(i -> idx.free[i] ? Int(RC.NLLSsolver.nvars(vars[i])) : 0, is; init = 0)

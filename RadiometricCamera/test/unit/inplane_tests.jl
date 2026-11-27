@@ -235,7 +235,7 @@ end
               Dict("edge" => Dict("sdf" => "distance_map.json")))
         o = RC.pipeline_options(d)
         @test !isempty(last(o).edge.sdf) && !("edge" in last(o).fixed)
-        kw = RC._refinement_lm(last(o), RC.PerViewRoute()).kw
+        kw = RC.refinement_structure(last(o), RC.PerViewRoute()).kw
         @test !(:edge in kw.fixed)
         pk, ik = build_problem(s_p.f, s_p.u0; kw...)
         @test nmat(pk, ik.material) == 9 + (kw.height_degree > 0 ? HEIGHT_NFREE : 0) + (kw.inplane && !(:inplane in kw.fixed) ? INPLANE_NC : 0)

@@ -8,33 +8,33 @@
 # ReadNoise alone) contributes its rows as measured, today's behaviour bit for bit. The choice is what the camera's sensor model
 # provides, by TYPE, never a flag: set once where the photographs are read (`masked_observations`), the rows' weights are
 # `Unweighted()` or the per-row 1/σ vector, and every consumer — both LM routes' row kernel and host residual, the closed-form blocks'
-# reductions and design rows, the cost, the penalties' data norm and the LM's residual resolution — reads them through `_whiten`,
+# reductions and design rows, the cost, the penalties' data norm and the LM's residual resolution — reads them through `weighted_rows`,
 # THE one weighting.
 # ---------------------------------------------------------------------------
 
 """
     Unweighted()
 
-The weights of rows taken as measured (a plain image): every row's weight is one, and `_whiten` is the identity, so the
+The weights of rows taken as measured (a plain image): every row's weight is one, and `weighted_rows` is the identity, so the
 residuals, Jacobians and costs are today's bit for bit. The other weights are a vector of 1/σ per row (a whitened view).
 """
 struct Unweighted end
 
 """
-    _whiten(w, e, x)
-    _whiten(w, x::AbstractArray)
+    weighted_rows(w, e, x)
+    weighted_rows(w, x::AbstractArray)
 
 THE weighting of the residual rows: row `e`'s value (a residual, a Jacobian row, a design row, a measured value) `x` times its weight
 `w[e]` (1/σ of its measured value) when `w` is a weight vector, `x` itself when `w` is `Unweighted()`. The array form weights every
 row of `x`, a vector or a matrix of rows (host or device broadcast). In a kernel the same expression is the row kernel's.
 """
-@inline _whiten(::Unweighted, e, x) = x
-@inline _whiten(w::AbstractVector, e, x) = (@inbounds w[e]) * x
-_whiten(::Unweighted, x::AbstractArray) = x
-_whiten(w::AbstractVector, x::AbstractArray) = w .* x
+@inline weighted_rows(::Unweighted, e, x) = x
+@inline weighted_rows(w::AbstractVector, e, x) = (@inbounds w[e]) * x
+weighted_rows(::Unweighted, x::AbstractArray) = x
+weighted_rows(w::AbstractVector, x::AbstractArray) = w .* x
 # a sparse matrix of rows (the texture page's design rows): its row scaling, sparse (the broadcast of a vector against a sparse matrix
 # allocates for the full shape: a page's 7 M rows × 1 M texels ran out of host memory, dgx01 2026-11-15); the same products, bit for bit
-_whiten(w::AbstractVector, x::SparseArrays.AbstractSparseMatrixCSC) = Diagonal(w) * x
+weighted_rows(w::AbstractVector, x::SparseArrays.AbstractSparseMatrixCSC) = Diagonal(w) * x
 
 """
     masked_observations(img, px; channel = 0) -> (ϕ, w, q)
@@ -73,12 +73,17 @@ View `k`'s row weights from a state's `weights` (`Unweighted()` for every view, 
 """
 _view_weights(::Unweighted, k::Integer) = Unweighted()
 _view_weights(w::AbstractVector{<:AbstractVector}, k::Integer) = w[k]
-"""The weights of the rows `rows` of one view's (a block's subset, its observations' order; `Unweighted()` as it is)."""
-_select_rows(w::Unweighted, rows) = w
-_select_rows(w::AbstractVector, rows) = w[rows]
+"""
+    select_rows(w, rows)
+
+The weights of the rows `rows` of one view's (a block's subset, its observations' order), the weights [`weighted_rows`](@ref) applies;
+`Unweighted()` as it is.
+"""
+select_rows(w::Unweighted, rows) = w
+select_rows(w::AbstractVector, rows) = w[rows]
 """Weights on the backend `be`, shared read-only like a block's other device data (`Unweighted()` as it is)."""
 _device_weights(be, w::Unweighted) = w
-_device_weights(be, w::AbstractVector) = _shared_read_only!(be, adapt(be, w))
+_device_weights(be, w::AbstractVector) = share_read_only!(be, adapt(be, w))
 """The weights of the views' rows stacked in view order (the closed-form blocks' rows, `all_parts`)."""
 _stacked_weights(::Unweighted) = Unweighted()
 _stacked_weights(w::AbstractVector{<:AbstractVector}) = reduce(vcat, w; init = Float64[])
@@ -90,7 +95,7 @@ The squared norm of the measured values in the cost's units, `Σ ‖w ∘ ϕ‖�
 penalties' weights are relative to (Core's `penalty_scale`: the grid, focus and vignetting smoothness) and the
 relative RMS's denominator (`cost`).
 """
-data_norm2(f) = sum(k -> sum(abs2, _whiten(_view_weights(f.weights, k), f.ϕ[k])), eachindex(f.ϕ); init = 0.0)
+data_norm2(f) = sum(k -> sum(abs2, weighted_rows(_view_weights(f.weights, k), f.ϕ[k])), eachindex(f.ϕ); init = 0.0)
 
 """
     lm_abstol(f) -> Float64
@@ -98,10 +103,10 @@ data_norm2(f) = sum(k -> sum(abs2, _whiten(_view_weights(f.weights, k), f.ϕ[k])
 The absolute residual-norm tolerance (SciML's `abstol`) in the cost's units, which Core's `LmStops(; residual_resolution)` reads (the
 meaning of `StaticLmStops`'): the RAW quantisation the data resolve, never the noise level (owner ruling 2026-11-14). A row's resolution is its code step `q` (`_quanta`, one
 RAW code in the row's units) over √12, so the resolution's square is `Σᵢ (qᵢ wᵢ)² / 12` — `wᵢ = 1/σᵢ` for whitened rows, `1` for rows
-as measured — through the one weighting (`_whiten`); `0` for views without a code (decoded images: Core's own resolution alone). A fit
+as measured — through the one weighting (`weighted_rows`); `0` for views without a code (decoded images: Core's own resolution alone). A fit
 at the noise level (χ² ≈ m) is then far above it: no exact fit (Core's stop rules decide its termination).
 """
 lm_abstol(f) = sqrt(sum(k -> _resolution2(_view_weights(f.weights, k), f.quanta[k]), eachindex(f.ϕ); init = 0.0))
-# a view's Σ (q·w)² / 12 (`_whiten`: whitened rows or as measured); a view without code steps (a decoded image) resolves exactly
+# a view's Σ (q·w)² / 12 (`weighted_rows`: whitened rows or as measured); a view without code steps (a decoded image) resolves exactly
 _resolution2(w, ::Nothing) = 0.0
-_resolution2(w, q::AbstractVector) = sum(abs2, _whiten(w, q)) / 12
+_resolution2(w, q::AbstractVector) = sum(abs2, weighted_rows(w, q)) / 12

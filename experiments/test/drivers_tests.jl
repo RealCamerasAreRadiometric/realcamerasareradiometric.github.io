@@ -359,7 +359,7 @@ end
         rj(p) = VgtkIO.read_record(p)
         gt = joinpath(F, "gt", "poses.json"); truth = "lens:" * joinpath(F, "truth_lens.json")
         # reprojection_vectors: a Kannala–Brandt lens (Core's project) and a grid lens (Core's project of its generic model), both
-        # through Core's projection (RadiometricCamera's _project_from)
+        # through Core's projection (RadiometricCamera's project_points)
         for (tag, kind) in (("kb", "lens"), ("grid", "grid"))
             reprojection_vectors(gt, "$kind:" * joinpath(F, "$(tag)_lens.json"), joinpath(F, "$(tag)_poses.json"), joinpath(T, "$tag.json"))
             O = rj(joinpath(T, "$tag.json")); e = rj(joinpath(F, "expected_reprojection.json"))[tag]

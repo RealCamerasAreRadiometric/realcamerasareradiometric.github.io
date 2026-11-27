@@ -69,8 +69,8 @@ end
             # the configuration converter (RadiometricCamera's RC_CONFIG_VERSIONS, 0.4.0): a config of record stays version 1 on disk, its
             # [lm] read whole as the current [optimizer]; its start and refinement settings split as written, the keys of version 1 —
             # the split of record (before 0.4.0), so its products keep their keys
-            @test !haskey(p, RC.VgtkCore.CONFIG_VERSION_KEY)
-            let m = RC.VgtkCore.migrate_config(p, RC.RC_CONFIG_VERSIONS), old = "sensor_characteris" * "ation"   # (split: the banned spelling)
+            @test !haskey(p, VgtkCore.CONFIG_VERSION_KEY)
+            let m = VgtkCore.migrate_config(p, RC.RC_CONFIG_VERSIONS), old = "sensor_characteris" * "ation"   # (split: the banned spelling)
                 @test get(m, "optimizer", nothing) == get(p, "lm", nothing)
                 @test get(get(m, "camera", Dict()), "sensor_characterization", nothing) ==
                       get(get(p, "camera", Dict()), "sensor_characterization", get(get(p, "camera", Dict()), old, nothing))

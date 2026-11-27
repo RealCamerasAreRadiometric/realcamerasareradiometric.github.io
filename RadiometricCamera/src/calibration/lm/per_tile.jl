@@ -381,7 +381,7 @@ function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; pa
             ϕt = f.ϕ[k][rows]
             idx = SVector(k, ip[I + 1, Jt + 1], ip[I + 2, Jt + 1], ip[I + 1, Jt + 2], ip[I + 2, Jt + 2],
                           i_f, i_r, i_m, i_v, i_l)
-            push!(blocks, TileT(k, pix, ϕt, _select_rows(_view_weights(f.weights, k), rows), (I, Jt), idx, f, θ, Ref{Any}(nothing), free, held_rotation_coordinates))
+            push!(blocks, TileT(k, pix, ϕt, select_rows(_view_weights(f.weights, k), rows), (I, Jt), idx, f, θ, Ref{Any}(nothing), free, held_rotation_coordinates))
             n_tiles += 1
         end
     end
@@ -478,7 +478,7 @@ function _tile_dev!(r::PerTileResidual)
         u, v = f.px[r.k][i]
         ids[j] = UInt32((u - 1) * _image_height(θ) + v)
     end
-    sh(a) = _shared_read_only!(f.backend, a)                  # read on the window's queues too, written only here
+    sh(a) = share_read_only!(f.backend, a)                  # read on the window's queues too, written only here
     d = (; px = sh(adapt(f.backend, ids)), idx = sh(_index_list(f.backend, length(ids))), pix = sh(adapt(f.backend, Int32.(r.pix))),
           ϕ = sh(adapt(f.backend, r.ϕt)), ω = _device_weights(f.backend, r.ωt), layouts = Dict{Any, Any}())
     r.dev[] = d
@@ -748,8 +748,8 @@ function _batch_launch(f::CalibrationData, θ::CalibrationParameters{N}, k::Inte
         S = need_jac ? _slot_rows(be, [(c0, o, C) for (c0, o) in co], P, length(px)) : nothing
         KA.synchronize(be)
         # the batch's outputs are read by its tiles' row kernels on other queues (the main task's, the window's workers) and never
-        # written again: out of the per-buffer queue tracking (`_shared_read_only!`), as the view's pixel lists
-        foreach(a -> a === nothing || _shared_read_only!(be, a), (fo, S, po, ho))
+        # written again: out of the per-buffer queue tracking (`share_read_only!`), as the view's pixel lists
+        foreach(a -> a === nothing || share_read_only!(be, a), (fo, S, po, ho))
         bytes = _device_bytes(fo, rays, hrays === rays ? nothing : hrays, ho, po, S) + sum(x -> sizeof(x[2]), co; init = 0)
         (; key, flux, flux_d = fo, px, C, S, parts = po, heights = ho, bytes)
     end
@@ -799,13 +799,13 @@ end
 
 """The residual of tile `r` from a view's flux `flux` (three channels per pixel, the kernels'; the tile's pixels at the view pixels
 `ivs`): the measured channels' entries (`residual_channels`) minus the tile's observed `ϕt`, one per measured channel and pixel, under
-the rows' weights `ωt` (`_whiten`; the row kernel's product)."""
+the rows' weights `ωt` (`weighted_rows`; the row kernel's product)."""
 function _tile_residual(flux::AbstractVector, r::PerTileResidual, ivs)
     chs = residual_channels(r.f); nc = length(chs)
     out = Vector{Float64}(undef, nc * length(r.pix))
     @inbounds for (i, iv) in enumerate(ivs), (j, c) in enumerate(chs)
         e = nc * (i - 1) + j
-        out[e] = _whiten(r.ωt, e, flux[3 * (iv - 1) + c] - r.ϕt[e])
+        out[e] = weighted_rows(r.ωt, e, flux[3 * (iv - 1) + c] - r.ϕt[e])
     end
     return out
 end

@@ -341,7 +341,7 @@ function _block_residual(r::PerViewResidual, pose::VgtkCore.LeftRigidManifold6{F
              all(isfinite, view.focus.t̂_i) && isfinite(view.r) && all(isfinite, control_points(VgtkCore.model(vg))) && all(isfinite, coefficients(lt.light))
     finite || return fill(NaN, NLLSsolver.nres(r))
     fluxv = _flux_device(f, θ, r.k, view, VgtkCore.model(vg), m.mat, lt.light, m.surface)
-    return _whiten(_view_weights(f.weights, r.k), _channel_rows(fluxv, f.channel) .- f.ϕ[r.k])   # the rows' weights (weighting.jl)
+    return weighted_rows(_view_weights(f.weights, r.k), _channel_rows(fluxv, f.channel) .- f.ϕ[r.k])   # the rows' weights (weighting.jl)
 end
 
 @inline _bit(flags, i) = (Int(flags) >> (i - 1)) & 1 == 1

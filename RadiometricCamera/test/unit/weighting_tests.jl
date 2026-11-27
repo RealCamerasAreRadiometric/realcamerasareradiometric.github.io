@@ -149,7 +149,7 @@ end
     using SparseArrays: sprand, issparse, nnz
     using StableRNGs: StableRNG
     A = sprand(StableRNG(3), 2000, 50_000, 1e-4); w = rand(StableRNG(4), 2000) .+ 0.5
-    Aw = RC._whiten(w, A)
+    Aw = RC.weighted_rows(w, A)
     @test issparse(Aw) && nnz(Aw) == nnz(A) && Matrix(Aw[:, 1:200]) == w .* Matrix(A[:, 1:200])
-    @test RC._whiten(RC.Unweighted(), A) === A
+    @test RC.weighted_rows(RC.Unweighted(), A) === A
 end

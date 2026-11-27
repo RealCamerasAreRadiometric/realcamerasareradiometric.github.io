@@ -106,20 +106,20 @@ end
     include(joinpath(rct, "fixture_board.jl")); include(joinpath(rct, "fixture_camera.jl"))   # RadiometricCamera's test scene (its checkpoint item's)
 
     tex = fixture_board()
-    board = RC.with_facing(RC.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
+    board = VrtkCore.with_facing(VrtkCore.TexturedTarget([-1.0, -1.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], tex), [0.0, 0.0, 1.5])
     W = H = 24
     glens = VgtkCore.solve(VgtkCore.EstimationProblem(VgtkCore.SplineLens, cam(VgtkCore.Lens(VgtkCore.DoubleSphere(0.25, 0.4)), 30.912, (12.24, 11.52), W, H)),
                            RC.GridStart(; lattice = RC.ImageLattice(10, 10))).u
     poses = [VgtkCore.EuclideanMap(SMatrix{3, 3}(exp_so3(SVector(π, 0.0, 0.0)) * exp_so3(SVector(0.15 * cos(k), 0.12 * sin(k), 0.1 * k))),
                                    SVector{3}(SVector(0.3 * cos(k), 0.3 * sin(k), 1.4 + 0.1 * k)); check = false) for k in 1:2]
-    focus = RC.Focus(RC.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
+    focus = VrtkCore.Focus(VrtkCore.FocusSpline(VgtkCore.grid_nodes(3, VgtkCore.Rect(0, 0, W, H))), fill(1 / 1.5, 9))
     vig = RC.gauge_center_value(VrtkCore.TensorProductVignetting((4, 4), VgtkCore.Rect(0, 0, W, H); degree = 2))
     camera = RC.RadiometricCameraModel(glens, focus, 0.0386, vig)
-    b = RC.VgtkCore.centroid(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
+    b = VgtkCore.centroid(board); a = zeros(3, 9); a[:, 1] .= (2.0, 1.9, 1.8)
     light = EnvironmentLight(SphericalHarmonicMap(a, 2), b, RC.sphere_radius(b, [p.t for p in poses]))
-    mat = RC.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
+    mat = VrtkCore.Material(; roughness_ink = 0.12, roughness_paper = 0.35, refractive_index_ink = 1.65, refractive_index_paper = 1.33, diffuse_weight = 0.4)
     rs = RC.RenderSettings(; n_𝐩 = 2, n_ρ = 2, n_φ = 6, N = 4)
-    masks = [RC.compute_mask(camera, p, board, rs; δ = 0.02, backend = RC.KernelAbstractions.CPU()) for p in poses]
+    masks = [RC.compute_mask(camera, p, board, rs; δ = 0.02, backend = VgtkCore.KA.CPU()) for p in poses]
     imgs = [RC.render_view(k, camera, poses[k], mat, light, board, rs, masks[k]) for k in 1:2]
     # the detections: board points seen through the start camera, each image point moved by a fixed sub-pixel offset (a detector's
     # bias), so the start's bearing error is not zero
@@ -140,9 +140,9 @@ end
         # the start's initialization region: the whole 24 × 24 image (a stored grid start is defined on its region; every detection inside)
         g = RC.StartGeometry(glens, poses, obs, board; names = basename.(photos), init_region = VgtkCore.Rect2{Float64}(0, 0, W, H))
         so = RC.start_options(run, settings)
-        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, photos), (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
+        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, photos), (; run, device = VgtkCore.KA.CPU())), alg; stops)
         s = c.cache.prob                                                # the start (the start options, the run's io.out)
-        RC.save_start(sdir, s.f, s.u0, s.f.start, so...)                              # the start record: iteration 0
+        RC.save_calibration_start(sdir, s.f, s.u0; run, settings)                              # the start record: iteration 0
         fit = VgtkCore.solve!(c)
         n = fit.stats.nsteps
         @test n == 2

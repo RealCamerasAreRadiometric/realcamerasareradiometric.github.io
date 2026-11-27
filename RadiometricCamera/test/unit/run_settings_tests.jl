@@ -47,7 +47,7 @@
         _lm_views!(s2.f, s2.u0; stops = RC._calibration_stops(; max_iter = 1), damping = VgtkCore.LevenbergDamping(), height_degree = 1)
         @test !isfile(log)                                                                   # the run's log is the run's
         # … and the run's own problem has them: Θ_m held inside the riding block, μ on the run's bounds
-        lp = RC._refinement_lm(settings, RC.PerViewRoute())
+        lp = RC.refinement_structure(settings, RC.PerViewRoute())
         s3 = fresh()
         prob3, idx3 = build_problem(s3.f, s3.u0; lp.kw...)
         mv3 = material_var(prob3)

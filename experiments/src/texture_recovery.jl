@@ -18,8 +18,9 @@
 # bootstrap. Only the cells enough fit, validation and test photographs cover are scored.
 # =============================================================================
 using RadiometricCamera
-using RadiometricCamera: chart, compute_mask, draws, focus, inside, photo_file, residuals,
-                         world_ray
+using RadiometricCamera: compute_mask, draws, photo_file
+using VisualGeometryToolkitCore: chart, residuals                  # Core's (RC adds methods to them)
+using VisualRadiometryToolkitCore: focus, inside, world_ray        # the radiometric layer's
 const RC = RadiometricCamera
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
@@ -322,7 +323,7 @@ function sheet_poses(finder, photos; page, log = println)
             b = VgtkCore.centroid(src); p = SVector{2, Float64}(VgtkCore.centroid(dst))
             Xc = R * VgtkCore.ustrip.(VgtkCore.m, page(SVector(Float64(b[1]), Float64(b[2]), 0.0)) .* VgtkCore.mm) + t
             f = VgtkCore.backproject(camera, p); all(isfinite, f) && push!(ang, angle_between(normalize(Xc), normalize(SVector{3, Float64}(f))))
-            q = RC._project_from(camera, [SVector{3, Float64}(Xc)], [p])[1]
+            q = RC.project_points(camera, [SVector{3, Float64}(Xc)], [p])[1]
             all(isfinite, q) ? (push!(r, norm(q - p)); push!(XY, p)) : (nn += 1)
         end
         nan += nn; append!(allr, r)
@@ -457,7 +458,7 @@ function sample_pixels(ctx, k::Integer, external; fraction::Real, seed::Integer,
     rng = StableRNG(seed + k); px = NTuple{4, Float64}[]
     for (u, v) in RC.masked_pixels(mask)
         rand(rng) < fraction || continue
-        o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[k], RC.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
+        o, d = VrtkCore.world_ray(ctx.camera, ctx.poses[k], VrtkCore.sensor_position(u, v), SVector(0.0, 0.0, 0.0)); sr, 𝐱 = VrtkCore.intersect_board(ctx.rays, o, d)
         (isfinite(sr) && sr > 0) || continue
         𝐛 = VgtkCore.chart(ctx.bd, 𝐱); push!(px, (u, v, 𝐛[1] * ctx.page_mm[1], 𝐛[2] * ctx.page_mm[2]))
     end
@@ -488,7 +489,7 @@ row_weights(weights::AbstractVector, groups, n::Integer) =
 
 "The record of a page solve's row weighting (`row_weights`): as measured, or whitened by the sensor record's variance law."
 weighting_record(::RC.Unweighted) = "as measured (a plain observation: unweighted rows)"
-weighting_record(::AbstractVector) = "whitened: each row and its value times 1/σ, σ² the sensor record's variance law at the photosite (RC's masked_observations, _whiten)"
+weighting_record(::AbstractVector) = "whitened: each row and its value times 1/σ, σ² the sensor record's variance law at the photosite (RC's masked_observations, weighted_rows)"
 
 "The sensor record a photo set's observation model states: its sha256, or nothing (no record)."
 sensor_record_sha256(s::RC.SensorRecord) = s.sha256
@@ -570,13 +571,13 @@ _footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
     TW, TH = Int(f.TW), Int(f.TH)
     base = (Int(q) - 1) * _footprint_slots(st); n = 0; tot = 0.0
     @inbounds for ks in 1:length(st.sensor)
-        𝐩 = RC.sensor_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
+        𝐩 = VrtkCore.sensor_sample(st.sensor, ks, Int(u), Int(v)); rs = view.r; sw = st.sensor.weights[ks]
         for la in 1:VrtkCore.n_disc(st.aperture)
-            𝐚 = RC.aperture_sample(st.aperture, la, rs)
+            𝐚 = VrtkCore.aperture_sample(st.aperture, la, rs)
             o, d = VrtkCore.world_ray(view, 𝐩, 𝐚); sr, 𝐱 = VrtkCore.intersect_board(rays, o, d)
             (isfinite(sr) && sr > 0) || return Int32(0)
             tw = texel_weights(VgtkCore.chart(bd, 𝐱), TW, TH); tw === nothing && return Int32(0)
-            w = sw * RC.aperture_weight(st.aperture, la, rs)
+            w = sw * VrtkCore.aperture_weight(st.aperture, la, rs)
             for (t, b) in tw                                           # the texel's slot (a linear search of the ≤ n so far), or a new one
                 c = Int32(t); i = base + 1
                 while i <= base + n && f.cols[i] != c
@@ -591,7 +592,7 @@ _footprint_slots(st) = 4 * length(st.sensor) * VrtkCore.n_disc(st.aperture)
         end
     end
     tot > 0 || return Int32(0)
-    V = f.vig(RC.sensor_position(Int(u), Int(v)))
+    V = f.vig(VrtkCore.sensor_position(Int(u), Int(v)))
     @inbounds for i in (base + 1):(base + n)
         f.vals[i] = V * (f.vals[i] / tot)
     end
@@ -628,10 +629,10 @@ Base.@propagate_inbounds function _gather_row!(valout, i, colout, dst, src, cnt,
     end
     return nothing
 end
-# Row `i`'s entries times its weight `w[i]` (RC's one weighting, `_whiten`: the same product as its sparse row scaling).
+# Row `i`'s entries times its weight `w[i]` (RC's one weighting, `weighted_rows`: the same product as its sparse row scaling).
 Base.@propagate_inbounds function _weight_row!(nzval, i, rowptr, w)
     for e in rowptr[i]:(rowptr[i + 1] - 1)
-        nzval[e] = RC._whiten(w, i, nzval[e])
+        nzval[e] = RC.weighted_rows(w, i, nzval[e])
     end
     return nothing
 end
@@ -792,15 +793,15 @@ relative to the normal equations' right-hand side). A regularised solve
 is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `CGLS(; preconditioner)`), the
 unregularised one never: without the penalty the problem is ill-posed in the texels the rows barely see, and the scaling moves those
 by 10²–10³ (where the unpreconditioned iteration leaves them at the start). The 1 + |weights|
-solves are independent and run at once, each on a worker of its own (RC's `_each_chunk`: on a device, its own stream), `op`'s arrays
-shared read-only by them (RC's `_shared_read_only!`).
+solves are independent and run at once, each on a worker of its own (RC's `each_chunk`: on a device, its own stream), `op`'s arrays
+shared read-only by them (RC's `share_read_only!`).
 """
 function page_solves(op, b, x0; scale::Real, weights, stops::VgtkCore.ToleranceStops)
     ws = [0.0; [β * scale for β in weights]]                           # the unregularised solve, then one per weight
     be = op.device
     dA, dD = column_sumsq(op.At; device = be), column_sumsq(op.Dt; device = be)   # diag(AᵀA), diag(DᵀD): the Jacobi diagonals' parts
-    RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
-    sols = RC._each_chunk(be, ws) do w
+    RC.share_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
+    sols = RC.each_chunk(be, ws) do w
         r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0),
                            VgtkCore.CGLS(; preconditioner = w > 0 ? dA .+ w .* dD : nothing); stops)
         VgtkCore.KA.synchronize(be)                                    # the solution complete on this worker's stream before another task reads `u`
@@ -899,8 +900,8 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
         R = page_footprints(ctx, rows_px, variant_camera(ctx, name; pinhole_r = PINR), groups; device)   # every row, on the device
         F, Fs, Vs, Ts = (findall(b .& R.kept) for b in blocks)         # indices of rows_px: the fit rows, the scored fit, validation and test rows
         nkept = count(R.kept); nval = count(R.kept .& isval); ntest = count(R.kept .& istest)
-        wF = RC._select_rows(rw, F)                                    # the fit rows' weights (RC's one weighting: _whiten)
-        bw = RC._whiten(wF, yv[F])                                     # the values whitened as the rows, or as measured
+        wF = RC.select_rows(rw, F)                                    # the fit rows' weights (RC's one weighting: weighted_rows)
+        bw = RC.weighted_rows(wF, yv[F])                                     # the values whitened as the rows, or as measured
         t2 = time(); op = texture_operator(R.A, F, wF, D; device)          # the fit rows selected, weighted and transposed on the device
         scale = VgtkCore.penalty_scale(sum(abs2, Array(op.At.nzval)), TW * TH, m̄)   # λ = β · scale, the fit rows' energy in the cost's units
         log(@sprintf("page %s: %d rows kept (fit %d, validation %d, test %d), %d fit nonzeros, m̄ %.4g, λ/β %.4g, rows %s  [%.0f s]", name, nkept, length(F), nval, ntest,
@@ -1402,7 +1403,7 @@ function page_photograph(img::AbstractMatrix, lens, R, t; TW::Integer, TH::Integ
     n = SVector{3, Float64}(R[1, 3], R[2, 3], R[3, 3]); tt = SVector{3, Float64}(t); nt = dot(n, tt)   # the page's plane in the camera frame: n · X = n · t
     Rm = SMatrix{3, 3, Float64}(R)
     function on_page(u, v)                                           # pixel (u, v)'s chief ray on the page, in texels from its top-left corner
-        𝐩 = RC.sensor_position(u, v)
+        𝐩 = VrtkCore.sensor_position(u, v)
         RC.in_domain(lens, 𝐩) || return SVector(NaN, NaN)
         d = SVector{3, Float64}(VgtkCore.backproject(lens, 𝐩)); all(isfinite, d) || return SVector(NaN, NaN)
         s = nt / dot(n, d); (isfinite(s) && s > 0) || return SVector(NaN, NaN)

@@ -50,11 +50,11 @@ _rotation(a, b) = SMatrix{3, 3, Float64}(VgtkCore.solve(VgtkCore.EstimationProbl
     _forward(lens, X, 𝐩₀) -> SVector{2}
 
 The COLMAP pixel whose chief ray through `lens` goes through the camera-frame point `X`: Core's projection of the camera's type
-(RadiometricCamera's `_project_from`: a parametric lens's `project`; a SplineLens camera's batched `project` warm-started at `𝐩₀`),
+(RadiometricCamera's `project_points`: a parametric lens's `project`; a SplineLens camera's batched `project` warm-started at `𝐩₀`),
 NaN where it does not converge or lands outside the lens's domain.
 """
 function _forward(lens, X, 𝐩₀)
-    𝐩 = RC._project_from(lens, [SVector{3, Float64}(X)], [SVector{2, Float64}(𝐩₀)])[1]
+    𝐩 = RC.project_points(lens, [SVector{3, Float64}(X)], [SVector{2, Float64}(𝐩₀)])[1]
     return all(isfinite, 𝐩) && RC.in_domain(lens, 𝐩) ? 𝐩 : SVector(NaN, NaN)
 end
 

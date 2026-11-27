@@ -26,6 +26,12 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   public protocol): a `CalibrationBundle(variables, blocks, free, decode)` holds its route's reading of a variable vector, and its
   `block_result` (Core's block contract) assembles the LM result's `u`, the NamedTuple `(; camera, poses, mat, surface, light)`
   the solved variables encode (copied out of the cache's vector), which the route writes into the parameters. The same values.
+- **Public for the paper project (#46: no reach into RadiometricCamera's internals).** The helpers experiments/ calls become documented
+  public API, renamed off their `_` (no alias): `weighted_rows` (was `_whiten`), `select_rows` (`_select_rows`), `project_points`
+  (`_project_from`), `each_chunk` (`_each_chunk`), `share_read_only!` (`_shared_read_only!`, its CUDA-extension method too),
+  `refinement_structure` (`_refinement_lm`); and public as they are: `lm_route`, `LmRoute`, `PerViewRoute`, `PerTileRoute`,
+  `gauge_center_value`, `GaussianDerivativeEdges`. VisualRadiometryToolkitCore's and VisualGeometryToolkitCore's names are no longer
+  reached through `RadiometricCamera.` (their owners'). The same code.
 - **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
   `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
   converge now says so in one line, as the parametric starts did).

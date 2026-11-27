@@ -253,7 +253,7 @@ records that a 7 M-row page ran out of host memory in this path.
 ```text
 page_footprints   footprint kernel per photograph: each pixel's texels left ASCENDING in its slots (insertion sort in
                   the kernel) → row-parallel gather → Core CSRMatrix of every sampled row, on the device
-fit_operator      csr_rows (the fit rows: one gather) → weights in a row kernel (RC's _whiten) →
+fit_operator      csr_rows (the fit rows: one gather) → weights in a row kernel (RC's weighted_rows) →
                   csr_transpose (keys (column − 1)·nz + entry, one device sort, a binary search per column)
                   → PenalizedOperator(A, Aᵀ, D, Dᵀ)
 page_solves       unchanged: Core's cgls per penalty weight

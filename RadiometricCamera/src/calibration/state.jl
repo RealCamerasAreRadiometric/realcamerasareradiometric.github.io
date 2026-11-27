@@ -309,9 +309,9 @@ view (290 MB each at 4256 × 2848) is what pushed the 16-view full-resolution ru
 photometric_residuals(f::CalibrationData, θ::CalibrationParameters) =
     [_channel_rows(_flux_device(f, θ, k, view_of(θ, k), θ.camera.vignetting, θ.mat, θ.light), f.channel) - f.ϕ[k] for k in 1:n_views(θ)]
 
-"""The cost's residual vectors: [`photometric_residuals`](@ref) under the rows' weights (`_whiten`: whitened when the state's rows
+"""The cost's residual vectors: [`photometric_residuals`](@ref) under the rows' weights (`weighted_rows`: whitened when the state's rows
 carry 1/σ, as measured otherwise)."""
-residuals(f::CalibrationData, θ::CalibrationParameters) = [_whiten(_view_weights(f.weights, k), r) for (k, r) in enumerate(photometric_residuals(f, θ))]
+residuals(f::CalibrationData, θ::CalibrationParameters) = [weighted_rows(_view_weights(f.weights, k), r) for (k, r) in enumerate(photometric_residuals(f, θ))]
 
 """Cost `½ Σ_k ‖𝔯_k‖²` of the cost's residual vectors (`residuals(f, θ)`: whitened when the rows carry 1/σ) and the relative
 RMS residual `√(Σ_k ‖𝔯_k‖² / data_norm2(f))`, in the same norm."""

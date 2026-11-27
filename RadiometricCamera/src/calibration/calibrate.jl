@@ -270,7 +270,7 @@ function _run_refinement!(f::CalibrationData, θ::CalibrationParameters, meta, r
     rays_init = [normalize(backproject(lens_init, p)) for p in probe]   # the start camera's probe rays, once (the drift monitor)
     pinned_material = "material" in settings.fixed
     damping = alg.optimizer.damping
-    lp = _refinement_lm(settings, route; smoothness = meta.grid_smoothness)   # THE problem: its blocks and holds (a parametric start has no grid smoothness)
+    lp = refinement_structure(settings, route; smoothness = meta.grid_smoothness)   # THE problem: its blocks and holds (a parametric start has no grid smoothness)
     pinned_material && lp.blocks.material && println("material Θ_m FIXED (\"material\" in fixed): its columns are zero; the board warping / in-plane print error of the block stay free")
     if !isempty(run.resume.state)                           # continue from a finished state (views, material, surface, vignetting, light)
         sst = load_state(run.resume.state)

@@ -24,7 +24,7 @@ is_grid_lens(l) = l isa GridLike
 
 The refinement's LM route, by the camera's TYPE (never a flag): a SplineLens camera is refined per tile (its lattice's patches,
 `_lm_tiles!`: [`PerTileRoute`](@ref)), any other pixel camera per view in its own parameters (`_lm_views!`: [`PerViewRoute`](@ref)).
-The problem spec (`_refinement_lm`), the LM's call and the run's camera records dispatch on it.
+The problem spec (`refinement_structure`), the LM's call and the run's camera records dispatch on it.
 """
 function lm_route end
 """The LM route of a camera ([`lm_route`](@ref)): `PerViewRoute` or `PerTileRoute`."""

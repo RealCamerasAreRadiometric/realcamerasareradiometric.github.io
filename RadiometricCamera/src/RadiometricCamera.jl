@@ -60,7 +60,7 @@ import JSON                                                    # JSON.lower / JS
 import PNGFiles
 using ImageCore: ImageCore, Gray, N0f8
 import KernelAbstractions
-import SparseArrays                                           # the row weighting of a sparse design matrix (_whiten, weighting.jl)
+import SparseArrays                                           # the row weighting of a sparse design matrix (weighted_rows, weighting.jl)
 import StatsBase                                              # the photosite draw: tiedrank (the edge strength's ECDF rank)
 using Adapt: Adapt, adapt
 import LinearSolve

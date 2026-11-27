@@ -262,7 +262,7 @@ end
 end
 
 # Work item `w`'s share of the cost: Σ r² over its pixels `w, w + W, …` and their measured channels, into `out[1, w]` (each row under
-# its weight `ω`, `_whiten`).
+# its weight `ω`, `weighted_rows`).
 Base.@propagate_inbounds function _radiometry_cost_row!(out, w, parts, ϕ, ω, chs::NTuple{NC, Int}, vig, a, μ, Z, lay, x) where {NC}
     NV = n_control_points(vig)
     dP = _trial_points(lay, Z, x, Val(NV)); a′ = _trial_coefficients(lay, chs, a, x); μ′, _ = _trial_μ(lay, μ, x)
@@ -272,7 +272,7 @@ Base.@propagate_inbounds function _radiometry_cost_row!(out, w, parts, ϕ, ω, c
         Φ = _rowdot(a′, L)
         for jc in 1:NC
             e = NC * (i - 1) + jc
-            r = _whiten(ω, e, Φ[chs[jc]] - ϕ[e])
+            r = weighted_rows(ω, e, Φ[chs[jc]] - ϕ[e])
             s += r * r
         end
     end
@@ -280,7 +280,7 @@ Base.@propagate_inbounds function _radiometry_cost_row!(out, w, parts, ϕ, ω, c
     return nothing
 end
 # Work item `w`'s share of the normal equations: Σ r², Σ Jᵀr and Σ JᵀJ over its pixels into column `w` (the cost, then the N gradient
-# entries, then the N × N Hessian column-major), each row and its Jacobian row under the row's weight `ω` (`_whiten`).
+# entries, then the N × N Hessian column-major), each row and its Jacobian row under the row's weight `ω` (`weighted_rows`).
 Base.@propagate_inbounds function _radiometry_normal_row!(out, w, parts, ϕ, ω, chs::NTuple{NC, Int}, vig, a, μ, Z, lay, x::SVector{N, Float64}) where {NC, N}
     NV = n_control_points(vig)
     dP = _trial_points(lay, Z, x, Val(NV)); a′ = _trial_coefficients(lay, chs, a, x); μ′, dμ = _trial_μ(lay, μ, x)
@@ -292,7 +292,7 @@ Base.@propagate_inbounds function _radiometry_normal_row!(out, w, parts, ϕ, ω,
         for jc in 1:NC
             r0, Jr0 = _radiometry_row(lay, Z, rows, a′, dμ, ϕ, i, jc, chs[jc], Val(N), Val(NV))
             e = NC * (i - 1) + jc
-            r = _whiten(ω, e, r0); Jr = _whiten(ω, e, Jr0)
+            r = weighted_rows(ω, e, r0); Jr = weighted_rows(ω, e, Jr0)
             s += r * r
             g += Jr * r
             H += Jr * Jr'
@@ -377,10 +377,10 @@ function _design_matrix(f::CalibrationData, θ::CalibrationParameters, parts::Ra
 end
 
 """The least-squares system `(A, b)` of the block `blk` on the host: the design matrix (`_design_matrix`) and the measured values,
-every row under its weight (`_whiten`: whitened rows, or as measured)."""
+every row under its weight (`weighted_rows`: whitened rows, or as measured)."""
 function _weighted_system(f::CalibrationData, θ::CalibrationParameters, parts::RadiometryParts, blk::Val)
     ω = adapt(Array, parts.w)                                  # the host's copy (`Unweighted()` as it is)
-    return _whiten(ω, _design_matrix(f, θ, parts, blk)), _whiten(ω, Array(parts.ϕ))
+    return weighted_rows(ω, _design_matrix(f, θ, parts, blk)), weighted_rows(ω, Array(parts.ϕ))
 end
 
 """

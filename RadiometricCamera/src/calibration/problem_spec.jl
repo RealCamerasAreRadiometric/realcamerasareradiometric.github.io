@@ -19,7 +19,7 @@ function _surface_free(settings::CalibrationSettings, k::Symbol)
     return has && !(k in _lm_surface_holds(settings))
 end
 """
-    _refinement_lm(settings, route; smoothness = nothing) -> (; kw, blocks)
+    refinement_structure(settings, route; smoothness = nothing) -> (; kw, blocks)
 
 THE refinement's LM problem, derived once from the options: `blocks` (`_lm_blocks`: which blocks are solved) and `kw`, the keywords
 of the route's builder and LM (`lm_route`: `build_problem` / `_lm_views!` per view, `build_problem_grid` / `_lm_tiles!` per tile): the held blocks as `fixed` (`:grid` the
@@ -29,7 +29,7 @@ surface's holds from `fixed`, the model's structure (`_lm_structure`) and the gr
 optimizer's, is the caller's: a builder takes it beside these). The calibration's refinement, the grid smoothness's GCV, the Jacobian parity
 check and the tests build their problems from it alone.
 """
-function _refinement_lm(settings::CalibrationSettings, route::LmRoute; smoothness = nothing)
+function refinement_structure(settings::CalibrationSettings, route::LmRoute; smoothness = nothing)
     blocks = _lm_blocks(settings)
     held = Tuple(k for k in keys(blocks) if !getfield(blocks, k) || (k === :material && "material" in settings.fixed))
     kw = _route_kw(route, held, settings)

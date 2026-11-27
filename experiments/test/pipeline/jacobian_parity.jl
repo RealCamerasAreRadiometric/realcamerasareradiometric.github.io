@@ -16,7 +16,8 @@
 using RadiometricCamera, CUDA, LinearAlgebra, TOML, Printf
 import VisualGeometryToolkitCore as VgtkCore
 const RC = RadiometricCamera
-const NL = RC.NLLSsolver
+import NLLSsolver as NL
+using Static: static                 # the varflags of NLLSsolver's computeresjac (a StaticInt)
 
 function jacobian_parity(root, images, nviews = 2)
     CUDA.functional() || error("jacobian_parity.jl: no functional CUDA device")
@@ -40,10 +41,10 @@ function jacobian_parity(root, images, nviews = 2)
         RC.load_calibration_start(dir; run, settings, device = CUDA.CUDABackend())
     end
     meta = s.f.start
-    # the problem as the RadiometricCalibration solve builds it (the one derivation, `_refinement_lm`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
-    lp = RC._refinement_lm(settings, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
+    # the problem as the RadiometricCalibration solve builds it (the one derivation, `refinement_structure`: its blocks, the structure, the holds — Θ_m's among them — and the prior)
+    lp = RC.refinement_structure(settings, RC.PerTileRoute(); smoothness = meta.grid_smoothness); kw = lp.kw
     problem(st) = RC.build_problem_grid(st.f, st.u0; kw...)
-    host(st) = (h = typeof(st.f)(ntuple(i -> getfield(st.f, i), fieldcount(typeof(st.f)))...); h.backend = RC.KernelAbstractions.CPU(); h.device_cache = nothing;
+    host(st) = (h = typeof(st.f)(ntuple(i -> getfield(st.f, i), fieldcount(typeof(st.f)))...); h.backend = VgtkCore.KA.CPU(); h.device_cache = nothing;
                 VgtkCore.RefineProblem(h, st.u0))   # the data on the host, the same parameters
 
     failed = false
@@ -54,8 +55,8 @@ function jacobian_parity(root, images, nviews = 2)
         worst_tile = Dict{Symbol, Float64}()
         for (rc, rg) in zip(RC.tile_costs(pc), RC.tile_costs(pg))
             vc = NL.getvars(rc, pc.variables); vg = NL.getvars(rg, pg.variables)
-            r0c, Jc = NL.computeresjac(RC.static(1023), rc, vc...)
-            r0g, Jg = NL.computeresjac(RC.static(1023), rg, vg...)
+            r0c, Jc = NL.computeresjac(static(1023), rc, vc...)
+            r0g, Jg = NL.computeresjac(static(1023), rg, vg...)
             (r0c == NL.computeresidual(rc, vc...) && r0g == NL.computeresidual(rg, vg...)) || (failed = true; println("FAIL $label: a residual is not the flux kernel's"))
             nv = [Int(NL.nvars(v)) for v in vc]
             off(b) = sum(nv[1:(b - 1)]; init = 0)

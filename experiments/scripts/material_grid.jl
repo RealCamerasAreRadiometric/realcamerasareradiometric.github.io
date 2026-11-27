@@ -13,7 +13,8 @@
 #     --alphas, --etas  the candidate values, comma lists (the defaults are the values of record)
 #     --limit           evaluate only the first n candidates (a timing probe)
 using RadiometricCamera, Printf, StaticArrays
-using RadiometricCamera: all_parts, cost, set_vignetting!, RadiometryData, RadiometryBlockDescent
+using RadiometricCamera: all_parts, set_vignetting!, RadiometryData, RadiometryBlockDescent
+using VisualGeometryToolkitCore: cost                               # Core's (RC adds its method)
 using VisualRadiometryToolkitCore: Material, with_diffuse_weight
 import VisualGeometryToolkitCore as VgtkCore
 import VisualRadiometryToolkitCore as VrtkCore
@@ -54,11 +55,11 @@ sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
     g = RC.start_geometry(run_options, settings)                                          # (the start reads its own options: `init`'s, the record's)
-    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run_options, g.names)), (; run = run_options, device = RC.KernelAbstractions.CPU())),
+    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run_options, g.names)), (; run = run_options, device = VgtkCore.KA.CPU())),
                           alg; stops).cache.prob
     RC.save_calibration_start(joinpath(out, "start"), start.f, start.u0; run = run_options, settings)
 end
-s = RC.load_calibration_start(sdir; run = run_options, settings, device = RC.KernelAbstractions.CPU()); meta = s.f.start
+s = RC.load_calibration_start(sdir; run = run_options, settings, device = VgtkCore.KA.CPU()); meta = s.f.start
 RC.load_state_into!(s.f, s.u0, init, meta.names)                                 # the init's poses and camera (lens, focus, r), surface, lighting, V
 let v = s.u0.camera.vignetting                                              # V flat: the grid scores the material and the lighting alone
     set_vignetting!(s.u0, VrtkCore.with_control_points(v, ones(size(VrtkCore.control_points(v)))))

@@ -153,24 +153,24 @@ end
     # the printed edge is never a parameter (no hold of the LM; "edge" in fixed refused)
     @test_throws ArgumentError RC._surface_free(last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board")))), :edge)
     # one encoding (review round 2, finding 9): the model's structure (`_lm_structure`) and the holds (`_lm_surface_holds`), the
-    # booleans `_edge_free` / `_inplane_free` gone; the LM's keywords are built from them by `_refinement_lm` alone
+    # booleans `_edge_free` / `_inplane_free` gone; the LM's keywords are built from them by `refinement_structure` alone
     _, eh = RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "warping" => Dict("inplane" => "aspect_skew")))
     @test isempty(eh.fixed) && RC._lm_structure(eh) == (; height_degree = 0, inplane = true) && RC._lm_surface_holds(eh) == ()
-    @test RC._refinement_lm(eh, RC.PerTileRoute()).kw.fixed == () && RC._refinement_lm(eh, RC.PerViewRoute()).kw.fixed == () && RC._surface_free(eh, :inplane)
-    @test !haskey(RC._refinement_lm(eh, RC.PerTileRoute()).kw, :edge_block) && RC._refinement_lm(eh, RC.PerTileRoute(); smoothness = :p).kw.smoothness === :p
-    # one derivation of the held blocks (review round 3, findings 6 and 7): `_refinement_lm` reads `_lm_blocks` itself; "material" is
+    @test RC.refinement_structure(eh, RC.PerTileRoute()).kw.fixed == () && RC.refinement_structure(eh, RC.PerViewRoute()).kw.fixed == () && RC._surface_free(eh, :inplane)
+    @test !haskey(RC.refinement_structure(eh, RC.PerTileRoute()).kw, :edge_block) && RC.refinement_structure(eh, RC.PerTileRoute(); smoothness = :p).kw.smoothness === :p
+    # one derivation of the held blocks (review round 3, findings 6 and 7): `refinement_structure` reads `_lm_blocks` itself; "material" is
     # the problem's `fixed` either way — the builders hold Θ_m alone while a surface parameter rides the block (`_hold_material`), the
     # problem's own type (`MaterialVar{…, true}`), never a module global
     _, hm = RC.pipeline_options(Dict("fixed" => ["focus", "material"], "warping" => Dict("degree" => 1)))
-    lh = RC._refinement_lm(hm, RC.PerTileRoute())
+    lh = RC.refinement_structure(hm, RC.PerTileRoute())
     @test lh.kw.fixed == (:focus, :material) && lh.blocks.material && keys(lh) == (:kw, :blocks)       # Θ_m held inside a riding block
-    lh2 = RC._refinement_lm(last(RC.pipeline_options(Dict("fixed" => ["material"]))), RC.PerViewRoute())
+    lh2 = RC.refinement_structure(last(RC.pipeline_options(Dict("fixed" => ["material"]))), RC.PerViewRoute())
     @test lh2.kw.fixed == (:material,) && !lh2.blocks.material                                         # nothing rides: the block held
-    @test RC._refinement_lm(hm, RC.PerViewRoute()).kw.fixed == (:focus, :material)
+    @test RC.refinement_structure(hm, RC.PerViewRoute()).kw.fixed == (:focus, :material)
     @test RC._hold_material((:focus, :material), true) == ((:material,), (:focus,)) && RC._hold_material((:focus, :material), false) == ((), (:focus, :material))
     @test !isdefined(RC, :_edge_free) && !isdefined(RC, :_inplane_free)
     psrc = join((read(joinpath(pkgdir(RadiometricCamera), "src", f), String) for f in ("calibration/problem_spec.jl", "start/prepare.jl", "start/image_region.jl", "calibration/calibrate.jl")), "\n")
-    @test count("_refinement_lm(settings, ", psrc) == 3                                                    # docstring; the GCV, refine!
+    @test count("refinement_structure(settings, ", psrc) == 3                                                    # docstring; the GCV, refine!
     # the grid smoothness's GCV builds the refinement's problem from the same keywords (RC 0.9.0 review, finding 4: prepare_refinement
     # left a module-global hold set; there is none now)
     @test count("select_grid_smoothness_weight(f, θ, settings.grid.smoothness, grid_int; lp.kw...)", psrc) == 1
@@ -199,7 +199,7 @@ end
     # the printed edge is never a parameter, so no route can leave it free and unsolved (review finding 2: a parametric run recorded
     # it free and never solved it): whatever the holds the problem's keywords hold no edge, on either route
     edge_free = last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board")))); edge_held = last(RC.pipeline_options(Dict("edge" => Dict("sdf" => "board"), "fixed" => ["aperture"])))
-    @test all(!(:edge in RC._refinement_lm(o, p).kw.fixed) && !haskey(RC._refinement_lm(o, p).kw, :edge_block) for o in (edge_free, edge_held), p in (RC.PerViewRoute(), RC.PerTileRoute()))
+    @test all(!(:edge in RC.refinement_structure(o, p).kw.fixed) && !haskey(RC.refinement_structure(o, p).kw, :edge_block) for o in (edge_free, edge_held), p in (RC.PerViewRoute(), RC.PerTileRoute()))
     @test !isdefined(RC, :_check_parametric_edge)
     m = thrown_message(() -> RC.pipeline_options(Dict("material" => Dict("freeze" => true)))); @test occursin("[material]", m) && occursin("\"freeze\"", m)
     # the image region is the capture set's own keyed step (owner ruling 2026-11-15): the run names its record (`camera.lens_coverage`) or

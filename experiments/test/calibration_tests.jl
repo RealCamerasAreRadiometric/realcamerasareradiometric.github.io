@@ -123,6 +123,7 @@ end
 @testitem "the golden case's config of record loads; its record reads back (owner D15: the pipeline golden is the experiments' gate)" default_imports = false begin
     using Test, TOML, RadiometricCamera
     const RC = RadiometricCamera
+    import VisualGeometryToolkitCore as VgtkCore
     root = normpath(pkgdir(RadiometricCamera), "..")   # the repository: the package and the experiments side by side
     _, o = RC.pipeline_options(TOML.parsefile(joinpath(root, "experiments", "configs", "calibration", "siemens_coarse_full.toml"))["pipeline"])
     @test o isa RC.CalibrationSettings && o.warping.inplane == "aspect_skew" && !("inplane" in o.fixed) && o.fixed == ["aperture"]
@@ -131,9 +132,9 @@ end
     rr = TOML.parsefile(joinpath(root, "experiments", "configs", "experiments", "radiometric_refinement.toml"))
     for c in ("si30_ocv14_warped", "si30_kb_warped", "ag30_ocv14_warped", "ag30_kb_warped")
         _, oc = RC.pipeline_options(rr["cases"][c]["pipeline"])
-        @test !isempty(oc.edge.sdf) && !(:edge in RC._refinement_lm(oc, RC.PerViewRoute()).kw.fixed)
+        @test !isempty(oc.edge.sdf) && !(:edge in RC.refinement_structure(oc, RC.PerViewRoute()).kw.fixed)
     end
-    @test isempty(RC.VgtkCore.config_tag_violations((RC.FRONTEND_TAGS, RC.VIGNETTING_CONFIG_TAGS, RC.BACKEND_TAGS),
+    @test isempty(VgtkCore.config_tag_violations((RC.FRONTEND_TAGS, RC.VIGNETTING_CONFIG_TAGS, RC.BACKEND_TAGS),
                                                     [joinpath(root, "experiments", "configs", "calibration")]))
 end
 

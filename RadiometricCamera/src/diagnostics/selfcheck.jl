@@ -44,21 +44,21 @@ end
 
 # ---- the self-check and its outputs --------------------------------------------------------------------------------------------
 """
-    _project_from(camera, Xcs, 𝐩₀s) -> Vector{SVector{2, Float64}}
+    project_points(camera, Xcs, 𝐩₀s) -> Vector{SVector{2, Float64}}
 
 The sensor positions (COLMAP pixels) of the camera-frame points `Xcs` through the camera, by Core's projection of its type: a
 SplineLens camera's batched `project` of its model, warm-started at the detections `𝐩₀s` (NaN where it does not converge onto a
 present window); a parametric pixel camera's closed-form `project` (NaN where it does not image the point; no seed read).
 """
-_project_from(m::CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}, Xcs, 𝐩₀s) =
+project_points(m::CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}, Xcs, 𝐩₀s) =
     Vector{SVector{2, Float64}}(VgtkCore.project(m, Xcs, 𝐩₀s; device = KernelAbstractions.CPU()).px)
-_project_from(g::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, Xcs, 𝐩₀s) = _project_from(VgtkCore.model(g), Xcs, 𝐩₀s)
-_project_from(g::_PixelCamera, Xcs, _) = [SVector{2, Float64}(project(g, X)) for X in Xcs]
+project_points(g::BoundedCamera{<:CameraModel{<:VgtkCore.AbstractIntrinsics, <:SplineLens}}, Xcs, 𝐩₀s) = project_points(VgtkCore.model(g), Xcs, 𝐩₀s)
+project_points(g::_PixelCamera, Xcs, _) = [SVector{2, Float64}(project(g, X)) for X in Xcs]
 
 """Residual VECTORS in image px: from each detection to the model's prediction — the projection of the board point under the pose
-through the lens (`_project_from`, Core's projections), started at the detection."""
+through the lens (`project_points`, Core's projections), started at the detection."""
 function residual_vectors(lens, pose, feats)
-    q = _project_from(lens, [SVector{3, Float64}(inv(pose)(X)) for (_, X) in feats], [SVector{2, Float64}(𝐩) for (𝐩, _) in feats])
+    q = project_points(lens, [SVector{3, Float64}(inv(pose)(X)) for (_, X) in feats], [SVector{2, Float64}(𝐩) for (𝐩, _) in feats])
     return NTuple{4, Float64}[all(isfinite, qk) ? (𝐩[1], 𝐩[2], qk[1] - 𝐩[1], qk[2] - 𝐩[2]) : (𝐩[1], 𝐩[2], NaN, NaN) for ((𝐩, _), qk) in zip(feats, q)]
 end
 """The same residual on the BOARD: the detection's ray (lens + pose) intersected with the board plane, in chart units, next to the chart

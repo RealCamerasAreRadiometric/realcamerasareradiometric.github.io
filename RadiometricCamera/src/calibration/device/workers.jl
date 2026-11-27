@@ -101,25 +101,25 @@ function _await(job)
 end
 
 """
-    _shared_read_only!(backend, x) -> x
+    share_read_only!(backend, x) -> x
 
-Mark the device arrays inside `x` as shared read-only by the concurrent chunks of a device Jacobian (`_each_chunk`): a no-op here;
+Mark the device arrays inside `x` as shared read-only by the concurrent chunks of a device Jacobian (`each_chunk`): a no-op here;
 RC's CUDA extension (ext/RadiometricCameraCUDAExt.jl) synchronizes the calling task's stream once and takes the arrays out of
 CUDA.jl's per-buffer ownership synchronization, so the chunks' kernels on their own streams run concurrently instead of each
 waiting for the previous chunk's stream. Only for arrays no kernel writes while they are shared (an upload, or a producing kernel
 before the call).
 """
-_shared_read_only!(be, x) = x
+share_read_only!(be, x) = x
 
 """
-    _each_chunk(f, be, c0s) -> Vector
+    each_chunk(f, be, c0s) -> Vector
 
 `f(c0)` for every chunk start in `c0s`, results in chunk order. Every chunk runs on a worker of its own (`_on_worker`: a device
 queue each), so on a device the chunks' kernels run concurrently and each worker waits for its own queue once: with 255 registers
 per thread a 25k-px view is less than one wave per launch (+21% there; less on larger views). (On the CPU backend a Jacobian has
 one chunk beside the heights', Core's `dual_chunk`, and KernelAbstractions' CPU kernels are threaded over pixels.)
 """
-function _each_chunk(f, be, c0s)
+function each_chunk(f, be, c0s)
     jobs = [_on_worker(() -> f(c0)) for c0 in c0s]
     outs = [try (true, _await(j)) catch e; (false, e) end for j in jobs]      # every worker back to the pool before a rethrow
     for (ok, x) in outs; ok || throw(x); end

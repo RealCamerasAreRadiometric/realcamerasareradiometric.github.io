@@ -28,7 +28,7 @@ end
 """
     _whiten_rows!(J, r, ω, base, Val(NC))
 
-A pixel's `NC` rows `base + 1 … base + NC` under their weights (`_whiten`, weighting.jl): the residual `r[e]` and its Jacobian row
+A pixel's `NC` rows `base + 1 … base + NC` under their weights (`weighted_rows`, weighting.jl): the residual `r[e]` and its Jacobian row
 `J[:, e]` (columns × rows) times `ω[e]` — the same product the host residual takes (`_block_residual`), so the two stay bitwise one.
 `Unweighted()`: nothing (the rows as measured), statically.
 """
@@ -36,9 +36,9 @@ A pixel's `NC` rows `base + 1 … base + NC` under their weights (`_whiten`, wei
 Base.@propagate_inbounds function _whiten_rows!(J, r, ω::AbstractVector, base, ::Val{NC}) where {NC}
     for t in 1:NC
         e = base + t
-        r[e] = _whiten(ω, e, r[e])
+        r[e] = weighted_rows(ω, e, r[e])
         for col in 1:size(J, 1)
-            J[col, e] = _whiten(ω, e, J[col, e])
+            J[col, e] = weighted_rows(ω, e, J[col, e])
         end
     end
     return nothing
@@ -179,7 +179,7 @@ function _focus_weights(f::CalibrationData, θ::CalibrationParameters, k::Intege
                 G[n, ks, i] = g[ks][n]
             end
         end
-        return _shared_read_only!(be, adapt(be, G))
+        return share_read_only!(be, adapt(be, G))
     end
     G = lock(_DEVICE_CACHE_LOCK) do                          # (the views run concurrently: `_windowed`)
         dc = _ensure_device!(f, θ)
@@ -209,7 +209,7 @@ function _device_copy(f::CalibrationData, A::AbstractArray)
     be = f.backend
     KA.isgpu(be) || return VgtkCore.on_device(be, A)              # the host: the array itself (Core's upload, none needed)
     return lock(_DEVICE_CACHE_LOCK) do
-        get!(() -> _shared_read_only!(be, VgtkCore.on_device(be, A)), _DEVICE_COPIES, A)
+        get!(() -> share_read_only!(be, VgtkCore.on_device(be, A)), _DEVICE_COPIES, A)
     end
 end
 const _DEVICE_COPIES = WeakKeyDict{Any, Any}()
@@ -221,7 +221,7 @@ own), formed once. The key is the layout itself (compared by value): varflags an
 free board heights (`NH`), the in-plane print error (`NI`) and the block sizes change its slots, and a layout cached under a
 coarser key was read against another layout's slot rows (`S`), past their end."""
 _cached_layout(cache::AbstractDict, be, lay) =
-    lock(() -> get!(() -> (k = _kernel_layout(be, lay); _shared_read_only!(be, k.scatter); k.free === nothing || _shared_read_only!(be, k.free); k),
+    lock(() -> get!(() -> (k = _kernel_layout(be, lay); share_read_only!(be, k.scatter); k.free === nothing || share_read_only!(be, k.free); k),
                     cache, lay), _DEVICE_CACHE_LOCK)
 
 """
@@ -326,8 +326,8 @@ function _ensure_device!(f::CalibrationData, θ::CalibrationParameters)
     # read by every chunk of every view, written only here: out of the device's per-buffer queue tracking, the lists one by one (an
     # adaptor does not descend into a Vector of device arrays — the lists stayed tracked, and a tile's row kernel on the main queue
     # waited for the next view's whole batch on its worker's queue: 85 % of a grid linearization, 2026-11-13)
-    foreach(a -> _shared_read_only!(be, a), px); foreach(a -> _shared_read_only!(be, a), idx)
-    f.device_cache = _shared_read_only!(be, (; board = board32, px, idx))
+    foreach(a -> share_read_only!(be, a), px); foreach(a -> share_read_only!(be, a), idx)
+    f.device_cache = share_read_only!(be, (; board = board32, px, idx))
     return f.device_cache
 end
 
@@ -338,7 +338,7 @@ function _height_board(f::CalibrationData, θ::CalibrationParameters)
     hasproperty(dc, :board_h) && return dc.board_h
     be = f.backend
     G = HIGH_FLOAT
-    sh = G === VgtkCore.kernel_float(be) ? dc.board : _shared_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, _board(f, θ))))
+    sh = G === VgtkCore.kernel_float(be) ? dc.board : share_read_only!(be, adapt(be, VgtkCore.convert_eltype(G, _board(f, θ))))
     f.device_cache = merge(f.device_cache, (; board_h = sh))
     return sh
 end
@@ -438,10 +438,10 @@ function _view_jacobian(varflags, r::PerViewResidual{N}, pose::VgtkCore.LeftRigi
         hrays = _radiance_record_device(be, dc.px[r.k], dc.idx[r.k], r.k, _image_height(θ), hk.view, hk.vig, hk.mat, hk.light, hk.board, hk.st)
         rays = _record_as(F, hrays)
     end
-    _shared_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
-    hrays === rays || _shared_read_only!(be, hrays)
+    share_read_only!(be, (vk, rays))                                          # the view's lens and the record: read by every chunk below
+    hrays === rays || share_read_only!(be, hrays)
     plan = _chunk_plan(c0s, F, (vigk, lk, dc.board, stk, rays), hk === nothing ? nothing : (hk.vig, hk.light, hk.board, hk.st, hrays))
-    hs = _each_chunk(be, plan) do (c0, Fc, inputs, _)                 # the chunks' launches overlap (one worker queue each)
+    hs = each_chunk(be, plan) do (c0, Fc, inputs, _)                 # the chunks' launches overlap (one worker queue each)
         _view_chunk(Val(Fc), f, θ, r, lay, c0, C, pose, dist, foc, ap, m, inputs...)
     end
     S = _slot_rows(be, [(c0, h, C) for (c0, h) in zip(c0s, hs)], P, npx)
@@ -479,7 +479,7 @@ end
 function _view_phi(f::CalibrationData, θ::CalibrationParameters, k::Integer)
     dc = _ensure_device!(f, θ)
     ϕs = get(dc, :phi, nothing)
-    ϕs === nothing && (ϕs = [_shared_read_only!(f.backend, adapt(f.backend, p)) for p in f.ϕ]; f.device_cache = merge(dc, (; phi = ϕs)))
+    ϕs === nothing && (ϕs = [share_read_only!(f.backend, adapt(f.backend, p)) for p in f.ϕ]; f.device_cache = merge(dc, (; phi = ϕs)))
     return ϕs[k]
 end
 
@@ -502,7 +502,7 @@ the flux kernel (bitwise `computeresidual`'s) and the view's Jacobian in the pro
 the stall postcondition and the diagnostics; the LM's iterations take the Gauss–Newton blocks on the device (`computecostgradhess`)."""
 function _block_jacobian(varflags, r::PerViewResidual, vars...)
     v = _view_jacobian(varflags, r, vars...)
-    return _whiten(_view_weights(r.f.weights, r.k), _channel_rows(Float64.(Array(v.flux)), r.f.channel) .- r.f.ϕ[r.k]),
+    return weighted_rows(_view_weights(r.f.weights, r.k), _channel_rows(Float64.(Array(v.flux)), r.f.channel) .- r.f.ϕ[r.k]),
            _host_jacobian(v.J, v.T, v.lay, r.f.run)
 end
 

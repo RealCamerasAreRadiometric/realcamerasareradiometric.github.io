@@ -51,6 +51,10 @@ public CalibrationData, CalibrationParameters, flat_vignetting, center_constrain
        CPUCompute, GPUCompute, start_is_grid, read_switch, switch_spelling, boolean_switch_violations, LatticeRule,
        DerivedLattice, NodeCountLattice, LATTICE_TAGS, INAPPLICABLE_KEYS, inapplicable_reason
 public launch_rows!   # the row kernels' one launch (Core's `pointwise!`): RC's and the paper project's
+# the paper project's building blocks (experiments/): the rows' weighting, a camera's projection of camera-frame points, the device
+# workers' chunks and shared arrays, and the refinement's LM structure by its route
+public weighted_rows, select_rows, project_points, each_chunk, share_read_only!, refinement_structure, lm_route, LmRoute, PerViewRoute,
+       PerTileRoute, gauge_center_value, GaussianDerivativeEdges
 
 # ---- retired names (an earlier release's), each refused by name with its replacement (no alias, no forwarding)
 """Retired in an earlier release: VisualGeometryToolkitCore's `backproject(camera, 𝐩)`."""
