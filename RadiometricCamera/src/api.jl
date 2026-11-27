@@ -2,7 +2,7 @@
 # RadiometricCamera's API surface — the one file that states it.
 #
 #   export   the headline API: the radiometric calibration (its algorithm, solved by VisualGeometryToolkitCore's `init`/`solve!`/`solve`,
-#            and the one-call calibrate), its inputs, cache and result types, the options and their TOML reader. Everything a user writes unqualified.
+#            one `solve` the start and the refinement), its inputs, cache and result types, the options and their TOML reader. Everything a user writes unqualified.
 #   public   the user-facing names beyond it (the image formation, the camera and target models, the records, the diagnostics, the
 #            LM's blocks for those who build their own problem, the paper's symbols — D14: demoted, names kept), reached qualified
 #            (`RadiometricCamera.name`) or imported by name (`using RadiometricCamera: name`).
@@ -15,9 +15,9 @@
 # `RadiometricCameraModel`, which every verb here takes.
 # ---------------------------------------------------------------------------
 
-export calibrate, RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_calibration, StartGeometry, start_geometry, load_calibration_start,
+export RadiometricCalibration, RadiometricRefinement, CalibrationCache, read_calibration, StartGeometry, start_geometry, load_calibration_start,
        save_calibration_start, save_radiometric_calibration, start_photographs, CalibrationEstimate, CalibrationMetadata,
-       calibration_problem, RadiometricCameraModel, RadiometricTarget, RunOptions, CalibrationSettings, pipeline_options, CalibratedCamera
+       calibration_problem, CalibrationPhotographs, RadiometricCameraModel, RadiometricTarget, RunOptions, CalibrationSettings, pipeline_options, CalibratedCamera
 
 public CalibrationData, CalibrationParameters, flat_vignetting, center_constraint, in_domain, lm_box, lm_scale, is_grid_lens, grid_dims, GridStart, ImageLattice,
        coverage_region, check_coverage, calibrated_folds, grid_angular_error,
@@ -82,6 +82,12 @@ compute_mask(::View, ::TexturedTarget, ::RenderSettings; kwargs...) =
     _retired_view_form("Φ_pixel", "`Φ_pixel(u, v, k, camera, pose, mat, light, board, settings)`")
 pixel_parts(::Integer, ::Integer, ::Integer, ::View, args...) =
     _retired_view_form("pixel_parts", "`pixel_parts(u, v, k, camera, pose, mat, light, board, settings)`")
+
+# ---- retired name (the solve interface: one estimation verb). `calibrate` was a one-line synonym of the calibration's `solve`.
+"""Retired: the calibration's `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run, device)), algorithm; stops)`."""
+calibrate(args...; kwargs...) = throw(ArgumentError(
+    "calibrate is retired: a calibration is one solve — `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), " *
+    "(; run, device)), algorithm; stops)` (`init` / `solve!` for the start, then the refinement)"))
 
 # ---- retired names (`lens` is VisualGeometryToolkitCore's lens model everywhere). A radiometric camera's geometric
 # camera (Core's bounded camera or a grid model) is its `geometric`: the field, the accessor of a camera and of calibration parameters, the replacer.

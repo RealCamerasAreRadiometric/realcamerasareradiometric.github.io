@@ -54,7 +54,7 @@ sdir = if isfile(joinpath(dirname(initpath), RC.START_RECORD_FILE))
     dirname(initpath)
 else
     g = RC.start_geometry(run_options, settings)                                          # (the start reads its own options: `init`'s, the record's)
-    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, RC.start_photographs(run_options, g.names)), (; run = run_options, device = RC.KernelAbstractions.CPU())),
+    start = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(run_options, g.names)), (; run = run_options, device = RC.KernelAbstractions.CPU())),
                           alg; stops).cache.prob
     RC.save_calibration_start(joinpath(out, "start"), start.f, start.u0; run = run_options, settings)
 end

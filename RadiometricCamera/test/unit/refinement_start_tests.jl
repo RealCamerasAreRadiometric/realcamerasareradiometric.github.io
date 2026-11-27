@@ -111,7 +111,8 @@
             @test !isdefined(RC, n)
         end
         @test !any(m -> m.module === RC, methods(RC.VgtkCore.refine!))
-        @test isdefined(RC, :RadiometricCalibration) && isdefined(RC, :CalibrationCache) && isdefined(RC, :calibrate)
+        @test isdefined(RC, :RadiometricCalibration) && isdefined(RC, :CalibrationCache) && isdefined(RC, :CalibrationPhotographs)
+        @test occursin("calibrate is retired", sprint(showerror, try RC.calibrate(); catch e; e end))   # one solve, no synonym
         @test !(:save_init in fieldnames(RC.IOOptions)) && !("io.save_init" in RC.PIPELINE_OUTPUT_KEYS)
     end
     end

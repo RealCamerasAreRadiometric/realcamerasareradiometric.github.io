@@ -140,7 +140,7 @@ end
         # the start's initialization region: the whole 24 × 24 image (a stored grid start is defined on its region; every detection inside)
         g = RC.StartGeometry(glens, poses, obs, board; names = basename.(photos), init_region = VgtkCore.Rect2{Float64}(0, 0, W, H))
         so = RC.start_options(run, settings)
-        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (g, photos), (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
+        c = VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(g, photos), (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
         s = c.cache.prob                                                # the start (the start options, the run's io.out)
         RC.save_start(sdir, s.f, s.u0, s.f.start, so...)                              # the start record: iteration 0
         fit = VgtkCore.solve!(c)

@@ -1,7 +1,7 @@
 # The per-iteration checkpoint (`io.checkpoint_each`): a refinement writes poses_it<N>.json and state_it<N>.json after every LM
 # iteration, the state through save_state with the run's observation model (RC 0.11.1 made it required; the monitor omitted it, and
-# every checkpointed refinement crashed at iteration 1 until 0.11.2). A small decoded scene through `calibrate`, 2 LM iterations.
-# A small decoded scene through `calibrate`: two 24 × 24 renders of a board through a grid camera, the start the rendering's own
+# every checkpointed refinement crashed at iteration 1 until 0.11.2). A small decoded scene through the calibration's `solve`, 2 LM iterations.
+# A small decoded scene through the calibration's `solve`: two 24 × 24 renders of a board through a grid camera, the start the rendering's own
 # geometry (`run_scene(dir, lm, tex, cam)`: the fit and the run's io.out under `dir`, `lm` the [lm] table).
 @testsetup module CheckpointScene
     using RadiometricCamera, StaticArrays, LinearAlgebra, PNGFiles, ImageCore
@@ -34,9 +34,10 @@
                                         "lm" => lm, "masks" => Dict("samples_per_view" => 10^9, "seed" => 1),
                                         "rendering" => Dict("N" => 4, "n_rho" => 2, "n_phi" => 6, "n_p" => 2), tables...))
         obs = [Tuple{SVector{2, Float64}, SVector{3, Float64}}[] for _ in 1:2]
-        start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, (RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
+        start_only && return VgtkCore.init(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
                                                                       (; run, device = RC.KernelAbstractions.CPU())), alg; stops).cache.prob
-        fit = RC.calibrate(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos, run, alg; stops, device = RC.KernelAbstractions.CPU())
+        fit = VgtkCore.solve(VgtkCore.EstimationProblem(RC.CalibrationEstimate, RC.CalibrationPhotographs(RC.StartGeometry(glens, poses, obs, board; names = basename.(photos)), photos),
+                                                        (; run, device = RC.KernelAbstractions.CPU())), alg; stops)
         return (; fit, out, photos)
     end
     export run_board

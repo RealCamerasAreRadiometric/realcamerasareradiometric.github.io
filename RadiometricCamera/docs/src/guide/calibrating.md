@@ -34,12 +34,13 @@ own session, so it is not run here:
 using RadiometricCamera, VisualGeometryToolkitCore
 run, alg, stops = read_calibration("run.toml"; set = ["optimizer.max_iter=15"])   # the run, the calibration, the solve's stops
 g = start_geometry(run, alg.refinement.settings)                                  # the front end's geometric calibration
-fit = calibrate(g, start_photographs(run, g.names), run, alg; stops)             # the start, then the joint LM over Θ̄
+data = CalibrationPhotographs(g, start_photographs(run, g.names))               # the geometry and its photographs' files
+fit = solve(EstimationProblem(CalibrationEstimate, data, (; run)), alg; stops)    # the start, then the joint LM over Θ̄
 fit.u.camera                                                                  # the radiometric camera (lens, focus, r, V)
 ```
 
 A SplineLens camera (the generic grid model) is refined per tile, any other camera per view in its own parameters. The device is
-the problem's (`EstimationProblem(CalibrationEstimate, data, (; run, device))`; [`default_backend`](@ref) by default).
+the problem's (`EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run, device))`; [`default_backend`](@ref) by default).
 `JULIA_NUM_THREADS=auto`: the CPU backend is multithreaded over pixels.
 
 ## Run the refinement driver
@@ -70,13 +71,13 @@ refused.
 
 Its stages are the API: [`read_calibration`](@ref) reads the TOML, [`start_geometry`](@ref) reads the front end's geometric
 calibration through VisualGeometryToolkitIO, the calibration's `init` lifts it into the refinement's problem (the masks, the
-photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run)),
+photographs' observations, the closed-form start: `init(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run)),
 algorithm; stops)`, the refinement stage's `init` — an `EstimationCache` of a [`CalibrationCache`](@ref) of `RefineProblem(f, u0, run)`: the data [`CalibrationData`](@ref), the parameters
 [`CalibrationParameters`](@ref), the run's [`RunOptions`](@ref)), [`save_calibration_start`](@ref) writes it as a start record
 (`bin/refine.jl --stage=start`), [`load_calibration_start`](@ref) builds the refinement's problem from one (`--start=<dir>`),
 `solve!` of the cache — or `solve(problem, algorithm.refinement; stops)` of a loaded problem ([`RadiometricRefinement`](@ref)) —
 runs the sweeps and the LM (a `FitResult` of a [`CalibrationEstimate`](@ref), [`RadiometricCalibration`](@ref)), and
-[`save_radiometric_calibration`](@ref) writes the records; [`calibrate`](@ref) is the start and the refinement in one call. A run
+[`save_radiometric_calibration`](@ref) writes the records; one `solve` of the calibration's problem is the start and the refinement in one call. A run
 with neither flag computes its start, writes it (into `io.out/start/`, or `--start-out=<dir>`) and refines from it in the same
 process, the photographs read once (the start's streamed observations handed to `load_calibration_start`).
 

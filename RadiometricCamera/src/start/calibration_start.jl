@@ -43,6 +43,24 @@ function StartGeometry(camera, poses::AbstractVector, observations::AbstractVect
 end
 
 """
+    CalibrationPhotographs(geometry::StartGeometry, photographs)
+
+The data of a radiometric calibration from scratch ([`RadiometricCalibration`](@ref)'s `EstimationProblem(CalibrationEstimate,
+CalibrationPhotographs(geometry, photographs), p)`): the geometric calibration it starts from (`geometry`, a [`StartGeometry`](@ref))
+and the photographs' files, `photographs[k]` the file of view `k` (a RAW photograph by its file, its green photosites, or a decoded
+image; [`start_photographs`](@ref) resolves a run's), one per photograph of the geometry (a `DimensionMismatch` otherwise).
+"""
+struct CalibrationPhotographs{G <: StartGeometry}
+    geometry::G
+    photographs::Vector{String}
+end
+function CalibrationPhotographs(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString})
+    length(photographs) == length(geometry.names) ||
+        throw(DimensionMismatch("CalibrationPhotographs: $(length(geometry.names)) photographs in the geometry, $(length(photographs)) files"))
+    return CalibrationPhotographs(geometry, collect(String, photographs))
+end
+
+"""
     start_geometry(run, settings; record = nothing) -> StartGeometry
 
 The start geometry of the run `run` (its [`RunOptions`](@ref); `settings` its calibration's, the grid's lattice) from its front end (`frontend.type`: a calibration session's records, or a Schöps run's), every

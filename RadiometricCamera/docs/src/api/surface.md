@@ -6,8 +6,8 @@ reach is `public`: write it qualified (`RadiometricCamera.RenderSettings`) or im
 ## Exported
 
 <!-- the suite checks this list equals `names(RadiometricCamera)` (test/unit/api_surface_tests.jl) -->
-- [`calibrate`](@ref) — a radiometric calibration in one call
-- [`RadiometricCalibration`](@ref) — the calibration, an algorithm of VisualGeometryToolkitCore's `solve` / `init` / `solve!` on `EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run))`: `init` lifts the geometric calibration into the refinement's problem (the start; its cache the refinement stage's `init`, holding a [`CalibrationCache`](@ref)), `solve!` refines it (a `FitResult`)
+- [`CalibrationPhotographs`](@ref) — the data of a calibration from scratch: its [`StartGeometry`](@ref) and the photographs' files
+- [`RadiometricCalibration`](@ref) — the calibration, an algorithm of VisualGeometryToolkitCore's `solve` / `init` / `solve!` on `EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run))`: `init` lifts the geometric calibration into the refinement's problem (the start; its cache the refinement stage's `init`, holding a [`CalibrationCache`](@ref)), `solve!` refines it (a `FitResult`)
 - [`RadiometricRefinement`](@ref) — the refinement, a refine of VisualGeometryToolkitCore's `solve` on `RefineProblem(f, u0, run)` ([`calibration_problem`](@ref), [`load_calibration_start`](@ref)): the parameters `u0` refined in place on the data `f` in the run `run`; it holds the [`CalibrationSettings`](@ref)
 - [`StartGeometry`](@ref), [`start_geometry`](@ref), [`start_photographs`](@ref) — the start's inputs: the geometric calibration and the photographs
 - [`save_calibration_start`](@ref), [`load_calibration_start`](@ref) — the start record

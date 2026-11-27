@@ -286,7 +286,7 @@ A run's data and its input/output, one table each (see the table structs for eve
 lists them): where the photographs and the records are (`[io]`), the front end's geometric calibration (`[frontend]`), the capture's
 facts (`[camera]`: the sensor, the lens, the sensor characterization), resuming a finished run (`[resume]`), the bearing
 self-check (`[selfcheck]`) and the device (`[compute]`). The problem's `p` of a calibration: `EstimationProblem(CalibrationEstimate,
-(geometry, photographs), (; run, device))` and the refinement's `RefineProblem(f, u0, run)`. Read from TOML with the algorithm's
+CalibrationPhotographs(geometry, photographs), (; run, device))` and the refinement's `RefineProblem(f, u0, run)`. Read from TOML with the algorithm's
 settings by [`pipeline_options`](@ref), written for the run record with [`config_dict`](@ref). Required: `io.images`, `io.out` and
 the front end's inputs (`frontend.type = "blob"`: `session`; `"schoeps"`: `schoeps`, `texture`, `texture_features`). A
 `selfcheck.only` run reads no photograph: it needs no `io.images`.

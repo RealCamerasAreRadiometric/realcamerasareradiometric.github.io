@@ -3,13 +3,13 @@
 # calibration's parameters on its data (`RadiometricRefinement`'s solve of `RefineProblem(f, u0, run)`, `RadiometricCalibration`'s after its
 # start: the route's LM, `_lm_views!` per view or `_lm_tiles!` per tile, by the camera's type; in chunks with a
 # closed-form sweep between them, with the live monitor and the per-iteration checkpoints), its result a Core FitResult whose estimate
-# is the `CalibrationEstimate` (the calibrated camera, the poses, the radiometric target, the light); `calibrate` = its solve.
+# is the `CalibrationEstimate` (the calibrated camera, the poses, the radiometric target, the light).
 # ---------------------------------------------------------------------------
 
 """
     CalibrationEstimate(camera, poses, target, light)
 
-The estimate of a radiometric calibration ([`RadiometricCalibration`](@ref), [`calibrate`](@ref)): the calibrated camera (a
+The estimate of a radiometric calibration ([`RadiometricCalibration`](@ref)): the calibrated camera (a
 [`CalibratedCamera`](@ref): the `RadiometricCameraModel` — the geometric camera, the focus surface, the aperture radius and
 the vignetting — with the observation model its photographs were read under and its render settings), the poses (camera →
 world, one per photograph), the radiometric target (the printed target, its warping, its material and print) and the light.
@@ -100,9 +100,9 @@ The radiometric calibration of the paper, a fit (`FitKind`: it seeds itself, fro
 lifts the geometric camera into a radiometric calibration's data and parameters with the run's start options
 (`start_options(run, refinement.settings)`, the run's output directory kept), then the [`RadiometricRefinement`](@ref) `refinement` of
 them in the run. A run's TOML gives the run, it and the solve's stops, [`read_calibration`](@ref). Solved on
-`EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run[, device]))` (`run` the run's [`RunOptions`](@ref), `device`
-the compute backend, [`default_backend`](@ref) by default): a [`StartGeometry`](@ref) and the photographs' files, `photographs[k]` the file of view `k`
-(a RAW photograph by its file, its green photosites, or a decoded image). The start: the focus surface through the mean target
+`EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run[, device]))` (`run` the run's [`RunOptions`](@ref), `device`
+the compute backend, [`default_backend`](@ref) by default): the data a [`CalibrationPhotographs`](@ref), a [`StartGeometry`](@ref) and the
+photographs' files. The start: the focus surface through the mean target
 centre, the aperture from the f-number, the image circle measured where the run names its frames, the masks, the photographs'
 observations streamed, the vignetting and the lighting by the closed-form start, the grid smoothness.
 
@@ -113,9 +113,14 @@ a [`CalibrationCache`](@ref); its `prob`, the started `RefineProblem(f, u0, run)
 
 ```julia
 run, alg, stops = read_calibration("run.toml")
-c = init(EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run)), alg; stops)   # the start
-r = solve!(c)                                                                           # the refinement
+c = init(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run)), alg; stops)   # the start
+r = solve!(c)                                                                                                  # the refinement
 ```
+
+or, the start and the refinement in one call, `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry,
+photographs), (; run, device)), alg; stops)`. The data and parameters refined are the ones a start record rebuilds
+(`save_calibration_start` → `load_calibration_start`, bin/refine.jl's path): the start reads no refinement-only key
+(`REFINE_ONLY_KEYS`), and a record carries the start's values bit for bit.
 
 Every input is a value: the pipeline's front ends read theirs through VisualGeometryToolkitIO ([`start_geometry`](@ref)); a caller
 with a Schöps run, a Kalibr or an OpenCV calibration of its own loads its camera and observations with IO's importers itself
@@ -158,10 +163,10 @@ end
 _calibration_device(::NamedTuple{(:run,)}) = default_backend()
 _calibration_device(p::NamedTuple{(:run, :device)}) = p.device
 
-function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:Tuple{StartGeometry, AbstractVector{<:AbstractString}},
+function VgtkCore.__init(prob::VgtkCore.EstimationProblem{CalibrationEstimate, <:CalibrationPhotographs,
                                                           <:Union{NamedTuple{(:run,), <:Tuple{RunOptions}}, NamedTuple{(:run, :device), <:Tuple{RunOptions, Any}}}},
                          alg::RadiometricCalibration; stops::VgtkCore.LmStops = _calibration_stops())
-    geometry, photographs = prob.f
+    (; geometry, photographs) = prob.f
     run = prob.p.run
     refinement = alg.refinement
     f, θ = _start_state(geometry, photographs, _start_run_options(run, refinement.settings)..., nothing; backend = _calibration_device(prob.p),
@@ -208,7 +213,7 @@ The radiometric calibration a run's TOML states: `run` its [`RunOptions`](@ref) 
 blocks by [`JointRadiometry`](@ref) of the optimizer, else [`RadiometryBlockDescent`](@ref); `iterations` the sweeps of their stops,
 `radiometry_stops`; `lm_chunk`), and `stops` its solve's stop settings (Core's
 `LmStops`: `max_iter`, `max_time`, `ftol`, `xtol_rel` of the table, Core's absolute step tolerance of record) —
-`solve(EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run)), algorithm; stops)`. A version-1 config's `[lm]` is the `[optimizer]` table ([`RC_CONFIG_VERSIONS`](@ref)).
+`solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(geometry, photographs), (; run)), algorithm; stops)`. A version-1 config's `[lm]` is the `[optimizer]` table ([`RC_CONFIG_VERSIONS`](@ref)).
 """
 read_calibration(path::AbstractString; set = ()) = _read_config_file(read_calibration, path, set)
 function read_calibration(d::AbstractDict; set = ())
@@ -234,20 +239,6 @@ end
 write_pipeline_config(dir::AbstractString, run::RunOptions, algorithm::RadiometricCalibration, stops::VgtkCore.LmStops; header::AbstractString = "") =
     _write_pipeline_config(dir, config_dict(run, algorithm, stops), run; header)
 
-"""
-    calibrate(geometry::StartGeometry, photographs, run::RunOptions, algorithm::RadiometricCalibration; stops, device = default_backend())
-        -> FitResult{CalibrationEstimate, CalibrationMetadata}
-
-A radiometric calibration in one call (a task verb): `solve(EstimationProblem(CalibrationEstimate, (geometry, photographs),
-(; run, device)), algorithm; stops)` of the run `run` — the start, then its refinement ([`RadiometricCalibration`](@ref); `stops` its solve's,
-configs/default.toml's `[optimizer]` by default).
-The geometric calibration is data: a [`StartGeometry`](@ref)`(camera, poses, observations, target; names)`. The data and
-parameters refined are the ones a start record rebuilds (`save_calibration_start` → `load_calibration_start`, bin/refine.jl's path): the start
-reads no refinement-only key (`REFINE_ONLY_KEYS`), and a record carries the start's values bit for bit.
-"""
-calibrate(geometry::StartGeometry, photographs::AbstractVector{<:AbstractString}, run::RunOptions, algorithm::RadiometricCalibration;
-          stops::VgtkCore.LmStops = _calibration_stops(), device = default_backend()) =
-    VgtkCore.solve(VgtkCore.EstimationProblem(CalibrationEstimate, (geometry, photographs), (; run, device)), algorithm; stops)
 """The start's options of the run `run` and the settings `settings` (`start_options`: the refinement-only keys at their defaults), written
 to the run's `io.out`: `(run, settings)`."""
 _start_run_options(run::RunOptions, settings::CalibrationSettings) =

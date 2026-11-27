@@ -92,7 +92,7 @@ if isempty(start_dir)
     start_dir = start_only ? run_options.io.out : isempty(start_out) ? joinpath(run_options.io.out, "start") : start_out
     ts = @timed begin
         g = RC.start_geometry(srun, ssettings)
-        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, (g, RC.start_photographs(srun, g.names)), (; run = run_options, device = backend)), alg; stops).cache.prob
+        VgtkCore.init(VgtkCore.EstimationProblem(CalibrationEstimate, RC.CalibrationPhotographs(g, RC.start_photographs(srun, g.names)), (; run = run_options, device = backend)), alg; stops).cache.prob
     end
     s0 = ts.value
     if !isempty(srun.io.render_state)                                        # diagnostic: the masked pixels rendered with a finished state

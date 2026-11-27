@@ -5,6 +5,11 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **Breaking: `calibrate` is retired (one estimation verb).** It was a one-line synonym of the calibration's `solve`; it is refused by
+  name. The data of a calibration from scratch are a type, `CalibrationPhotographs(geometry::StartGeometry, photographs)` (was the
+  bare tuple `(geometry, photographs)`): `solve(EstimationProblem(CalibrationEstimate, CalibrationPhotographs(g, files), (; run,
+  device)), alg; stops)`, or `init` (the start) then `solve!` (the refinement). A file count that differs from the geometry's
+  photographs is a `DimensionMismatch`.
 - **Breaking: the closed-form blocks are a REFINE (they start from the parameters' current blocks).** `RefineProblem(RadiometryData(f,
   parts), θ[, (; light, vignetting, mu)])` (was `EstimationProblem(RadiometryBlocks, (f, θ, parts)[, blocks])`), its context read by
   Core's `read_context` (a misspelt block refused); `RadiometryBlockDescent` and `JointRadiometry` are `RefineKind`. Their sweeps are
