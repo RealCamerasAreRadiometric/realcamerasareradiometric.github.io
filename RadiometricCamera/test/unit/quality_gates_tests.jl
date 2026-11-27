@@ -53,8 +53,10 @@ end
     using Test, RadiometricCamera, JET
     # the count of JET's reports on the package alone, at its RC 0.11.0 baseline: it may only fall — a new report fails here. 36: the
     # T0 count 34 plus the new public entry points start_geometry (two methods) and _start_state re-reporting the existing leaf sites
-    # (load_session, load_state, board_features) that prepare_refinement reached (RC 0.11.0 ledger) — no new leaf
-    BASELINE = 36
+    # (load_session, load_state, board_features) that prepare_refinement reached (RC 0.11.0 ledger) — no new leaf. 35 (RC #8): the
+    # grid GCV's `_gcv_selection` on a stated weight (now refused before the linearization) and the session's `settings_line` on a
+    # `nothing` its own test excluded (read once, narrowed) are gone
+    BASELINE = 35
     n = length(JET.get_reports(JET.report_package(RadiometricCamera; target_modules = (RadiometricCamera,), toplevel_logger = nothing)))
     @test n <= BASELINE
     n < BASELINE && @info "JET: $n reports, below the baseline $BASELINE — lower BASELINE to $n"
