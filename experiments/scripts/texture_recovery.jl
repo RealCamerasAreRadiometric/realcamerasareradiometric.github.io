@@ -184,7 +184,7 @@ refine(fold::Integer) = produce(texture_product(fold); product_records(DRIVER, C
     cells = select_cells(cnt, roles; min_fit_views = Int(s["min_fit_views"]), min_val_views = Int(s["min_val_views"]), min_test_views = Int(s["min_test_views"]),
                          min_pixels = Int(s["min_pixels"]))
     isempty(cells) && error("refine: no cell is covered by ≥ $(s["min_fit_views"]) fit, ≥ $(s["min_val_views"]) validation and ≥ $(s["min_test_views"]) test photographs with ≥ $(s["min_pixels"]) pixels")
-    run_page(ctx, samples, roles, cells, circle, dir; settings = s, device, values, weights, log = say)
+    run_page(ctx, samples, roles, cells, circle, dir; settings = s, stops = cgls_stops(CFG), device, values, weights, log = say)
     Produced(; inputs = [inputs; state; images; product_dir(poses_product())])
 end
 

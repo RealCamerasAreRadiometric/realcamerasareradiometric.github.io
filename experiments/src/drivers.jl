@@ -198,15 +198,16 @@ function check_input_table(t, where::AbstractString; stage::Bool = true)
 end
 
 """
-    load_driver_config(path, name; tables, case_keys = ()) -> Dict
+    load_driver_config(path, name; tables, case_keys = (), versions = nothing) -> Dict
 
-Read the config of record of driver `name` at `path`: the top-level tables must be among `tables` (each driver lists its own; an
+Read the config of record of driver `name` at `path` — through the driver's versioned converter `versions` when it has one (a
+Core `ConfigVersions`: the file migrated from its `config_version` to the current one, `migrate_config`): the top-level tables must be among `tables` (each driver lists its own; an
 unknown one is an `ArgumentError` naming it), `[experiment] name` must be `name` and the file `<name>.toml` or `<name>_<variant>.toml`
 (another config of record of the same driver), every `[inputs.<id>]` is
 checked ([`INPUT_KEYS`](@ref), a known tier and stage, a relative path inside data_root()), and every `[cases.<name>]` takes only
 `case_keys`, its `pipeline` table read through `pipeline_options` (refused keys name the case).
 """
-function load_driver_config(path::AbstractString, name::AbstractString; tables, case_keys = ())
+function load_driver_config(path::AbstractString, name::AbstractString; tables, case_keys = (), versions = nothing)
     isfile(path) || throw(ArgumentError("config not found: $path"))
     ex = excluded_sets()
     for (set, e) in ex                                                    # an excluded set's own config: refused by name
@@ -214,6 +215,10 @@ function load_driver_config(path::AbstractString, name::AbstractString; tables, 
             throw(ArgumentError("$path is the config of the excluded set $set (configs/excluded.toml): $(e["reason"])"))
     end
     cfg = skip_excluded(expand_overrides(inherit_kinds!(TOML.parsefile(path), path), path), ex)
+    if versions !== nothing                                                # the driver's converter: the current version's tables
+        cfg = VgtkCore.migrate_config(cfg, versions; source = path)
+        delete!(cfg, VgtkCore.CONFIG_VERSION_KEY)
+    end
     VgtkCore.check_keys(cfg, (tables..., "_locations"), path)             # `_locations`: where a group's variants lie (`variant_location`)
     for t in ("experiment", "inputs")
         haskey(cfg, t) && cfg[t] isa AbstractDict || throw(ArgumentError("$path: no [$t] table"))

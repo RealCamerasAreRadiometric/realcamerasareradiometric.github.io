@@ -41,7 +41,13 @@
     e = refused(c -> c["compare"] = merge(cmp, Dict("runs" => Dict("new" => "short"))));   @test e isa ArgumentError && occursin("runs", e.msg)
     e = refused(c -> c["compare"] = merge(cmp, Dict("crop_mm" => [1.0, 2.0])));  @test e isa ArgumentError && occursin("crop_mm", e.msg)
     e = refused(c -> c["texture"]["pixel_fraction"] = 1.5);                   @test e isa ArgumentError && occursin("pixel_fraction", e.msg)
-    e = refused(c -> c["texture"]["cgls_rtol"] = 1.0);                        @test e isa ArgumentError && occursin("cgls_rtol", e.msg)
+    # the CGLS's stops: [cgls.stops] (version 2); a version-1 file's [texture] cgls_max_iter / cgls_rtol read through the converter
+    @test cgls_stops(load_texture_recovery_config(projectdir("configs", "experiments", "texture_recovery_14mm_small.toml"))) === VgtkCore.ToleranceStops(; max_iter = 500, rtol = 1.0e-6)
+    v1 = refused(c -> (delete!(c, "config_version"); c["texture"]["cgls_max_iter"] = 7; c["texture"]["cgls_rtol"] = 1.0e-5; delete!(c, "cgls")))
+    @test v1 === nothing
+    e = refused(c -> c["cgls"]["stops"]["rtol"] = 1.0);                      @test e isa ArgumentError && occursin("rtol", e.msg)
+    e = refused(c -> c["cgls"]["stops"]["max_iter"] = 0);                    @test e isa ArgumentError && occursin("max_iter", e.msg)
+    e = refused(c -> c["texture"]["cgls_rtol"] = 1.0e-6);                    @test e isa ArgumentError
     e = refused(c -> c["texture"]["regularization_weights"] = [0.1, 0.1]);    @test e isa ArgumentError && occursin("regularization_weights", e.msg)
     e = refused(c -> c["texture"]["regularization_weights"] = Float64[]);     @test e isa ArgumentError && occursin("regularization_weights", e.msg)
     e = refused(c -> c["texture"]["centre_rho"] = 0.7);                       @test e isa ArgumentError && occursin("centre_rho", e.msg)
@@ -101,13 +107,13 @@ end
     b = A * xt
     op = VgtkCore.PenalizedOperator(A, D; device = VgtkCore.KA.CPU())
     m̄ = VgtkCore.mean_positive_eigenvalue(D); scale = VgtkCore.penalty_scale(sum(abs2, nonzeros(A)), TW * TH, m̄); β = 0.3
-    sw = page_solves(op, b, fill(0.5, TW * TH); scale, weights = [β, 0.01, 1.0], rtol = 1e-12, maxit = 5000)
-    @test sw.main.converged && maximum(abs.(sw.main.x .- xt)) < 1e-6
+    sw = page_solves(op, b, fill(0.5, TW * TH); scale, weights = [β, 0.01, 1.0], stops = VgtkCore.ToleranceStops(; rtol = 1e-12, max_iter = 5000))
+    @test VgtkCore.successful_retcode(sw.main) && maximum(abs.(Array(sw.main.u) .- xt)) < 1e-6
     xd = (Matrix(A' * A) + β * scale * Matrix(D' * D)) \ (A' * b)
-    @test sw.reg[1].converged && maximum(abs.(sw.reg[1].x .- xd)) < 1e-6
-    @test norm(D * sw.reg[3].x) < norm(D * sw.reg[2].x)                    # the heavier weight is the smoother texture
-    cap = page_solves(op, b, fill(0.5, TW * TH); scale, weights = Float64[], rtol = 1e-14, maxit = 3)
-    @test !cap.main.converged && cap.main.iterations == 3
+    @test VgtkCore.successful_retcode(sw.reg[1]) && maximum(abs.(Array(sw.reg[1].u) .- xd)) < 1e-6
+    @test norm(D * Array(sw.reg[3].u)) < norm(D * Array(sw.reg[2].u))                    # the heavier weight is the smoother texture
+    cap = page_solves(op, b, fill(0.5, TW * TH); scale, weights = Float64[], stops = VgtkCore.ToleranceStops(; rtol = 1e-14, max_iter = 3))
+    @test !VgtkCore.successful_retcode(cap.main) && cap.main.stats.nsteps == 3
     # the roles by index, the cells and their coverage
     @test split_roles(10, 5) == [:val, :fit, :fit, :fit, :test, :val, :fit, :fit, :fit, :test]
     @test_throws ArgumentError split_roles(10, 2)
@@ -347,20 +353,21 @@ end
     # pinhole, does worse; then the report, the textures and the figures
     roles = split_roles(5, 5); cells = select_cells(cell_coverage(samples, 3, 5, 20.0), roles; min_fit_views = 1, min_val_views = 1, min_test_views = 1, min_pixels = 20)
     @test !isempty(cells)
-    settings = Dict{String, Any}("regularization_weights" => [1e-3, 1e-1], "cgls_rtol" => 1e-8, "cgls_max_iter" => 3000, "cell_mm" => 20.0, "centre_rho" => 0.4, "edge_rho" => 0.6,
+    settings = Dict{String, Any}("regularization_weights" => [1e-3, 1e-1], "cell_mm" => 20.0, "centre_rho" => 0.4, "edge_rho" => 0.6,
                                  "pinhole_r_m" => 1e-9, "start" => 0.5)
+    stops = VgtkCore.ToleranceStops(; rtol = 1e-8, max_iter = 3000)      # the page's CGLS stops ([cgls.stops])
     out = joinpath(dir, "refine"); logs = String[]
     # each photograph's values at its sampled pixels: read once, by its type (a decoded image: its linear green), the rendered I
     photo_samples = [sample_pixels(ctx, k, ext; fraction = 1.0, seed = 11, backend = VgtkCore.KA.CPU()) for k in 1:5]
     photo_values = [r.values for r in photo_samples]; photo_weights = [r.weights for r in photo_samples]
     @test maximum(abs.(reduce(vcat, photo_values) .- I_true)) <= 1 / 65535   # each value within the 16-bit PNG's quantisation
     @test all(w -> w === RC.Unweighted(), photo_weights)                      # decoded photographs: rows as measured (RC's masked_observations)
-    run_page(ctx, samples, roles, cells, circle, out; settings, device = VgtkCore.KA.CPU(), values = photo_values, weights = photo_weights, log = s -> push!(logs, s))
+    run_page(ctx, samples, roles, cells, circle, out; settings, stops, device = VgtkCore.KA.CPU(), values = photo_values, weights = photo_weights, log = s -> push!(logs, s))
     @test occursin("as measured", String(VgtkIO.read_record(joinpath(out, "page.json"); allownan = true).weighting))
     # whitened rows: a constant 1/σ scales the rows, the values and (through penalty_scale) λ alike, so the texture is the unweighted one;
     # the record states the weighting
     outw = joinpath(dir, "refine_weighted")
-    run_page(ctx, samples, roles, cells, circle, outw; settings, device = VgtkCore.KA.CPU(), values = photo_values,
+    run_page(ctx, samples, roles, cells, circle, outw; settings, stops, device = VgtkCore.KA.CPU(), values = photo_values,
              weights = [fill(2.0, length(v)) for v in photo_values], log = _ -> nothing)
     tex(d) = reshape(Float64.(reinterpret(Float32, read(page_files(d, "learned").reg))), :)
     @test maximum(abs.(tex(outw) .- tex(out))) < 1e-5
@@ -399,7 +406,7 @@ end
     @test_throws ArgumentError crop_texels([50.0, 30.0, 20.0, 12.0], 1.0, TW, TH)
     # the rotation of the split: fold 1's page run beside fold 0's; the report of both
     out1 = joinpath(dir, "refine_fold1")
-    run_page(ctx, samples, split_roles(5, 5; fold = 1), cells, circle, out1; settings, device = VgtkCore.KA.CPU(), values = photo_values, weights = photo_weights, log = _ -> nothing)
+    run_page(ctx, samples, split_roles(5, 5; fold = 1), cells, circle, out1; settings, stops, device = VgtkCore.KA.CPU(), values = photo_values, weights = photo_weights, log = _ -> nothing)
     fo = fold_report([out, out1], joinpath(dir, "folds"); settings = rset, log = _ -> nothing)
     @test fo["folds"] == 2 && length(fo["paired_at_own_weight"]["values"]) == 2 && fo["models"]["learned"]["chosen_weight_mean_curve"] in fo["weights"]
     @test fo["models"]["learned"]["mean_val_rel_rms"] ≈ [(a + b) / 2 for (a, b) in zip(fo["models"]["learned"]["val_rel_rms_per_fold"]...)]
@@ -446,14 +453,14 @@ end
     D = VgtkCore.difference_rows((TW, TH), 1); b = A * xt .+ 0.01 .* randn(rng, size(A, 1))
     scale = VgtkCore.penalty_scale(sum(abs2, nonzeros(A)), TW * TH, VgtkCore.mean_positive_eigenvalue(D))
     cpu = VgtkCore.PenalizedOperator(A, D; device = VgtkCore.KA.CPU()); gpu = VgtkCore.PenalizedOperator(A, D; device = RadiometricCamera.rc_backend("gpu"; inline = false, fallback = false))
-    sc = page_solves(cpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], rtol = 1e-9, maxit = 3000)
-    sg = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], rtol = 1e-9, maxit = 3000)
-    @test maximum(abs.(sc.main.x .- sg.main.x)) < 1e-6 && abs(sc.main.iterations - sg.main.iterations) <= 2
+    sc = page_solves(cpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], stops = VgtkCore.ToleranceStops(; rtol = 1e-9, max_iter = 3000))
+    sg = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], stops = VgtkCore.ToleranceStops(; rtol = 1e-9, max_iter = 3000))
+    @test maximum(abs.(Array(sc.main.u) .- Array(sg.main.u))) < 1e-6 && abs(sc.main.stats.nsteps - sg.main.stats.nsteps) <= 2
     for k in 1:2
-        @test maximum(abs.(sc.reg[k].x .- sg.reg[k].x)) < 1e-6
+        @test maximum(abs.(Array(sc.reg[k].u) .- Array(sg.reg[k].u))) < 1e-6
     end
-    sg2 = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], rtol = 1e-9, maxit = 3000)
-    @test sg2.main.x == sg.main.x                                    # deterministic on the device
+    sg2 = page_solves(gpu, b, fill(0.5, TW * TH); scale, weights = [0.01, 1.0], stops = VgtkCore.ToleranceStops(; rtol = 1e-9, max_iter = 3000))
+    @test Array(sg2.main.u) == Array(sg.main.u)                                    # deterministic on the device
     # the operators' construction on the device (the rows selected, weighted, transposed there: csr_rows, csr_transpose, texture_operator)
     # gives the arrays Core uploads from the host matrix
     dev = gpu.device; sel = findall(q -> q % 3 != 0, 1:size(A, 1)); w = [1.0 + 0.01 * (q % 11) for q in sel]

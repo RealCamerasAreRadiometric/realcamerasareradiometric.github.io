@@ -93,20 +93,20 @@ function texture_benchmark()
         call == "first" && (say("fit_rows", op.A.m); say("fit_nonzeros", length(op.A.nzval)); say("fit_nonzeros_sumsq", energy))
         yd = Adapt.adapt(BENCH_DEVICE, zeros(op.A.m)); mul!(yd, op.A, Adapt.adapt(BENCH_DEVICE, vec(design))); y = Array(yd)
         scale = VgtkCore.penalty_scale(energy, TW * TH, 1.0)
-        sw, t = timed(() -> page_solves(op, y, fill(0.5, TW * TH); scale, weights = [1e-3, 1e-1], rtol = 1e-6, maxit = 300))
+        sw, t = timed(() -> page_solves(op, y, fill(0.5, TW * TH); scale, weights = [1e-3, 1e-1], stops = VgtkCore.ToleranceStops(; rtol = 1e-6, max_iter = 300)))
         say("page_solves_$(call)_s", t)
-        call == "first" && (say("iterations", [sw.main.iterations; [r.iterations for r in sw.reg]]); say("texture_checksum", sum(sw.main.x) + sum(r -> sum(r.x), sw.reg)))
+        call == "first" && (say("iterations", [sw.main.stats.nsteps; [r.stats.nsteps for r in sw.reg]]); say("texture_checksum", sum(Array(sw.main.u)) + sum(r -> sum(Array(r.u)), sw.reg)))
     end
     # the refine stage as a whole: the photographs' values the learned rows' prediction of the design
     Rall = page_rows(ctx, rows_px, ctx.camera, (; all = trues(length(rows_px))), groups; device = BENCH_DEVICE)
     I = zeros(length(rows_px)); I[Rall.blocks.all.rows] .= Rall.blocks.all.A * vec(design)
     values = [I[groups[k]] for k in 1:K]; weights = [RC.Unweighted() for _ in 1:K]
     cells = select_cells(cell_coverage(px, 3, 5, 20.0), roles; min_fit_views = 1, min_val_views = 1, min_test_views = 1, min_pixels = 20)
-    settings = Dict{String, Any}("regularization_weights" => [1e-3, 1e-1], "cgls_rtol" => 1e-6, "cgls_max_iter" => 300, "cell_mm" => 20.0, "centre_rho" => 0.4,
+    settings = Dict{String, Any}("regularization_weights" => [1e-3, 1e-1], "cell_mm" => 20.0, "centre_rho" => 0.4,
                                  "edge_rho" => 0.6, "pinhole_r_m" => 1e-9, "start" => 0.5)
     for call in ("first", "warm")
         out = joinpath(dir, "refine_$call")
-        _, t = timed(() -> run_page(ctx, px, roles, cells, nothing, out; settings, device = BENCH_DEVICE, values, weights, log = s -> println("    ", s)))
+        _, t = timed(() -> run_page(ctx, px, roles, cells, nothing, out; settings, stops = VgtkCore.ToleranceStops(; rtol = 1e-6, max_iter = 300), device = BENCH_DEVICE, values, weights, log = s -> println("    ", s)))
         say("run_page_$(call)_s", t)
         if call == "first"
             tex = sum(Float64, reinterpret(Float32, read(page_files(out, "learned").texture))) + sum(Float64, reinterpret(Float32, read(page_files(out, "learned").reg)))

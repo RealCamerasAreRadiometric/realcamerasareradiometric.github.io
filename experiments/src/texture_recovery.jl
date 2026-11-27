@@ -42,8 +42,18 @@ using CairoMakie: Makie
 
 "The blur models compared: the calibration's camera as it is, and the chief ray alone."
 const TEXTURE_VARIANTS = ("learned", "pinhole")
-"The tables of a texture config of record (configs/experiments/texture_recovery_<set>.toml)."
-const TEXTURE_TABLES = ("experiment", "inputs", "prepare", "upstream", "poses", "texture", "report", "figures", "render", "folds", "compare")
+"The tables of a texture config of record (configs/experiments/texture_recovery_<set>.toml), at its current version (`TEXTURE_CONFIG_VERSIONS`)."
+const TEXTURE_TABLES = ("experiment", "inputs", "prepare", "upstream", "poses", "texture", "cgls", "report", "figures", "render", "folds", "compare")
+"""The texture config's versioned converter (Core's `ConfigVersions`): version 1 held the CGLS's stops in `[texture]` as
+`cgls_max_iter` and `cgls_rtol`; version 2 holds them in the solver's table, `[cgls.stops]` (`max_iter`, `rtol`: Core's
+`ToleranceStops`, the table rule's `[<algorithm>.stops]`)."""
+const TEXTURE_CONFIG_VERSIONS = VgtkCore.ConfigVersions("RadiometricCamera experiments: texture_recovery",
+    VgtkCore.ConfigMigration(; tables = ["experiment", "inputs", "prepare", "upstream", "poses", "texture", "report", "figures", "render", "folds",
+                                         "compare", "_locations"],
+                             renames = ["texture.cgls_max_iter" => "cgls.stops.max_iter", "texture.cgls_rtol" => "cgls.stops.rtol"]);
+    tables = [TEXTURE_TABLES..., "_locations"])
+"The keys of `[cgls.stops]`: Core's `ToleranceStops` of the page's CGLS solves."
+const TEXTURE_CGLS_STOPS_KEYS = ("max_iter", "rtol")
 "The optional tables of a texture config: the rotation of the split (`[folds]`) and the comparison of page runs (`[compare]`)."
 const TEXTURE_OPTIONAL_TABLES = ("folds", "compare")
 "The keys of `[folds]`: the rotations of the split (`split_roles`' `fold` 0 … rotations − 1; 0 the split of record)."
@@ -57,8 +67,8 @@ const TEXTURE_UPSTREAM_KEYS = ("refinement", "case", "state", "images")
 sheet (an input of stage init), and `find_boards`, BlobBoards' own `[find_boards]` table (its pose arm: `[poses.find_boards.geometry]
 type = "pose"`)."""
 const TEXTURE_POSES_KEYS = ("images", "board_design", "board", "find_boards")
-"The keys of `[texture]`: the split, the cells, the sampling, the CGLS, the coverage a cell needs, the start, the pinhole, the regions, the penalty weights."
-const TEXTURE_KEYS = ("split_every", "cell_mm", "pixel_fraction", "cgls_max_iter", "cgls_rtol", "min_fit_views", "min_val_views", "min_test_views",
+"The keys of `[texture]`: the split, the cells, the sampling, the coverage a cell needs, the start, the pinhole, the regions, the penalty weights."
+const TEXTURE_KEYS = ("split_every", "cell_mm", "pixel_fraction", "min_fit_views", "min_val_views", "min_test_views",
                       "min_pixels", "start", "pinhole_r_m", "seed", "centre_rho", "edge_rho", "regularization_weights")
 "The keys of `[report]`: the scoring block, the bootstrap draws and their seed."
 const TEXTURE_REPORT_KEYS = ("block_mm", "bootstrap", "seed")
@@ -80,12 +90,14 @@ The texture config of record, every table and key checked (`load_driver_config` 
 one `[prepare.<set>]` (the texture photographs, its `raw` an input of stage prepare); `[upstream]` a case of the refinement config it names
 (`load_radiometric_refinement_config`), on that case's photographs; `[poses]` the photographs and the board's design (stage detect), the sheet (stage init) and the
 pose arm (BlobBoards' `[find_boards]` table, `geometry.type = "pose"`; the retired keys refused by name); `[texture]` (`TEXTURE_KEYS`) with its numbers in range — `split_every` ≥ 3, `cell_mm` > 0, 0 < `pixel_fraction` ≤ 1,
-`cgls_max_iter` ≥ 1, 0 < `cgls_rtol` < 1, the `min_*` counts, a finite `start`, `pinhole_r_m` > 0, 0 ≤ `centre_rho` < `edge_rho` ≤ 1,
-`regularization_weights` positive and strictly increasing; `[report]` (`TEXTURE_REPORT_KEYS`); every `[figures.<name>]` of a known
-`kind` with that kind's keys; `[render]`.
+the `min_*` counts, a finite `start`, `pinhole_r_m` > 0, 0 ≤ `centre_rho` < `edge_rho` ≤ 1,
+`regularization_weights` positive and strictly increasing; `[cgls.stops]` (`TEXTURE_CGLS_STOPS_KEYS`, [`cgls_stops`](@ref)): `max_iter` ≥ 1,
+0 < `rtol` < 1; `[report]` (`TEXTURE_REPORT_KEYS`); every `[figures.<name>]` of a known
+`kind` with that kind's keys; `[render]`. Read through `TEXTURE_CONFIG_VERSIONS` (a version-1 file's `[texture] cgls_max_iter`,
+`cgls_rtol` are `[cgls.stops]`).
 """
 function load_texture_recovery_config(path::AbstractString)
-    c = load_driver_config(path, "texture_recovery"; tables = TEXTURE_TABLES)
+    c = load_driver_config(path, "texture_recovery"; tables = TEXTURE_TABLES, versions = TEXTURE_CONFIG_VERSIONS)
     for t in TEXTURE_TABLES
         t in TEXTURE_OPTIONAL_TABLES && !haskey(c, t) && continue
         haskey(c, t) && c[t] isa AbstractDict && !isempty(c[t]) || throw(ArgumentError("$path: no [$t] table"))
@@ -119,8 +131,6 @@ function load_texture_recovery_config(path::AbstractString)
     _check(_is_count(s["split_every"]) && s["split_every"] >= 3, "$w split_every = $(repr(s["split_every"])): an integer ≥ 3 (a test, a validation and at least one fit photograph per cycle)")
     _check(_is_number(s["cell_mm"]) && s["cell_mm"] > 0, "$w cell_mm = $(repr(s["cell_mm"])): a positive length (mm)")
     _check(_is_number(s["pixel_fraction"]) && 0 < s["pixel_fraction"] <= 1, "$w pixel_fraction = $(repr(s["pixel_fraction"])): in (0, 1]")
-    _check(_is_count(s["cgls_max_iter"]) && s["cgls_max_iter"] >= 1, "$w cgls_max_iter = $(repr(s["cgls_max_iter"])): an integer ≥ 1")
-    _check(_is_number(s["cgls_rtol"]) && 0 < s["cgls_rtol"] < 1, "$w cgls_rtol = $(repr(s["cgls_rtol"])): in (0, 1)")
     for k in ("min_fit_views", "min_val_views", "min_test_views", "min_pixels", "seed")
         _check(_is_count(s[k]), "$w $k = $(repr(s[k])): an integer ≥ 0")
     end
@@ -131,6 +141,11 @@ function load_texture_recovery_config(path::AbstractString)
     rw = s["regularization_weights"]
     _check(rw isa AbstractVector && !isempty(rw) && all(x -> _is_number(x) && x > 0, rw) && issorted(rw; lt = <=),
            "$w regularization_weights = $(repr(rw)): positive finite weights, strictly increasing")
+    g = get(c["cgls"], "stops", nothing); w = "$path [cgls.stops]"
+    g isa AbstractDict || throw(ArgumentError("$w: the page's CGLS stops, a table (max_iter, rtol)"))
+    VgtkCore.check_keys(c["cgls"], ("stops",), "$path [cgls]"); check_required_keys(g, TEXTURE_CGLS_STOPS_KEYS, w)
+    _check(_is_count(g["max_iter"]) && g["max_iter"] >= 1, "$w max_iter = $(repr(g["max_iter"])): an integer ≥ 1")
+    _check(_is_number(g["rtol"]) && 0 < g["rtol"] < 1, "$w rtol = $(repr(g["rtol"])): in (0, 1)")
     if haskey(c, "folds")
         f = c["folds"]; w = "$path [folds]"; check_required_keys(f, TEXTURE_FOLDS_KEYS, w)
         _check(_is_count(f["rotations"]) && 2 <= f["rotations"] <= c["texture"]["split_every"],
@@ -766,31 +781,40 @@ end
 # ---- the solve: Core's CGLS on the page, on the host or the device -----------------------------------------------------------------
 
 """
-    page_solves(op, b, x0; scale, weights, rtol, maxit) -> (; main, reg)
+    page_solves(op, b, x0; scale, weights, stops) -> (; main, reg)
 
 The page's textures by Core's `CGLS()` on the penalized least squares of the operator `op` (Core's `PenalizedOperator` of the fit rows and the first
 differences, `difference_rows((TW, TH), 1)`, on its device): `main` the unregularised one (penalty weight 0) and `reg[k]` the one of
 `min ‖A x − b‖² + λ_k ‖∇x‖²` for every β of `weights`, `λ_k = β_k · scale` (`scale` Core's `penalty_scale` of the fit rows' energy, the
-texels and the operator's mean positive eigenvalue, so β is the stack's normalized weight), each `(; x, iterations, converged, relres)`
-with `x` on the host (the solve's `u`, `stats.nsteps`, `successful_retcode` and `metadata.relres`). `x0` the start; Core's stopping rule (relative to the normal equations' right-hand side). A regularised solve
+texels and the operator's mean positive eigenvalue, so β is the stack's normalized weight), each the solve's `FitResult` as it comes back
+(`u` the texture on `op`'s device, `stats.nsteps` the iterations, `successful_retcode` the convergence, `metadata.relres`). `x0` the start; `stops` the solves' Core `ToleranceStops` ([`cgls_stops`](@ref): the config's `[cgls.stops]`; Core's stopping rule,
+relative to the normal equations' right-hand side). A regularised solve
 is Jacobi-preconditioned by the normal matrix's diagonal `diag(AᵀA) + λ diag(DᵀD)` (`column_sumsq`; Core's `diagonal`), the
 unregularised one never: without the penalty the problem is ill-posed in the texels the rows barely see, and the scaling moves those
 by 10²–10³ (where the unpreconditioned iteration leaves them at the start). The 1 + |weights|
 solves are independent and run at once, each on a worker of its own (RC's `_each_chunk`: on a device, its own stream), `op`'s arrays
 shared read-only by them (RC's `_shared_read_only!`).
 """
-function page_solves(op, b, x0; scale::Real, weights, rtol::Real, maxit::Integer)
+function page_solves(op, b, x0; scale::Real, weights, stops::VgtkCore.ToleranceStops)
     ws = [0.0; [β * scale for β in weights]]                           # the unregularised solve, then one per weight
     be = op.device
     dA, dD = column_sumsq(op.At; device = be), column_sumsq(op.Dt; device = be)   # diag(AᵀA), diag(DᵀD): the Jacobi diagonals' parts
     RC._shared_read_only!(be, (op.A, op.At, op.D, op.Dt, dA, dD))              # read by every solve at once (RC's CUDA extension: no per-buffer sync)
     sols = RC._each_chunk(be, ws) do w
-        r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0, diagonal = w > 0 ? dA .+ w .* dD : nothing), VgtkCore.CGLS();
-                           stops = VgtkCore.ToleranceStops(; rtol, max_iter = maxit))
-        (; x = Array(r.u), iterations = r.stats.nsteps, converged = VgtkCore.successful_retcode(r), relres = r.metadata.relres)
+        r = VgtkCore.solve(VgtkCore.PenalizedLeastSquaresProblem(op, b; w, u0 = x0, diagonal = w > 0 ? dA .+ w .* dD : nothing), VgtkCore.CGLS(); stops)
+        VgtkCore.KA.synchronize(be)                                    # the solution complete on this worker's stream before another task reads `u`
+        r
     end
     return (; main = sols[1], reg = sols[2:end])
 end
+
+"""
+    cgls_stops(config) -> ToleranceStops
+
+The page's CGLS stops of a texture config ([`load_texture_recovery_config`](@ref)'s): its `[cgls.stops]` table as Core's
+`ToleranceStops` (`max_iter`, `rtol`).
+"""
+cgls_stops(c::AbstractDict) = (t = c["cgls"]["stops"]; VgtkCore.ToleranceStops(; max_iter = Int(t["max_iter"]), rtol = Float64(t["rtol"])))
 
 """
     column_sumsq(Ct; device) -> vector
@@ -820,7 +844,7 @@ page_files(dir::AbstractString, v::AbstractString) = (; texture = joinpath(dir, 
                                                       seen = joinpath(dir, "page_$(v)_seen.u8"), record = joinpath(dir, "page_$v.json"))
 
 """
-    run_page(ctx, samples, roles, cells, circle, out; settings, variants, device, values, log)
+    run_page(ctx, samples, roles, cells, circle, out; settings, stops, variants, device, values, log)
 
 The refine stage: every sampled pixel's row (`samples`, `page_footprints`: on `device`, where they stay) under each blur model of `variants`
 (`variant_camera`), the fit rows' operator built there (`texture_operator`: Core's `PenalizedOperator` on the GPU's `CUDABackend()`, or the CPU) and `page_solves` (the unregularised texture and
@@ -830,10 +854,11 @@ sums of squares. The observed values are `values[k]`: `sample_pixels`' values of
 was made (each photograph read once, by its type). Writes `page.json` (the run's record: the grid, the cells,
 the photographs and their roles, the weights, the image circle), `design.f32`, and per blur model its `page_files`.
 """
-function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, out::AbstractString; settings, variants = TEXTURE_VARIANTS, device,
+function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, out::AbstractString; settings, stops::VgtkCore.ToleranceStops,
+                  variants = TEXTURE_VARIANTS, device,
                   values, weights, log = println)
     s = settings; mkpath(out); TW, TH = ctx.TW, ctx.TH
-    W8 = Float64.(collect(s["regularization_weights"])); rtol = Float64(s["cgls_rtol"]); maxit = Int(s["cgls_max_iter"])
+    W8 = Float64.(collect(s["regularization_weights"]))
     cell_mm = Float64(s["cell_mm"]); cr, ce = Float64(s["centre_rho"]), Float64(s["edge_rho"]); PINR = Float64(s["pinhole_r_m"])
     cellset = Set(cells)
     rows_px = Tuple{Int, Int, Int}[]; scored = Bool[]; ρ = Float64[]
@@ -855,7 +880,7 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
     write(joinpath(out, "design.f32"), Float32.(vec(ctx.design)))
     meta = Dict{String, Any}("TW" => TW, "TH" => TH, "tex_mm" => ctx.tex_mm, "page_mm" => collect(ctx.page_mm), "image_size" => [ctx.W, ctx.H],
                              "cell_mm" => cell_mm, "cells" => [[i, j] for (i, j) in cells], "photographs" => ctx.names, "roles" => String.(roles),
-                             "variants" => collect(variants), "regularization_weights" => W8, "cgls_max_iter" => maxit, "cgls_rtol" => rtol,
+                             "variants" => collect(variants), "regularization_weights" => W8, "cgls_max_iter" => stops.max_iter, "cgls_rtol" => stops.rtol,
                              "pinhole_r_m" => PINR, "learned_r_m" => Float64(ctx.learned_r), "centre_rho" => cr, "edge_rho" => ce, "rows_sampled" => length(rows_px),
                              "rows_scored" => count(scored), "weighting" => weighting_record(rw),
                              "sensor_record_sha256" => sensor_record_sha256(ctx.photos.observation.sensor),
@@ -879,26 +904,27 @@ function run_page(ctx, samples, roles::AbstractVector{Symbol}, cells, circle, ou
         scale = VgtkCore.penalty_scale(sum(abs2, Array(op.At.nzval)), TW * TH, m̄)   # λ = β · scale, the fit rows' energy in the cost's units
         log(@sprintf("page %s: %d rows kept (fit %d, validation %d, test %d), %d fit nonzeros, m̄ %.4g, λ/β %.4g, rows %s  [%.0f s]", name, nkept, length(F), nval, ntest,
                      length(op.A.nzval), m̄, scale, weighting_record(rw), time() - t1))
-        sw = page_solves(op, bw, x0; scale, weights = W8, rtol, maxit)
+        sw = page_solves(op, bw, x0; scale, weights = W8, stops)
         colptr = Array(op.At.rowptr); op = nothing
-        log(@sprintf("page %s: unregularised %d its%s; Tikhonov %s  [%.0f s]", name, sw.main.iterations, sw.main.converged ? "" : " (NOT converged)",
-                     join([@sprintf("%g:%d", λ, r.iterations) for (λ, r) in zip(W8, sw.reg)], " "), time() - t2))
+        log(@sprintf("page %s: unregularised %d its%s; Tikhonov %s  [%.0f s]", name, sw.main.stats.nsteps, VgtkCore.successful_retcode(sw.main) ? "" : " (NOT converged)",
+                     join([@sprintf("%g:%d", λ, r.stats.nsteps) for (λ, r) in zip(W8, sw.reg)], " "), time() - t2))
         mc = ρ[Ts] .< cr; me = ρ[Ts] .> ce
         yd = Adapt.adapt(device, yv); pred = similar(yd)
-        function record(x, iters, converged, weight)
-            mul!(pred, R.A, Adapt.adapt(device, x)); e = Array(pred .- yd)    # every row's error A x − y, the rows as measured (a dropped pixel's unread)
+        function record(r, weight)                                     # a solve's FitResult at its penalty weight
+            iters, converged = r.stats.nsteps, VgtkCore.successful_retcode(r)
+            mul!(pred, R.A, Adapt.adapt(device, r.u)); e = Array(pred .- yd)    # every row's error A x − y, the rows as measured (a dropped pixel's unread)
             ef = e[Fs]; ev = e[Vs]; et = e[Ts]
             Dict{String, Any}("weight" => weight, "iters" => iters, "converged" => converged, "fit_sse" => sum(abs2, ef), "val_sse" => sum(abs2, ev),
                               "test_sse" => sum(abs2, et), "test_sse_centre" => sum(abs2, et[mc]), "test_sse_edge" => sum(abs2, et[me]))
         end
-        recs = [record(sw.main.x, sw.main.iterations, sw.main.converged, 0.0); [record(r.x, r.iterations, r.converged, λ) for (λ, r) in zip(W8, sw.reg)]]
+        recs = [record(sw.main, 0.0); [record(r, λ) for (λ, r) in zip(W8, sw.reg)]]
         seen = [colptr[j + 1] > colptr[j] for j in 1:(TW * TH)]                # the texels the fit rows read
         files = page_files(out, name)
-        write(files.texture, Float32.(sw.main.x)); write(files.reg, Float32.(reduce(hcat, [r.x for r in sw.reg]; init = zeros(TW * TH, 0)))); write(files.seen, UInt8.(seen))
+        write(files.texture, Float32.(Array(sw.main.u))); write(files.reg, Float32.(reduce(hcat, [Array(r.u) for r in sw.reg]; init = zeros(TW * TH, 0)))); write(files.seen, UInt8.(seen))
         VgtkIO.write_record(files.record, Dict{String, Any}("schema" => EXPERIMENT_RECORD_SCHEMAS.texture_page_variant, "variant" => name, "rows" => nkept, "fit_rows" => length(F), "val_rows" => nval, "test_rows" => ntest,
                                                     "scored_rows" => Dict("fit" => length(Fs), "validation" => length(Vs), "test" => length(Ts), "test_centre" => count(mc), "test_edge" => count(me)),
                                                     "fit_sumsq" => sum(abs2, yv[Fs]), "val_sumsq" => sum(abs2, yv[Vs]), "test_sumsq" => sum(abs2, yv[Ts]),
-                                                    "test_sumsq_centre" => sum(abs2, yv[Ts][mc]), "test_sumsq_edge" => sum(abs2, yv[Ts][me]), "relres" => sw.main.relres,
+                                                    "test_sumsq_centre" => sum(abs2, yv[Ts][mc]), "test_sumsq_edge" => sum(abs2, yv[Ts][me]), "relres" => sw.main.metadata.relres,
                                                     "solutions" => recs); allownan = true)
         log(@sprintf("page %s: test rel-RMS unregularised %.4f; by weight %s  [%.0f s]", name, sqrt(recs[1]["test_sse"] / max(sum(abs2, yv[Ts]), 1e-300)),
                      join([@sprintf("%g:%.4f", r["weight"], sqrt(r["test_sse"] / max(sum(abs2, yv[Ts]), 1e-300))) for r in recs[2:end]], " "), time() - t1))

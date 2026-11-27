@@ -7,6 +7,8 @@
 # under the learned blur and under the pinhole, each with the Tikhonov weight it chooses blind on the validation photographs, and scored
 # on the test photographs and against the design.
 
+config_version = 2   # TEXTURE_CONFIG_VERSIONS (src/texture_recovery.jl): version 1 held the CGLS's stops in [texture]
+
 [experiment]
 name = "texture_recovery"
 
@@ -70,8 +72,6 @@ local_optimization_strategy = { type = "student_t_uniform" }   # BlobBoards' con
 split_every = 5                # by index: k % 5 == 0 test, == 1 validation, the rest fit
 cell_mm = 25.4                 # the cells coverage is counted and the paired test runs over (100 texels)
 pixel_fraction = 0.15          # of every photograph's masked pixels, a row each
-cgls_max_iter = 500
-cgls_rtol = 1.0e-6
 min_fit_views = 1              # a cell is scored when this many fit, validation and test photographs each put ≥ min_pixels sampled pixels in it
 min_val_views = 1
 min_test_views = 1
@@ -88,6 +88,11 @@ regularization_weights = [1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 0.1, 0
 # folds' mean validation curve and the spread of each fold's chosen β and paired margin (owner 2026-11-15: no GCV; the rotation reported beside it)
 [folds]
 rotations = 5                  # = split_every: every photograph once a test and once a validation photograph
+
+[cgls.stops]
+# the page's CGLS solves (Core's ToleranceStops; version 1: [texture] cgls_max_iter, cgls_rtol)
+max_iter = 500
+rtol = 1.0e-6
 
 [report]
 block_mm = 1.0                 # the texture is scored at the texel and over blocks of this size
