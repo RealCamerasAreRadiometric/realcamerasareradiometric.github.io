@@ -392,7 +392,7 @@ function build_problem_grid(f::CalibrationData, θ::CalibrationParameters{N}; pa
     free_vars = trues(length(variables))
     free_vars[dependent_patches] .= false                # a patch block without a present node is no variable of the solve
     _free_mask!(free_vars, idx, Tuple(k for k in blocks_held if !(k in SURFACE_HOLDS)); lens_key = :grid, lens_idx = vec(ip))
-    return CalibrationBundle(variables, blocks, free_vars), (; idx..., free = free_vars)
+    return CalibrationBundle(variables, blocks, free_vars, vars -> _extract_variables_grid(f, θ, vars, idx)), (; idx..., free = free_vars)
 end
 
 """No residual reads an absent node: every sensor sample of pixel `(u, v)` (view `k`) has its whole 4 × 4 window of present nodes
@@ -426,8 +426,8 @@ function _assembled_directions(G0, vec, patches)
 end
 
 """The camera (with the re-assembled grid lens), the poses, the material, the surface and the lighting from a grid-problem variable
-vector (as `extract_variables`)."""
-function extract_variables_grid(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
+vector (as `_extract_variables`): the bundle's `decode` and the per-iteration callback's."""
+function _extract_variables_grid(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
     lens0 = θ.camera.geometric::GridLike
     ap = vars[idx.aperture]::ApertureVar
     lens_new = _assemble_lens(lens0, vars, idx.patches)
@@ -450,10 +450,10 @@ function _lm_tiles!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCo
                     fixed = (), verbose::Bool = false, trace = nothing, trace_meta = (;), iter_callback = nothing,
                     height_degree::Integer = 0, smoothness = nothing, inplane::Bool = false, lm_log::AbstractString = "")
     bundle, idx = build_problem_grid(f, θ; patch, fixed, height_degree, smoothness, inplane)
-    callback = _final_iteration_callback(_lm_callback(f, θ, idx, extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), f, stops.max_iter)
+    callback = _final_iteration_callback(_lm_callback(f, θ, idx, _extract_variables_grid; trace, trace_meta, iter_callback, verbose, lm_log), f, stops.max_iter)
     _reset_scrubbed!(f.run)
     try                                                          # (Core's stall postcondition runs inside, the tiles still batched)
-        return _solve_bundle!(f, θ, bundle, idx, extract_variables_grid; stops, damping, callback)
+        return _solve_bundle!(f, θ, bundle, idx; stops, damping, callback)
     finally
         f.run.final_iteration = false
         _report_scrubbed(f.run, "_lm_tiles!")

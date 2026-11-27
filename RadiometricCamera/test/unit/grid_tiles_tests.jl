@@ -201,7 +201,7 @@ end
     end
     # the solved lens: its present nodes moved, its absent ones still absent (no value: NaN)
     moved = [v isa RC._Patch ? RC.NLLSsolver.update(v, 1e-3 .* cos.(1:50)) : v for v in prob_f.variables]
-    lens = RC.extract_variables_grid(s.f, s.u0, moved, idx_f)[1].geometric     # (camera, poses, …): the camera's lens
+    lens = RC._extract_variables_grid(s.f, s.u0, moved, idx_f)[1].geometric     # (camera, poses, …): the camera's lens
     l0 = s.u0.camera.geometric
     @test VgtkCore.present_nodes(VgtkCore.model(lens)) == held
     @test D(lens)[held] != D(l0)[held] && all(v -> all(isnan, v), D(lens)[.!held])

@@ -726,49 +726,57 @@ function build_problem(f::CalibrationData, θ::CalibrationParameters{N}; fixed =
     free = trues(length(variables))
     last(lens_free(geometric(θ); fixed = lens_held)) && (free[i_d] = false)      # a fixed model: no lens columns
     _free_mask!(free, idx, blocks_held; lens_key = :distortion, lens_idx = i_d)
-    return CalibrationBundle(variables, blocks, free), (; idx..., free)
+    return CalibrationBundle(variables, blocks, free, vars -> _extract_variables(f, θ, vars, idx)), (; idx..., free)
 end
 
 """
-    CalibrationBundle(variables, blocks, free)
+    CalibrationBundle(variables, blocks, free, decode)
 
 A calibration LM's problem — `build_problem`'s (per view) and `build_problem_grid`'s (per tile): its NLLSsolver variables (the poses,
 the lens or the grid's patches, focus, aperture, material, vignetting, lighting), its residual blocks (a view's or a tile's, the
-smoothness rows) and the free mask `free` over the variables (a held block: NLLSsolver's unfixed mask). A bundle of
-VisualGeometryToolkitCore's block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary: the
-result is the LM's own, `u` its variables), solved by `init(RefineProblem(bundle, bundle.variables), LevenbergMarquardt(; damping);
+smoothness rows), the free mask `free` over the variables (a held block: NLLSsolver's unfixed mask) and `decode`, the route's reading
+of a variable vector into the parameters it encodes (`vars -> (camera, poses, mat, surface, light)`). A bundle of
+VisualGeometryToolkitCore's block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary; its
+`block_result` assembles the estimate: `u` the NamedTuple `(; camera, poses, mat, surface, light)` the solved variables encode, the
+LM's termination record, stats and metadata as they are), solved by `init(RefineProblem(bundle, bundle.variables), LevenbergMarquardt(; damping);
 stops, callback)` and `solve!` (`_solve_bundle!`). `solver` holds the two vectors the solve evaluates the blocks at (NLLSsolver's
 `variables` and `varnext`, as VisualGeometryToolkitCore's `prepare_evaluation!` names them; empty before a solve), where its batched
 requests find their variables (`_with_registered`).
 """
-struct CalibrationBundle <: VgtkCore.AbstractBlockProblem
+struct CalibrationBundle{D} <: VgtkCore.AbstractBlockProblem
     variables::Vector{Any}
     blocks::Vector{Any}
     free::BitVector
+    decode::D
     solver::Base.RefValue{Any}
 end
-CalibrationBundle(variables, blocks, free) = CalibrationBundle(variables, blocks, free, Ref{Any}((; variables = Any[], varnext = Any[])))
+CalibrationBundle(variables, blocks, free, decode) = CalibrationBundle(variables, blocks, free, decode, Ref{Any}((; variables = Any[], varnext = Any[])))
 VgtkCore.prepare_evaluation!(b::CalibrationBundle, variables, varnext) = (b.solver[] = (; variables, varnext); nothing)
 VgtkCore.block_structure(b::CalibrationBundle, _u0) = (b.variables, b.blocks, nothing)
 VgtkCore.fixed_variables(b::CalibrationBundle) = findall(!, b.free)
 VgtkCore.default_optimization_strategy(::CalibrationBundle) = nothing    # plain least squares: the rows are whitened at the data
 VgtkCore.residual_summary(::CalibrationBundle) = nothing                 # the result reads no row: nothing swept at the solution
-VgtkCore.block_result(::CalibrationBundle, _u0, r::VgtkCore.FitResult, _summary) = r
+# the estimate the solved variables encode (`decode`: copied out of the cache's vector, which the next solve overwrites)
+function VgtkCore.block_result(b::CalibrationBundle, _u0, r::VgtkCore.FitResult, _summary)
+    camera, poses, mat, surface, light = b.decode(r.u)
+    return VgtkCore.FitResult((; camera, poses, mat, surface, light), r.retcode, r.stop_rule, r.stats, r.rms, r.n, r.metadata;
+                              r.resid, r.original)
+end
 
 """
-    _solve_bundle!(f, θ, bundle, idx, extract; stops, damping, callback) -> FitResult
+    _solve_bundle!(f, θ, bundle, idx; stops, damping, callback) -> FitResult
 
 The calibration LM of `bundle` on the data `f` at the parameters `θ` (`idx` its indices): VisualGeometryToolkitCore's
 LevenbergMarquardt at the optimizer's `damping` under `stops` (`_lm_stops`: their residual resolution the data's), the solve with
-the bundle registered (`_with_registered`, the solver's variables `bundle.solver`), the solution read back into `θ` through the
-route's `extract` (`read_back!`). The result is the LM's: its termination record, `stats.nsteps` the accepted iterations,
+the bundle registered (`_with_registered`, the solver's variables `bundle.solver`), its estimate (`u`, the bundle's `block_result`)
+written into `θ` (`_read_back!`). The result is the LM's: its termination record, `stats.nsteps` the accepted iterations,
 `metadata.cost` ‖r‖² at the solution.
 """
-function _solve_bundle!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx, extract; stops::VgtkCore.LmStops,
+function _solve_bundle!(f::CalibrationData, θ::CalibrationParameters, bundle::CalibrationBundle, idx; stops::VgtkCore.LmStops,
                         damping::VgtkCore.LmDamping, callback = nothing)
     c = VgtkCore.init(VgtkCore.RefineProblem(bundle, bundle.variables), VgtkCore.LevenbergMarquardt(; damping); stops = _lm_stops(f, stops), callback)
     r = _with_registered(() -> VgtkCore.solve!(c), f, θ, bundle, idx; vectors = bundle.solver)
-    read_back!(f, θ, r.u, idx, extract)
+    _read_back!(θ, r.u)
     return r
 end
 """The residual blocks of `b` in the order the LM visits them — NLLSsolver's: by type, in the order of the blocks' `Union` (the problem
@@ -786,12 +794,12 @@ _trial_vectors(r::Base.RefValue{Any}) = _trial_vectors(r[])
 _trial_vectors(p) = (p.variables, p.varnext)
 
 """
-    extract_variables(f, θ, vars, idx) -> (camera, poses, mat, surface, light)
+    _extract_variables(f, θ, vars, idx) -> (camera, poses, mat, surface, light)
 
-The camera, the poses, the material, the surface and the lighting encoded in a variable vector (non-mutating; used by `read_back!`
-and tracing).
+The camera, the poses, the material, the surface and the lighting encoded in a per-view variable vector (non-mutating): the bundle's
+`decode` (its `block_result`) and the per-iteration callback's.
 """
-function extract_variables(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
+function _extract_variables(f::CalibrationData, θ::CalibrationParameters, vars::Vector, idx)
     lens_new = VgtkCore.with_model(geometric(θ), VgtkCore.model(vars[idx.distortion]::_LensBlock))
     mv = vars[idx.material]::MaterialVar
     camera = RadiometricCameraModel(lens_new, VgtkCore.model(vars[idx.focus]::_FocusBlock), (vars[idx.aperture]::ApertureVar).r,
@@ -800,14 +808,12 @@ function extract_variables(f::CalibrationData, θ::CalibrationParameters, vars::
     return camera, poses, mv.mat, mv.surface, (vars[idx.lighting]::LightingVar).light
 end
 
-"""`read_back!(f, θ, vars, idx, extract = extract_variables)`: write the variable vector `vars` (an LM's solution: its result's `u`) back
-into the state, read through the route's `extract` (`extract_variables` per view, `extract_variables_grid` per tile): the one read-back
-of both LMs."""
-function read_back!(f::CalibrationData, θ::CalibrationParameters, vars::AbstractVector, idx, extract = extract_variables)
-    camera, poses, mat, surface, light = extract(f, θ, vars, idx)
-    θ.camera = camera; θ.poses .= poses
-    θ.mat = mat; θ.light = light
-    set_surface!(θ, surface)
+"""`_read_back!(θ, u)`: write an LM's estimate `u` (its result's, `(; camera, poses, mat, surface, light)`: the bundle's
+`block_result`) into the parameters: the one read-back of both LMs."""
+function _read_back!(θ::CalibrationParameters, u::NamedTuple)
+    θ.camera = u.camera; θ.poses .= u.poses
+    θ.mat = u.mat; θ.light = u.light
+    set_surface!(θ, u.surface)
     return θ
 end
 
@@ -847,7 +853,7 @@ end
 
 The per-iteration callback of a calibration LM (`_lm_views!`'s and `_lm_tiles!`'s one; VisualGeometryToolkitCore's `callback = state ->
 Bool` of its LevenbergMarquardt, `state` an `LmIterationState`): with a `trace` or an `iter_callback`, after every iteration the
-iterate's variables (`state.u`) read through `extract(s, vars, idx)` (the route's `extract_variables` / `extract_variables_grid`)
+iterate's variables (`state.u`) read through `extract(s, vars, idx)` (the route's `_extract_variables` / `_extract_variables_grid`)
 into `(camera, poses, mat, surface, light)`, a snapshot pushed to `trace` (`trace_meta` merged, `phase = :lm`) and
 `iter_callback(it, cost, camera, poses, mat, surface, light)` called; else a print-out line per iteration (`verbose`, `_lm_print`)
 or none (`nothing`). Either way wrapped by `_lm_log` (the file `lm_log`, the algorithm's `log`; empty: none). It never stops the
@@ -890,10 +896,10 @@ function _lm_views!(f::CalibrationData, θ::CalibrationParameters; stops::VgtkCo
                     trace = nothing, trace_meta = (;), iter_callback = nothing, height_degree::Integer = 0, inplane::Bool = false,
                     lm_log::AbstractString = "")
     bundle, idx = build_problem(f, θ; fixed, height_degree, inplane)
-    callback = _lm_callback(f, θ, idx, extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
+    callback = _lm_callback(f, θ, idx, _extract_variables; trace, trace_meta, iter_callback, verbose, lm_log)
     _reset_scrubbed!(f.run)
     try                                                    # (Core's stall postcondition runs inside, the views still concurrent)
-        return _solve_bundle!(f, θ, bundle, idx, extract_variables; stops, damping, callback)
+        return _solve_bundle!(f, θ, bundle, idx; stops, damping, callback)
     finally
         _report_scrubbed(f.run, "_lm_views!")
     end

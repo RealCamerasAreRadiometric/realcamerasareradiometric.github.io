@@ -22,6 +22,10 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
   a Core `TagRegistry`: `"radiometry_block_descent"` | `"joint_radiometry"`), in place of the switch `[sweep] joint` that picked it.
   `RC_CONFIG_VERSIONS`' step 2 → 3 reads a version-2 (or earlier) file's `joint = "on"` / `"off"` as the tag; a current file holding
   `joint` is refused naming its version. configs/default.toml is version 3.
+- **Breaking: `read_back!`, `extract_variables` and `extract_variables_grid` are internal** (the bundle's variable layout is no
+  public protocol): a `CalibrationBundle(variables, blocks, free, decode)` holds its route's reading of a variable vector, and its
+  `block_result` (Core's block contract) assembles the LM result's `u`, the NamedTuple `(; camera, poses, mat, surface, light)`
+  the solved variables encode (copied out of the cache's vector), which the route writes into the parameters. The same values.
 - **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
   `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
   converge now says so in one line, as the parametric starts did).
@@ -35,7 +39,8 @@ RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: ever
     are `bundle.blocks` (`get(problem.problem.costs, T)` → `filter(c -> c isa T, bundle.blocks)`; `tile_costs(bundle)`);
   - `_lm_views!`, `_lm_tiles!` and the refinement's chunks return the LM's `FitResult` (`retcode`, `stop_rule`, `stats.nsteps`,
     `metadata.cost` = ‖r‖²) in place of `(; code, rule, iterations, cost)`; `CalibrationMetadata.solver` holds it; `lm_termination`
-    reads `(r.retcode, r.stop_rule)`; `read_back!(f, u0, vars, idx, extract)` takes the solution's variable vector (`r.u`);
+    reads `(r.retcode, r.stop_rule)`; the bundle's `block_result` assembles the estimate, `u = (; camera, poses, mat, surface, light)`
+    (below);
   - the solve's blocks are evaluated in batches again (the concurrent window, the grid's view batches): the bundle's
     `prepare_evaluation!` (Core's block-contract generic) records the two vectors NLLSsolver evaluates them at in
     `bundle.solver`, where the requests find their variables, as they found them in the `LmProblem`'s fields before; the
