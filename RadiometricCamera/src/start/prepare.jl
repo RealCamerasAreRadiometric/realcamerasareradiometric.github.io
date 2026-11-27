@@ -13,7 +13,7 @@
 # A start record's value `k` (`fpx`, `f_m`, `d_c`, `be0`), checked against the value recomputed from its stored lens and poses: the same
 # to the record's rounding (its lengths and rotations through IO: 1e-6 relative, 1e-6 absolute), else the record is of
 # another front end or code — refused by name. The record's value is the one taken (the computed start's, bit for bit).
-function _recorded(start, k::Symbol, x)
+function _start_record_value(start, k::Symbol, x)
     r = getfield(start, k)
     size(r) == size(x) && isapprox(r, x; rtol = 1e-6, atol = 1e-6) ||
         throw(ArgumentError("the start record $(start.dir): its $k ($(k === :be0 ? "$(length(r)) bearing errors" : r)) is not its stored lens and poses' " *
@@ -60,13 +60,13 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     length(photographs) == K || throw(ArgumentError("$(length(photographs)) photographs for the $(K) views $(names)"))
     start === nothing || (W₀, H₀) == (start.W₀, start.H₀) ||
         throw(ArgumentError("the start record $(start.dir) is of $(start.W₀) × $(start.H₀) photographs, the front end's $(W₀) × $(H₀)"))
-    fpx = start === nothing ? fpx_of(lens0, W₀, H₀) : _recorded(start, :fpx, fpx_of(lens0, W₀, H₀))
+    fpx = start === nothing ? fpx_of(lens0, W₀, H₀) : _start_record_value(start, :fpx, fpx_of(lens0, W₀, H₀))
     route = lm_route(lens0)                                # the refinement's route, by the start camera's type (a parametric camera: per view, _lm_views!)
     is_grid_lens(lens0) == start_is_grid(run) || error("io.init = $(repr(run.io.init)): the front end's start is a $(_route_label(route)) " *
                                                         "camera, but start_is_grid says otherwise (one decision of the start's kind: fix start_is_grid)")
     _print_start_route(route, lens0)
     be0 = _start_bearings(g, fpx)                                            # on the initialization region
-    be0 = start === nothing ? be0 : _recorded(start, :be0, be0)
+    be0 = start === nothing ? be0 : _start_record_value(start, :be0, be0)
     @printf("SELF-CHECK: %d detections; bearing error through the start model under the start poses: median %.3f px, p90 %.3f px (expect ≈ the pipeline's own residual)\n",
             length(be0), _med(be0), _q90(be0)); flush(stdout)
     _med(be0) > 2.0 && @warn "bearing self-check > 2 px: suspect a pixel/board convention error" median = median(be0)
@@ -75,10 +75,10 @@ function _start_state(g::StartGeometry, photographs::AbstractVector{<:AbstractSt
     # board centre averaged over the views); the image distance s′ (no parameter of the model) is derived from the thin-lens equation of
     # d_c for the log and parameters.json
     sensor = run_sensor(run, W₀, H₀)                            # Core's Sensor: the image's pixels, the pitch of the sensor width
-    f_m = start === nothing ? fpx * _pixel_pitch(sensor) : _recorded(start, :f_m, fpx * _pixel_pitch(sensor))   # the focal length (m)
+    f_m = start === nothing ? fpx * _pixel_pitch(sensor) : _start_record_value(start, :f_m, fpx * _pixel_pitch(sensor))   # the focal length (m)
     board = g.target
     𝐛_c = VgtkCore.centroid(board)
-    d_c = start === nothing ? mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0) : _recorded(start, :d_c, mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0))
+    d_c = start === nothing ? mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0) : _start_record_value(start, :d_c, mean(dot(p.R[:, 3], 𝐛_c - p.t) for p in poses0))
     d_s = f_m * d_c / (d_c - f_m)
     # the run's one support: Core's imaged region of the lens whose lens coverage is the capture set's, as `camera.lens_coverage` states
     # it (run_lens_coverage: the sensor, or the set's measured image-region record), which a grid's interior nodes, its smoothness and

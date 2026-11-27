@@ -94,12 +94,12 @@
 
     @testset "a start record's derived values agree with its stored lens and poses (code review 0.11.0, finding 8)" begin
         rec = (; fpx = 1000.0, d_c = 0.31, be0 = [0.1, 0.2], dir = "the record")
-        @test RC._recorded(rec, :fpx, 1000.0 * (1 + 1e-9)) === 1000.0                     # the record's value, to its rounding
-        @test RC._recorded(rec, :be0, [0.1 + 1e-9, 0.2]) == [0.1, 0.2]
-        e = try RC._recorded(rec, :fpx, 1001.0); nothing catch err; err end
+        @test RC._start_record_value(rec, :fpx, 1000.0 * (1 + 1e-9)) === 1000.0                     # the record's value, to its rounding
+        @test RC._start_record_value(rec, :be0, [0.1 + 1e-9, 0.2]) == [0.1, 0.2]
+        e = try RC._start_record_value(rec, :fpx, 1001.0); nothing catch err; err end
         @test e isa ArgumentError && occursin("fpx", e.msg) && occursin("produce its start again", e.msg)
-        @test_throws ArgumentError RC._recorded(rec, :be0, [0.1])                         # another count of bearing errors
-        @test_throws ArgumentError RC._recorded(rec, :d_c, 0.35)
+        @test_throws ArgumentError RC._start_record_value(rec, :be0, [0.1])                         # another count of bearing errors
+        @test_throws ArgumentError RC._start_record_value(rec, :d_c, 0.35)
     end
 
     @testset "the retired one-step entry points are refused by name" begin
