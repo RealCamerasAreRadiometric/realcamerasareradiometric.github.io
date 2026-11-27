@@ -5,6 +5,10 @@
 RadiometricCamera on VisualGeometryToolkitCore 0.14's estimation interface: every estimator is `solve(problem, algorithm)`
 (CommonSolve's verb, Core's front end), and a `FitResult` is read by field. No calibration number moves (below).
 
+- **The grid start's context is read by Core's `read_context`** (`GridStart`: `coverage`, `device`; another key is an
+  `ArgumentError`), and every termination of its regression is documented as accepted as a start (an exact resample that did not
+  converge now says so in one line, as the parametric starts did).
+
 - **Breaking: the calibration LMs on Core's block contract (R22: `LmProblem` and `lmsolve_chart!` are Core-internal).** The two LM
   problems are a `CalibrationBundle` (public: `variables`, `blocks`, the free mask `free`), a `VgtkCore.AbstractBlockProblem` of the
   block contract (`block_structure`, `fixed_variables`, plain least squares, no residual summary), solved by

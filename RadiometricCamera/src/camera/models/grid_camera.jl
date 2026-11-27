@@ -198,7 +198,13 @@ VisualGeometryToolkitEstimation's `CameraRegression` (no tolerance, no forward s
 
 The source's kind and the lattice must agree (`lattice_refusal`: an `ArgumentError` naming the key and the fix). The `FitResult`:
 `u` the bounded SplineLens camera; `retcode`, `stop_rule`, `stats`, `rms` and `n` the regression's; `metadata.regression` its
-metadata. A start whose optical-axis fit did not converge proceeds unturned, and one line says so.
+metadata. The context's keys are `coverage` and `device` (Core's `read_context`: another key is an `ArgumentError`).
+
+Every termination of the regression is ACCEPTED as a start, and its callers read `u` without a retcode test: a start is the
+refinement's guess, never a calibration (the refinement and its checks — the coverage assertion, `calibrated_folds` — judge the
+camera), and a non-converged regression still returns the lattice it reached. Such a start is announced by one line (a parametric
+start's whose optical-axis fit did not converge proceeds unturned; an exact resample's that did not converge proceeds on the
+lattice it returned), so a run's log says which start it refined.
 """
 struct GridStart{L <: LatticeRule} <: VgtkCore.AbstractEstimationAlgorithm
     lattice::L
@@ -214,13 +220,12 @@ function GridStart(; lattice::LatticeRule, node_count::Union{Nothing, Integer} =
 end
 VgtkCore.estimator_kind(::GridStart) = VgtkCore.FitKind()
 
-# the problem's context: the lens coverage and the device (the default backend only when none is stated)
-_grid_start_coverage(p) = p isa NamedTuple ? get(p, :coverage, nothing) : nothing
-_grid_start_device(p) = p isa NamedTuple && haskey(p, :device) ? p.device : default_backend()
-
 function VgtkCore.__solve(prob::VgtkCore.EstimationProblem{VgtkCore.SplineLens}, alg::GridStart)
-    st = _grid_start(prob.f, alg.lattice, alg.node_count; coverage = _grid_start_coverage(prob.p),
-                     device = alg.lattice isa DerivedLattice ? _grid_start_device(prob.p) : nothing)
+    # the problem's context, read by Core's one reader (a misspelt key refused): the lens coverage and the device (the default
+    # backend only when none is stated, and only for an exact resample, which runs on it)
+    c = VgtkCore.read_context(prob.p, (), (; coverage = nothing, device = nothing), "GridStart")
+    device = alg.lattice isa DerivedLattice ? (c.device === nothing ? default_backend() : c.device) : nothing
+    st = _grid_start(prob.f, alg.lattice, alg.node_count; c.coverage, device)
     f = st.fit
     extras = alg.lattice isa DerivedLattice ? (; st.resample) :
              alg.lattice isa NodeCountLattice ? (; st.spacing, st.origin, st.supported) : (;)
@@ -482,6 +487,9 @@ function _exact_start(src::SplineCamera; node_count::Union{Nothing, Integer} = n
     # The cell h / m (Estimation's exact resample takes the integer factors whose cell is nearest: m itself)
     h = Tuple(Float64.(VgtkCore.lattice_spacing(VgtkCore.model(s))))
     fit = _spline_regression(s, region; lattice_spacing = sub.m == 1 ? nothing : (h[1] / sub.m * VgtkCore.px, h[2] / sub.m * VgtkCore.px), device)
+    VgtkCore.successful_retcode(fit) ||                               # accepted as a start (GridStart): one line says so
+        (@printf("start: the exact resample's regression did not converge (%s, %s): the start proceeds on the lattice it returned\n",
+                 fit.retcode, fit.stop_rule); flush(stdout))
     resampled = VgtkCore.with_model(s, fit.u)
     # the lattice padded at its right and bottom edges to the grid route's patch multiple (`pad_lattice`): nodes outside the region,
     # the resample's camera bit for bit on it
