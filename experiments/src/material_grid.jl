@@ -13,6 +13,12 @@
 # --stage=start writes for that material — beside material_grid.json, the grid, every candidate's costs and the chosen one.
 # The refinement reads it with --start (`run_refine`), its [pipeline] at the chosen α and η (`with_material_start`), so the
 # refinement's own records state the material it started from. scripts/material_grid.jl is the stage's child process.
+#
+# The candidates are independent of each other, so a run may split them over several GPUs (the driver's --grid-parts=n): stage
+# material_grid_part runs the same solves at part k of n of a case's candidates (every n-th from the k-th; a keyed product per case
+# and part, a GPU job each with the driver's --shard) and writes their rows, material_grid_part.json. Stage material_grid then reads
+# the n parts' rows instead of solving at every candidate, solves once more at the chosen candidate alone — its state is what the
+# start record holds, and its row must be its part's number for number — and writes the same records under the same key.
 # Included at the end of src/drivers.jl.
 # =============================================================================
 import VisualRadiometryToolkitCore as VrtkCore
@@ -115,8 +121,50 @@ function material_sweep!(s::RadiometricCamera.CalibrationState, opts::Radiometri
     return (; costs = (; init, linear), mu = s.mat.diffuse_weight, vignetting_gcv = gcv)
 end
 
+"""A candidate's row in the stage's records: its α and η, the solved μ, and the cost and relative RMS after the lighting solve
+(`cost_init`, `rel_rms_init`) and after the sweep (`cost`, `rel_rms`: what the candidates are compared by)."""
+candidate_row(candidate, mu, cost_init, rel_rms_init, cost, rel_rms) = (; candidate..., mu, cost_init, rel_rms_init, cost, rel_rms)
+
+"The index of the row of the lowest finite `cost` of `rows`, of equal ones the first (the search's rule); `nothing` when none is finite."
+function lowest_cost(rows)
+    best = nothing
+    for (i, r) in enumerate(rows)
+        isfinite(r.cost) && (best === nothing || r.cost < rows[best].cost) && (best = i)
+    end
+    return best
+end
+
+"""A start whose grid smoothness weight was chosen by GCV is refused (an `ArgumentError`): that choice was made on the linearization
+at the start's own material, and the stage does not make it again."""
+refuse_gcv_start(s::RadiometricCamera.CalibrationState) = s.start.grid_gcv === nothing ||
+    throw(ArgumentError("the material grid: this start chose its grid smoothness weight by GCV on the linearization at its own material " *
+                        "(grid.smoothness weight = \"gcv\"), which another material start changes: state the weight"))
+
 """
-    material_grid_search!(s, opts, grid; io = stdout) -> (; start, candidates, chosen)
+    material_sweeps!(s, opts, candidates, indices; io = stdout) -> (; rows, best)
+
+[`material_sweep!`](@ref) at the candidates `indices` of `candidates`, in that order: `rows`, a row each (`candidate_row`), and
+`best`, the one of the lowest cost after its sweep (of equal ones the first) as its solves left the state — its index, its sweep,
+the material, the lighting and the vignetting — or `nothing` when no cost is finite. A line per candidate, with its seconds, goes
+to `io`. A start whose grid smoothness weight was chosen by GCV is refused (`refuse_gcv_start`).
+"""
+function material_sweeps!(s::RadiometricCamera.CalibrationState, opts::RadiometricCamera.PipelineOptions, candidates, indices; io::IO = stdout)
+    refuse_gcv_start(s)
+    rows = NamedTuple[]; best = nothing
+    for i in indices
+        c = candidates[i]; t = time()
+        r = material_sweep!(s, opts, c)
+        push!(rows, candidate_row(c, r.mu, r.costs.init..., r.costs.linear...))
+        lowest = isfinite(r.costs.linear[1]) && (best === nothing || r.costs.linear[1] < best.sweep.costs.linear[1])
+        lowest && (best = (; index = i, sweep = r, material = s.mat, light = s.light, vignetting = s.camera.vignetting))
+        @printf(io, "%4d/%d  α %.4f / %.4f  η %.4f / %.4f  μ %.4f  rel-RMS %.5f (lighting alone %.5f)  cost %.6e  (%.1f s)%s\n", i, length(candidates),
+                c.alpha_ink, c.alpha_noink, c.eta_ink, c.eta_noink, r.mu, r.costs.linear[2], r.costs.init[2], r.costs.linear[1], time() - t, lowest ? "  *" : ""); flush(io)
+    end
+    return (; rows, best)
+end
+
+"""
+    material_grid_search!(s, opts, grid; io = stdout, rows = nothing) -> (; start, candidates, chosen)
 
 The material start of the started state `s` (a start record's, `load_calibration_start`, of the start options `opts`) on the
 `[material_grid]` table `grid`: [`material_sweep!`](@ref) at every candidate (`material_candidates`), and the candidate of the
@@ -125,14 +173,16 @@ lowest cost after its sweep kept — the state left at its material, lighting, v
 start record was computed at with its costs (the config's own `[material]`, for comparison); `candidates`, a row each in their
 order; `chosen`, the kept row's index. A line per candidate, with its seconds, goes to `io`.
 
-A start whose grid smoothness weight was chosen by GCV is refused: that choice was made on the linearization at the start's own
-material, and the stage does not make it again.
+With `rows`, every candidate's row as its part computed it (`read_material_grid_parts`), no candidate is solved but the chosen
+one (`lowest_cost`), whose solves leave the state the start record holds: its row must be the given one number for number (the
+solves read nothing of the state they start from), an `ArgumentError` naming both otherwise — rows of another start, or of
+another machine's arithmetic, are not this search's.
+
+A start whose grid smoothness weight was chosen by GCV is refused (`refuse_gcv_start`).
 """
-function material_grid_search!(s::RadiometricCamera.CalibrationState, opts::RadiometricCamera.PipelineOptions, grid::AbstractDict; io::IO = stdout)
+function material_grid_search!(s::RadiometricCamera.CalibrationState, opts::RadiometricCamera.PipelineOptions, grid::AbstractDict; io::IO = stdout, rows = nothing)
+    refuse_gcv_start(s)
     meta = s.start
-    meta.grid_gcv === nothing ||
-        throw(ArgumentError("the material grid: this start chose its grid smoothness weight by GCV on the linearization at its own material " *
-                            "(grid.smoothness weight = \"gcv\"), which another material start changes: state the weight"))
     m = opts.material
     start = (; alpha_ink = m.alpha_ink, alpha_noink = m.alpha_noink, eta_ink = m.eta_ink, eta_noink = m.eta_noink, mu = meta.μ_lin,
                cost_init = meta.costs.init[1], rel_rms_init = meta.costs.init[2], cost = meta.costs.linear[1], rel_rms = meta.costs.linear[2])
@@ -140,15 +190,19 @@ function material_grid_search!(s::RadiometricCamera.CalibrationState, opts::Radi
     @printf(io, "material grid: %d candidates (α %s; η %s) on %d samples of %d views; the start's own material α %g / %g, η %g / %g: rel-RMS %.5f\n",
             length(candidates), join(cell_midpoints(grid["alpha_range"], grid["alpha_cells"]), ", "), join(cell_midpoints(grid["eta_range"], grid["eta_cells"]), ", "),
             sum(length, s.px), length(s.px), m.alpha_ink, m.alpha_noink, m.eta_ink, m.eta_noink, start.rel_rms); flush(io)
-    rows = NamedTuple[]; best = nothing
-    for (i, c) in enumerate(candidates)
-        t = time()
-        r = material_sweep!(s, opts, c)
-        push!(rows, (; c..., mu = r.mu, cost_init = r.costs.init[1], rel_rms_init = r.costs.init[2], cost = r.costs.linear[1], rel_rms = r.costs.linear[2]))
-        lowest = isfinite(r.costs.linear[1]) && (best === nothing || r.costs.linear[1] < best.sweep.costs.linear[1])
-        lowest && (best = (; index = i, sweep = r, material = s.mat, light = s.light, vignetting = s.camera.vignetting))
-        @printf(io, "%4d/%d  α %.4f / %.4f  η %.4f / %.4f  μ %.4f  rel-RMS %.5f (lighting alone %.5f)  cost %.6e  (%.1f s)%s\n", i, length(candidates),
-                c.alpha_ink, c.alpha_noink, c.eta_ink, c.eta_noink, r.mu, r.costs.linear[2], r.costs.init[2], r.costs.linear[1], time() - t, lowest ? "  *" : ""); flush(io)
+    if rows === nothing
+        (; rows, best) = material_sweeps!(s, opts, candidates, eachindex(candidates); io)
+    else
+        length(rows) == length(candidates) || throw(ArgumentError("the material grid: $(length(rows)) rows for its $(length(candidates)) candidates"))
+        i = lowest_cost(rows); best = nothing
+        if i !== nothing
+            println(io, "the candidates' rows are their parts': the solves run at the chosen candidate alone"); flush(io)
+            swept = material_sweeps!(s, opts, candidates, i:i; io)
+            only(swept.rows) == rows[i] ||
+                throw(ArgumentError("the material grid: candidate $i's solves give $(only(swept.rows)), its part's row is $(rows[i]): the parts are not " *
+                                    "this start's solves on this machine (produce the stage without --grid-parts)"))
+            best = swept.best
+        end
     end
     best === nothing && error("the material grid: no candidate of $(length(candidates)) has a finite cost")
     s.mat = best.material; s.light = best.light
@@ -192,6 +246,72 @@ function write_material_grid(dir::AbstractString, grid::AbstractDict, result)
     return path
 end
 
+# ---- the candidates in parts ---------------------------------------------------------------------------------------------------------
+
+"""
+    material_grid_parts(argv = ARGS) -> Union{Nothing, Int}
+
+The number of parts a run splits every case's candidates into, `--grid-parts=n` (an integer ≥ 2: a GPU job per part), or `nothing`
+without the option: stage material_grid then solves at every candidate itself. The split changes no result and no key.
+"""
+function material_grid_parts(argv = ARGS)
+    s = cli_option(argv, "grid-parts", "")
+    isempty(s) && return nothing
+    n = tryparse(Int, s)
+    n !== nothing && n >= 2 || throw(ArgumentError("--grid-parts=$s: the number of parts the candidates are split into, an integer ≥ 2"))
+    return n
+end
+
+"""
+    part_candidates(count, part, parts) -> the indices
+
+The candidates of part `part` of `parts` among `count`, by their indices (`1 ≤ part ≤ parts ≤ count`, an `ArgumentError`
+otherwise): every `parts`-th from the `part`-th, so the parts hold every candidate once and as many each, to within one.
+"""
+function part_candidates(count::Integer, part::Integer, parts::Integer)
+    1 <= part <= parts <= count || throw(ArgumentError("the material grid: part $part of $parts of $count candidates (1 ≤ part ≤ parts ≤ the candidates)"))
+    return part:parts:count
+end
+
+"The record of a part of the candidates in its product `dir`: the candidates' rows, each with its index."
+material_grid_part_record(dir::AbstractString) = joinpath(dir, "material_grid_part.json")
+
+"""
+    write_material_grid_part(dir, grid, part, parts, indices, rows) -> path
+
+The record of part `part` of `parts` of the candidates of the `[material_grid]` table `grid` (`material_sweeps!`'s `rows` at the
+candidates `indices`) as `material_grid_part_record(dir)`: the `grid`, the `part` and the `parts`, and `candidates`, per candidate
+its `index` (from 1) and its row as the stage's own record states it (`write_material_grid`).
+"""
+function write_material_grid_part(dir::AbstractString, grid::AbstractDict, part::Integer, parts::Integer, indices, rows)
+    path = material_grid_part_record(dir)
+    VgtkIO.write_record(path, (; schema = EXPERIMENT_RECORD_SCHEMAS.material_grid_part, grid = Dict{String, Any}(k => grid[k] for k in MATERIAL_GRID_KEYS),
+                               part, parts, candidates = [(; index, row...) for (index, row) in zip(indices, rows)]))
+    return path
+end
+
+"""
+    read_material_grid_parts(dirs, grid) -> Vector{NamedTuple}
+
+Every candidate's row of the `[material_grid]` table `grid`, in the candidates' order, from the part products `dirs` (their
+`material_grid_part.json`): what `material_grid_search!` takes as `rows`. An `ArgumentError` unless the records hold exactly one
+row per candidate, each at its candidate's α and η — parts of another grid, a missing or a repeated part.
+"""
+function read_material_grid_parts(dirs, grid::AbstractDict)
+    candidates = material_candidates(grid)
+    rows = Vector{Union{Nothing, NamedTuple}}(nothing, length(candidates))
+    for dir in dirs, d in VgtkIO.read_record(material_grid_part_record(dir))["candidates"]
+        i = d["index"]
+        i isa Integer && checkbounds(Bool, rows, i) && all(k -> d[k] == getproperty(candidates[i], Symbol(k)), MATERIAL_START_KEYS) ||
+            throw(ArgumentError("the material grid's part $dir: its row of index $(repr(i)) is not a candidate of this grid"))
+        rows[i] === nothing || throw(ArgumentError("the material grid's part $dir: candidate $i has a row of another part already"))
+        rows[i] = candidate_row(candidates[i], (Float64(d[k]) for k in ("mu", "cost_init", "rel_rms_init", "cost", "rel_rms"))...)
+    end
+    missing_rows = findall(isnothing, rows)
+    isempty(missing_rows) || throw(ArgumentError("the material grid's parts ($(join(dirs, ", "))) hold no row of the candidates $(join(missing_rows, ", "))"))
+    return NamedTuple[r for r in rows]
+end
+
 """
     with_material_start(table, dir) -> Dict
 
@@ -225,16 +345,31 @@ function material_grid_product(cfg::AbstractDict, case::AbstractString)
 end
 
 """
-    run_material_grid_search(table, grid, start_dir, run_dir; source, label) -> String
+    material_grid_part_product(cfg, case, part, parts) -> Product
+
+Part `part` of `parts` of the candidates of `[cases.<case>]`'s material grid (`part_candidates`): keyed as the case's material start
+(`material_grid_product`: the config's `[material_grid]` and the key of the case's start), by the part and by its record's schema.
+Its output: the part's rows, material_grid_part.json.
+"""
+function material_grid_part_product(cfg::AbstractDict, case::AbstractString, part::Integer, parts::Integer)
+    rec = Dict{String, Any}("experiment" => cfg["experiment"], "material_grid" => Dict{String, Any}(case => cfg["material_grid"]),
+                            "upstream" => Dict{String, Any}("start" => start_product(cfg, case).key), "part" => [part, parts],
+                            "record" => EXPERIMENT_RECORD_SCHEMAS.material_grid_part)
+    return driver_product("material_grid_part", rec; output = basename(material_grid_part_record("")), experiment = variant_location(cfg, case))
+end
+
+"""
+    run_material_grid_search(table, grid, start_dir, run_dir; source, label, args = String[]) -> String
 
 The stage's child process, scripts/material_grid.jl, on the start record `start_dir`: the `[pipeline]` table `table` (the case's
 start settings, as its start read them) with `io.out = run_dir` and the `[material_grid]` table `grid` are written to
 `run_dir/material_grid_input.toml` and run in a child process (this project's environment, this process's Julia and thread count:
 the closed-form solves sum over thread chunks) whose working directory is data_root(), the directory the table's relative input
-paths are relative to. The child's output goes to `run_dir/material_grid.log`. Returns that log.
+paths are relative to. `args`: the child's further arguments (`--part`, a part of the candidates alone; `--parts`, the candidates'
+rows read from their parts). The child's output goes to `run_dir/material_grid.log`. Returns that log.
 """
 function run_material_grid_search(table::AbstractDict, grid::AbstractDict, start_dir::AbstractString, run_dir::AbstractString;
-                                  source::AbstractString, label::AbstractString)
+                                  source::AbstractString, label::AbstractString, args = String[])
     assert_not_input(run_dir)
     mkpath(run_dir)
     t = deepcopy(Dict{String, Any}(table))
@@ -247,7 +382,7 @@ function run_material_grid_search(table::AbstractDict, grid::AbstractDict, start
         TOML.print(io, Dict{String, Any}("pipeline" => t, "material_grid" => grid); sorted = true)
     end
     threads = execution_threads()
-    cmd = `$(Base.julia_cmd()) --threads=$threads --project=$(projectdir()) $(projectdir("scripts", "material_grid.jl")) --config=$input --start=$start_dir`
+    cmd = `$(Base.julia_cmd()) --threads=$threads --project=$(projectdir()) $(projectdir("scripts", "material_grid.jl")) --config=$input --start=$start_dir $(collect(String, args))`
     log = joinpath(run_dir, "material_grid.log")
     println(">> scripts/material_grid.jl: $label → ", run_dir, "   (threads ", threads, "; in data_root() = ", data_root(), "; log material_grid.log)")
     flush(stdout)
@@ -258,22 +393,52 @@ function run_material_grid_search(table::AbstractDict, grid::AbstractDict, start
     return log
 end
 
+# The child of the stage's two products of a case (its material start, a part of its candidates) into `dir`: the case's start
+# produced on demand, its photographs decoded, scripts/material_grid.jl on the case's start settings and the config's
+# [material_grid] with `args`. Returns the inputs it read.
+function material_grid_child(cfg::AbstractDict, case::AbstractString, dir::AbstractString, label::AbstractString, args; driver::AbstractString, config_path::AbstractString)
+    t = cfg["cases"][case]
+    sdir = produce_upstream(start_product(cfg, case), "the material grid of case $case: its start"; make = () -> run_start(cfg, case; driver, config_path),
+                            command = driver_run(driver, config_path, "prepare,start"; case).command, gpu = runs_on_gpu(t))
+    require_prepared(cfg, t, "the material grid of case $case"; driver, config_path)
+    p = resolve_pipeline(cfg, start_settings(t); init_dir = init_start_dir(cfg, _start_init(cfg, case), case; driver, config_path))
+    run_material_grid_search(p, cfg["material_grid"], sdir, dir; source = relpath(config_path, projectdir()), label, args)
+    return [run_inputs_through(cfg, t, "start"); pipeline_input_paths(p); sdir]
+end
+
 """
-    run_material_grid(cfg, case; driver, config_path) -> dir
+    run_material_grid_part(cfg, case, part, parts; driver, config_path) -> dir
+
+Stage material_grid_part of `[cases.<case>]`: part `part` of `parts` of its candidates into its product
+(`material_grid_part_product`), produced or loaded — from the case's start (produced on demand), scripts/material_grid.jl
+`--part=<part>/<parts>` on the case's start settings and the config's `[material_grid]`.
+"""
+function run_material_grid_part(cfg::AbstractDict, case::AbstractString, part::Integer, parts::Integer; driver::AbstractString, config_path::AbstractString)
+    g = material_grid_part_product(cfg, case, part, parts)
+    produce(g; product_records(driver, config_path)...) do dir
+        Produced(; inputs = material_grid_child(cfg, case, dir, "case $case, part $part of $parts of its candidates (product $(g.key))", ["--part=$part/$parts"];
+                                                driver, config_path))
+    end
+end
+
+"""
+    run_material_grid(cfg, case; driver, config_path, parts = material_grid_parts()) -> dir
 
 Stage material_grid of `[cases.<case>]` into its product (`material_grid_product`), produced or loaded: from the case's start
 (produced on demand: its stage start, `run_start`), scripts/material_grid.jl on the case's start settings and the config's
-`[material_grid]` (`run_material_grid_search`).
+`[material_grid]` (`run_material_grid_search`). With `parts` (the run's `--grid-parts`) the child reads the candidates' rows from
+the case's `parts` part products (`--parts`), each produced on demand as the start is (its stage material_grid_part), and solves
+at the chosen candidate alone; the product, its records and its key are the same.
 """
-function run_material_grid(cfg::AbstractDict, case::AbstractString; driver::AbstractString, config_path::AbstractString)
-    g = material_grid_product(cfg, case); t = cfg["cases"][case]
+function run_material_grid(cfg::AbstractDict, case::AbstractString; driver::AbstractString, config_path::AbstractString, parts = material_grid_parts())
+    g = material_grid_product(cfg, case); gpu = runs_on_gpu(cfg["cases"][case])
     produce(g; product_records(driver, config_path)...) do dir
-        sdir = produce_upstream(start_product(cfg, case), "the material grid of case $case: its start"; make = () -> run_start(cfg, case; driver, config_path),
-                                command = driver_run(driver, config_path, "prepare,start"; case).command, gpu = runs_on_gpu(t))
-        require_prepared(cfg, t, "the material grid of case $case"; driver, config_path)
-        p = resolve_pipeline(cfg, start_settings(t); init_dir = init_start_dir(cfg, _start_init(cfg, case), case; driver, config_path))
-        run_material_grid_search(p, cfg["material_grid"], sdir, dir; source = relpath(config_path, projectdir()), label = "case $case (product $(g.key))")
-        Produced(; inputs = [run_inputs_through(cfg, t, "start"); pipeline_input_paths(p); sdir])
+        pdirs = parts === nothing ? String[] :
+                [produce_upstream(material_grid_part_product(cfg, case, k, parts), "the material grid of case $case: part $k of $parts of its candidates";
+                                  make = () -> run_material_grid_part(cfg, case, k, parts; driver, config_path), gpu,
+                                  command = driver_run(driver, config_path, "prepare,start,material_grid_part"; case).command * " --grid-parts=$parts") for k in 1:parts]
+        inputs = material_grid_child(cfg, case, dir, "case $case (product $(g.key))", isempty(pdirs) ? String[] : ["--parts=$(join(pdirs, ','))"]; driver, config_path)
+        Produced(; inputs = [inputs; pdirs])
     end
 end
 

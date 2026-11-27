@@ -1,8 +1,9 @@
 # The material start of a refinement (src/material_grid.jl; stage material_grid of scripts/radiometric_refinement.jl, its child
 # scripts/material_grid.jl): the config's grid and its candidates, what a grid table refuses, the keys of the stage and of the
 # refinement that reads it; and, on a tiny synthetic set, the search itself — a candidate's solves are the start's own, the candidate
-# the photographs were rendered with is the one kept, and the record written is the start record of that material. No run of a case
-# of record: those need the GPU and the published data.
+# the photographs were rendered with is the one kept, and the record written is the start record of that material; and the candidates
+# in parts (the driver's --grid-parts): the parts' rows are the search's number for number, and the search from them is the search.
+# No run of a case of record: those need the GPU and the published data.
 
 @testitem "material grid: the configs' grid, its candidates, the keys of the stage" default_imports = false begin
     using Test
@@ -96,13 +97,47 @@
         @test !haskey(st["pipeline"], "lm") && st["pipeline"]["material"] == rc["cases"][case]["pipeline"]["material"]
     end
 
+    @testset "the candidates in parts: every candidate once, the option, the keys" begin
+        @test part_candidates(81, 1, 3) == 1:3:81 && part_candidates(81, 3, 3) == 3:3:81 && part_candidates(16, 2, 5) == [2, 7, 12]
+        for (count, parts) in ((81, 3), (81, 4), (16, 3), (5, 5))
+            shares = [collect(part_candidates(count, k, parts)) for k in 1:parts]
+            @test sort(reduce(vcat, shares)) == 1:count && maximum(length, shares) - minimum(length, shares) <= 1
+        end
+        for (k, n) in ((0, 3), (4, 3), (1, 82))
+            e = try part_candidates(81, k, n); nothing catch err; err end
+            @test e isa ArgumentError && occursin("part $k of $n", e.msg)
+        end
+        @test material_grid_parts(String[]) === nothing && material_grid_parts(["--stage=material_grid", "--grid-parts=3"]) == 3
+        for bad in ("1", "0", "-2", "x", "2.5")
+            e = try material_grid_parts(["--grid-parts=$bad"]); nothing catch err; err end
+            @test e isa ArgumentError && occursin("--grid-parts=$bad", e.msg)
+        end
+        @test lowest_cost([(; cost = 3.0), (; cost = 1.0), (; cost = 1.0), (; cost = Inf), (; cost = NaN)]) == 2   # of equal ones the first
+        @test lowest_cost([(; cost = NaN), (; cost = Inf)]) === nothing && lowest_cost(NamedTuple[]) === nothing
+        # a part's product: keyed as the material start (the grid, the start's key) and by the part; the material start's key is no part's
+        g = material_grid_product(rc, case); p = material_grid_part_product(rc, case, 2, 3)
+        @test p.name == "material_grid_part" && p.output == "material_grid_part.json" == basename(material_grid_part_record("x"))
+        @test p.record["part"] == [2, 3] && p.record["record"] == EXPERIMENT_RECORD_SCHEMAS.material_grid_part
+        @test p.record["material_grid"] == g.record["material_grid"] && p.record["upstream"] == g.record["upstream"]
+        @test dirname(product_dir(p)) == joinpath(results_root(), "radiometric_refinement", "material_grid_part")
+        @test allunique([g.key; [material_grid_part_product(rc, case, k, n).key for n in (2, 3) for k in 1:n]])
+        c2 = deepcopy(rc); c2["material_grid"]["alpha_cells"] = 4
+        @test material_grid_part_product(c2, case, 2, 3).key != p.key
+    end
+
     @testset "the stage and its child in the drivers" begin
         drv = read(projectdir("scripts", "radiometric_refinement.jl"), String)
         @test occursin("Stage(:material_grid,", drv) && occursin(":material_grid => [CFG[\"cases\"][c] for c in CASES]", drv)   # a GPU stage
         @test findfirst("Stage(:start,", drv).start < findfirst("Stage(:material_grid,", drv).start < findfirst("Stage(:refine,", drv).start
+        # the parts of the candidates: a GPU stage before the stage that reads them, its items a case's part each, split by --shard
+        @test findfirst("Stage(:start,", drv).start < findfirst("Stage(:material_grid_part,", drv).start < findfirst("Stage(:material_grid,", drv).start
+        @test occursin(":material_grid_part => [CFG[\"cases\"][c] for c in CASES]", drv) && occursin("const GRID_PARTS = material_grid_parts()", drv)
+        @test occursin("cli_shard(ARGS, [(c, k) for c in CASES for k in 1:something(GRID_PARTS, 0)])", drv)
         @test !occursin("start_with_refine", drv)               # the start is its own child: the material grid reads its record
         child = read(projectdir("scripts", "material_grid.jl"), String)
         @test occursin("load_calibration_start(START; options = OPTIONS, device = DEVICE)", child) && occursin("save_calibration_start(", child)
+        @test occursin("cli_option(ARGS, \"part\", \"\")", child) && occursin("cli_option(ARGS, \"parts\", \"\")", child)
+        @test findfirst("read_material_grid_parts(PARTS, GRID)", child).start < findfirst("load_calibration_start(", child).start   # refused before the start is loaded
         src = read(projectdir("src", "drivers.jl"), String)
         @test occursin("\"prepare,start,material_grid,refine\"", src)   # another driver's refinement upstream runs the stage too
     end
@@ -253,9 +288,49 @@ end
             @test e isa ArgumentError && occursin("material.alpha_ink", e.msg) && occursin("other start options", e.msg)
         end
 
+        @testset "the candidates in parts: the parts' rows are the search's, and the search from them is the search" begin
+            s2 = started(opts, photos)                               # the start again, as the stage's child loads it for every part
+            @test s2.start.costs == own && s2.start.μ_lin == μ_own
+            pdirs = [joinpath(dir, "part_$k") for k in 1:3]; foreach(mkpath, pdirs)
+            for k in 1:3
+                ix = part_candidates(length(candidates), k, 3)
+                swept = material_sweeps!(s2, opts, candidates, ix; io = devnull)
+                @test swept.rows == result.candidates[ix]            # number for number, whatever was solved before: what the split rests on
+                @test swept.best.index == ix[argmin([r.cost for r in swept.rows])]
+                path = write_material_grid_part(pdirs[k], grid, k, 3, ix, swept.rows)
+                rec = VgtkIO.read_record(path)
+                @test path == material_grid_part_record(pdirs[k]) && rec["schema"] == EXPERIMENT_RECORD_SCHEMAS.material_grid_part
+                @test (rec["part"], rec["parts"]) == (k, 3) && rec["grid"]["eta_cells"] == 2 && [c["index"] for c in rec["candidates"]] == collect(ix)
+                @test rec["candidates"][1]["cost"] == swept.rows[1].cost && rec["candidates"][end]["alpha_ink"] == candidates[last(ix)].alpha_ink
+            end
+            @test s2.start.costs == own                              # a part's solves leave the start's record of its costs alone
+            rows = read_material_grid_parts(pdirs, grid)
+            @test rows == result.candidates && rows isa Vector{NamedTuple} && keys(first(rows)) == keys(first(result.candidates))
+            @test lowest_cost(rows) == result.chosen
+            log2 = IOBuffer()
+            r2 = material_grid_search!(s2, opts, grid; io = log2, rows)
+            @test r2 == result                                       # the stage's record: the start's row, every candidate's, the chosen one
+            material(x) = (x.mat.roughness_ink, x.mat.roughness_paper, x.mat.refractive_index_ink, x.mat.refractive_index_paper, x.mat.diffuse_weight)
+            @test material(s2) == material(s) && nodes(s2) == nodes(s) && sh(s2) == sh(s)   # the state the start record holds: the search's
+            @test s2.start.costs == s.start.costs && s2.start.μ_lin == s.start.μ_lin
+            out = String(take!(log2))
+            @test occursin("the solves run at the chosen candidate alone", out) && count("  *\n", out) == 1 && occursin("material start: candidate $(result.chosen),", out)
+            # what the parts' records refuse: a part missing, a part twice, the parts of another grid
+            msg(f) = try f(); "" catch err; err isa ArgumentError ? err.msg : rethrow() end
+            @test occursin("hold no row of the candidates 3, 6, 9, 12, 15", msg(() -> read_material_grid_parts(pdirs[1:2], grid)))
+            @test occursin("has a row of another part already", msg(() -> read_material_grid_parts([pdirs; pdirs[2]], grid)))
+            @test occursin("is not a candidate of this grid", msg(() -> read_material_grid_parts(pdirs, merge(grid, Dict{String, Any}("alpha_cells" => 3)))))
+            # what the search refuses: rows that are not this start's solves (the chosen one's cost, one unit in the last place off), too few rows
+            off = [i == result.chosen ? (; r..., cost = prevfloat(r.cost)) : r for (i, r) in enumerate(rows)]
+            @test occursin("candidate $(result.chosen)'s solves give", msg(() -> material_grid_search!(s2, opts, grid; io = devnull, rows = off)))
+            @test occursin("15 rows for its 16 candidates", msg(() -> material_grid_search!(s2, opts, grid; io = devnull, rows = rows[1:15])))
+        end
+
         @testset "a start whose grid smoothness weight was chosen by GCV is refused" begin
             s.start = (; s.start..., grid_gcv = (; β = 0.1))
             e = try material_grid_search!(s, opts, grid; io = devnull); nothing catch err; err end
+            @test e isa ArgumentError && occursin("GCV", e.msg)
+            e = try material_sweeps!(s, opts, candidates, 1:1; io = devnull); nothing catch err; err end   # a part of the candidates: before its solves
             @test e isa ArgumentError && occursin("GCV", e.msg)
         end
     end

@@ -21,12 +21,20 @@
 #   material_grid  per case, its material start (scripts/material_grid.jl, src/material_grid.jl): the start's closed-form solves at
 #             every candidate (α_ink, α_¬ink, η_ink, η_¬ink) of the config's [material_grid], the candidate of the lowest cost kept
 #             as a start record; keyed by [material_grid] and the start's key
+#   material_grid_part  only with --grid-parts=n: per case and part, part k of n of the case's candidates (every n-th from the k-th),
+#             their rows; keyed as material_grid and by the part. Stage material_grid then reads the n parts' rows and solves at the
+#             chosen candidate alone: the same product under the same key (declared before it, so one run may do both)
 #   refine    per case, the radiometric refinement from its material start (bin/refine.jl --start, a checkpoint per iteration);
 #             keyed by the refinement-only settings and the material grid's key; refused while the config has [pending]
 #
 #   julia --project=experiments experiments/scripts/radiometric_refinement.jl [--config=<toml>] [--plan] [--stage=NAME[,NAME]] [--case=a,b] [--force]
+#         [--grid-parts=n [--shard=k/m]]
 #
-# --case restricts start, material_grid and refine to the named cases. Data: VGTK_DATA_ROOT binds data_root() (REPRODUCE.md); the raw photographs are the
+# --case restricts start, material_grid_part, material_grid and refine to the named cases. --grid-parts=n splits every case's
+# candidates of the material grid over n GPUs, which shortens the wait for a case and changes no result: after the case's start
+# (`--stage=start`: jobs that run at once would each produce a missing one), n jobs `--stage=material_grid_part --grid-parts=n
+# --shard=k/n` (k = 0 … n-1: --shard splits the stage's items, a case's part each, between the jobs), then
+# `--stage=material_grid,refine --grid-parts=n` (a part not produced by then is produced there). Data: VGTK_DATA_ROOT binds data_root() (REPRODUCE.md); the raw photographs are the
 # tier rc_raw_photos, the start fits and Schöps's runs rc_baselines, the boards rc_calibration (configs/data_artifacts.toml).
 # =============================================================================
 using DrWatson
@@ -45,10 +53,12 @@ detect() = (require_stage_inputs(CFG, "detect"); nothing)
 
 const R = (; driver = DRIVER, config_path = CFG_PATH)
 
-# The stages that run the GPU: start (the starts) and refine hand the cases' [pipeline] tables to bin/refine.jl, material_grid to
-# scripts/material_grid.jl (their compute.backend).
-const GPU_STAGES = gpu_stages(:start => [CFG["cases"][c] for c in CASES], :material_grid => [CFG["cases"][c] for c in CASES],
-                              :refine => [CFG["cases"][c] for c in CASES])
+# The stages that run the GPU: start (the starts) and refine hand the cases' [pipeline] tables to bin/refine.jl, material_grid_part
+# and material_grid to scripts/material_grid.jl (their compute.backend).
+const GPU_STAGES = gpu_stages(:start => [CFG["cases"][c] for c in CASES], :material_grid_part => [CFG["cases"][c] for c in CASES],
+                              :material_grid => [CFG["cases"][c] for c in CASES], :refine => [CFG["cases"][c] for c in CASES])
+# --grid-parts=n: the parts every case's candidates of the material grid are split into (src/material_grid.jl); none without it
+const GRID_PARTS = material_grid_parts()
 
 const STAGES = [
     Stage(:prepare, "the board photographs decoded (Features' load_raw)";
@@ -56,6 +66,9 @@ const STAGES = [
     Stage(:detect, "the detections, calibrations and start fits of record (tier rc_baselines)"; check = detect),
     Stage(:start, "the start of every case (bin/refine.jl --stage=start: its start record, keyed without the refinement-only options)";
           items = () -> CASES, product = c -> start_product(CFG, c), run = c -> run_start(CFG, c; R...)),
+    Stage(:material_grid_part, "with --grid-parts=n, the candidates of every case's material grid in n parts (their rows; --shard=k/m: a job's share of them)";
+          items = () -> cli_shard(ARGS, [(c, k) for c in CASES for k in 1:something(GRID_PARTS, 0)]),
+          product = x -> material_grid_part_product(CFG, x..., GRID_PARTS), run = x -> run_material_grid_part(CFG, x..., GRID_PARTS; R...)),
     Stage(:material_grid, "the material start of every case (scripts/material_grid.jl: the start's closed-form solves at every candidate of [material_grid], the lowest cost kept)";
           items = () -> CASES, product = c -> material_grid_product(CFG, c), run = c -> run_material_grid(CFG, c; R...)),
     Stage(:refine, "the radiometric refinement of every case from its material start (bin/refine.jl --start)";

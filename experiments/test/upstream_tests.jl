@@ -50,6 +50,7 @@
                  ("src/material_grid.jl", "produce_upstream(start_product(cfg, case)"),                       # material grid ← the case's start (GPU)
                  ("src/material_grid.jl", "require_prepared(cfg, t, \"the material grid of case \$case\"; driver, config_path)"),   # material grid ← decode
                  ("src/material_grid.jl", "produce_upstream(material_grid_product(cfg, case)"),               # the refinement's start record ← material grid (GPU)
+                 ("src/material_grid.jl", "produce_upstream(material_grid_part_product(cfg, case, k, parts)"),  # material grid ← the parts of its candidates (GPU)
                  ("src/drivers.jl", "gdir = material_grid_dir(cfg, case; driver, config_path)"),              # refine ← material grid
                  ("scripts/calibrate.jl", "config_source(CFG, id) for id in table_runs(CFG[\"pipeline\"])"),     # golden case ← its distance map ([runs])
                  ("scripts/calibrate.jl", "resolved(table) = resolve_pipeline(CFG"),                          # its [pipeline]'s run:<id>, produced

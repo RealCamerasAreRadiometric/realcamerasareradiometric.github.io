@@ -13,7 +13,7 @@
                      "panorama_vignetting", "panorama_stitching", "panorama_figure",
                      "teaser")
     const DRIVER_STAGE_NAMES = Dict(
-        "radiometric_refinement" => ("prepare", "detect", "start", "material_grid", "refine"),
+        "radiometric_refinement" => ("prepare", "detect", "start", "material_grid_part", "material_grid", "refine"),
         "focus_surfaces" => ("panels", "figures"),
         "texture_recovery" => ("prepare", "detect", "sheet", "init", "refine", "folds", "evaluate", "fold_report", "compare", "report", "figures", "bands"),
         "frontends" => ("prepare", "detect", "init", "evaluate"),
