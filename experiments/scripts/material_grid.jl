@@ -71,16 +71,16 @@ relrms(c) = sqrt(2c / ϕ²)
 @printf("material grid: %d candidates (α %s; η %s) on %d pixels of %d views, V flat\n", length(cands), join(αs, "/"), join(ηs, "/"),
         sum(length.(s.f.px)), length(s.f.px)); flush(stdout)
 
-"""μ scanned over 0:0.1:1 with the closed-form lighting at each value (RadiometricCamera's closed-form blocks, the lighting alone),
-then the lighting and μ by block descent from the best μ (up to 100 sweeps, to a relative cost change of 1e-7); returns the cost."""
+"""μ selected by VisualGeometryToolkitCore's one 1-D minimizer, `GridBrent` on `BracketedMinimizationProblem` over 0:0.1:1 (the
+grid scanned, its least cost refined by Brent's method between its neighbours), the cost of a μ the closed-form lighting's at it
+(RadiometricCamera's closed-form blocks, the lighting alone: a linear least squares, so a function of μ alone); then the lighting
+and μ by block descent from the selected μ (up to 100 sweeps, to a relative cost change of 1e-7); returns the cost. (Before
+2026-11-27 the grid's own argmin was taken, without Brent's refinement: the selected μ, and so the costs, moved.)"""
 function fit_light_mu!(s, parts)
     lighting(s) = VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(s.f, parts), s.u0, (; vignetting = false, mu = false)), RadiometryBlockDescent())
-    best = (Inf, 0.5)
-    for μ in 0.0:0.1:1.0
-        s.u0.mat = with_diffuse_weight(s.u0.mat, μ); c = lighting(s).metadata.cost
-        c < best[1] && (best = (c, μ))
-    end
-    s.u0.mat = with_diffuse_weight(s.u0.mat, best[2]); c = lighting(s).metadata.cost
+    cost_at(μ) = (s.u0.mat = with_diffuse_weight(s.u0.mat, μ); lighting(s).metadata.cost)
+    m = VgtkCore.solve(VgtkCore.BracketedMinimizationProblem(cost_at, 0.0:0.1:1.0), VgtkCore.GridBrent())
+    s.u0.mat = with_diffuse_weight(s.u0.mat, m.u); c = lighting(s).metadata.cost
     r = VgtkCore.solve(VgtkCore.RefineProblem(RadiometryData(s.f, parts), s.u0, (; vignetting = false)), RadiometryBlockDescent();
                        stops = VgtkCore.ToleranceStops(; max_iter = 100, rtol = 1e-7))
     return min(c, r.metadata.cost)
